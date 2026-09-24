@@ -1998,6 +1998,27 @@ html[data-theme="dark"] .lx-shot::before { background: linear-gradient(90deg, tr
   transition: opacity 240ms var(--lxe-out), transform 420ms var(--lxe-spring);
 }
 .lx-shot .lx-shot-zoom svg { width: 14px; height: 14px; }
+/* a grid of several subjects ("lord" → the deities) names each picture */
+.lx-shot .lx-shot-cap {
+  position: absolute;
+  left: 0; right: 0; bottom: 0;
+  z-index: 2;
+  padding: 18px 9px 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  line-height: 1.2;
+  letter-spacing: 0.01em;
+  color: #fff;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: linear-gradient(to top, rgba(16, 10, 14, 0.72), rgba(16, 10, 14, 0));
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+}
+.lx-shot.is-hero .lx-shot-cap { font-size: 13px; padding: 26px 12px 9px; }
+.lx-shot:has(.lx-shot-cap) .lx-shot-zoom { bottom: auto; top: 7px; }
 .lx-shot:hover .lx-shot-zoom, .lx-shot:focus-visible .lx-shot-zoom { opacity: 1; transform: none; }
 #clavis-task-surface:not(.is-open) .lx-shot,
 .cts:not(.is-open) .lx-shot {

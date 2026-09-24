@@ -10,9 +10,15 @@
  *    - give to app:   "ise chatgpt/claude/gemini ko do"
  *    - open:          "youtube khol do", "open notepad", "launch spotify"
  *    - save note:     "notepad me likho ...", "save this text ..."
+ *    - PC automation: "excel kholo", "notepad kholo aur likho …",
+ *                     "chrome kholo aur youtube pe … search karo",
+ *                     "website scroll karo", "notepad band karo",
+ *                     "is website ke baare me batao" → clavis-automation.js
  *
- *  route(text) → { handled, spoken?, silent? }. The caller renders/speaks
- *  `spoken` (unless `silent`). Screen powers use window.ClavisPC; screen
+ *  route(text) → { handled, spoken?, silent?, text?, display? }. The caller
+ *  speaks `spoken` (unless `silent`); `text` is markdown for the screen
+ *  when it differs from what is said (website briefs), `display:'window'`
+ *  asks for the floating window. Screen powers use window.ClavisPC; screen
  *  understanding uses window.ClavisDirect (a vision-capable key).
  * ============================================================
  */
@@ -25,7 +31,13 @@
 
   const state = { lastShot: null, muted: false };
 
-  function isStop(text) { return STOP_RE.test(norm(text)); }
+  // "map band karo" / "window hatao" close a THING — they are not "be quiet".
+  // Without this, "band karo" matched STOP and the map simply stayed open.
+  const OBJECT_RE = /\b(map|maps|naksha|nakshe|window|windows|floating|display|photo|photos|image|images|picture|pictures|tasveer|website|site|panel|popup|screen|sab|sabhi|saare|sare|everything|all|app|apps|tab|tabs)\b|नक्शा|मैप|विंडो|फोटो/i;
+  // Same for a named desktop app: "notepad band karo" closes Notepad
+  // (clavis-automation.js, after a confirm) — it doesn't mean "chup".
+  function namesApp(t) { try { return Boolean(window.ClavisPC?.matchApp?.(t)); } catch (_) { return false; } }
+  function isStop(text) { const t = norm(text); return STOP_RE.test(t) && !OBJECT_RE.test(t) && !namesApp(t); }
 
   function cancelSpeech() {
     try { window.speechSynthesis?.cancel(); } catch (_) {}
@@ -85,7 +97,7 @@
     }
 
     // 1) STOP — silence Clavis immediately, no LLM, no spoken reply.
-    if (STOP_RE.test(t) && t.split(' ').length <= 4) {
+    if (isStop(t) && t.split(' ').length <= 4) {
       cancelSpeech();
       state.muted = true;
       window.setJarvisStatus?.('online', 'Chup — bolo jab chahiye');
@@ -140,6 +152,17 @@
     if (/\b(screen (?:par|pe|me|pr) kya|isme kya (?:hai|likha)|is screen|read (?:the |this )?screen|screen ?read|extract|kya likha hai|padh(?:o| ke batao)|screen samjhao)\b/.test(t)) {
       try { return { handled: true, spoken: await analyzeScreen(raw) }; }
       catch (err) { return { handled: true, spoken: `Screen nahi padh paya: ${err.message}` }; }
+    }
+
+    // 4b) PC AUTOMATION — desktop apps, typing into them, multi-step tasks,
+    //     web searches, scrolling a website, closing a NAMED app, website
+    //     briefs. Most of these are claimed earlier by its priority gate;
+    //     this call covers the rest (and the AI planner for odd phrasings).
+    if (window.ClavisAutomation?.handle) {
+      try {
+        const auto = await window.ClavisAutomation.handle(raw, { phase: 'route' });
+        if (auto && auto.handled) return auto;
+      } catch (err) { console.warn('[ClavisCommands] automation error:', err); }
     }
 
     // 5) OPEN app / site — checked before "save note" so "open notepad" opens

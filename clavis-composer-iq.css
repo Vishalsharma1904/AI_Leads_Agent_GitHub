@@ -36,6 +36,24 @@
   color: transparent;
 }
 
+/* The app's universal `* { font-family: … !important }` layers reach the
+   two spans too, so they rendered in a different face than the textarea
+   and the ghost started after a visible gap. Force them to take the
+   mirror's (textarea-synced) metrics. */
+html:not(#_):not(#_) body:not(#_):not(#_) .ciq-mirror > .ciq-typed,
+html:not(#_):not(#_) body:not(#_):not(#_) .ciq-mirror > .ciq-ghost {
+  font-family: inherit !important;
+  font-size: inherit !important;
+  font-weight: inherit !important;
+  font-style: inherit !important;
+  font-feature-settings: inherit !important;
+  font-variation-settings: inherit !important;
+  font-kerning: inherit !important;
+  letter-spacing: inherit !important;
+  word-spacing: inherit !important;
+  line-height: inherit !important;
+}
+
 .ciq-mirror .ciq-ghost {
   color: rgba(17, 17, 17, 0.38);
   opacity: 0;
@@ -127,6 +145,51 @@ html[data-theme="dark"] .ciq-tab-hint {
 
 html[data-theme="dark"] .ciq-tab-hint kbd {
   background: rgba(255, 255, 255, 0.12);
+}
+
+/* In the Clavis studio composer the top-right corner is where the ghost
+   sentence runs — the pill sat right on top of it. clavis-composer-iq.js
+   now puts the hint INSIDE the bottom tool row (.ciq-tab-hint--inbar), as
+   a flex item between the left tools and the right-hand buttons: it can
+   never cover text or a button, and on a narrow composer it shrinks
+   first. Kept in the layout (visibility, not display) so it fades in
+   instead of popping and the row never reflows. */
+html body .jarvis-composer-bottom-bar > .ciq-tab-hint--inbar {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  flex: 0 1000 auto;
+  min-width: 0;
+  max-width: 140px;
+  overflow: hidden;
+  white-space: nowrap;
+  margin: 0 4px 0 auto;
+  align-self: center;
+  display: inline-flex;
+  visibility: hidden;
+  opacity: 0;
+  transform: translateY(3px);
+  transition:
+    opacity 180ms ease,
+    transform 260ms cubic-bezier(0.22, 1, 0.36, 1),
+    visibility 0s linear 260ms;
+}
+html body .jarvis-composer-bottom-bar > .ciq-tab-hint--inbar.is-live {
+  visibility: visible;
+  opacity: 1;
+  transform: none;
+  transition-delay: 0s;
+}
+/* Too narrow for the label → key only; too narrow for the key → hidden
+   (set by Ghost.fitHint in clavis-composer-iq.js). */
+html body .jarvis-composer-bottom-bar > .ciq-tab-hint--inbar.is-compact { padding-right: 6px; }
+html body .jarvis-composer-bottom-bar > .ciq-tab-hint--inbar.is-compact > span { display: none; }
+html body .jarvis-composer-bottom-bar > .ciq-tab-hint--inbar.is-cramped { visibility: hidden; opacity: 0; }
+/* Touch keyboards have no Tab key — the hint would only be noise. */
+@media (hover: none) and (pointer: coarse) {
+  html body .jarvis-composer-bottom-bar > .ciq-tab-hint--inbar { display: none; }
 }
 
 /* ── B · Attachment tray ─────────────────────────────────────
@@ -292,4 +355,92 @@ html body .cts .cts-act[data-action-id="retry"] {
 html body .cts .cts-act[data-action-id="retry"]:hover {
   background: #b99a55 !important;
   border-color: #a68745 !important;
+}
+
+/* ── C · One voice at a time (composer quiet states) ─────────
+   The feature-tip ticker (#clavis-feature-tip-pill, cycled by
+   cycleClavisFeatureTip in jarvis_ui.js), the in-box hint (.lx-ph)
+   and the suggestion chips (.lx-suggest) all speak into the same
+   strip around the composer. The tip used to keep talking over the
+   chips, the ghost completion and whatever was already typed — it got
+   squashed between them. Now, while the composer has text, chips are
+   up, or a ghost is live, the tips blur/fade out in place (no layout
+   jump) and they drift back once the field is empty and idle.
+
+   Two triggers, same result: :has() (catches values written by voice /
+   scripts without an input event, via :placeholder-shown) and the
+   data-cs-quiet flag set by clavis-suggestions.js (fallback for
+   engines without :has()). Kept in separate rules so an engine that
+   cannot parse :has() drops only those. !important is needed to beat
+   the inline opacity/transform the ticker writes every 4.2s. */
+
+/* Base: return a beat late, so the tip never flashes back in the gap
+   between the chips leaving and the field blurring. */
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .clavis-feature-tip-pill {
+  transition:
+    opacity 420ms cubic-bezier(0.22, 1, 0.36, 1) 180ms,
+    filter 560ms cubic-bezier(0.22, 1, 0.36, 1) 180ms,
+    transform 640ms cubic-bezier(0.34, 1.3, 0.64, 1) 180ms,
+    max-height 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    margin 720ms cubic-bezier(0.22, 1, 0.36, 1),
+    background-color 160ms ease,
+    border-color 160ms ease,
+    color 160ms ease !important;
+}
+/* Leaving for the chat (has-messages, clavis-aurora.css) stays immediate. */
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis.has-messages .clavis-feature-tip-pill {
+  transition-delay: 0s !important;
+}
+
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis[data-cs-quiet="1"] .clavis-feature-tip-pill {
+  opacity: 0 !important;
+  filter: blur(6px) !important;
+  transform: translateY(5px) scale(0.965) !important;
+  pointer-events: none !important;
+  transition:
+    opacity 200ms ease,
+    filter 280ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis:has(.lx-suggest.is-on) .clavis-feature-tip-pill,
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis:has(.ciq-mirror.is-live) .clavis-feature-tip-pill,
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis:has(#jarvis-input:not(:placeholder-shown)) .clavis-feature-tip-pill {
+  opacity: 0 !important;
+  filter: blur(6px) !important;
+  transform: translateY(5px) scale(0.965) !important;
+  pointer-events: none !important;
+  transition:
+    opacity 200ms ease,
+    filter 280ms ease,
+    transform 360ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* The in-box hint ("Try: …") must never sit under real text — even when
+   the value was written by voice/script without an input event, which
+   is what left it overlapping the typed words. */
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .jarvis-input-container:has(#jarvis-input:not(:placeholder-shown)) .lx-ph,
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .jarvis-input-container:has(.ciq-mirror.is-live) .lx-ph {
+  opacity: 0 !important;
+  filter: blur(3px) !important;
+  transition: opacity 120ms ease, filter 180ms ease !important;
+}
+
+/* Suggestion chips are for an empty box only — same guard. */
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis:has(#jarvis-input:not(:placeholder-shown)) .lx-suggest,
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis:has(.ciq-mirror.is-live) .lx-suggest {
+  max-height: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  opacity: 0 !important;
+  transform: translateY(6px) !important;
+  pointer-events: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .clavis-feature-tip-pill,
+  html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis[data-cs-quiet="1"] .clavis-feature-tip-pill {
+    filter: none !important;
+    transform: none !important;
+    transition: opacity 160ms linear !important;
+  }
 }

@@ -670,11 +670,56 @@
   }
 
   /* ── images ─────────────────────────────────────────────────── */
-  async function searchImages(q, n) {
+  /* What was asked for, read the way sir means it: "lord" is God (the
+     major Hindu deities, each labelled), "shiv ji" is Lord Shiva,
+     "neemaroli baba" is Neem Karoli Baba. clavis-luxe.js holds that
+     dictionary and the model + Wikipedia resolution
+     (ClavisLuxe.understandImageQuery / resolveImageQuery / findImages);
+     without it the query passes through exactly as before. */
+  function understandQuery(q) {
     try {
-      const r = await getJSON(`${BACKEND()}/api/v1/web/images?q=${encodeURIComponent(q)}&n=${n}`, {}, 9000);
-      if (Array.isArray(r.items) && r.items.length) return r.items.slice(0, n);
+      const u = window.ClavisLuxe?.understandImageQuery?.(q);
+      if (u && u.name) return u;
+    } catch (_) { /* dictionary missing: plain query */ }
+    return { raw: q, subject: q, search: q, name: q, title: q, kind: 'other', sure: false, group: null, tokens: null };
+  }
+  const settle = (p, ms, fallback) => withTimeout(Promise.resolve(p), ms, 'Images').catch(() => fallback);
+  /* A picture stays only if it names the subject (its title or page) —
+     "lord" once came back as whatever the web calls "lord". */
+  function keepOnSubject(items, u) {
+    const P = window.ClavisLuxe?.pictures;
+    if (!P?.mentions || !u.tokens || !u.tokens.length) return items;
+    const kept = items.filter((it) => P.mentions(`${it.title || ''} ${it.page || ''}`, u.tokens));
+    return kept.length ? kept : (u.sure ? items : []);
+  }
+  function fromBundle(b, n) {
+    return (b?.items || []).slice(0, n).map((it) => ({
+      thumb: it.thumb, full: it.full || it.thumb, title: it.title || b.name, label: it.label || '',
+      source: it.source || 'Wikipedia', page: it.link || '',
+    }));
+  }
+  async function searchImages(u, n) {
+    const L = window.ClavisLuxe;
+    // 1 · several subjects ("lord" → the deities): one labelled picture each
+    if (u.group && L?.findImages) {
+      const b = await settle(L.findImages(u.raw), 12000, null);
+      if (b?.items?.length) return { items: fromBundle(b, Math.max(n, 9)), name: b.name };
+    }
+    // 2 · the backend's web image search — with the understood query, kept on subject
+    try {
+      const r = await getJSON(`${BACKEND()}/api/v1/web/images?q=${encodeURIComponent(u.search || u.raw)}&n=${n + 3}`, {}, 9000);
+      if (Array.isArray(r.items) && r.items.length) {
+        const kept = keepOnSubject(r.items, u);
+        if (kept.length) return { items: kept.slice(0, n), name: null };
+      }
     } catch (_) { /* backend off or old: go direct */ }
+    // 3 · the trusted chain: the article's own pictures, its Commons category, then open search — each naming the subject
+    if (L?.findImages) {
+      const b = await settle(L.findImages(u.raw), 12000, null);
+      if (b?.items?.length) return { items: fromBundle(b, n), name: b.name };
+    }
+    // 4 · loose open search, as before (still filtered when the dictionary is loaded)
+    const q = u.search || u.raw;
     const [commons, openverse] = await Promise.all([
       getJSON(`https://commons.wikimedia.org/w/api.php?action=query&format=json&origin=*&generator=search&gsrnamespace=6&gsrlimit=14&gsrsearch=${encodeURIComponent(q)}&prop=imageinfo&iiprop=url|mime&iiurlwidth=720`, {}, 9000)
         .then((d) => Object.values(d?.query?.pages || {}).sort((a, b) => (a.index || 0) - (b.index || 0)).map((p) => {
@@ -686,31 +731,55 @@
         .then((d) => (d.results || []).map((r) => ({ thumb: r.thumbnail || r.url, full: r.url, title: r.title || q, source: r.source ? `Openverse · ${r.source}` : 'Openverse', page: r.foreign_landing_url }))).catch(() => []),
     ]);
     const seen = new Set();
-    return commons.concat(openverse).filter((it) => it.full && !seen.has(it.full) && seen.add(it.full)).slice(0, n);
+    const all = commons.concat(openverse).filter((it) => it.full && !seen.has(it.full) && seen.add(it.full));
+    return { items: keepOnSubject(all, u).slice(0, n), name: null };
+  }
+
+  /* The heading sharpens in place when the real name lands. */
+  function swapHeading(text) {
+    const node = V.title;
+    if (!node || !text || node.textContent === text) return;
+    if (reduced() || !node.animate) { node.textContent = text; return; }
+    const out = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 110, easing: 'ease-out', fill: 'forwards' });
+    out.onfinish = () => {
+      node.textContent = text;
+      node.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)' }], { duration: 220, easing: EASE });
+      try { out.cancel(); } catch (_) {}
+    };
   }
 
   async function showImages({ query, count } = {}) {
     const q = String(query || '').trim();
     if (!q) return { error: 'No image query given.' };
     const n = clamp(Number(count) || 9, 3, 12);
-    await present('images', 'Images', q, () => {
+    const u = understandQuery(q);
+    let heading = u.name || q;
+    await present('images', 'Images', heading, () => {
       V.body.innerHTML = `<div class="ccv-grid is-loading">${'<figure class="ccv-tile is-ghost"></figure>'.repeat(6)}</div>`;
       V.foot.innerHTML = '<span class="ccv-meta">Searching the web…</span>';
     });
     const token = V.token;
+    // The spelled-right name from the model + Wikipedia (≤ ~3.8 s), in place.
+    if (!u.sure && window.ClavisLuxe?.resolveImageQuery) {
+      Promise.resolve(window.ClavisLuxe.resolveImageQuery(q)).then((r) => {
+        if (r?.sure && r.name && token === V.token && V.kind === 'images') { heading = r.name; swapHeading(r.name); }
+      }).catch(() => {});
+    }
     let items = [];
-    try { items = await searchImages(q, n); } catch (_) {}
+    let found = null;
+    try { found = await searchImages(u, n); items = found.items || []; } catch (_) {}
     if (token !== V.token) return { error: 'Display was closed.' };
+    if (found?.name && found.name !== heading) { heading = found.name; swapHeading(found.name); }
     V.images = items;
     const grid = V.body.querySelector('.ccv-grid');
     if (!items.length) {
-      grid.outerHTML = `<p class="ccv-empty">No pictures found for “${esc(q)}”.</p>`;
+      grid.outerHTML = `<p class="ccv-empty">No pictures found for “${esc(heading)}”.</p>`;
       V.foot.innerHTML = '';
-      return { ok: false, count: 0, note: 'No images found.' };
+      return { ok: false, count: 0, subject: heading, note: 'No images found.' };
     }
     grid.classList.remove('is-loading');
     grid.innerHTML = items.map((it, i) =>
-      `<figure class="ccv-tile" data-i="${i}" tabindex="0" role="button" aria-label="${esc(it.title)}"><img alt="${esc(it.title)}" loading="eager" decoding="async" referrerpolicy="no-referrer" src="${esc(it.thumb)}"></figure>`).join('');
+      `<figure class="ccv-tile" data-i="${i}" tabindex="0" role="button" aria-label="${esc(it.label || it.title)}"><img alt="${esc(it.label || it.title)}" loading="eager" decoding="async" referrerpolicy="no-referrer" src="${esc(it.thumb)}">${it.label ? `<figcaption>${esc(it.label)}</figcaption>` : ''}</figure>`).join('');
     grid.querySelectorAll('.ccv-tile').forEach((fig, i) => {
       const img = fig.querySelector('img');
       img.addEventListener('load', () => {
@@ -722,9 +791,9 @@
       fig.addEventListener('click', openIt);
       fig.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openIt(); } });
     });
-    const sources = [...new Set(items.map((it) => it.source.split(' · ')[0]))].join(', ');
+    const sources = [...new Set(items.map((it) => String(it.source || '').split(' · ')[0]))].join(', ');
     V.foot.innerHTML = `<span class="ccv-meta">${items.length} pictures · ${esc(sources)}</span><span class="ccv-meta">Click one to view it large</span>`;
-    return { ok: true, count: items.length, titles: items.slice(0, 6).map((it) => it.title), sources };
+    return { ok: true, count: items.length, subject: heading, titles: items.slice(0, 6).map((it) => it.label || it.title), sources };
   }
 
   /* Claude-style expand: the picture itself grows from its tile. */
@@ -889,7 +958,7 @@
     };
     S.register('show_map', { builtin: true, description: 'Show a place on the map in the Clavis display (fly-in, pin). Use for any "where is / show on map / location" request.', params: { place: 'place name or address', style: 'optional: map, satellite, dark or 3d' }, run: visual(showMap) });
     S.register('show_nearby', { builtin: true, description: 'On the open map, scan the area and mark every place of one kind (hospital, police, hotel, office, school, bank, mall, metro...).', params: { category: 'what to find, e.g. hospital', place: 'optional place to scan around', radius_m: 'number of metres (default 1500)' }, run: visual(showNearby) });
-    S.register('show_images', { builtin: true, description: 'Search the web for pictures and show them in the Clavis display.', params: { query: 'what to find pictures of' }, run: visual(showImages) });
+    S.register('show_images', { builtin: true, description: 'Search the web for pictures and show them in the Clavis display. The owner is Indian and speaks Hinglish: "lord"/"bhagwan"/"god" alone means the Hindu deities, "shiv ji" is Lord Shiva, etc.', params: { query: 'what to find pictures of, correctly spelled (e.g. "Lord Shiva", "Neem Karoli Baba"); pass the owner\'s own words if unsure' }, run: visual(showImages) });
     S.register('show_website', { builtin: true, description: 'Show a website in the Clavis display: screenshot plus overview (what it is, fonts, colours, contacts).', params: { url: 'URL or domain', summary: 'optional one-line description' }, run: visual(showWebsite) });
     S.register('show_map_style', { builtin: true, description: 'Change the open map: style (map/satellite/dark/3d), zoom, or action (zoom_in, zoom_out, rotate, reset, expand).', params: { style: 'optional style', action: 'optional action', zoom: 'number (optional)' }, run: (p) => mapControl(p || {}) });
   }
@@ -910,6 +979,9 @@
         fmtDist(420) === '420 m' && fmtDist(1500) === '1.5 km' && fmtDist(12000) === '12 km',
         host('https://www.stripe.com/in') === 'stripe.com',
         (CATS[CAT_ALIASES.thana] || [])[1] === 'police stations',
+        // photo requests are read the way sir means them (needs clavis-luxe.js; plain pass-through without it)
+        window.ClavisLuxe?.understandImageQuery ? understandQuery('shiv ji ki photo').name === 'Lord Shiva' && understandQuery('lord ki photo dikhao').kind === 'group'
+          : understandQuery('taj mahal').name === 'taj mahal',
       ];
       const passed = ok.filter(Boolean).length;
       console[passed === ok.length ? 'log' : 'error'](`ClavisCanvas self-test: ${passed}/${ok.length}`);

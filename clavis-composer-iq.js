@@ -38,8 +38,17 @@
     'letterSpacing', 'wordSpacing', 'lineHeight', 'textIndent', 'textTransform',
     'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
     'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-    'boxSizing', 'whiteSpace', 'wordBreak', 'overflowWrap', 'direction', 'tabSize'
+    'boxSizing', 'whiteSpace', 'wordBreak', 'overflowWrap', 'direction', 'tabSize',
+    // Glyph-shaping props: without these the invisible typed run can be a
+    // few px wider/narrower than the real text, so the grey ghost started
+    // after a visible gap (or on top of the last letters).
+    'fontFeatureSettings', 'fontKerning', 'fontVariationSettings', 'fontStretch',
+    'fontVariantLigatures', 'fontOpticalSizing', 'textRendering'
   ];
+
+  function kebab(prop) {
+    return prop.replace(/[A-Z]/g, function (c) { return '-' + c.toLowerCase(); });
+  }
 
   function reduced() {
     try { return global.matchMedia('(prefers-reduced-motion: reduce)').matches; }
@@ -93,7 +102,18 @@
       hint.className = 'ciq-tab-hint';
       hint.setAttribute('aria-hidden', 'true');
       hint.innerHTML = '<kbd>Tab</kbd><span>accept</span>';
-      shell.appendChild(hint);
+      /* Studio composer: the hint joins the bottom tool row as a flex item
+         (between the +/attach tools and the right-hand buttons), so it can
+         never sit on the ghost text or on a button, at any width. The
+         floating window has no tool row and keeps the corner pill. */
+      var bar = shell.querySelector('.jarvis-composer-bottom-bar');
+      var right = bar && bar.querySelector(':scope > .jarvis-composer-right-tools');
+      if (bar && right) {
+        hint.classList.add('ciq-tab-hint--inbar');
+        bar.insertBefore(hint, right);
+      } else {
+        shell.appendChild(hint);
+      }
       this.hint = hint;
     }
   };
@@ -106,12 +126,35 @@
     var cs = getComputedStyle(input);
     var m = this.mirror.style;
     for (var i = 0; i < MIRROR_PROPS.length; i++) {
-      m[MIRROR_PROPS[i]] = cs[MIRROR_PROPS[i]];
+      var v = cs[MIRROR_PROPS[i]];
+      if (v == null || v === '') continue;
+      // 'important': several theme layers pin font-family / features on
+      // every div in the composer with !important, which silently beat
+      // the plain inline copy and put the mirror in a different font.
+      m.setProperty(kebab(MIRROR_PROPS[i]), v, 'important');
     }
     m.left = input.offsetLeft + 'px';
     m.top = input.offsetTop + 'px';
     m.width = input.offsetWidth + 'px';
     m.height = input.offsetHeight + 'px';
+
+    /* Show whole lines only. The textarea is sized for what was typed, not
+       for the ghost, so a long suggestion wraps onto a line the box has no
+       room for — and the top few px of that line used to peek out under
+       the real text (the squashed half-line). Clip the mirror to the last
+       complete line instead; Tab still inserts the full suggestion. */
+    var lh = parseFloat(cs.lineHeight);
+    if (!lh || isNaN(lh)) lh = (parseFloat(cs.fontSize) || 15) * 1.25;
+    var padTop = parseFloat(cs.paddingTop) || 0;
+    var padBottom = parseFloat(cs.paddingBottom) || 0;
+    var borderTop = parseFloat(cs.borderTopWidth) || 0;
+    var inner = input.clientHeight - padTop - padBottom;
+    var lines = Math.max(1, Math.floor((inner + 1) / lh));
+    var visible = borderTop + padTop + lines * lh;
+    var cut = Math.max(0, Math.floor(input.offsetHeight - visible));
+    // While Tab is being accepted the mirror paints the real text, so it
+    // must not be trimmed if the textarea has not finished growing yet.
+    m.clipPath = (cut > 0 && !this.accepting) ? 'inset(0 0 ' + cut + 'px 0)' : '';
 
     /* Take the ink straight from the textarea rather than guessing a
        per-theme value, so the accepted text lands on exactly the colour
@@ -144,8 +187,24 @@
     this.typedSpan.textContent = v;
     this.ghostSpan.textContent = g;
     this.mirror.classList.toggle('is-live', !!g);
-    if (this.hint) this.hint.classList.toggle('is-live', !!g);
+    if (this.hint) {
+      this.hint.classList.toggle('is-live', !!g);
+      if (g) this.fitHint();
+    }
     if (g) this.sync();
+  };
+
+  /* In the tool row the hint only gets the space the buttons leave. If
+     "Tab accept" does not fit, drop the word; if even the key does not
+     fit, hide it — never show a clipped sliver of a pill. */
+  Ghost.prototype.fitHint = function () {
+    var h = this.hint;
+    if (!h || !h.classList.contains('ciq-tab-hint--inbar')) return;
+    h.classList.remove('is-compact', 'is-cramped');
+    if (h.scrollWidth <= h.clientWidth + 1) return;
+    h.classList.add('is-compact');
+    if (h.scrollWidth <= h.clientWidth + 1) return;
+    h.classList.add('is-cramped');
   };
 
   Ghost.prototype.clear = function (silent) {
