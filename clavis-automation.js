@@ -434,8 +434,11 @@
 
   // ── LLM planner (JSON only, allow-listed steps) ─────────────
   const STEP_TYPES = ['open', 'focus', 'wait', 'type', 'key', 'hotkey', 'scroll', 'search-web', 'open-url'];
-  function validatePlan(obj) {
+  function validatePlan(obj, request) {
     const P = PC();
+    // A model may "helpfully" add Alt+F4 / Ctrl+W: closing shortcuts only
+    // survive when he himself asked to close something (and still get a yes).
+    const askedToClose = CLOSE_VERB.test(norm(request || '')) && !ALL_RE.test(norm(request || ''));
     const raw = Array.isArray(obj) ? obj : obj?.steps;
     if (!Array.isArray(raw)) return null;
     const steps = [];
@@ -464,11 +467,11 @@
         steps.push({ type: 'type', text });
       } else if (s.type === 'key') {
         const key = String(s.key || '').toLowerCase().replace(/[\s_-]/g, '');
-        if (!KEYS[key]) continue;
+        if (!KEYS[key] || (RISKY_KEYS.test(key) && !askedToClose)) continue;
         steps.push({ type: 'key', key });
       } else if (s.type === 'hotkey') {
         const keys = String(s.keys || '').toLowerCase().replace(/\s+/g, '');
-        if (!keyToSendKeys(keys)) continue;
+        if (!keyToSendKeys(keys) || (RISKY_KEYS.test(keys) && !askedToClose)) continue;
         steps.push({ type: 'hotkey', keys });
       } else if (s.type === 'scroll') {
         const direction = ['down', 'up', 'top', 'bottom'].includes(s.direction) ? s.direction : 'down';
@@ -510,7 +513,7 @@
         messages: [{ role: 'system', content: sys }, { role: 'user', content: String(raw).slice(0, 600) }],
         max_tokens: 500, temperature: 0,
       }, ctrl.signal);
-      return validatePlan(extractJson(data?.choices?.[0]?.message?.content));
+      return validatePlan(extractJson(data?.choices?.[0]?.message?.content), raw);
     } catch (err) {
       console.warn('[ClavisAutomation] AI planner:', err?.message || err);
       return null;
@@ -1273,7 +1276,9 @@
     if (forBrief) { const r = recentSite(); if (r) return r; }
     if (!P || !(await P.ping().catch(() => false))) return null;
     let fg = null;
-    try { fg = await withTimeout(P.activeWindow(), 3000, 'active window'); } catch (_) {}
+    // Short wait: this runs in front of every "scroll …" phrase, and a cold
+    // bridge takes seconds for its first active-window sample.
+    try { fg = await withTimeout(P.activeWindow(), 1500, 'active window'); } catch (_) {}
     if (fg && isBrowserProc(fg.process) && !P.isClavisTitle(fg.title)) return fg;
     return null;
   }

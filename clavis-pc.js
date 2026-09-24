@@ -257,10 +257,16 @@
       // "claude" / "excel" open the installed app, not a browser tab.
       const looksLikePath = /[\\/:]/.test(String(target || ''));
       if (!web && !looksLikePath && hasFeature('launch')) {
-        try {
-          const r = await launchApp(target);
-          if (r.ok) return { ok: true, native: true, web: r.web };
-        } catch (_) { /* fall through to the plain shell open */ }
+        let r = null;
+        try { r = await launchApp(target); } catch (_) { /* fall through to the plain shell open */ }
+        if (r?.ok) return { ok: true, native: true, web: r.web };
+        // The bridge checked what's installed and it isn't there: say so,
+        // rather than `start` popping a "Windows cannot find…" dialog. Bare
+        // executables / protocols ("mspaint.exe", "ms-settings:") still go
+        // through /open below.
+        if (r?.notInstalled && !/^[\w.-]+\.(exe|msc|cpl)$|^[\w-]+:$/i.test(String(target).trim())) {
+          throw new Error(`${r.name || target} is PC pe install nahi mila.`);
+        }
       }
       await bridge('/open', 'POST', { target: web || appFor(target)?.exe || target });
       return { ok: true, native: true };
