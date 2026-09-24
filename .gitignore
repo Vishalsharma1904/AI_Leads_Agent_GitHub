@@ -14,3 +14,6 @@ backend/.venv312/
 dist/
 build/
 *.spec
+
+# npm install output
+node_modules/
