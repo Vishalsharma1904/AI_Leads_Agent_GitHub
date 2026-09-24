@@ -1,0 +1,378 @@
+/* Clavis voice-first polish: quiet hierarchy, compact controls, no clipped settings. */
+#view-jarvis {
+  min-width: 0;
+  width: 100%;
+  max-width: none;
+  overflow: hidden;
+  background: #fbfbfa;
+}
+
+#view-jarvis .jarvis-split-layout {
+  width: 100%;
+  min-width: 0;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 320px);
+  gap: 0;
+}
+
+#view-jarvis .jarvis-hero-stage {
+  min-width: 0;
+  min-height: calc(100vh - 72px);
+  padding: 18px clamp(18px, 4vw, 56px) 24px;
+  background: #fbfbfa;
+}
+
+#view-jarvis .jarvis-hero-header {
+  max-width: 1120px;
+  margin: 0 auto;
+}
+
+#view-jarvis .jarvis-hero-header {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.clavis-live-mic-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+  margin-left: 10px;
+  color: #697169;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.clavis-live-mic-dot {
+  width: 7px;
+  height: 7px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #b78335;
+  box-shadow: 0 0 0 3px rgba(183, 131, 53, .12);
+}
+
+.clavis-live-mic-status[data-state="ready"] .clavis-live-mic-dot { background: #5b8064; box-shadow: 0 0 0 3px rgba(91, 128, 100, .12); }
+.clavis-live-mic-status[data-state="listening"] .clavis-live-mic-dot { background: #2f8b67; box-shadow: 0 0 0 3px rgba(47, 139, 103, .15); }
+
+#view-jarvis .jarvis-center-orb-wrapper {
+  width: min(100%, 720px);
+  min-height: 218px;
+  margin: clamp(34px, 8vh, 84px) auto 0;
+  gap: 18px;
+}
+
+#view-jarvis .jarvis-chat-container {
+  width: min(100%, 820px);
+  max-height: min(46vh, 520px);
+  margin: 10px auto 0;
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+}
+
+#view-jarvis #jarvis-messages {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0 4px 12px;
+}
+
+#view-jarvis .jarvis-input-container {
+  width: min(100%, 820px);
+  margin: 14px auto 0;
+  border: 1px solid #d9ddd8;
+  border-radius: 16px;
+  box-shadow: 0 8px 28px rgba(33, 38, 34, .06);
+}
+
+#view-jarvis .jarvis-voice-panel {
+  width: min(100%, 680px);
+  max-height: min(58vh, 560px);
+  overflow-y: auto;
+  margin: 12px auto 0;
+  padding: 16px;
+  border: 1px solid #d9ddd8;
+  border-radius: 14px;
+  background: #fff;
+  color: #20251f;
+  box-shadow: 0 14px 36px rgba(15, 23, 42, 0.12), 0 2px 8px rgba(15, 23, 42, 0.04);
+  animation: clavisVoicePanelIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes clavisVoicePanelIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.clavis-local-voice-header,
+.clavis-voice-actions,
+.clavis-mic-health {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.clavis-local-voice-header strong,
+.clavis-local-voice-header small {
+  display: block;
+}
+
+.clavis-local-voice-header small,
+.clavis-mic-health {
+  margin-top: 4px;
+  color: #697169;
+  font-size: 12px;
+}
+
+.clavis-engine-status {
+  flex: 0 0 auto;
+  color: #607367;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.clavis-engine-status[data-status="error"],
+[data-clavis-engine-status][data-status="error"],
+[data-clavis-mic-status][data-status="error"] { color: #a33d35; }
+
+[data-clavis-engine-status][data-status="ready"],
+[data-clavis-mic-status][data-status="ready"] { color: #42624d; }
+
+.clavis-voice-close-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.03);
+  color: #5b655d;
+  cursor: pointer;
+  transition: all 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+  flex-shrink: 0;
+}
+
+.clavis-voice-close-btn:hover {
+  background: rgba(0, 0, 0, 0.08);
+  border-color: rgba(0, 0, 0, 0.16);
+  color: #1a1e1b;
+  transform: scale(1.06);
+}
+
+.clavis-voice-close-btn:active {
+  transform: scale(0.94);
+  background: rgba(0, 0, 0, 0.12);
+}
+
+[data-theme="dark"] .clavis-voice-close-btn,
+html[data-theme="dark"] .clavis-voice-close-btn {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #cbd5e0;
+}
+
+[data-theme="dark"] .clavis-voice-close-btn:hover,
+html[data-theme="dark"] .clavis-voice-close-btn:hover {
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: #fff;
+}
+
+.clavis-voice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.clavis-voice-grid label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  color: #535d55;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.clavis-voice-grid select,
+.clavis-voice-grid input {
+  width: 100%;
+  min-width: 0;
+}
+
+.clavis-voice-grid select {
+  min-height: 34px;
+  padding: 0 8px;
+  border: 1px solid #d5dbd5;
+  border-radius: 8px;
+  background: #fff;
+  color: #20251f;
+}
+
+.clavis-voice-grid input[type="range"] { accent-color: #526b5a; }
+
+.clavis-voice-grid label span {
+  color: #697169;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.clavis-voice-actions { justify-content: flex-start; }
+
+.clavis-voice-actions button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid #cdd6ce;
+  border-radius: 8px;
+  background: #f7f9f7;
+  color: #34473a;
+  cursor: pointer;
+  font-weight: 650;
+}
+
+.clavis-voice-actions button:last-child { background: #34473a; color: #fff; }
+
+#view-jarvis .jarvis-side {
+  min-width: 0;
+  border-left: 1px solid #e1e5e0;
+  background: #f5f6f3;
+}
+
+#view-jarvis button:focus-visible,
+#view-jarvis textarea:focus-visible,
+#view-jarvis select:focus-visible,
+#view-jarvis input:focus-visible {
+  outline: 3px solid rgba(82, 107, 90, .28);
+  outline-offset: 2px;
+}
+
+@media (max-width: 840px) {
+  #view-jarvis .jarvis-split-layout { display: block; }
+  #view-jarvis .jarvis-side { display: none; }
+  #view-jarvis .jarvis-hero-stage { min-height: calc(100vh - 56px); padding-inline: 14px; }
+  #view-jarvis .jarvis-center-orb-wrapper { margin-top: 30px; }
+  #view-jarvis .jarvis-chat-container { max-height: 42vh; }
+}
+
+@media (max-width: 520px) {
+  #view-jarvis .jarvis-hero-header { flex-wrap: wrap; row-gap: 8px; }
+  .clavis-live-mic-status { order: 3; width: 100%; margin-left: 0; }
+  #view-jarvis .jarvis-hero-actions { gap: 5px; }
+  #view-jarvis .jarvis-newchat-pill { font-size: 0; width: 34px; padding: 0; }
+  #view-jarvis .jarvis-voice-panel { max-height: 62vh; padding: 13px; }
+  .clavis-voice-grid { grid-template-columns: 1fr; gap: 10px; }
+  .clavis-local-voice-header { align-items: flex-start; flex-direction: column; }
+  .clavis-mic-health { align-items: flex-start; font-size: 11px; }
+  #view-jarvis .jarvis-chat-container { max-height: 43vh; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view-jarvis *, #view-jarvis *::before, #view-jarvis *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* The legacy theme has a generous hero band. Once a conversation exists the
+   orb becomes a compact live status rail so the response, transcript, and
+   composer get the user's attention instead of a tall empty stage. */
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 10px !important;
+  height: 84px !important;
+  min-height: 84px !important;
+  max-height: 84px !important;
+  padding: 8px 18px !important;
+  margin: 0 !important;
+  border-bottom: 1px solid #e5e8e3 !important;
+  background: #fbfbfa !important;
+}
+
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper #orb-container {
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  margin: 0 !important;
+}
+
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper::after {
+  margin-left: 2px !important;
+  text-align: left !important;
+}
+
+html body #view-jarvis.active.has-messages .jarvis-chat-container {
+  padding-top: 12px !important;
+  padding-bottom: 8px !important;
+}
+
+html body #view-jarvis.active #jarvis-messages {
+  gap: 12px !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) .jarvis-center-orb-wrapper {
+  flex: 0 0 290px !important;
+  min-height: 290px !important;
+  max-height: 290px !important;
+  padding: 14px 14px 10px !important;
+  margin-top: 10px !important;
+  overflow: visible !important;
+}
+
+/* The composer already has the microphone action. Removing the duplicate
+   hero button keeps the first-run permission gate and composer in one stable
+   viewport on compact laptops and mobile browsers. */
+html body #view-jarvis.active:not(.has-messages) .jarvis-hero-controls { display: none !important; }
+
+html body #view-jarvis.active:not(.has-messages) .jarvis-center-orb-wrapper #orb-container {
+  width: 220px !important;
+  height: 220px !important;
+  min-width: 220px !important;
+  min-height: 220px !important;
+  margin-bottom: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) #jarvis-welcome {
+  margin: 4px 0 6px !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) #clavis-brain-card {
+  width: min(440px, 100%) !important;
+  margin: 8px auto 0 !important;
+  padding: 10px 12px !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) #clavis-brain-card > div:nth-of-type(1) {
+  margin-bottom: 2px !important;
+  font-size: 13px !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) #clavis-brain-card > div:nth-of-type(2) {
+  margin-bottom: 6px !important;
+  font-size: 11.5px !important;
+  line-height: 1.35 !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) #clavis-brain-card > div:nth-of-type(3) input,
+html body #view-jarvis.active:not(.has-messages) #clavis-brain-card > div:nth-of-type(3) button {
+  min-height: 34px !important;
+  height: 34px !important;
+  padding-block: 6px !important;
+}
+
+html body #view-jarvis.active:not(.has-messages) #clavis-brain-card > div:nth-of-type(4) {
+  min-height: 0 !important;
+  margin-top: 4px !important;
+}

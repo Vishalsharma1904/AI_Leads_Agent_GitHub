@@ -1,0 +1,378 @@
+/* ============================================================
+   clavis-refine.css — Clavis AI Studio, minimal pass (v2)
+   Scope: #view-jarvis (Studio tab) and the .ap-tip tooltips.
+   The floating surface has its own file (clavis-task-surface.css).
+   Loaded LAST (end of <body>).
+
+   Specificity note: clavis-stage.css targets
+   `.clavis-stage-v2 #view-jarvis .x` = (1,2,0), so every studio
+   rule here is prefixed with
+   `#view-jarvis.jarvis-wrapper.claude-ui-wrapper` = (1,2,0) and
+   lands at (1,3,x). Don't lower it or the old pills come back.
+
+   The orb (#orb-container / canvas) is deliberately untouched.
+   ============================================================ */
+
+:root {
+  --cr-canvas:  #FAF9F5;
+  --cr-panel:   #FFFFFF;
+  --cr-line:    #E7E4DC;
+  --cr-line-2:  #F1EEE7;
+  --cr-text:    #1A1917;
+  --cr-mute:    #6B6862;
+  --cr-faint:   #9C9890;
+  --cr-accent:  #C96442;
+  --cr-ok:      #5F7F5A;
+  --cr-warn:    #B08442;
+  --cr-serif:   "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  --cr-sans:    "Figtree", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+
+  /* One motion vocabulary for the whole pass. */
+  --cr-spring:  cubic-bezier(0.16, 1, 0.3, 1);   /* settle, no overshoot */
+  --cr-out:     cubic-bezier(0.2, 0, 0, 1);      /* quick exit */
+  --cr-fast:    130ms;
+  --cr-base:    260ms;
+  --cr-slow:    420ms;
+}
+html[data-theme="dark"] {
+  --cr-canvas: #121211;
+  --cr-panel:  #1A1A18;
+  --cr-line:   #2E2D29;
+  --cr-line-2: #242320;
+  --cr-text:   #ECEAE4;
+  --cr-mute:   #9A968E;
+  --cr-faint:  #6E6B65;
+  --cr-accent: #D97757;
+  --cr-ok:     #85A37F;
+  --cr-warn:   #C9A15E;
+}
+
+/* ── 1. Canvas + panel — squarer corners, tighter inset ─────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper {
+  background: var(--cr-canvas) !important;
+  font-family: var(--cr-sans) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-split-layout {
+  padding: 8px 10px 10px !important;
+  gap: 10px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage {
+  background: var(--cr-panel) !important;
+  border: 1px solid var(--cr-line) !important;
+  border-radius: 10px !important;      /* was a fat 24px curve eating corner space */
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage::before,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage::after { content: none !important; }
+
+/* the shell's own top-left curve also steals a corner */
+html body .views-container { border-radius: 10px 0 0 0 !important; }
+
+/* ── 2. Header row ─────────────────────────────────────────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-header {
+  border-bottom: 1px solid var(--cr-line-2) !important;
+  background: none !important;
+  padding: 11px 14px !important;
+  box-shadow: none !important;
+  gap: 10px !important;
+}
+
+/* Top header AI brand title — pure typography, no icons */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-header-brand-wrap {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  min-width: 0 !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-ai-title-top {
+  font-family: var(--cr-sans, -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif) !important;
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--cr-text, #1A1917) !important;
+  line-height: 1 !important;
+  white-space: nowrap !important;
+  user-select: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-ai-title-top::before,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-ai-title-top::after {
+  content: none !important;
+  display: none !important;
+}
+
+/* Status + mic: plain text and a dot. No boxes, no colour fills. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-status-pill,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-status {
+  background: none !important;
+  background-color: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  padding: 0 !important;
+  margin: 0 12px 0 0 !important;
+  border-radius: 0 !important;
+  font-family: var(--cr-sans) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: var(--cr-mute) !important;
+  animation: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill::after,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-status-pill::after { content: none !important; }
+/* the ::before becomes the status dot itself */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill::before,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-status-pill::before {
+  content: "" !important;
+  position: static !important;
+  width: 6px !important; height: 6px !important;
+  min-width: 6px !important;
+  border-radius: 50% !important;
+  background: var(--cr-faint) !important;
+  box-shadow: none !important;
+  animation: none !important;
+  inset: auto !important;
+  transform: none !important;
+  opacity: 1 !important;
+}
+html.clavis-stage-v2[data-clavis-state="listening"] body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill::before,
+html.clavis-stage-v2[data-clavis-state="thinking"]  body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill::before {
+  background: var(--cr-accent) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-dot,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-pulse-dot {
+  width: 6px !important; height: 6px !important; min-width: 6px !important;
+  border-radius: 50% !important;
+  background: var(--cr-faint) !important; box-shadow: none !important; animation: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-status[data-status="ok"] .clavis-live-mic-dot { background: var(--cr-ok) !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-status[data-status="warn"] .clavis-live-mic-dot { background: var(--cr-warn) !important; }
+
+/* Icon buttons + New Chat */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-newchat-pill,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-handsfree-pill {
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  border-radius: 7px !important;
+  color: var(--cr-mute) !important;
+  font-family: var(--cr-sans) !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  transition: background-color var(--cr-fast) var(--cr-out),
+              color var(--cr-fast) var(--cr-out) !important;
+  animation: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill { padding: 6px !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-newchat-pill { padding: 6px 11px !important; gap: 6px !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill:hover,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-newchat-pill:hover,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-handsfree-pill:hover {
+  background: var(--cr-line-2) !important;
+  color: var(--cr-text) !important;
+  transform: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill:active { background: var(--cr-line) !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill[aria-pressed="true"] {
+  background: var(--cr-line-2) !important; color: var(--cr-accent) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-actions-sep {
+  background: var(--cr-line) !important; opacity: 1 !important; width: 1px !important; height: 16px !important;
+}
+
+/* ── 3. The startup stage — this is the first thing you see ─── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-center-orb-wrapper {
+  gap: 22px !important;
+  padding: 24px 20px 8px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-greeting {
+  font-family: var(--cr-serif) !important;
+  font-size: clamp(30px, 3.4vw, 46px) !important;
+  font-weight: 400 !important;
+  line-height: 1.06 !important;
+  letter-spacing: -0.014em !important;
+  color: var(--cr-text) !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  text-shadow: none !important;
+  margin: 0 0 8px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-greeting em {
+  font-family: var(--cr-serif) !important;
+  font-style: italic !important;
+  font-weight: 400 !important;
+  color: inherit !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-subgreeting {
+  font-family: var(--cr-sans) !important;
+  font-size: 13.5px !important; font-weight: 400 !important;
+  color: var(--cr-mute) !important; background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-feature-tip-pill {
+  background: transparent !important;
+  border: 1px solid var(--cr-line) !important;
+  box-shadow: none !important; backdrop-filter: none !important;
+  border-radius: 999px !important;
+  padding: 6px 14px !important;
+  font-family: var(--cr-sans) !important;
+  font-size: 12.5px !important; font-weight: 450 !important;
+  color: var(--cr-mute) !important;
+  animation: none !important;
+  transition: background-color var(--cr-fast) var(--cr-out),
+              border-color var(--cr-fast) var(--cr-out),
+              color var(--cr-fast) var(--cr-out) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-feature-tip-pill:hover {
+  background: var(--cr-line-2) !important; border-color: #DCD7CC !important; color: var(--cr-text) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-tip-icon { filter: grayscale(1); opacity: .6; }
+
+/* Staged entrance: orb settles, then the line, then the composer.
+   Runs once when the studio view becomes active. */
+@keyframes cr-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes cr-fade { from { opacity: 0; } to { opacity: 1; } }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active #orb-container {
+  animation: cr-fade var(--cr-slow) var(--cr-out) both;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active .jarvis-greeting-container {
+  animation: cr-rise var(--cr-slow) var(--cr-spring) 90ms both;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active .clavis-feature-tip-pill {
+  animation: cr-rise var(--cr-slow) var(--cr-spring) 170ms both;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active .jarvis-input-container {
+  animation: cr-rise var(--cr-slow) var(--cr-spring) 240ms both;
+}
+
+/* ── 4. Composer ───────────────────────────────────────────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-input-container {
+  background: var(--cr-panel) !important;
+  border: 1px solid var(--cr-line) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.03) !important;
+  backdrop-filter: none !important;
+  transition: border-color var(--cr-base) var(--cr-out),
+              box-shadow var(--cr-base) var(--cr-out) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-input-container::before,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-input-container::after { content: none !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-input-container:focus-within {
+  border-color: #D3CEC2 !important;
+  box-shadow: 0 2px 10px -4px rgba(0,0,0,.10) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .claude-textarea,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-luxury-textarea {
+  font-family: var(--cr-sans) !important;
+  font-size: 14.5px !important; line-height: 1.5 !important;
+  color: var(--cr-text) !important; background: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .claude-textarea::placeholder { color: var(--cr-faint) !important; }
+
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-composer-btn,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-composer-plus-btn {
+  background: transparent !important; border: 1px solid transparent !important;
+  box-shadow: none !important; color: var(--cr-mute) !important;
+  border-radius: 7px !important; animation: none !important;
+  transition: background-color var(--cr-fast) var(--cr-out), color var(--cr-fast) var(--cr-out) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-composer-btn:hover {
+  background: var(--cr-line-2) !important; color: var(--cr-text) !important;
+}
+/* send / stop — one solid ink circle, one muted stop */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-send-btn {
+  background: var(--cr-text) !important; color: var(--cr-panel) !important;
+  border: 0 !important; box-shadow: none !important; border-radius: 999px !important;
+  transition: opacity var(--cr-fast) var(--cr-out), transform var(--cr-base) var(--cr-spring) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-send-btn:hover { opacity: .84 !important; transform: none !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-stop-btn {
+  background: transparent !important; color: var(--cr-accent) !important;
+  border: 1px solid var(--cr-line) !important; box-shadow: none !important; border-radius: 999px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-composer-dropdown {
+  background: var(--cr-panel) !important; border: 1px solid var(--cr-line) !important;
+  border-radius: 11px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,.05), 0 12px 28px -14px rgba(0,0,0,.26) !important;
+  backdrop-filter: none !important;
+  animation: cr-rise 200ms var(--cr-spring) both !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-dropdown-item {
+  font-family: var(--cr-sans) !important; font-size: 13px !important;
+  color: var(--cr-text) !important; background: none !important; border-radius: 7px !important;
+  transition: background-color var(--cr-fast) var(--cr-out) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-dropdown-item:hover { background: var(--cr-line-2) !important; }
+
+/* ── 5. Chat area ──────────────────────────────────────────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-chat-container { background: none !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-chat-container::-webkit-scrollbar { width: 7px; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-chat-container::-webkit-scrollbar-thumb { background: var(--cr-line); border-radius: 4px; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-chat-container::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 6. Voice CTA ──────────────────────────────────────────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-voice-main-btn {
+  background: var(--cr-panel) !important;
+  border: 1px solid var(--cr-line) !important;
+  color: var(--cr-text) !important;
+  box-shadow: none !important; backdrop-filter: none !important;
+  border-radius: 999px !important;
+  font-family: var(--cr-sans) !important;
+  font-size: 13px !important; font-weight: 500 !important;
+  letter-spacing: 0 !important; text-transform: none !important;
+  animation: none !important;
+  transition: background-color var(--cr-fast) var(--cr-out) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-voice-main-btn:hover { background: var(--cr-line-2) !important; transform: none !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-voice-main-btn::before,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-voice-main-btn::after { content: none !important; }
+
+/* Section 7 (sneak-peek pipeline window) removed — that popover is
+   retired; the floating surface now lives in clavis-task-surface.css. */
+
+/* ============================================================
+   7. TOOLTIPS (.ap-tip, built by apple-polish.js)
+   Quick in, instant out — a tooltip that lingers reads as lag.
+   ============================================================ */
+html body .ap-tip {
+  padding: 5px 9px !important;
+  border-radius: 6px !important;
+  font-family: var(--cr-sans) !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: .002em !important;
+  line-height: 1.35 !important;
+  color: #FBFAF7 !important;
+  background: rgba(28, 27, 25, 0.94) !important;
+  box-shadow:
+    0 0 0 0.5px rgba(0,0,0,.28),
+    0 2px 6px -2px rgba(0,0,0,.22),
+    0 10px 22px -12px rgba(0,0,0,.34) !important;
+  will-change: opacity, transform;
+  transform: translateX(-3px) scale(.97);
+  transition:
+    opacity var(--cr-fast) var(--cr-out),
+    transform 220ms var(--cr-spring) !important;
+}
+html[data-theme="dark"] body .ap-tip {
+  color: #16150F !important;
+  background: rgba(238, 236, 230, 0.95) !important;
+  box-shadow: 0 0 0 0.5px rgba(0,0,0,.5), 0 12px 26px -14px rgba(0,0,0,.7) !important;
+}
+html body .ap-tip[data-side="top"]    { transform: translateY(3px) scale(.97); }
+html body .ap-tip[data-side="bottom"] { transform: translateY(-3px) scale(.97); }
+html body .ap-tip.ap-tip-in { transform: none !important; }
+@media (prefers-reduced-motion: reduce) {
+  html body .ap-tip { transition: opacity 90ms linear !important; transform: none !important; }
+}

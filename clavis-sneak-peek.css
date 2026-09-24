@@ -1,0 +1,539 @@
+/* ============================================================
+ * CLAVIS SNEAK PEEK AGENT PIPELINE WINDOW (clavis-sneak-peek.css)
+ * ------------------------------------------------------------
+ * Apple macOS & Claude inspired floating live task & agent
+ * pipeline inspection popover.
+ * - Solid floating card, ZERO background blur on main page
+ * - Compact 288px width, anchored right of orb / top-right
+ * - Minimalist typography with Cormorant Garamond task headers
+ * - Apple fluid spring physics
+ * - ChatGPT/Claude-style streaming text shimmer animation
+ * ============================================================ */
+
+:root {
+  --csp-w: 292px;
+  --csp-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --csp-ease: cubic-bezier(0.2, 0.9, 0.3, 1.05);
+  --csp-accent: #C0392B; /* Notetaker brick red */
+  --csp-accent-rgb: 192, 57, 43;
+}
+
+/* ── Invisible backdrop: handles outside clicks with NO blur/darkening ── */
+.clavis-sneak-peek-overlay {
+  position: fixed;
+  inset: 0;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  z-index: 9990;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease;
+}
+.clavis-sneak-peek-overlay.is-active {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ── Compact Floating Window (Solid Mac Popover) ─────────────── */
+.clavis-sneak-peek-window {
+  position: fixed;
+  top: 68px;
+  right: 24px;
+  width: var(--csp-w);
+  max-height: min(620px, calc(100vh - 86px));
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  background: #FAF9F6; /* Clean warm solid cream — zero blur bleed */
+  border: 1px solid rgba(0, 0, 0, 0.09);
+  border-radius: 18px;
+  box-shadow: 
+    0 20px 50px -10px rgba(0, 0, 0, 0.18),
+    0 6px 18px -4px rgba(0, 0, 0, 0.08),
+    0 0 0 1px rgba(255, 255, 255, 0.8) inset;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
+  color: #1a1a1c;
+  transform: translateY(-8px) scale(0.96);
+  opacity: 0;
+  pointer-events: none;
+  transition: 
+    transform 0.36s var(--csp-spring),
+    opacity 0.24s ease,
+    box-shadow 0.36s ease;
+  contain: layout style;
+  box-sizing: border-box;
+}
+
+.clavis-sneak-peek-window.is-open {
+  transform: translateY(0) scale(1);
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Dark Mode Theme */
+html[data-theme="dark"] .clavis-sneak-peek-window {
+  background: #17171A; /* Solid obsidian card */
+  border: 1px solid rgba(255, 255, 255, 0.11);
+  color: #f4f4f6;
+  box-shadow: 
+    0 24px 60px -12px rgba(0, 0, 0, 0.7),
+    0 8px 24px -4px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+}
+
+/* ── Top Header Bar ────────────────────────────────────────── */
+.csp-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px 10px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.02);
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .csp-header-bar {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.csp-status-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #555558;
+}
+html[data-theme="dark"] .csp-status-badge {
+  color: #a1a1aa;
+}
+
+.csp-live-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #34C759;
+  box-shadow: 0 0 8px rgba(52, 199, 89, 0.6);
+  animation: csp-pulse-dot 1.8s ease-in-out infinite;
+}
+@keyframes csp-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+.csp-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.csp-icon-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: #88888b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+.csp-icon-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1a1a1c;
+}
+html[data-theme="dark"] .csp-icon-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+/* ── Task Title Banner ─────────────────────────────────────── */
+.csp-task-banner {
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .csp-task-banner {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.csp-task-eyebrow {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #C0392B;
+  margin-bottom: 3px;
+}
+html[data-theme="dark"] .csp-task-eyebrow {
+  color: #FF6B6B;
+}
+
+.csp-task-title {
+  font-family: 'Cormorant Garamond', Georgia, serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: #18181b;
+  margin: 0 0 6px 0;
+}
+html[data-theme="dark"] .csp-task-title {
+  color: #ffffff;
+}
+
+.csp-task-title em {
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* ── Minimalist Horizontal Pipeline Bar ─────────────────────── */
+.csp-pipeline-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 6px;
+  position: relative;
+  padding: 4px 2px;
+}
+
+.csp-pipeline-track::before {
+  content: '';
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  top: 50%;
+  height: 2px;
+  background: rgba(0, 0, 0, 0.08);
+  z-index: 1;
+}
+html[data-theme="dark"] .csp-pipeline-track::before {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.csp-pipe-step {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+}
+
+.csp-step-node {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #FAF9F6;
+  border: 2px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  font-weight: 700;
+  color: transparent;
+  transition: all 0.25s var(--csp-spring);
+}
+html[data-theme="dark"] .csp-step-node {
+  background: #17171A;
+  border-color: #444;
+}
+
+.csp-pipe-step.done .csp-step-node {
+  background: #34C759;
+  border-color: #34C759;
+  color: #fff;
+}
+.csp-pipe-step.active .csp-step-node {
+  background: #C0392B;
+  border-color: #C0392B;
+  color: #fff;
+  box-shadow: 0 0 8px rgba(192, 57, 43, 0.5);
+  transform: scale(1.15);
+}
+html[data-theme="dark"] .csp-pipe-step.active .csp-step-node {
+  background: #E74C3C;
+  border-color: #E74C3C;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.6);
+}
+
+.csp-step-name {
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #8e8e93;
+}
+.csp-pipe-step.active .csp-step-name {
+  color: #C0392B;
+  font-weight: 700;
+}
+html[data-theme="dark"] .csp-pipe-step.active .csp-step-name {
+  color: #FF6B6B;
+}
+
+/* ── Scrollable Body: Named Agent Logs ──────────────────────── */
+.csp-scroll-area {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scroll-behavior: smooth;
+}
+
+.csp-scroll-area::-webkit-scrollbar {
+  width: 4px;
+}
+.csp-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+}
+html[data-theme="dark"] .csp-scroll-area::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+/* ── Individual Agent Card ─────────────────────────────────── */
+.csp-agent-card {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 12px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: all 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+html[data-theme="dark"] .csp-agent-card {
+  background: #202024;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+}
+
+.csp-agent-card.active-agent {
+  border-left: 3px solid #C0392B;
+  box-shadow: 0 2px 8px rgba(192, 57, 43, 0.08);
+}
+html[data-theme="dark"] .csp-agent-card.active-agent {
+  border-left: 3px solid #E74C3C;
+  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.15);
+}
+
+.csp-agent-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.csp-agent-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.csp-agent-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: rgba(0, 0, 0, 0.04);
+}
+html[data-theme="dark"] .csp-agent-icon {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.csp-agent-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #1a1a1c;
+}
+html[data-theme="dark"] .csp-agent-name {
+  color: #f4f4f6;
+}
+
+.csp-agent-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.04);
+  color: #71717a;
+}
+.csp-agent-card.active-agent .csp-agent-badge {
+  background: rgba(192, 57, 43, 0.1);
+  color: #C0392B;
+}
+html[data-theme="dark"] .csp-agent-card.active-agent .csp-agent-badge {
+  background: rgba(231, 76, 60, 0.18);
+  color: #FF6B6B;
+}
+
+.csp-agent-card.done-agent .csp-agent-badge {
+  background: rgba(52, 199, 89, 0.12);
+  color: #2fb344;
+}
+
+/* ── ChatGPT / Claude-Style Streaming Text Shimmer Animation ── */
+@keyframes csp-shimmer {
+  0%   { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.csp-agent-log {
+  font-size: 11.5px;
+  line-height: 1.42;
+  color: #4b4b50;
+  margin: 0;
+  transition: color 0.18s ease;
+}
+html[data-theme="dark"] .csp-agent-log {
+  color: #d1d1d6;
+}
+
+.csp-agent-card.active-agent .csp-agent-log {
+  background: linear-gradient(
+    90deg,
+    #555558 0%,
+    #555558 35%,
+    #C0392B 50%,
+    #555558 65%,
+    #555558 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: csp-shimmer 2.2s linear infinite;
+  font-weight: 500;
+}
+
+html[data-theme="dark"] .csp-agent-card.active-agent .csp-agent-log {
+  background: linear-gradient(
+    90deg,
+    #9c9ca1 0%,
+    #9c9ca1 35%,
+    #ffffff 50%,
+    #FF6B6B 58%,
+    #9c9ca1 70%,
+    #9c9ca1 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: csp-shimmer 2.2s linear infinite;
+}
+
+.csp-agent-metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.csp-metric-chip {
+  font-size: 9.5px;
+  color: #88888b;
+  font-family: 'JetBrains Mono', monospace;
+  background: rgba(0, 0, 0, 0.03);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+html[data-theme="dark"] .csp-metric-chip {
+  background: rgba(255, 255, 255, 0.05);
+  color: #a1a1aa;
+}
+
+/* ── Bottom Footer / Controls ──────────────────────────────── */
+.csp-footer-bar {
+  padding: 8px 12px 10px;
+  border-top: 1px solid rgba(0, 0, 0, 0.06);
+  background: rgba(0, 0, 0, 0.02);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+}
+html[data-theme="dark"] .csp-footer-bar {
+  border-top: 1px solid rgba(255, 255, 255, 0.07);
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.csp-footer-status {
+  font-size: 10px;
+  color: #71717a;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+html[data-theme="dark"] .csp-footer-status {
+  color: #a1a1aa;
+}
+
+.csp-footer-btn {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  background: #ffffff;
+  color: #1a1a1c;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+.csp-footer-btn:hover {
+  background: #f4f4f6;
+  border-color: rgba(0, 0, 0, 0.18);
+}
+html[data-theme="dark"] .csp-footer-btn {
+  background: #232328;
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f4f6;
+}
+html[data-theme="dark"] .csp-footer-btn:hover {
+  background: #2c2c32;
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+/* ── Completion Banner (Clean Apple Style) ─────────────────── */
+.csp-completion-box {
+  background: rgba(52, 199, 89, 0.08);
+  border: 1px solid rgba(52, 199, 89, 0.25);
+  border-radius: 10px;
+  padding: 8px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #22863a;
+  animation: csp-pop-in 0.28s var(--csp-spring);
+}
+html[data-theme="dark"] .csp-completion-box {
+  background: rgba(52, 199, 89, 0.14);
+  border-color: rgba(52, 199, 89, 0.35);
+  color: #4cd964;
+}
+
+@keyframes csp-pop-in {
+  0%   { opacity: 0; transform: scale(0.95); }
+  100% { opacity: 1; transform: scale(1); }
+}

@@ -1,0 +1,42 @@
+# ============================================================
+# .kiroignore — excludes heavy / auto-generated / regenerable
+# files from Kiro workspace indexing and search.
+#
+# Nothing here is source code, config, UI, or functional logic.
+# All of these are either dependency dirs, build output, caches,
+# lock files, or logs that can be regenerated at any time.
+# ============================================================
+
+# ---- Python virtual environment (thousands of dependency files) ----
+backend/.venv/
+
+# ---- Node dependencies (regenerable via npm/yarn install) ----
+node_modules/
+
+# ---- Version control internals ----
+.git/
+
+# ---- Build / distribution output ----
+dist/
+build/
+
+# ---- Python bytecode cache ----
+__pycache__/
+
+# ---- Logs ----
+*.log
+
+# ---- Dependency lock files ----
+package-lock.json
+yarn.lock
+
+# ---- Old extracted zip snapshots (duplicate copies of earlier app
+#      versions — not referenced by the live app, safe to exclude) ----
+temp_extract/
+temp_redesign/
+unzip_AndroidApp_Source/
+unzip_Skylark_Agent_Candidates/
+unzip_Skylark_Agent_Candidates_AI/
+unzip_Skylark_Agent_Claude_Fix/
+unzip_Skylark_Agent_Claude_Redesign/
+unzip_Skylark_Agent_Responsive/

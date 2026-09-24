@@ -1,0 +1,235 @@
+/* ============================================================
+   clavis-viewport.css — in-app view: crisp, sized to the screen,
+   and cheap enough to scroll at 60fps.
+   Loaded LAST. Fixes measured on the real page, not guessed:
+
+     · 304 elements carried `will-change` → 304 permanently
+       promoted compositor layers. That is the scroll stutter, and
+       on a fractional device-scale it is also what smears text.
+     · 54 elements had a live `backdrop-filter` → each one re-blurs
+       its backdrop every frame while you scroll.
+     ·  #orb-container had `contain: layout paint`, which clips
+       anything painting outside the box — that is why the orb was
+       sliced flat on one side.
+     ·  #main-scroll-area carried `zoom`, which re-rasterises the
+       whole scroller on every scroll frame.
+     ·  Everything was fixed-px, so a 1366 screen got the same
+        numbers as a 1920 one and read as tiny.
+     ·  Selectors here carry `:not(#_)`. It matches everything, but
+        counts as an id, which is how these rules outrank the app's
+        own `html body .x !important` overrides without resorting to
+        load-order luck.
+   ============================================================ */
+
+/* ── 1. Fluid type scale ─────────────────────────────────────
+   apple-polish.css routes its typography through these tokens, so
+   redefining them here rescales the app from one place. Each step
+   is ~8% larger than before at 1366px and ~28% larger at 1920px,
+   with a hard floor so nothing can collapse on a small window. */
+:root {
+  --ap-fs-display:  clamp(40px,   2.30vw + 8.6px, 56px);
+  --ap-fs-t1:       clamp(25px,   1.10vw + 10px,  32px);
+  --ap-fs-t2:       clamp(20px,   0.85vw + 8.4px, 25px);
+  --ap-fs-t3:       clamp(17px,   0.66vw + 8px,   21px);
+  --ap-fs-headline: clamp(15px,   0.55vw + 7.5px, 18px);
+  --ap-fs-body:     clamp(14.5px, 0.50vw + 7.7px, 17.5px);
+  --ap-fs-callout:  clamp(14px,   0.47vw + 7.6px, 17px);
+  --ap-fs-sub:      clamp(13.5px, 0.45vw + 7.4px, 16px);
+  --ap-fs-foot:     clamp(13px,   0.42vw + 7.3px, 15.5px);
+  --ap-fs-caption:  clamp(12px,   0.38vw + 6.8px, 14.5px);
+  --ap-fs-micro:    clamp(11.5px, 0.35vw + 6.7px, 14px);
+
+  /* Panels and sheets go square; controls keep a small radius so
+     buttons still read as buttons. */
+  --ap-r-lg: 0px;
+  --ap-r-xl: 0px;
+  --ap-r-md: 8px;
+  --ap-r-sm: 7px;
+  --ap-r-xs: 5px;
+
+  /* One rail width that grows with the window instead of a fixed 220. */
+  --sidebar-expanded: clamp(212px, 13vw + 34px, 268px);
+}
+
+html { font-size: clamp(15px, 0.42vw + 9.3px, 18px); }
+
+/* Crisp text is a rendering setting plus the absence of stray layer
+   promotion — both matter, see section 3. */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ── 2. Rail + shell geometry follow the same scale ──────────── */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(.collapsed),
+html:not(#_) body:not(#_) aside#sidebar:not(.collapsed) {
+  width: var(--sidebar-expanded) !important;
+  min-width: var(--sidebar-expanded) !important;
+  max-width: var(--sidebar-expanded) !important;
+}
+html:not(#_) body:not(#_) #main-content.main-content,
+html:not(#_) body:not(#_) #main-content {
+  margin-left: var(--sidebar-expanded) !important;
+  width: calc(100% - var(--sidebar-expanded)) !important;
+  max-width: calc(100% - var(--sidebar-expanded)) !important;
+}
+html[data-sidebar-state="collapsed"]:not(#_) body:not(#_) #main-content.main-content,
+html[data-sidebar-state="collapsed"]:not(#_) body:not(#_) #main-content,
+html:has(#sidebar.collapsed):not(#_) body:not(#_) #main-content {
+  margin-left: 64px !important;              /* matches clavis-sidebar.css */
+  width: calc(100% - 64px) !important;
+  max-width: calc(100% - 64px) !important;
+}
+
+html:not(#_) body:not(#_) #sidebar .nav-item,
+html:not(#_) body:not(#_) #sidebar .nav-sub-item {
+  font-size: var(--ap-fs-callout) !important;
+  padding: clamp(7px, 0.55vh, 10px) clamp(10px, 0.85vw, 14px) !important;
+}
+html:not(#_) body:not(#_) #sidebar .nav-item svg,
+html:not(#_) body:not(#_) #sidebar .nav-sub-item svg {
+  width: clamp(16px, 1.25vw, 19px) !important;
+  height: clamp(16px, 1.25vw, 19px) !important;
+}
+html:not(#_) body:not(#_) #sidebar .nav-section-label { font-size: var(--ap-fs-micro) !important; }
+html:not(#_) body:not(#_) #sidebar .logo-text  { font-size: var(--ap-fs-headline) !important; }
+html:not(#_) body:not(#_) #sidebar .logo-sub   { font-size: var(--ap-fs-micro) !important; }
+html:not(#_) body:not(#_) .topbar .view-title,
+html:not(#_) body:not(#_) .topbar-title         { font-size: var(--ap-fs-t3) !important; }
+
+/* ── 3. Performance: stop paying for effects nothing needs ──── */
+
+/* `will-change` is a promise to the compositor, not a hint. 300 of
+   them is 300 layers held in GPU memory, which is exactly what makes
+   a scroll stutter — and on a fractional device-scale factor a
+   promoted layer is also what smears text. Keep it only on the two
+   surfaces that genuinely animate. */
+html:not(#_) body:not(#_) *:not(#_):not(.cts):not(.cts-body):not(.ap-tip):not(#orb-container) {
+  will-change: auto !important;
+}
+
+/* Every live backdrop-filter re-blurs its backdrop each frame. The
+   design is flat now, so none of them are earning their cost. */
+html:not(#_) body:not(#_) *:not(#_),
+html:not(#_) body:not(#_) *:not(#_)::before,
+html:not(#_) body:not(#_) *:not(#_)::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* The scroller must not be zoomed: it re-rasterises the whole
+   subtree on every scroll frame, and at a fractional value it is
+   also a text-blur source. */
+html:not(#_) body:not(#_) #main-scroll-area,
+html:not(#_) body:not(#_) .views-container {
+  zoom: 1 !important;
+  overscroll-behavior: contain;
+}
+
+/* A hidden view should cost nothing. */
+html:not(#_) body:not(#_) .view:not(.active) * {
+  animation-play-state: paused !important;
+}
+
+/* Long lists and tables: let the engine skip offscreen rows. */
+html:not(#_) body:not(#_) .table-container tbody tr,
+html:not(#_) body:not(#_) .leads-table tbody tr,
+html:not(#_) body:not(#_) #jarvis-messages > * {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 44px;
+}
+
+/* ── 4. The orb was being clipped ────────────────────────────
+   `contain: paint` clips descendants to the padding box, and the
+   orb's blobs animate past their container — hence the flat edge.
+   Layout+style containment keeps the isolation without the crop. */
+html:not(#_) body:not(#_) #orb-container {
+  contain: layout style !important;
+  overflow: visible !important;
+  /* min/max were pinned to 220px elsewhere, which overrode `width`
+     inside the flex row — all four have to move together. */
+  width: max(150px, min(20vw, 30vh)) !important;
+  height: max(150px, min(20vw, 30vh)) !important;
+  min-width: max(150px, min(20vw, 30vh)) !important;
+  min-height: max(150px, min(20vw, 30vh)) !important;
+  max-width: max(150px, min(20vw, 30vh)) !important;
+  max-height: max(150px, min(20vw, 30vh)) !important;
+  flex: 0 0 auto !important;
+  aspect-ratio: 1 / 1;
+}
+html:not(#_) body:not(#_) #view-jarvis.active.has-messages .jarvis-center-orb-wrapper #orb-container {
+  width: clamp(64px, 6vw, 88px) !important;
+  height: clamp(64px, 6vw, 88px) !important;
+  min-width: clamp(64px, 6vw, 88px) !important;
+  min-height: clamp(64px, 6vw, 88px) !important;
+  max-width: clamp(64px, 6vw, 88px) !important;
+  max-height: clamp(64px, 6vw, 88px) !important;
+}
+html:not(#_) body:not(#_) #orbCanvas,
+html:not(#_) body:not(#_) #orb-container > canvas,
+html:not(#_) body:not(#_) #orb-container > svg { width: 100% !important; height: 100% !important; display: block; border-radius: 50% !important; }
+
+/* ── 5. Square the panel edges ───────────────────────────────── */
+html:not(#_) body:not(#_) .views-container,
+html:not(#_) body:not(#_) #main-scroll-area,
+html:not(#_) body:not(#_) #main-content,
+html:not(#_) body:not(#_) .app-shell,
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage {
+  border-radius: 0 !important;
+}
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-split-layout {
+  padding: 0 !important;
+  gap: 0 !important;
+}
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage {
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+}
+
+/* ── 6. Retire the credit counter ────────────────────────────── */
+html:not(#_) body:not(#_) #token-meter,
+html:not(#_) body:not(#_) .lx-usage-card,
+html:not(#_) body:not(#_) .sidebar .token-meter,
+html:not(#_) body:not(#_) .token-count-num { display: none !important; }
+
+/* ── 7. Studio type follows the same scale ───────────────────── */
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-greeting {
+  font-size: var(--ap-fs-display) !important;
+}
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-subgreeting,
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-feature-tip-pill {
+  font-size: var(--ap-fs-sub) !important;
+}
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .claude-textarea,
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-luxury-textarea {
+  font-size: var(--ap-fs-body) !important;
+}
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill,
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-status,
+html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-newchat-pill {
+  font-size: var(--ap-fs-foot) !important;
+}
+html:not(#_) body:not(#_) .cts { font-size: var(--ap-fs-foot); }
+html:not(#_) body:not(#_) .cts-title { font-size: var(--ap-fs-t3); }
+html:not(#_) body:not(#_) .cts-live, html:not(#_) body:not(#_) .cts-summary { font-size: var(--ap-fs-sub); }
+
+/* ── 8. Small windows ────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  :root { --sidebar-expanded: 200px; }
+  html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-header { padding: 10px 12px !important; }
+}
+@media (max-height: 700px) {
+  html:not(#_) body:not(#_) #orb-container {
+    width: clamp(120px, 18vh, 180px) !important;
+    height: clamp(120px, 18vh, 180px) !important;
+    min-width: clamp(120px, 18vh, 180px) !important;
+    min-height: clamp(120px, 18vh, 180px) !important;
+    max-width: clamp(120px, 18vh, 180px) !important;
+    max-height: clamp(120px, 18vh, 180px) !important;
+  }
+  html:not(#_) body:not(#_) #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-center-orb-wrapper {
+    gap: 12px !important; padding: 12px 16px 4px !important;
+  }
+}

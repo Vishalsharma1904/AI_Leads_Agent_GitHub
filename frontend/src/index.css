@@ -1,0 +1,56 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@import "tailwindcss";
+
+@theme {
+  --color-background: #09090b;
+  --color-foreground: #f8fafc;
+  --color-card: #0f1115;
+  --color-border: #1e293b;
+}
+
+@layer base {
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@layer utilities {
+  .glass {
+    @apply bg-card/80 backdrop-blur-xl border border-white/5;
+  }
+  
+  .glass-panel {
+    @apply bg-[#0f1115]/60 backdrop-blur-2xl border border-white/10 shadow-2xl;
+  }
+
+  .text-gradient {
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-indigo-400 to-purple-400;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    @apply bg-white/10 rounded-full hover:bg-white/20 transition-colors;
+  }
+
+  .tubelight-bulb {
+    box-shadow: 0 0 5px rgba(255,255,255,1),
+                0 0 15px rgba(255,255,255,0.8),
+                0 0 30px rgba(99,102,241,0.8),
+                0 0 60px rgba(99,102,241,0.4);
+  }
+
+  .tubelight-ray {
+    background: linear-gradient(to bottom, rgba(255,255,255,0.08) 0%, rgba(99,102,241,0.03) 25%, transparent 100%);
+    clip-path: polygon(20% 0, 80% 0, 100% 100%, 0 100%);
+  }
+}

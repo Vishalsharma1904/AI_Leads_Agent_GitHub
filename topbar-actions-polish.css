@@ -1,0 +1,217 @@
+/* Topbar and Clavis-header controls: flat, precise actions without pill chrome. */
+:root {
+  --top-action-ink: #2d2c29;
+  --top-action-muted: #716e68;
+  --top-action-accent: #0a66d8;
+  --top-action-focus: rgba(10, 102, 216, 0.34);
+}
+
+html[data-theme="dark"] {
+  --top-action-ink: #f3f1ed;
+  --top-action-muted: #aaa69e;
+  --top-action-accent: #5da2ff;
+  --top-action-focus: rgba(93, 162, 255, 0.48);
+}
+
+/* Text actions read as part of the header, with an underline as feedback. */
+html body .topbar .tb-history-btn,
+html body .topbar .tb-shortcuts-btn,
+html body .topbar .tb-sneak-peek-btn,
+html body .topbar .generate-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 6px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--top-action-muted) !important;
+  font-size: 12px !important;
+  font-weight: 590 !important;
+  letter-spacing: -0.01em;
+  cursor: pointer;
+  transition: color 160ms ease, transform 120ms ease;
+}
+
+html body .topbar .tb-history-btn::after,
+html body .topbar .tb-shortcuts-btn::after,
+html body .topbar .tb-sneak-peek-btn::after,
+html body .topbar .generate-btn::after {
+  content: '' !important;
+  position: absolute;
+  right: 6px;
+  bottom: 2px;
+  left: 6px;
+  height: 2px;
+  background: currentColor !important;
+  opacity: 0;
+  transform: scaleX(0.45);
+  transform-origin: center;
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+html body .topbar .tb-history-btn:hover,
+html body .topbar .tb-shortcuts-btn:hover,
+html body .topbar .tb-sneak-peek-btn:hover,
+html body .topbar .generate-btn:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--top-action-ink) !important;
+  transform: translateY(-1px) !important;
+}
+
+html body .topbar .generate-btn {
+  color: var(--top-action-accent) !important;
+  font-weight: 680 !important;
+}
+
+html body .topbar .tb-history-btn:hover::after,
+html body .topbar .tb-shortcuts-btn:hover::after,
+html body .topbar .tb-sneak-peek-btn:hover::after,
+html body .topbar .generate-btn:hover::after,
+html body .topbar .tb-sneak-peek-btn[aria-pressed="true"]::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+
+html body .topbar .tb-history-btn:active,
+html body .topbar .tb-shortcuts-btn:active,
+html body .topbar .tb-sneak-peek-btn:active,
+html body .topbar .generate-btn:active {
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: translateY(1px) !important;
+}
+
+html body .topbar .tb-history-btn:focus-visible,
+html body .topbar .tb-shortcuts-btn:focus-visible,
+html body .topbar .tb-sneak-peek-btn:focus-visible,
+html body .topbar .generate-btn:focus-visible,
+html body .topbar .topbar-user-badge:focus-visible,
+html body .topbar .lx-theme-toggle:focus-visible,
+html body #view-jarvis.active .jarvis-icon-pill:focus-visible,
+html body #view-jarvis.active .jarvis-newchat-pill:focus-visible {
+  outline: 2px solid var(--top-action-focus) !important;
+  outline-offset: 2px;
+}
+
+html body .topbar .tb-shortcuts-btn .tb-cmd-icon {
+  width: auto !important;
+  height: auto !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* The account and theme controls stay discoverable without becoming cards. */
+html body .topbar .topbar-user-badge,
+html body .topbar .topbar-user-badge:hover {
+  min-height: 32px !important;
+  padding: 0 4px 0 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--top-action-ink) !important;
+}
+
+html body .topbar .lx-theme-toggle,
+html[data-theme="light"] body .topbar .lx-theme-toggle,
+html[data-theme="dark"] body .topbar .lx-theme-toggle {
+  width: 32px !important;
+  height: 32px !important;
+  margin-inline: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+html body .topbar .lx-theme-toggle::before,
+html body .topbar .lx-theme-toggle::after,
+html body .topbar .lx-toggle-ghost { display: none !important; }
+html body .topbar .lx-toggle-ball,
+html[data-theme="light"] body .topbar .lx-toggle-ball,
+html[data-theme="dark"] body .topbar .lx-toggle-ball {
+  top: 4px !important;
+  left: 4px !important;
+  width: 24px !important;
+  height: 24px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+/* Header mode controls: transparent hit areas, with a restrained active bar. */
+html body #view-jarvis.active .jarvis-icon-pill,
+html body #view-jarvis.active .jarvis-newchat-pill {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--top-action-muted) !important;
+  transition: color 160ms ease, transform 120ms ease !important;
+}
+html body #view-jarvis.active .jarvis-icon-pill::after,
+html body #view-jarvis.active .jarvis-newchat-pill::after {
+  content: '';
+  position: absolute;
+  right: 7px;
+  bottom: 2px;
+  left: 7px;
+  height: 2px;
+  background: currentColor;
+  opacity: 0;
+  transform: scaleX(0.4);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+html body #view-jarvis.active .jarvis-icon-pill:hover,
+html body #view-jarvis.active .jarvis-newchat-pill:hover {
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--top-action-ink) !important;
+  transform: translateY(-1px) !important;
+}
+html body #view-jarvis.active .jarvis-icon-pill.active,
+html body #view-jarvis.active .jarvis-icon-pill[aria-pressed="true"] {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--top-action-accent) !important;
+}
+html body #view-jarvis.active .jarvis-icon-pill:hover::after,
+html body #view-jarvis.active .jarvis-newchat-pill:hover::after,
+html body #view-jarvis.active .jarvis-icon-pill.active::after,
+html body #view-jarvis.active .jarvis-icon-pill[aria-pressed="true"]::after {
+  opacity: 1;
+  transform: scaleX(1);
+}
+html body #view-jarvis.active .jarvis-icon-pill:active,
+html body #view-jarvis.active .jarvis-newchat-pill:active {
+  transform: translateY(1px) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body .topbar .tb-history-btn,
+  html body .topbar .tb-shortcuts-btn,
+  html body .topbar .tb-sneak-peek-btn,
+  html body .topbar .generate-btn,
+  html body #view-jarvis.active .jarvis-icon-pill,
+  html body #view-jarvis.active .jarvis-newchat-pill {
+    transition: none !important;
+  }
+}

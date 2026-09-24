@@ -1,0 +1,652 @@
+/* ============================================================
+   clavis-motion.css
+   ------------------------------------------------------------
+   Loaded last. Three things live here and nothing else:
+
+     1. the ghost-completion mirror and its Tab affordance
+     2. the attachment tray in the Clavis composer
+     3. the Peek Task window's motion — the slow blur-to-clear
+        open, the per-word settle of an answer, and the smart chips
+
+   Everything animates transform / opacity / filter only, except
+   the panel's own height, which is already isolated by
+   `contain: layout paint style` on .cts.
+   ============================================================ */
+
+:root {
+  --ciq-ease-soft:  cubic-bezier(0.22, 1, 0.36, 1);
+  --ciq-ease-calm:  cubic-bezier(0.16, 1, 0.3, 1);
+  --ciq-ease-glide: cubic-bezier(0.33, 0.01, 0, 1);
+  --ciq-ghost:      rgba(120, 118, 112, 0.52);
+}
+
+html[data-theme="dark"] {
+  --ciq-ghost: rgba(190, 190, 198, 0.42);
+}
+
+/* ══════════════════════════════════════════════════════════
+   1 · Ghost completion
+   ══════════════════════════════════════════════════════════
+   The mirror sits exactly over the textarea. What the user typed
+   is re-drawn invisibly so the suggestion starts at the right
+   pixel; only the suggestion itself is painted. */
+
+.ciq-mirror {
+  position: absolute;
+  z-index: 6;
+  margin: 0;
+  pointer-events: none;
+  user-select: none;
+  overflow: hidden;
+  background: none;
+  border-color: transparent;
+  border-style: solid;
+  white-space: pre-wrap;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  opacity: 0;
+  visibility: hidden;
+  contain: layout paint style;
+}
+
+.ciq-mirror.is-live {
+  opacity: 1;
+  visibility: visible;
+}
+
+.ciq-typed {
+  color: transparent;
+}
+
+.ciq-ghost {
+  color: var(--ciq-ghost);
+  font-weight: inherit;
+  opacity: 0;
+  animation: ciq-ghost-in 260ms var(--ciq-ease-calm) forwards;
+}
+
+@keyframes ciq-ghost-in {
+  from { opacity: 0; filter: blur(2.5px); }
+  to   { opacity: 1; filter: blur(0); }
+}
+
+/* Tab accepted: the typed part is painted for real (the textarea's own
+   glyphs are hidden for the duration by .ciq-input-muted) and the grey
+   run walks up to full ink. One object changing colour, not two. */
+.ciq-mirror.is-accepting .ciq-typed {
+  color: var(--ciq-ink, currentColor);
+}
+
+.ciq-mirror.is-accepting .ciq-ghost {
+  animation: none;
+  opacity: 1;
+  color: var(--ciq-ghost);
+  transition: color 380ms var(--ciq-ease-calm);
+}
+
+.ciq-mirror.is-accepting.is-settled .ciq-ghost {
+  color: var(--ciq-ink, currentColor);
+}
+
+.ciq-input-muted {
+  color: transparent !important;
+  -webkit-text-fill-color: transparent !important;
+}
+
+/* The Tab affordance — small, upper right, only while a suggestion is live */
+.ciq-tab-hint {
+  position: absolute;
+  top: -11px;
+  right: 16px;
+  z-index: 9;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 6px;
+  border-radius: 999px;
+  font-family: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--ciq-ghost);
+  background: var(--background, #fff);
+  border: 1px solid rgba(127, 127, 127, 0.18);
+  box-shadow: 0 2px 8px rgba(20, 18, 16, 0.07);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(4px) scale(0.94);
+  transition:
+    opacity 300ms var(--ciq-ease-calm),
+    transform 420ms var(--ciq-ease-soft);
+}
+
+html[data-theme="dark"] .ciq-tab-hint {
+  background: #1C1C1E;
+  border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+}
+
+.ciq-tab-hint.is-live {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.ciq-tab-hint kbd {
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 5px;
+  color: var(--foreground, #111);
+  background: rgba(127, 127, 127, 0.12);
+  border: none;
+  box-shadow: none;
+}
+
+html[data-theme="dark"] .ciq-tab-hint { color: rgba(190, 190, 198, 0.62); }
+html[data-theme="dark"] .ciq-tab-hint kbd { color: #F4F4F6; }
+
+/* Inside the narrow floating window the pill tucks in tighter */
+.cts-composer .ciq-tab-hint {
+  top: -10px;
+  right: 12px;
+  font-size: 10px;
+  padding: 2px 8px 2px 5px;
+}
+
+/* ══════════════════════════════════════════════════════════
+   2 · Attachment tray in the Clavis composer
+   ══════════════════════════════════════════════════════════
+   Pasted screenshots get their own labelled section. The 0fr→1fr
+   grid trick animates to the tray's natural height, so the composer
+   grows into the space instead of snapping. */
+
+.ciq-tray {
+  display: grid;
+  grid-template-rows: 0fr;
+  width: 100%;
+  opacity: 0;
+  transition:
+    grid-template-rows 520ms var(--ciq-ease-glide),
+    opacity 320ms var(--ciq-ease-calm),
+    margin 420ms var(--ciq-ease-glide);
+  margin-bottom: 0;
+}
+
+.ciq-tray > * { min-height: 0; }
+
+.ciq-tray.has-items {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin-bottom: 8px;
+}
+
+.ciq-tray-head {
+  display: none;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 4px 7px;
+  font-family: "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+  color: rgba(127, 127, 127, 0.72);
+}
+
+.ciq-tray.has-items .ciq-tray-head {
+  display: flex;
+  animation: ciq-tray-head-in 420ms var(--ciq-ease-soft) both;
+}
+
+@keyframes ciq-tray-head-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.ciq-tray-icon { display: inline-flex; opacity: 0.8; }
+
+.ciq-tray-count { flex: 0 0 auto; }
+
+.ciq-tray-clear {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  color: rgba(127, 127, 127, 0.68);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 240ms var(--ciq-ease-calm), background 200ms, color 200ms;
+}
+
+.ciq-tray:hover .ciq-tray-clear { opacity: 1; }
+
+.ciq-tray-clear:hover {
+  background: rgba(127, 127, 127, 0.11);
+  color: var(--foreground, #111);
+}
+
+html[data-theme="dark"] .ciq-tray-clear:hover { color: #F4F4F6; }
+
+/* The dock itself is now inside the tray, so it no longer needs its own
+   slide-down or its divider line — the tray provides both. */
+.ciq-tray .clavis-composer-attachment-dock {
+  padding: 0 2px 2px;
+  border-bottom: none;
+}
+
+.ciq-tray .clavis-composer-attachment-dock.has-items {
+  animation: none;
+  max-height: none;
+}
+
+/* Cards spring in one after another rather than all at once */
+.ciq-tray .clavis-att-card {
+  animation: ciq-card-in 520ms var(--ciq-ease-soft) both;
+  animation-delay: calc(var(--ciq-i, 0) * 45ms);
+}
+
+@keyframes ciq-card-in {
+  0%   { opacity: 0; transform: translateY(9px) scale(0.9); filter: blur(5px); }
+  60%  { opacity: 1; filter: blur(0); }
+  100% { opacity: 1; transform: none; filter: blur(0); }
+}
+
+/* Four or more and the cards tighten instead of scrolling away */
+.clavis-composer-attachment-dock.is-dense .clavis-att-card {
+  max-width: 152px;
+}
+
+/* A pasted screenshot should feel caught */
+.jarvis-luxury-composer.ciq-caught,
+.jarvis-input-container.ciq-caught,
+.cts-composer.ciq-caught {
+  animation: ciq-caught 640ms var(--ciq-ease-soft);
+}
+
+@keyframes ciq-caught {
+  0%   { transform: scale(1); }
+  28%  { transform: scale(1.012); }
+  100% { transform: scale(1); }
+}
+
+/* ══════════════════════════════════════════════════════════
+   3 · Peek Task window — open, settle, read
+   ══════════════════════════════════════════════════════════ */
+
+/* The open. Nine hundred milliseconds from a blurred, slightly small,
+   slightly lifted card to something crystal clear and settled. The blur
+   is what makes it read as arriving rather than appearing: the eye reads
+   focus-pulling as depth, and depth over this long a curve reads as calm.
+   The clip-path keeps the old capsule→card idea, just unhurried. */
+.cts.is-revealing {
+  animation: ciq-peek-arrive 960ms var(--ciq-ease-glide) forwards;
+  will-change: transform, opacity, filter, clip-path, border-radius;
+}
+
+@keyframes ciq-peek-arrive {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.955);
+    filter: blur(16px) saturate(1.28);
+    border-radius: 9999px;
+    clip-path: inset(0 0 calc(100% - 44px) 0 round 9999px);
+  }
+  18% {
+    opacity: 1;
+    transform: translateY(-3px) scale(0.982);
+    filter: blur(9px) saturate(1.18);
+    border-radius: 9999px;
+    clip-path: inset(0 0 calc(100% - 44px) 0 round 9999px);
+  }
+  52% {
+    opacity: 1;
+    transform: translateY(0) scale(1.004);
+    filter: blur(3.2px) saturate(1.06);
+    border-radius: 26px;
+    clip-path: inset(0 0 0 0 round 26px);
+  }
+  78% {
+    filter: blur(0.7px) saturate(1.01);
+    transform: scale(1.001);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: blur(0) saturate(1);
+    border-radius: 18px;
+    clip-path: inset(0 0 0 0 round 18px);
+  }
+}
+
+/* The shadow lands after the panel does, so the card looks like it
+   settles onto the page rather than starting out already heavy. */
+.cts.is-revealing::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.5), transparent 62%);
+  opacity: 0;
+  animation: ciq-peek-sheen 1100ms var(--ciq-ease-calm) forwards;
+}
+
+html[data-theme="dark"] .cts.is-revealing::after {
+  background:
+    radial-gradient(120% 70% at 50% 0%, rgba(255, 255, 255, 0.09), transparent 62%);
+}
+
+@keyframes ciq-peek-sheen {
+  0%   { opacity: 0; }
+  30%  { opacity: 1; }
+  100% { opacity: 0; }
+}
+
+/* Slower, softer closing transitions than the base file sets, so a
+   resize or a drag-release eases rather than snaps. */
+.cts {
+  transition:
+    opacity 420ms var(--ciq-ease-calm),
+    transform 900ms var(--ciq-ease-soft),
+    height 900ms var(--ciq-ease-glide),
+    width 860ms var(--ciq-ease-glide),
+    border-radius 760ms var(--ciq-ease-soft),
+    box-shadow 720ms var(--ciq-ease-calm);
+}
+
+.cts.is-dragging { transition: none !important; }
+
+/* ── The answer settles in, word by word ───────────────────
+   Not a typewriter that spells letters out — that is slower to read
+   than it is impressive. Each word arrives from a small blur, with a
+   stagger the JS shortens as the answer gets longer, so a two-line
+   reply feels deliberate and a twenty-line one never feels slow. */
+.cts-tw-w {
+  display: inline-block;
+  opacity: 0;
+  /* Softer than before: a heavy blur dissolving in per word is what
+     reads as "effect" rather than "arriving". A hair of blur and a
+     shorter lift reads as ink settling instead. */
+  filter: blur(2.5px);
+  transform: translateY(3px);
+  animation: ciq-word-in 460ms var(--ciq-ease-calm) forwards;
+  animation-delay: calc(var(--w, 0) * var(--wstep, 16ms));
+  will-change: opacity, filter, transform;
+}
+
+@keyframes ciq-word-in {
+  to { opacity: 1; filter: blur(0); transform: none; }
+}
+
+/* Blocks that are not prose — tables, meters, stat rows — fade as one
+   piece. Reading a table word by word is noise. */
+.cts-tw-b {
+  opacity: 0;
+  animation: ciq-block-in 520ms var(--ciq-ease-soft) forwards;
+  animation-delay: calc(var(--w, 0) * var(--wstep, 16ms));
+}
+
+@keyframes ciq-block-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.995); filter: blur(2px); }
+  to   { opacity: 1; transform: none; filter: blur(0); }
+}
+
+/* While it is still writing, a soft caret keeps the line alive */
+.cts[data-phase="working"] .cts-live-text::after,
+.cts[data-phase="understanding"] .cts-live-text::after {
+  content: '';
+  display: inline-block;
+  width: 2px;
+  height: 0.95em;
+  margin-left: 3px;
+  vertical-align: -0.12em;
+  border-radius: 1px;
+  background: currentColor;
+  opacity: 0.5;
+  animation: ciq-caret 1.15s var(--ciq-ease-calm) infinite;
+}
+
+@keyframes ciq-caret {
+  0%, 44%  { opacity: 0.55; transform: scaleY(1); }
+  62%      { opacity: 0.08; transform: scaleY(0.85); }
+  100%     { opacity: 0.55; transform: scaleY(1); }
+}
+
+/* ── Smart chips ───────────────────────────────────────────
+   Follow-ups written for this conversation, sitting between the
+   answer and the composer. They stagger in, and when the model's
+   own set arrives it cross-fades over the local one in place. */
+.cts-smart {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 11px 14px 3px;
+  border-top: 1px solid var(--cts-line-2, rgba(127, 127, 127, 0.1));
+  transition: opacity 260ms var(--ciq-ease-calm);
+}
+
+.cts-smart[hidden] { display: none; }
+
+/* The chips already carry the separator, so the composer's own top rule
+   would only draw a second hairline two pixels below the first. */
+.cts-smart:not([hidden]) + .cts-composer { border-top-color: transparent; }
+
+.cts-smart.is-swapping { opacity: 0; }
+
+.cts-smart-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cts-smart-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--cts-faint, #9C9890);
+}
+
+.cts-smart-label .cts-chip-ico { opacity: 0.8; }
+
+.cts-smart-label svg { opacity: 0.75; }
+
+.cts-smart-label .cts-smart-spark {
+  display: inline-block;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 400ms var(--ciq-ease-calm);
+}
+
+.cts-smart.is-thinking .cts-smart-spark {
+  opacity: 0.9;
+  animation: ciq-spark 1.4s ease-in-out infinite;
+}
+
+@keyframes ciq-spark {
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50%      { opacity: 0.25; transform: scale(0.72); }
+}
+
+.cts-smart-chip {
+  --ciq-chip-i: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 6px 11px;
+  border: 1px solid var(--cts-line, rgba(127, 127, 127, 0.18));
+  border-radius: 999px;
+  background: transparent;
+  font-family: var(--cts-sans, "Figtree", sans-serif);
+  font-size: 11.5px;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+  color: var(--cts-mute, #6B6862);
+  text-align: left;
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0;
+  transform: translateY(7px) scale(0.965);
+  filter: blur(4px);
+  animation: ciq-chip-in 560ms var(--ciq-ease-soft) forwards;
+  animation-delay: calc(var(--ciq-chip-i) * 58ms);
+  transition:
+    background 220ms var(--ciq-ease-calm),
+    border-color 220ms var(--ciq-ease-calm),
+    color 220ms var(--ciq-ease-calm),
+    transform 320ms var(--ciq-ease-soft),
+    box-shadow 260ms var(--ciq-ease-calm);
+}
+
+@keyframes ciq-chip-in {
+  to { opacity: 1; transform: none; filter: blur(0); }
+}
+
+.cts-smart-chip:hover {
+  background: var(--cts-line-2, rgba(127, 127, 127, 0.08));
+  border-color: var(--cts-mute, #6B6862);
+  color: var(--cts-text, #1A1917);
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px -4px rgba(23, 21, 18, 0.18);
+}
+
+.cts-smart-chip:active {
+  transform: translateY(0) scale(0.975);
+  transition-duration: 90ms;
+}
+
+.cts-smart-chip .cts-chip-ico {
+  flex: 0 0 auto;
+  display: inline-flex;
+  opacity: 0.6;
+}
+
+.cts-smart-chip:hover .cts-chip-ico { opacity: 0.95; }
+
+/* Tapped: it fills in and lifts out, so the send is felt, not assumed */
+.cts-smart-chip.is-fired {
+  animation: ciq-chip-fire 460ms var(--ciq-ease-soft) forwards;
+}
+
+@keyframes ciq-chip-fire {
+  0%   { transform: scale(1); opacity: 1; }
+  30%  { transform: scale(0.94); opacity: 1; }
+  100% { transform: translateY(-10px) scale(0.9); opacity: 0; filter: blur(4px); }
+}
+
+/* The "+" menu, rebuilt from the conversation. Same pill shape as
+   before, now carrying a line icon and a subject-specific label. */
+.cts-action-pill--iq {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  animation: ciq-chip-in 460ms var(--ciq-ease-soft) both;
+}
+
+.cts-action-pill--iq .cts-chip-ico {
+  flex: 0 0 auto;
+  display: inline-flex;
+  opacity: 0.6;
+}
+
+.cts-action-pill--iq:hover .cts-chip-ico { opacity: 1; }
+
+.cts-action-pill--iq > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Body and header polish ───────────────────────────────── */
+
+/* Once every word has landed, give the compositor its budget back.
+   Leaving will-change on a few hundred spans is how a smooth panel
+   turns into a warm laptop. */
+.cts-body.is-settled .cts-tw-w,
+.cts-body.is-settled .cts-tw-b {
+  will-change: auto;
+  animation: none;
+  opacity: 1;
+  filter: none;
+  transform: none;
+}
+
+/* The base file fades the whole body in one go. The per-word pass
+   replaces that, so drop the blanket animation when it is running. */
+.cts-body.cts-enter.has-words { animation: none; }
+
+.cts-body { scroll-behavior: smooth; }
+
+.cts-head { transition: opacity 400ms var(--ciq-ease-calm); }
+
+.cts-head-label {
+  transition: color 300ms var(--ciq-ease-calm);
+}
+
+/* Grabbing the header should feel like picking the card up */
+.cts.is-dragging {
+  transform: scale(1.014) !important;
+  cursor: grabbing;
+}
+
+/* The composer inside the window breathes with focus */
+.cts-composer-input-wrap {
+  transition:
+    background 300ms var(--ciq-ease-calm),
+    border-color 300ms var(--ciq-ease-calm),
+    box-shadow 380ms var(--ciq-ease-calm);
+}
+
+.cts-composer-input::placeholder {
+  transition: opacity 320ms var(--ciq-ease-calm);
+}
+
+.cts-composer-input:focus::placeholder { opacity: 0.55; }
+
+/* ══════════════════════════════════════════════════════════
+   Reduced motion — keep the meaning, drop the movement
+   ══════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  .cts.is-revealing,
+  .cts.is-revealing::after,
+  .cts-tw-w,
+  .cts-tw-b,
+  .cts-smart-chip,
+  .ciq-tray .clavis-att-card,
+  .ciq-ghost {
+    animation: none !important;
+    opacity: 1 !important;
+    filter: none !important;
+    transform: none !important;
+  }
+  .cts,
+  .ciq-tray,
+  .ciq-tab-hint {
+    transition-duration: 1ms !important;
+  }
+  .cts[data-phase="working"] .cts-live-text::after,
+  .cts[data-phase="understanding"] .cts-live-text::after {
+    animation: none;
+  }
+}

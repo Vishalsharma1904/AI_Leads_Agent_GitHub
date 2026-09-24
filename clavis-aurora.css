@@ -1,0 +1,2667 @@
+/* ============================================================
+   clavis-aurora.css — Clavis AI Studio, editorial pass
+   ------------------------------------------------------------
+   Loaded LAST, after clavis-sidebar.css. Three jobs:
+
+     1. One typographic system for the studio page:
+        Figtree for everything you operate, an editorial serif
+        for everything you read. Nothing else.
+     2. One motion vocabulary. Every surface in this app now
+        opens the same way: out of focus, then settling into
+        focus. Blur resolves slower than opacity, and transform
+        settles slower than both — that stagger is the whole
+        trick. It reads as a lens finding focus, not as a box
+        being drawn.
+     3. The floating task surface: shadow, grab-and-move, and a
+        body that changes shape with what was actually asked.
+
+   Specificity note: the app is full of `html body .x !important`.
+   Every rule here is prefixed `html body` (0,2,x) or carries the
+   view id (1,3,x), which is what keeps it on top without relying
+   on load-order luck. Don't lower them.
+
+   Performance note: blur is expensive to hold. Every surface
+   below drops `filter` to `none` once it has settled (JS adds
+   `.au-settled` on transitionend), so at rest nothing in this
+   file costs a compositor pass.
+   ============================================================ */
+
+/* ── WHY `backwards` AND NOT `both` ─────────────────────────────
+   `both` holds the last keyframe forever. The last keyframe of
+   every reveal here ends on `filter: blur(0)` — and a filter that
+   is *present but zero* still promotes the element to its own
+   composited layer, where Chrome rasterises the text separately
+   and it comes back soft. That is why the floating panel's answer
+   stayed blurry long after it had opened, and why chat messages
+   read slightly fuzzy.
+   `backwards` applies the first keyframe before the run and then
+   lets go, so at rest the element is back on its own styles with
+   no filter, no layer, and crisp text. Same for the resting
+   `filter: blur(0)` declarations below: `none` still animates
+   (the spec interpolates it as the identity) and costs nothing. */
+
+/* ── 0. Tokens ─────────────────────────────────────────────── */
+:root {
+  /* Type. Two families do the work; the third is for numbers. */
+  --au-sans:    "Figtree", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --au-display: "Instrument Serif", "Newsreader", "Cormorant Garamond", Georgia, serif;
+  --au-read:    "Newsreader", "Instrument Serif", "Cormorant Garamond", Georgia, serif;
+  --au-mono:    ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+
+  /* ── Ink: two colours and everything between them ───────────
+     PLUM #381932 is the ink and the rail. MILK #FFF3E6 is the
+     page. Every neutral below is one of those two mixed toward
+     the other — which is why nothing here reads as "grey UI with
+     a colour bolted on". Cold grey next to a warm serif is the
+     fastest way to make a page look unfinished. */
+  --au-plum:    #381932;
+  --au-milk:    #FFF3E6;
+
+  --au-paper:   #FAF7F1;   /* the ground — rail and page share it */
+  --au-panel:   #FFFFFF;   /* the sheet the work sits on */
+  --au-sunk:    #F4EFE7;   /* a well in the sheet */
+  --au-line:    #EDE7DD;   /* hairline. Never a wall. */
+  --au-line-2:  #F5F1EA;   /* the quieter hairline */
+  --au-ink:     #381932;
+  --au-ink-2:   #5A3A50;
+  --au-mute:    #7C5E72;
+  --au-faint:   #A38C9B;
+  /* Berry: between the plum and the warm. 5.7:1 on milk, so it is
+     safe as text, not just as decoration. */
+  --au-accent:  #A63A5B;
+  --au-accent-soft: rgba(166, 58, 91, 0.10);
+  --au-ok:      #4F7A5E;
+  --au-warn:    #A8763A;
+  --au-err:     #B03E44;
+
+  /* ── The rail: cream, plum ink. Light by design.
+     Every rail rule reads these tokens and nothing else, so the
+     whole rail changes tone from this block alone. --rail-bg is a
+     step deeper than the milk page so the seam reads without a
+     border doing the work. */
+  --rail-bg:     #FAF7F1;   /* identical to --au-paper, on purpose */
+  --rail-top:    #FAF7F1;   /* no header band either — one surface */
+  --rail-seam:   transparent;
+  --rail-line:   #EDE7DD;
+  --rail-text:   #381932;
+  --rail-label:  #57384D;
+  --rail-mute:   #7C5E72;
+  --rail-faint:  #A99384;
+  --rail-hover:  rgba(56, 25, 50, 0.050);
+  --rail-active: rgba(56, 25, 50, 0.085);
+  --rail-accent: #A63A5B;   /* berry — 5.7:1 on cream */
+  --rail-accent-soft: rgba(166, 58, 91, 0.10);
+
+  /* Motion. One spring, one exit, one glass curve — the glass
+     curve is deliberately long and back-loaded so the last of
+     the blur clears slowly. That tail is what feels expensive. */
+  --au-spring:  cubic-bezier(0.16, 1, 0.3, 1);
+  --au-soft:    cubic-bezier(0.32, 0.9, 0.24, 1);
+  --au-out:     cubic-bezier(0.2, 0, 0, 1);
+  /* Not front-loaded. A blur that clears in the first 150ms reads
+     as a pop; this curve keeps the last two pixels of it for most
+     of the duration, which is what makes it feel like focus
+     rather than a fade. */
+  --au-glass:   cubic-bezier(0.28, 0.5, 0.12, 1);
+  --au-t-tap:   120ms;
+  --au-t-fast:  180ms;
+  --au-t-base:  320ms;
+  --au-t-slow:  520ms;
+  --au-t-glass: 760ms;
+  /* One clock for the rail and the page it pushes. Two different
+     durations here is what made the rail look like it slid under
+     the content — see section 6e. */
+  --au-rail-t:  320ms;
+  --au-rail-e:  cubic-bezier(0.16, 1, 0.3, 1);
+
+  /* Elevation. Four stops, low contrast, warm-tinted — a sheet
+     lifted off paper rather than a card with a drop shadow. */
+  /* Five stops, none above 12%. One dark shadow reads as a sticker;
+     a stack of faint ones reads as a sheet resting on paper, which
+     is the only shadow this UI ever wants. */
+  --au-lift-1:
+    0 0 0 0.5px rgba(46, 32, 42, 0.030),
+    0 1px 1px rgba(46, 32, 42, 0.028),
+    0 2px 4px -1px rgba(46, 32, 42, 0.030),
+    0 6px 12px -6px rgba(46, 32, 42, 0.060);
+  --au-lift-2:
+    0 0 0 0.5px rgba(46, 32, 42, 0.035),
+    0 1px 2px rgba(46, 32, 42, 0.030),
+    0 4px 8px -2px rgba(46, 32, 42, 0.040),
+    0 12px 24px -10px rgba(46, 32, 42, 0.070),
+    0 28px 48px -24px rgba(46, 32, 42, 0.090);
+  --au-lift-3:
+    0 0 0 0.5px rgba(46, 32, 42, 0.040),
+    0 2px 3px rgba(46, 32, 42, 0.030),
+    0 6px 12px -3px rgba(46, 32, 42, 0.045),
+    0 18px 34px -14px rgba(46, 32, 42, 0.085),
+    0 40px 72px -30px rgba(46, 32, 42, 0.110),
+    0 80px 120px -56px rgba(46, 32, 42, 0.090);
+  --au-lift-drag:
+    0 0 0 0.5px rgba(46, 32, 42, 0.055),
+    0 3px 6px rgba(46, 32, 42, 0.040),
+    0 12px 22px -6px rgba(46, 32, 42, 0.070),
+    0 34px 56px -20px rgba(46, 32, 42, 0.140),
+    0 72px 108px -40px rgba(46, 32, 42, 0.160),
+    0 130px 180px -80px rgba(46, 32, 42, 0.120);
+}
+
+html[data-theme="dark"] {
+  /* Dark is the plum pushed down, not a different hue. The rail
+     barely changes — it was already the dark half of the pair. */
+  --au-paper:   #150A12;
+  --au-panel:   #1E1019;
+  --au-sunk:    #180B14;
+  --au-line:    #34202D;
+  --au-line-2:  #271620;
+  --au-ink:     #FFF3E6;
+  --au-ink-2:   #E2CFD9;
+  --au-mute:    #A98FA0;
+  --au-faint:   #7A6372;
+  --au-accent:  #E7A87F;
+  --au-accent-soft: rgba(231, 168, 127, 0.14);
+  --au-ok:      #7FA98C;
+  --au-warn:    #C9A15E;
+  --au-err:     #D9727A;
+
+  --rail-bg:     #150A12;
+  --rail-top:    #150A12;
+  --rail-seam:   transparent;
+  --rail-line:   #34202D;
+  --rail-text:   #FFF3E6;
+  --rail-label:  #D8C6D1;
+  --rail-mute:   #A98FA0;
+  --rail-faint:  #7A6372;
+  --rail-hover:  rgba(255, 243, 230, 0.055);
+  --rail-active: rgba(255, 243, 230, 0.10);
+  --rail-accent: #E7A87F;
+  --rail-accent-soft: rgba(231, 168, 127, 0.14);
+
+  --au-lift-1:
+    0 0 0 0.5px rgba(255, 255, 255, 0.045),
+    0 2px 6px rgba(0, 0, 0, 0.42);
+  --au-lift-2:
+    0 0 0 0.5px rgba(255, 255, 255, 0.05),
+    0 8px 20px -10px rgba(0, 0, 0, 0.6),
+    0 26px 52px -24px rgba(0, 0, 0, 0.66);
+  --au-lift-3:
+    0 0 0 0.5px rgba(255, 255, 255, 0.06),
+    0 10px 24px -10px rgba(0, 0, 0, 0.62),
+    0 34px 66px -26px rgba(0, 0, 0, 0.7),
+    0 76px 128px -54px rgba(0, 0, 0, 0.6);
+  --au-lift-drag:
+    0 0 0 0.5px rgba(255, 255, 255, 0.08),
+    0 18px 38px -14px rgba(0, 0, 0, 0.68),
+    0 60px 104px -36px rgba(0, 0, 0, 0.78),
+    0 120px 180px -76px rgba(0, 0, 0, 0.66);
+}
+
+/* ============================================================
+   1. THE REVEAL — the one entrance every surface here uses.
+   ------------------------------------------------------------
+   Out of focus → in focus. opacity lands first (300ms), blur
+   clears next (640ms), the transform settles last (720ms). Any
+   two of those on the same timeline and it reads as a fade;
+   staggered, it reads as a lens.
+   ============================================================ */
+@keyframes au-reveal {
+  0% {
+    opacity: 0;
+    filter: blur(18px) saturate(1.08);
+    transform: translateY(12px) scale(0.972);
+  }
+  /* Opacity is done early — you should be able to read the shape
+     of the thing while it is still resolving. The blur keeps
+     going for another half a second. */
+  34% { opacity: 1; }
+  58% { filter: blur(6px) saturate(1.04); }
+  100% {
+    opacity: 1;
+    filter: none;
+    transform: none;
+  }
+}
+/* Same idea, shorter throw — for things anchored to a control
+   (dropdowns, menus, tooltips) where 12px of travel is too much. */
+@keyframes au-reveal-near {
+  0% {
+    opacity: 0;
+    filter: blur(11px);
+    transform: translateY(-5px) scale(0.978);
+  }
+  40% { opacity: 1; }
+  62% { filter: blur(4px); }
+  100% { opacity: 1; filter: none; transform: none; }
+}
+/* The veil fades its opacity, not its blur. clavis-viewport.css
+   kills every backdrop-filter with an `!important` rule carrying
+   three `:not(#_)` ids, and `!important` beats a keyframe — so the
+   blur is re-stated statically below at a higher specificity, and
+   the fade below carries it in. Same result, one rule cheaper. */
+@keyframes au-veil {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+@keyframes au-rise {
+  from { opacity: 0; transform: translateY(9px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Reusable, in case anything new wants it. */
+html body .au-reveal { animation: au-reveal var(--au-t-glass) var(--au-glass) backwards; }
+html body .au-reveal-near { animation: au-reveal-near 360ms var(--au-glass) backwards; }
+
+/* ── 1a. Modals ─────────────────────────────────────────────── */
+html body .jarvis-modal-overlay,
+html body .mac-upload-overlay,
+html body .clavis-confirm-overlay {
+  background: rgba(26, 25, 23, 0.28) !important;
+  animation: au-veil 420ms var(--au-out) backwards;
+}
+html[data-theme="dark"] body .jarvis-modal-overlay,
+html[data-theme="dark"] body .mac-upload-overlay,
+html[data-theme="dark"] body .clavis-confirm-overlay {
+  background: rgba(8, 8, 7, 0.46) !important;
+}
+/* Four `:not(#_)` ids so this clears the global backdrop-filter
+   kill in clavis-viewport.css (three ids). Nothing else in the app
+   gets its blur back — only these four surfaces, and only while
+   one of them is open. */
+html:not(#_) body:not(#_) .jarvis-modal-overlay:not(#_),
+html:not(#_) body:not(#_) .mac-upload-overlay:not(#_),
+html:not(#_) body:not(#_) .clavis-confirm-overlay:not(#_),
+html:not(#_) body:not(#_) #jarvis-side-backdrop:not(#_) {
+  backdrop-filter: blur(16px) saturate(1.06) !important;
+  -webkit-backdrop-filter: blur(16px) saturate(1.06) !important;
+}
+html body .jarvis-modal-overlay .jarvis-modal,
+html body .mac-upload-overlay .mac-upload-panel,
+html body .clavis-confirm-dialog,
+html body #jarvis-script-modal .jarvis-modal,
+html body #jarvis-memory-modal .jarvis-modal {
+  animation: au-reveal var(--au-t-glass) var(--au-glass) backwards !important;
+  border-radius: 16px !important;
+  border: 1px solid var(--au-line) !important;
+  background: var(--au-panel) !important;
+  box-shadow: var(--au-lift-3) !important;
+  will-change: filter, transform, opacity;
+}
+html body .jarvis-modal-header h3 {
+  font-family: var(--au-display) !important;
+  font-weight: 400 !important;
+  font-size: 22px !important;
+  letter-spacing: -0.012em !important;
+  color: var(--au-ink) !important;
+}
+
+/* ── 1b. Menus, dropdowns, popovers ─────────────────────────── */
+html body .jarvis-composer-dropdown,
+html body .jarvis-more-panel,
+html body .jarvis-voice-panel,
+html body .cand-source-menu,
+html body .custom-dropdown-menu {
+  animation: au-reveal-near 360ms var(--au-glass) backwards !important;
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 12px !important;
+  box-shadow: var(--au-lift-2) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  will-change: filter, transform, opacity;
+}
+
+/* ── 1c. The right drawer ───────────────────────────────────── */
+html body #jarvis-side-panel.jarvis-side {
+  background: var(--au-panel) !important;
+  border-left: 1px solid var(--au-line) !important;
+  box-shadow: var(--au-lift-2) !important;
+  backdrop-filter: none !important;
+  transition:
+    transform var(--au-t-slow) var(--au-spring),
+    opacity var(--au-t-base) var(--au-out),
+    filter var(--au-t-glass) var(--au-glass) !important;
+}
+html body #jarvis-side-backdrop.jarvis-side-backdrop {
+  background: rgba(26, 25, 23, 0.20) !important;
+  transition: opacity var(--au-t-base) var(--au-out) !important;
+}
+html body .jarvis-side-card {
+  background: var(--au-sunk) !important;
+  border: 1px solid var(--au-line-2) !important;
+  border-radius: 12px !important;
+  box-shadow: none !important;
+}
+html body .jarvis-side-card h4 {
+  font-family: var(--au-sans) !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.09em !important;
+  text-transform: uppercase !important;
+  color: var(--au-faint) !important;
+}
+
+/* ============================================================
+   2. THE STUDIO PAGE
+   ============================================================ */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper {
+  background: var(--au-paper) !important;
+  font-family: var(--au-sans) !important;
+  font-feature-settings: "cv11" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage {
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--au-lift-1) !important;
+  overflow: hidden !important;
+}
+
+/* ── 2a. Header: a hairline and nothing else ─────────────────
+   The actions row used to clip — "New Ch…" — because nothing in
+   it could shrink. Now the row may wrap, the status text gives up
+   its space first, and below 1240px the labels go, not the
+   buttons. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-header {
+  flex-wrap: wrap !important;
+  row-gap: 8px !important;
+  min-width: 0 !important;
+  padding: 10px 14px !important;
+  border-bottom: 1px solid var(--au-line-2) !important;
+  background: none !important;
+  gap: 10px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-actions {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  row-gap: 6px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-pill,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-status {
+  flex: 0 1 auto !important;
+  min-width: 0 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+/* New Chat is a square, like everything else in this row.
+
+   apple-polish already sizes it 32px with font-size:0 — an icon
+   button. A later rule put the label's font-size back without
+   giving the box any more room, so "New Chat" rendered at 12.5px
+   inside a 32px well and spilled out under the next button: the
+   overlap you could see in the header. One decision, stated once,
+   at a specificity nothing else in the app reaches. The name lives
+   in the tooltip and the aria-label, where it still reads. */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-newchat-pill {
+  flex: 0 0 auto !important;
+  width: 32px !important;
+  min-width: 32px !important;
+  max-width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  font-size: 0 !important;
+  line-height: 0 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border-radius: 10px !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-newchat-pill svg {
+  width: 15px !important;
+  height: 15px !important;
+  margin: 0 !important;
+  flex: 0 0 auto !important;
+}
+@media (max-width: 980px) {
+  html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-live-mic-status { display: none !important; }
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-status-text,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #clavis-mic-live-label {
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.002em !important;
+  color: var(--au-mute) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-newchat-pill {
+  transition:
+    background-color var(--au-t-tap) var(--au-out),
+    color var(--au-t-tap) var(--au-out),
+    transform 260ms var(--au-spring) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-icon-pill:active,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-newchat-pill:active {
+  transform: scale(0.94) !important;
+}
+
+/* ── 2b. The greeting — the page's one display moment ───────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-center-orb-wrapper {
+  gap: 20px !important;
+  padding: 26px 20px 10px !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-greeting {
+  font-family: var(--au-display) !important;
+  font-size: clamp(34px, 3.6vw, 52px) !important;
+  font-weight: 400 !important;
+  line-height: 1.02 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--au-ink) !important;
+  margin: 0 0 10px !important;
+  text-wrap: balance;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-greeting em {
+  font-style: italic !important;
+  color: var(--au-accent) !important;
+  letter-spacing: -0.014em !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-feature-tip-pill {
+  font-family: var(--au-sans) !important;
+  font-size: 12px !important;
+  font-weight: 450 !important;
+  color: var(--au-mute) !important;
+  border: 1px solid var(--au-line) !important;
+  background: transparent !important;
+  border-radius: 999px !important;
+  padding: 6px 15px !important;
+  transition:
+    background-color var(--au-t-fast) var(--au-out),
+    border-color var(--au-t-fast) var(--au-out),
+    color var(--au-t-fast) var(--au-out),
+    transform 300ms var(--au-spring) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-feature-tip-pill:hover {
+  background: var(--au-line-2) !important;
+  color: var(--au-ink) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* The hero arrives the same way everything else does: out of
+   focus, then in. Staggered so the eye lands on the orb first. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active #orb-container {
+  animation: au-reveal 780ms var(--au-glass) backwards;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active .jarvis-greeting-container {
+  animation: au-reveal var(--au-t-glass) var(--au-glass) 110ms backwards;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active .clavis-feature-tip-pill {
+  animation: au-rise var(--au-t-slow) var(--au-spring) 220ms backwards;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.active .jarvis-input-container {
+  animation: au-rise var(--au-t-slow) var(--au-spring) 300ms backwards;
+}
+
+/* The studio greeting leaves the same way the chat pages' does:
+   opacity first, blur last, height last of all. jarvis_ui.js
+   already marks the view `.has-messages` on the first exchange, so
+   there is nothing to detect — the class is the signal, and the
+   greeting is back the moment New Chat clears it. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-welcome,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .clavis-feature-tip-pill {
+  overflow: hidden;
+  max-height: 34vh;
+  opacity: 1;
+  filter: none;
+  transition:
+    max-height 720ms var(--au-spring),
+    margin 720ms var(--au-spring),
+    opacity 300ms var(--au-out),
+    filter 640ms var(--au-glass),
+    transform 720ms var(--au-spring) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.has-messages #jarvis-welcome,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper.has-messages .clavis-feature-tip-pill {
+  max-height: 0 !important;
+  margin: 0 !important;
+  opacity: 0 !important;
+  filter: blur(14px) !important;
+  transform: translateY(-12px) scale(0.985) !important;
+  pointer-events: none !important;
+}
+
+/* ── 2c. Chat ───────────────────────────────────────────────── */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-messages {
+  max-width: 720px;
+  margin: 0 auto;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-message {
+  animation: au-rise 420ms var(--au-spring) backwards;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-bubble {
+  font-family: var(--au-sans) !important;
+  font-size: 14.5px !important;
+  line-height: 1.68 !important;
+  letter-spacing: 0.002em !important;
+  color: var(--au-ink-2) !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-message.assistant .chat-bubble {
+  background: transparent !important;
+  border: 0 !important;
+  padding-left: 0 !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-message.user .chat-bubble {
+  background: var(--au-sunk) !important;
+  border: 1px solid var(--au-line-2) !important;
+  border-radius: 14px !important;
+  color: var(--au-ink) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-bubble h1,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-bubble h2,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-bubble h3 {
+  font-family: var(--au-display) !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.012em !important;
+  color: var(--au-ink) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-bubble code,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-bubble pre {
+  font-family: var(--au-mono) !important;
+  font-size: 0.9em !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .chat-avatar {
+  box-shadow: none !important;
+  border: 1px solid var(--au-line) !important;
+}
+
+/* ── 2d. Composer ────────────────────────────────────────────
+   Moved to section 8. The studio composer and the two chat
+   composers are one component now and are defined once, in one
+   place, for all three pages. Nothing about it lives here. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-dropdown-item {
+  font-family: var(--au-sans) !important;
+  font-size: 13px !important;
+  transition: background-color var(--au-t-tap) var(--au-out), padding-left 220ms var(--au-spring) !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-dropdown-item:hover {
+  background: var(--au-line-2) !important;
+  padding-left: 14px !important;
+}
+
+/* ============================================================
+   3. THE FLOATING TASK SURFACE
+   ------------------------------------------------------------
+   Opens out of focus and settles in. Drag lifts it off the page
+   and tilts it into the direction of travel. Everything it does
+   is transform / opacity / filter — the one exception is its own
+   height, and it is `contain: layout paint style`, so that
+   cannot reflow the page behind it.
+   ============================================================ */
+html body .cts {
+  --cts-panel:  var(--au-panel);
+  --cts-line:   var(--au-line);
+  --cts-line-2: var(--au-line-2);
+  --cts-text:   var(--au-ink);
+  --cts-mute:   var(--au-mute);
+  --cts-faint:  var(--au-faint);
+  --cts-accent: var(--au-accent);
+  --cts-ok:     var(--au-ok);
+  --cts-err:    var(--au-err);
+  --cts-sans:   var(--au-sans);
+  --cts-serif:  var(--au-display);
+
+  border-radius: 16px !important;
+  border: 1px solid var(--au-line) !important;
+  box-shadow: var(--au-lift-3) !important;
+  font-family: var(--au-sans) !important;
+
+  transform-origin: top right;
+  transform: translateY(14px) scale(0.968);
+  opacity: 0;
+  pointer-events: none !important;
+  visibility: hidden !important;
+
+  /* The blur is an ANIMATION, not a transition, and deliberately so.
+     As a transition it had to be cancelled by JS on `transitionend`
+     — and if that event never fired (reduced motion, an interrupted
+     transition, a repaint mid-flight) the panel kept `filter:
+     blur(0)` forever, sat on its own composited layer, and its text
+     rasterised soft. That is the blurry answer. An animation with
+     `backwards` fill ends on the element's own styles, which carry
+     no filter at all, so the resting panel is plain crisp text with
+     nothing to cancel. */
+  transition:
+    opacity 280ms var(--au-out),
+    transform 720ms var(--au-spring),
+    height 400ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 400ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-radius 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 380ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+html body .cts.is-open {
+  opacity: 1 !important;
+  transform: none;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+/* The focus blur hangs off its OWN one-shot class, not `.is-open`.
+   On `.is-open` it restarted every time any other class on the
+   panel changed — `.is-dragging` going off at the end of a drag
+   re-applied `animation`, and CSS restarts an animation whenever
+   its name comes back. That is why dragging the panel re-blurred
+   it. clavis-aurora.js adds `.au-focus-in` on the closed→open
+   edge only and drops it on animationend, so drag, resize,
+   collapse and repaint never touch it. */
+html body .cts.au-focus-in {
+  animation: cts-focus var(--au-t-glass) var(--au-glass) backwards;
+}
+@keyframes cts-focus {
+  0%   { filter: blur(18px) saturate(1.08); }
+  58%  { filter: blur(6px) saturate(1.04); }
+  100% { filter: none; }
+}
+/* Nothing is promoted once it has arrived. */
+html body .cts.is-open.au-settled { will-change: auto; }
+
+html body .cts.is-moved { transform-origin: center center; }
+
+/* ── 3a. Grab and move ──────────────────────────────────────── */
+html body .cts-head {
+  position: relative;
+  padding: 10px 8px 10px 12px !important;
+  cursor: grab;
+  touch-action: none;
+}
+/* A grab handle you can actually see, but only when you are
+   already near it. A permanent one is visual noise on a panel
+   that is mostly read, not moved. */
+html body .cts-head::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  width: 32px;
+  height: 3.5px;
+  border-radius: 4px;
+  background: var(--au-line);
+  transform: translateX(-50%) scaleX(0.4);
+  opacity: 0;
+  transition: opacity var(--au-t-fast) var(--au-out), transform 320ms var(--au-spring), width 320ms var(--au-spring);
+  pointer-events: none;
+}
+html body .cts:hover .cts-head::before {
+  opacity: 0.85;
+  transform: translateX(-50%) scaleX(1.15);
+  background: var(--au-accent);
+}
+html body .cts-head:hover::before,
+html body .cts.is-dragging .cts-head::before {
+  opacity: 1;
+  transform: translateX(-50%) scaleX(1.4);
+  background: var(--au-accent);
+}
+html body .cts:hover {
+  border-color: rgba(201, 100, 66, 0.22) !important;
+  box-shadow:
+    0 0 0 1px rgba(201, 100, 66, 0.12),
+    0 4px 12px -2px rgba(23, 21, 18, 0.08),
+    0 16px 36px -8px rgba(23, 21, 18, 0.16),
+    0 36px 70px -16px rgba(23, 21, 18, 0.22),
+    0 64px 110px -30px rgba(23, 21, 18, 0.18) !important;
+}
+html[data-theme="dark"] body .cts:hover {
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 6px 16px -4px rgba(0, 0, 0, 0.5),
+    0 18px 42px -10px rgba(0, 0, 0, 0.65),
+    0 40px 80px -18px rgba(0, 0, 0, 0.72),
+    0 72px 130px -32px rgba(0, 0, 0, 0.6) !important;
+}
+html body .cts.is-dragging {
+  cursor: grabbing;
+  transition: box-shadow 260ms var(--au-out) !important;
+  box-shadow: var(--au-lift-drag) !important;
+  z-index: 10000;
+  will-change: transform !important;
+}
+html body .cts.is-dragging .cts-head { cursor: grabbing; }
+/* The settle after you let go: a real spring, slightly longer
+   than the drag lift so the shadow lands after the panel does. */
+html body .cts.is-settling {
+  transition:
+    transform 560ms var(--au-spring),
+    box-shadow 420ms var(--au-out),
+    border-color 320ms var(--au-out) !important;
+}
+/* Snapped flush to an edge — square off the side that touches. */
+html body .cts.is-snapped-right { border-top-right-radius: 6px !important; border-bottom-right-radius: 6px !important; }
+html body .cts.is-snapped-left  { border-top-left-radius: 6px !important;  border-bottom-left-radius: 6px !important; }
+
+/* ── 3b. Header controls ────────────────────────────────────── */
+html body .cts-head-label {
+  font-size: 10px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: var(--au-faint) !important;
+  transition: color var(--au-t-base) var(--au-out);
+}
+html body .cts[data-phase="working"] .cts-head-label,
+html body .cts[data-phase="understanding"] .cts-head-label { color: var(--au-mute) !important; }
+
+html body .cts-x,
+html body .cts-min {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 7px;
+  color: var(--au-faint); cursor: pointer; padding: 0;
+  transition:
+    background-color var(--au-t-tap) var(--au-out),
+    color var(--au-t-tap) var(--au-out),
+    transform 280ms var(--au-spring);
+}
+html body .cts-x:hover,
+html body .cts-min:hover { background: var(--au-line-2); color: var(--au-ink); }
+html body .cts-x:active,
+html body .cts-min:active { transform: scale(0.88); }
+html body .cts-min svg { transition: transform 380ms cubic-bezier(0.16, 1, 0.3, 1) !important; }
+
+/* ── 3b. Header controls & Apple Dynamic Island Morphing ────── */
+html body .cts .cts-body,
+html body .cts .cts-foot {
+  transition:
+    opacity 240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 280ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Collapsing phase: fluid content fade & micro-glide out before display:none */
+html body .cts.is-collapsing {
+  border-radius: 22px !important;
+  box-shadow:
+    0 2px 8px -2px rgba(0, 0, 0, 0.25),
+    0 8px 24px -6px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+html body .cts.is-collapsing .cts-body,
+html body .cts.is-collapsing .cts-foot {
+  opacity: 0 !important;
+  transform: translateY(-8px) scale(0.98) !important;
+  pointer-events: none !important;
+  transition:
+    opacity 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+html body .cts.is-collapsing .cts-head { border-bottom-color: transparent !important; }
+html body .cts.is-collapsing .cts-min svg { transform: rotate(180deg) !important; }
+html body .cts.is-collapsing .cts-grip { display: none !important; }
+
+/* Fully collapsed: capsule pill */
+html body .cts.is-collapsed {
+  border-radius: 22px !important;
+  box-shadow:
+    0 2px 8px -2px rgba(0, 0, 0, 0.25),
+    0 8px 24px -6px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+}
+html body .cts.is-collapsed .cts-body,
+html body .cts.is-collapsed .cts-foot,
+html body .cts.is-collapsed .cts-grip { display: none !important; }
+html body .cts.is-collapsed .cts-head { border-bottom: 0 !important; }
+html body .cts.is-collapsed .cts-min svg { transform: rotate(180deg) !important; }
+html body .cts.is-collapsed .cts-head-label::after {
+  content: " — " attr(data-task-title);
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 450;
+  color: var(--au-mute);
+  animation: cts-fade-in 240ms cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+/* Expanding phase: bloom in with zero content snap */
+html body .cts.is-expanding .cts-body,
+html body .cts.is-expanding .cts-foot {
+  animation: cts-expand-bloom 380ms cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+}
+html body .cts.is-expanding .cts-grip { display: none !important; }
+
+@keyframes cts-expand-bloom {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  35% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@keyframes cts-fade-in {
+  0% { opacity: 0; transform: translateX(-4px); }
+  100% { opacity: 1; transform: none; }
+}
+
+/* ── 3c. Resize grip ────────────────────────────────────────── */
+html body .cts-grip {
+  position: absolute;
+  right: 2px; bottom: 2px;
+  width: 16px; height: 16px;
+  cursor: nwse-resize;
+  opacity: 0;
+  transition: opacity var(--au-t-fast) var(--au-out);
+  touch-action: none;
+  z-index: 3;
+}
+html body .cts:hover .cts-grip { opacity: 1; }
+html body .cts-grip::after {
+  content: "";
+  position: absolute; right: 3px; bottom: 3px;
+  width: 8px; height: 8px;
+  border-right: 1.5px solid var(--au-faint);
+  border-bottom: 1.5px solid var(--au-faint);
+  border-bottom-right-radius: 3px;
+  opacity: 0.7;
+}
+
+/* ── 3d. Body typography ────────────────────────────────────── */
+html body .cts-body { padding: 14px 15px 15px !important; }
+html body .cts-body.cts-enter { animation: au-reveal-near 380ms var(--au-glass) backwards !important; }
+
+html body .cts-kicker {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 6px;
+  font-family: var(--au-sans);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--au-accent);
+}
+html body .cts-kicker::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(to right, var(--au-line), transparent);
+}
+/* Sizes route through the app's fluid type tokens where they
+   exist (clavis-viewport.css defines them), with a fixed fallback
+   so this file still reads correctly on its own. */
+html body .cts-title {
+  font-family: var(--au-display) !important;
+  font-size: var(--ap-fs-t3, 19px) !important;
+  font-weight: 400 !important;
+  line-height: 1.18 !important;
+  letter-spacing: -0.014em !important;
+  color: var(--au-ink) !important;
+  text-wrap: balance;
+}
+html body .cts[data-density="expanded"] .cts-title { font-size: calc(var(--ap-fs-t3, 19px) * 1.1) !important; }
+html body .cts-title em { font-style: italic; color: var(--au-accent); }
+
+html body .cts-live { font-size: var(--ap-fs-caption, 12.5px) !important; color: var(--au-mute) !important; }
+html body .cts-summary,
+html body .cts-list { font-size: var(--ap-fs-sub, 13px) !important; line-height: 1.66 !important; color: var(--au-ink-2) !important; }
+html body .cts-note { font-family: var(--au-read) !important; font-size: var(--ap-fs-sub, 13px) !important; font-style: italic; color: var(--au-mute) !important; }
+
+html body .cts-stats dd { font-family: var(--au-sans) !important; font-weight: 550 !important; }
+
+/* ── 3e. Intent-specific furniture ──────────────────────────── */
+/* Chips: the filters Clavis actually understood from the ask.
+   They are the fastest way to show "I got what you meant". */
+html body .cts-chips {
+  display: flex; flex-wrap: wrap; gap: 5px;
+  margin: 9px 0 0;
+}
+html body .cts-chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--au-line);
+  background: var(--au-sunk);
+  font-size: 10.5px; font-weight: 500;
+  letter-spacing: 0.01em;
+  color: var(--au-mute);
+  animation: au-rise 340ms var(--au-spring) backwards;
+}
+html body .cts-chip.is-accent {
+  border-color: transparent;
+  background: var(--au-accent-soft);
+  color: var(--au-accent);
+}
+html body .cts-chips .cts-chip:nth-child(2) { animation-delay: 40ms; }
+html body .cts-chips .cts-chip:nth-child(3) { animation-delay: 80ms; }
+html body .cts-chips .cts-chip:nth-child(4) { animation-delay: 120ms; }
+html body .cts-chips .cts-chip:nth-child(n+5) { animation-delay: 160ms; }
+
+/* The headline number — used when one count IS the answer. */
+html body .cts-figure {
+  display: flex; align-items: baseline; gap: 8px;
+  margin: 11px 0 0;
+}
+html body .cts-figure b {
+  font-family: var(--au-display);
+  font-size: 40px; font-weight: 400;
+  line-height: 0.92; letter-spacing: -0.028em;
+  color: var(--au-ink);
+  font-variant-numeric: tabular-nums;
+}
+html body .cts-figure span {
+  font-size: 11px; font-weight: 500;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--au-faint);
+}
+
+/* A preview of real rows, never invented ones. */
+html body .cts-rows {
+  margin: 11px 0 0; padding: 0; list-style: none;
+  border-top: 1px solid var(--au-line-2);
+}
+html body .cts-rows li {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--au-line-2);
+  font-size: 12.5px;
+  animation: au-rise 360ms var(--au-spring) backwards;
+}
+html body .cts-rows li:nth-child(2) { animation-delay: 45ms; }
+html body .cts-rows li:nth-child(3) { animation-delay: 90ms; }
+html body .cts-rows li:nth-child(n+4) { animation-delay: 135ms; }
+html body .cts-rows b { font-weight: 550; color: var(--au-ink); }
+html body .cts-rows i {
+  font-style: normal;
+  font-family: var(--au-mono);
+  font-size: 10.5px;
+  color: var(--au-faint);
+  white-space: nowrap;
+}
+html body .cts-more {
+  margin: 7px 0 0;
+  font-size: 11px;
+  color: var(--au-faint);
+}
+
+/* A stepped pipeline, for tasks that really do have stages. One
+   row, no labels until a step is live — a four-word legend under
+   four dots is a dashboard, and we are not building one. */
+html body .cts-steps {
+  display: flex; align-items: center; gap: 0;
+  margin: 12px 0 0;
+}
+html body .cts-step {
+  flex: 1; display: flex; align-items: center; gap: 0;
+  font-size: 9.5px; letter-spacing: 0.06em; text-transform: uppercase;
+}
+html body .cts-step i {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--au-line);
+  flex: 0 0 auto;
+  transition: background-color 320ms var(--au-out), transform 420ms var(--au-spring), box-shadow 320ms var(--au-out);
+}
+html body .cts-step span {
+  max-width: 0; overflow: hidden; white-space: nowrap;
+  opacity: 0; color: var(--au-accent); font-weight: 600;
+  transition: max-width 420ms var(--au-spring), opacity 260ms var(--au-out), padding 420ms var(--au-spring);
+}
+html body .cts-step.is-live span { max-width: 84px; opacity: 1; padding: 0 6px; }
+html body .cts-step.is-live i { background: var(--au-accent); transform: scale(1.25); box-shadow: 0 0 0 4px var(--au-accent-soft); }
+html body .cts-step.is-done i { background: var(--au-ok); }
+html body .cts-step::after {
+  content: ""; flex: 1; height: 1px; margin: 0 5px;
+  background: var(--au-line);
+}
+html body .cts-step:last-child::after { display: none; }
+html body .cts-step.is-done::after { background: var(--au-ok); opacity: 0.45; }
+
+/* Per-intent accent. The dot and the kicker are the only things
+   that change colour — a panel that repaints itself per intent
+   would be a toy. */
+html body .cts[data-intent="leads"]     { --au-accent: #C96442; }
+html body .cts[data-intent="contacts"]  { --au-accent: #6F7D8C; }
+html body .cts[data-intent="outreach"]  { --au-accent: #8A6A3E; }
+html body .cts[data-intent="dataset"]   { --au-accent: #5F7F5A; }
+html body .cts[data-intent="calculate"] { --au-accent: #7A6BA8; }
+html body .cts[data-intent] .cts-dot { background: var(--au-accent); }
+html body .cts[data-intent][data-phase="completed"] .cts-dot { background: var(--au-ok); }
+html body .cts[data-intent][data-phase="failed"] .cts-dot { background: var(--au-err); }
+
+/* Width per intent. The surface writes an inline width on every
+   paint, so these carry `!important` to hold. A width the user
+   drags to is set as an inline `!important`, which still wins —
+   that is the one thing allowed to override this. */
+html body .cts[data-intent="leads"],
+html body .cts[data-intent="dataset"]  { width: 352px !important; }
+html body .cts[data-intent="contacts"],
+html body .cts[data-intent="outreach"] { width: 336px !important; }
+html body .cts[data-intent="calculate"] { width: 292px !important; }
+
+
+/* ── 3e-bis. Follow-ups ──────────────────────────────────────
+   The panel already knows the answer, so the obvious next move
+   should not cost a second round-trip. These are the moves — a
+   place to open, or one precise sentence to send. They wrap, they
+   never overflow, and they stagger in so the eye reads the answer
+   first and the options second. */
+html body .cts-next {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 13px 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--au-line-2);
+}
+html body .cts-next-label {
+  flex: 0 0 100%;
+  margin-bottom: 2px;
+  font-family: var(--au-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--au-faint);
+}
+html body .cts-next-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid var(--au-line);
+  background: var(--au-panel);
+  color: var(--au-ink-2);
+  font-family: var(--au-sans);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  line-height: 1.3;
+  text-align: left;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  animation: au-rise 360ms var(--au-spring) backwards;
+  transition:
+    background-color var(--au-t-tap) var(--au-out),
+    border-color var(--au-t-tap) var(--au-out),
+    color var(--au-t-tap) var(--au-out),
+    transform 360ms var(--au-spring);
+}
+html body .cts-next .cts-next-btn:nth-of-type(2) { animation-delay: 45ms; }
+html body .cts-next .cts-next-btn:nth-of-type(3) { animation-delay: 90ms; }
+html body .cts-next .cts-next-btn:nth-of-type(4) { animation-delay: 135ms; }
+html body .cts-next-btn:hover {
+  background: var(--au-sunk);
+  border-color: #DCD0BE;
+  color: var(--au-ink);
+  transform: translateY(-1px);
+}
+html body .cts-next-btn:active { transform: scale(0.97); }
+/* An action that opens somewhere in the app reads as a destination,
+   not a question — so it carries the accent and a small arrow. */
+html body .cts-next-btn.is-go { color: var(--au-accent); border-color: transparent; background: var(--au-accent-soft); }
+html body .cts-next-btn.is-go::after { content: "→"; font-size: 11px; opacity: 0.7; }
+html body .cts-next-btn.is-go:hover { background: var(--au-accent-soft); border-color: var(--au-accent); color: var(--au-accent); }
+@media (prefers-reduced-motion: reduce) {
+  html body .cts-next-btn { animation: none; transform: none !important; }
+}
+
+/* ── 3f. Footer ─────────────────────────────────────────────── */
+html body .cts-foot { padding: 10px 12px !important; }
+html body .cts-act {
+  font-family: var(--au-sans) !important;
+  border-radius: 9999px !important;
+  padding: 6px 14px !important;
+  transition:
+    background-color var(--au-t-tap) var(--au-out),
+    color var(--au-t-tap) var(--au-out),
+    transform 280ms var(--au-spring) !important;
+}
+html body .cts-act.is-primary {
+  background: #211A21 !important;
+  color: #FFFFFF !important;
+  border-radius: 9999px !important;
+  padding: 6px 18px !important;
+  font-weight: 550 !important;
+}
+html body .cts-act:active { transform: scale(0.94) !important; }
+
+/* ── 3g. Reduced motion ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html body .cts,
+  html body .jarvis-modal,
+  html body .mac-upload-panel,
+  html body .jarvis-composer-dropdown,
+  html body .jarvis-more-panel,
+  html body .au-reveal,
+  html body .au-reveal-near {
+    animation: none !important;
+    filter: none !important;
+    transform: none !important;
+    transition: opacity 120ms linear !important;
+  }
+  html body .cts-body.cts-enter { animation: none !important; }
+  html body .cts-chip,
+  html body .cts-rows li,
+  html body .chat-message { animation: none !important; }
+  html body .jarvis-modal-overlay,
+  html body .mac-upload-overlay { animation: none !important; backdrop-filter: blur(6px) !important; }
+}
+
+/* ── 3h. Narrow windows ─────────────────────────────────────── */
+@media (max-width: 900px) {
+  html body .cts { transform-origin: bottom center; }
+  html body .cts-grip { display: none; }
+  html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-greeting {
+    font-size: clamp(28px, 7vw, 38px) !important;
+  }
+}
+
+/* ============================================================
+   4. THE SHELL — milk page, plum rail
+   ------------------------------------------------------------
+   Selectors match clavis-sidebar.css's `:not(#_)` shape exactly.
+   That file and this one tie on specificity, and this one loads
+   second, so it wins on order. Don't "fix" them to be more
+   specific — the tie is deliberate and readable.
+   ============================================================ */
+html:not(#_) body:not(#_),
+html:not(#_) body:not(#_) #main-content,
+html:not(#_) body:not(#_) .views-container,
+html:not(#_) body:not(#_) #main-scroll-area {
+  background: var(--au-paper) !important;
+}
+
+/* Crystal text. On a dark rail, subpixel AA fattens the strokes
+   and reads as fuzzy; greyscale AA is what makes milk-on-plum
+   look printed rather than glowing. */
+html:not(#_) body:not(#_) {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-optical-sizing: auto;
+}
+
+/* ── 4a. Rail shell ─────────────────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___) {
+  background: var(--rail-bg) !important;
+  border-right: 0 !important;
+  color: var(--rail-text) !important;
+  /* A hairline of milk down the seam instead of a border — a
+     1px light edge reads as a fold, a border reads as a box. */
+  box-shadow: inset -1px 0 0 var(--rail-seam) !important;
+  transition:
+    width var(--csb-rail, 520ms) var(--au-spring),
+    min-width var(--csb-rail, 520ms) var(--au-spring),
+    max-width var(--csb-rail, 520ms) var(--au-spring),
+    box-shadow 420ms var(--au-out) !important;
+}
+
+/* ── 4b. Header ─────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-header {
+  background: var(--rail-top) !important;
+  border-bottom: 1px solid var(--rail-line) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-mark {
+  background: var(--rail-accent) !important;
+  transition: transform 420ms var(--au-spring), box-shadow 300ms var(--au-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-mark svg path { fill: var(--rail-top) !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-brand-row:hover .logo-mark {
+  transform: rotate(-8deg) scale(1.06) !important;
+  box-shadow: 0 4px 14px -4px rgba(166, 58, 91, 0.35) !important;
+}
+/* The brand is the one serif in the rail. It is a name, not a
+   label, and setting it in the display face is what stops the
+   rail from reading like a settings menu. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-brand {
+  font-family: var(--au-display) !important;
+  font-size: 17px !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.012em !important;
+  color: var(--rail-text) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-sub {
+  font-family: var(--au-sans) !important;
+  font-size: 9px !important;
+  letter-spacing: 0.16em !important;
+  color: var(--rail-faint) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-dot { opacity: 0.55; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-window-controls:hover .mac-dot { opacity: 1; }
+
+/* Belt and braces on label visibility. Two things in this app can
+   make a nav label render as nothing: an entrance animation that
+   leaves it at opacity 0 when `animation: none` cancels it
+   mid-flight, and gradient text (`-webkit-text-fill-color:
+   transparent`) inherited from an older stylesheet. Both are
+   invisible-text bugs with no other symptom, so the rail states
+   the safe value outright. */
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-sub-item,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-section-label,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .logo-brand,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .logo-sub {
+  opacity: 1 !important;
+  visibility: visible !important;
+  -webkit-text-fill-color: currentColor !important;
+  background-image: none !important;
+  text-shadow: none !important;
+}
+
+/* ── 4c. Section labels — editorial, not a shouty caps rule ─── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-section-label {
+  font-family: var(--au-read) !important;
+  font-style: italic !important;
+  font-size: 12.5px !important;
+  font-weight: 400 !important;
+  letter-spacing: 0.006em !important;
+  text-transform: lowercase !important;
+  font-variant: normal !important;
+  color: var(--rail-faint) !important;
+}
+/* Collapsed, clavis-sidebar.css turns this label into a 1px divider.
+   These are the open-rail numbers, so they must not reach it — this
+   file loads second and would otherwise win the tie and blow the
+   divider back out to label height. */
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-section-label {
+  padding: 0 10px !important;
+  margin: 18px 0 6px !important;
+}
+/* lowercase on an all-caps source string needs the first letter
+   back, or "ai assistant" reads as a typo rather than a style. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-section-label::first-letter {
+  text-transform: uppercase !important;
+}
+
+/* ── 4d. Items ──────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item {
+  font-family: var(--au-sans) !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.004em !important;
+  color: var(--rail-label) !important;
+  border-radius: 9px !important;
+  /* colour + background are instant-ish; only the press spring is
+     slow. A row that eases its own colour feels laggy. */
+  transition:
+    background-color 160ms var(--au-out),
+    color 160ms var(--au-out),
+    transform 460ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-sub-item {
+  padding: 7px 10px !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg {
+  color: var(--rail-mute) !important;
+  stroke: var(--rail-mute) !important;
+  transition: stroke 160ms var(--au-out), color 160ms var(--au-out), transform 460ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:hover {
+  background: var(--rail-hover) !important;
+  color: var(--rail-text) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:hover svg {
+  color: var(--rail-text) !important;
+  stroke: var(--rail-text) !important;
+  transform: scale(1.08) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:active,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:active {
+  background: var(--rail-active) !important;
+  transform: scale(0.982) !important;
+  transition-duration: 90ms !important;
+}
+
+/* Active: a filled milk-tint pill and an apricot marker. The
+   marker is 3px wide and grows in from nothing — on a 14-item
+   rail, movement is how you find where you are. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active {
+  background: var(--rail-active) !important;
+  color: var(--rail-text) !important;
+  font-weight: 600 !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active svg {
+  color: var(--rail-accent) !important;
+  stroke: var(--rail-accent) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active::before,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active::before {
+  content: "" !important;
+  position: absolute !important;
+  left: -6px; top: 50%;
+  width: 3px; height: 17px;
+  margin-top: -8.5px;
+  border-radius: 0 3px 3px 0;
+  background: var(--rail-accent) !important;
+  animation: au-marker 460ms var(--au-spring) backwards;
+}
+@keyframes au-marker {
+  from { transform: scaleY(0.2); opacity: 0; }
+  to   { transform: scaleY(1);   opacity: 1; }
+}
+
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-badge,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .dev-badge {
+  background: var(--rail-accent-soft) !important;
+  color: var(--rail-accent) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-items::before { background: var(--rail-line) !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .chevron-arrow { color: var(--rail-faint) !important; stroke: var(--rail-faint) !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover .chevron-arrow { color: var(--rail-mute) !important; stroke: var(--rail-mute) !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:focus-visible,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:focus-visible {
+  outline: 2px solid var(--rail-accent) !important;
+  outline-offset: 1px !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-resizer:hover { background: var(--rail-line) !important; }
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-section-label { background: var(--rail-line) !important; }
+
+/* Collapsed labels have to leave the layout, not just fade out.
+   clavis-sidebar.css hides them with opacity alone, so each one
+   still measured ~87px wide; `justify-content:center` then centred
+   [icon + invisible label] inside a 64px rail and pushed the icon
+   to x = -20. max-width collapses the box AND still animates,
+   which display:none does not. */
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .chevron-arrow,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .logo-text {
+  max-width: 0 !important;
+  margin-left: 0 !important;
+  overflow: hidden !important;
+  transition:
+    opacity var(--csb-label-out, 130ms) var(--au-out),
+    max-width 300ms var(--au-out) !important;
+}
+
+/* ── 4e. Scroll edges ───────────────────────────────────────
+   The fade only appears on the side that actually has more
+   content — a permanent top fade dims the first item and reads
+   as a rendering bug. `data-edge` is set by clavis-aurora.js. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav[data-edge="both"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 26px, #000 calc(100% - 26px), transparent 100%);
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav[data-edge="bottom"] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 26px), transparent 100%);
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav[data-edge="top"] {
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 26px);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 26px);
+}
+
+/* ── 4f. Hover-expand ───────────────────────────────────────
+   Collapsed, the rail opens over the page on hover and closes
+   when you leave. It never moves the page: #main-content's
+   margin is driven by `.collapsed` / data-sidebar-state, and
+   neither changes here — only the rail's own width. The 140ms
+   delay on the way in is what stops it firing when the cursor
+   merely crosses the rail on its way somewhere else.
+   Five `:not(#_)` ids so it outranks both the .collapsed width
+   rule in clavis-sidebar.css and the inline block in index.html. */
+/* @media removed: peek is a class now, so touch and keyboard
+   get it too. */
+@media all {
+  html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___).collapsed.au-peek,
+  html:not(#_) body:not(#_) aside#sidebar.sidebar:not(#__):not(#___).collapsed.au-peek {
+    width: 232px !important;
+    min-width: 232px !important;
+    max-width: 232px !important;
+    box-shadow:
+      inset -1px 0 0 var(--rail-seam),
+      24px 0 60px -28px rgba(56, 25, 50, 0.28),
+      60px 0 110px -60px rgba(56, 25, 50, 0.22) !important;
+    /* No transition-delay here. installPeek() already waits out a
+       passing pointer before it adds this class; a delay on top of
+       that debounce was 280ms of a rail that looked broken, then
+       jumped. One guard, in the JS, where the timing is readable. */
+  }
+
+  /* everything the collapsed rules hid, back — on the rail's own
+     timeline, so labels arrive after the width is nearly there */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item > span,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-item > span,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-label-wrap,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .logo-text,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .chevron-arrow {
+    opacity: 1 !important;
+    transform: none !important;
+    pointer-events: auto !important;
+    max-width: 220px !important;
+    overflow: visible !important;
+    transition:
+      opacity 300ms var(--au-out) 300ms,
+      max-width 420ms var(--au-spring) 200ms,
+      transform 420ms var(--au-spring) 300ms !important;
+  }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-item {
+    justify-content: flex-start !important;
+    padding: 7px 10px !important;
+    gap: 10px !important;
+  }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-items { display: grid !important; }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-items::before { display: block !important; }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .sidebar-nav { padding: 2px 8px 14px !important; }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .sidebar-brand-row { justify-content: flex-start !important; padding: 4px !important; }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .mac-window-controls { justify-content: flex-start !important; }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-section-label {
+    opacity: 1 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    background: none !important;
+    font-size: 12.5px !important;
+    margin: 18px 0 6px !important;
+    padding: 0 10px !important;
+    transition: opacity 260ms var(--au-out) 320ms !important;
+  }
+  /* the icon-only tooltip is redundant once the label is visible */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item::after,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-item::after { content: none !important; }
+}
+
+/* ── 4g. The travelling marker ───────────────────────────────
+   One element for the whole rail instead of a bar on each item.
+   It slides from the old row to the new one, which is the single
+   detail that makes a sidebar feel built rather than styled: the
+   eye follows one object instead of re-finding a new highlight.
+   Position comes from clavis-aurora.js; everything else is here. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav { position: relative !important; }
+html body .au-rail-marker {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: var(--rail-accent);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 3;
+  transform: translateY(0) scaleY(0.4);
+  transition:
+    transform 260ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 160ms cubic-bezier(0.2, 0, 0, 1),
+    height 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+html body .au-rail-marker.is-on { opacity: 1; transform: translateY(var(--au-marker-y, 0px)) scaleY(1); }
+/* The per-item bar is retired the moment the marker exists, or the
+   rail shows two indicators for one selection. */
+html body #sidebar.has-marker .nav-item.active::before,
+html body #sidebar.has-marker .nav-sub-item.active::before { content: none !important; }
+
+/* ── 4h. Collapsed rail: the label chip ──────────────────────
+   apple-polish.js positions its tooltip once, against the rail's
+   width at that moment — so when the rail changes width under it
+   the chip is left stranded in the page. clavis-aurora.js clears
+   it on every geometry change; this is just its resting look. */
+html body .ap-tip { z-index: 10001 !important; }
+
+/* ============================================================
+   5. MICRO — the small things, once, in one place
+   ============================================================ */
+/* Every control answers a press. 90ms down, spring back up:
+   the asymmetry is what makes a click feel mechanical rather
+   than animated. */
+html body button:not(.mac-dot):not(.cts-x):not(.cts-min):active,
+html body .btn-primary:active,
+html body .btn-secondary:active,
+html body .icon-btn:active {
+  transform: scale(0.965);
+  transition: transform 90ms var(--au-out) !important;
+}
+html body button,
+html body .btn-primary,
+html body .btn-secondary,
+html body .icon-btn {
+  transition: transform 420ms var(--au-spring),
+              background-color var(--au-t-tap) var(--au-out),
+              color var(--au-t-tap) var(--au-out),
+              border-color var(--au-t-tap) var(--au-out);
+}
+
+/* One focus ring for the whole app, and it is never the same
+   colour as hover. */
+html body :focus-visible {
+  outline: 2px solid var(--au-accent);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Text selection in the palette, not the browser's blue. */
+html body ::selection { background: var(--au-accent-soft); color: var(--au-ink); }
+
+/* Scrollbars: warm, thin, and only visible against content. */
+html body *::-webkit-scrollbar { width: 9px; height: 9px; }
+html body *::-webkit-scrollbar-thumb {
+  background: var(--au-line);
+  border-radius: 9px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+}
+html body *::-webkit-scrollbar-thumb:hover { background: #DCC9B2; background-clip: content-box; }
+html body *::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 5a. The conversation strip (built by clavis-aurora.js) ──
+   Sits in the studio header and names the conversation from what
+   was actually asked. Plain text and a hairline — it is a label,
+   not another pill in a row that already has six. */
+html body .au-thread {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  margin: 0 12px 0 0;
+  overflow: hidden;
+}
+html body .au-thread-kicker {
+  flex: 0 0 auto;
+  font-family: var(--au-sans);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--au-accent);
+}
+html body .au-thread-title {
+  font-family: var(--au-read);
+  font-style: italic;
+  font-size: 13.5px;
+  font-weight: 400;
+  color: var(--au-mute);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+/* It changes as the conversation reveals what it is about, so a
+   change gets its own small reveal rather than swapping in place. */
+html body .au-thread.is-new .au-thread-kicker,
+html body .au-thread.is-new .au-thread-title {
+  animation: au-reveal-near 420ms var(--au-glass) backwards;
+}
+@media (max-width: 1100px) { html body .au-thread-kicker { display: none; } }
+@media (max-width: 820px)  { html body .au-thread { display: none; } }
+
+/* ============================================================
+   5a-bis. THE TOP BAR
+   ------------------------------------------------------------
+   It was a row of four different design languages: a blue pill, a
+   yellow toggle, two ghost buttons and a user chip, none of them
+   agreeing on height, radius or weight. One rule for all of it:
+   the bar is a hairline, every control is quiet, and exactly one
+   thing is loud — Run Agent, because that is the only button that
+   spends money.
+   ============================================================ */
+html:not(#_) body:not(#_) .topbar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+  height: 52px !important;
+  min-height: 52px !important;
+  padding: 0 16px 0 18px !important;
+  /* plain first: if color-mix is unsupported the whole
+     declaration is dropped, and a transparent bar over
+     scrolling content is unreadable. */
+  background: var(--au-paper) !important;
+  background: color-mix(in srgb, var(--au-paper) 86%, transparent) !important;
+  backdrop-filter: blur(14px) saturate(1.05) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.05) !important;
+  border-bottom: 1px solid var(--au-line-2) !important;
+  box-shadow: none !important;
+}
+/* Same four-id trick as the modal overlays: clavis-viewport.css
+   strips every backdrop-filter app-wide for scroll performance,
+   and this is one bar, always on screen, never scrolled. */
+html:not(#_) body:not(#_) .topbar:not(#_) {
+  backdrop-filter: blur(14px) saturate(1.05) !important;
+  -webkit-backdrop-filter: blur(14px) saturate(1.05) !important;
+}
+html:not(#_) body:not(#_) .topbar-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
+html:not(#_) body:not(#_) .topbar-right {
+  margin-left: auto; display: flex; align-items: center; gap: 6px;
+  min-width: 0; flex-shrink: 1;
+}
+html:not(#_) body:not(#_) .topbar-left { flex: 0 1 auto; }
+html:not(#_) body:not(#_) .topbar-right > * { flex: 0 0 auto; }
+
+/* The breadcrumb is the page's name, so it gets the display face. */
+html:not(#_) body:not(#_) .page-breadcrumb,
+html:not(#_) body:not(#_) .topbar .view-title,
+html:not(#_) body:not(#_) .topbar-title {
+  font-family: var(--au-display) !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.012em !important;
+  color: var(--au-ink) !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+
+/* Every secondary control, one shape. */
+html:not(#_) body:not(#_) .topbar .tb-history-btn,
+html:not(#_) body:not(#_) .topbar .tb-shortcuts-btn,
+html:not(#_) body:not(#_) .topbar .tb-sneak-peek-btn,
+html:not(#_) body:not(#_) .topbar .topbar-chip {
+  height: 30px !important;
+  display: inline-flex !important; align-items: center; gap: 6px;
+  padding: 0 11px !important;
+  border-radius: 9px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--au-mute) !important;
+  font-family: var(--au-sans) !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  cursor: pointer;
+  transition:
+    background-color var(--au-t-tap) var(--au-out),
+    color var(--au-t-tap) var(--au-out),
+    transform 380ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) .topbar .tb-history-btn:hover,
+html:not(#_) body:not(#_) .topbar .tb-shortcuts-btn:hover,
+html:not(#_) body:not(#_) .topbar .tb-sneak-peek-btn:hover,
+html:not(#_) body:not(#_) .topbar .topbar-chip:hover {
+  background: var(--au-sunk) !important;
+  color: var(--au-ink) !important;
+}
+html:not(#_) body:not(#_) .topbar .tb-history-btn:active,
+html:not(#_) body:not(#_) .topbar .tb-shortcuts-btn:active,
+html:not(#_) body:not(#_) .topbar .tb-sneak-peek-btn:active { transform: scale(0.95) !important; }
+html:not(#_) body:not(#_) .topbar svg { color: currentColor !important; stroke: currentColor !important; }
+
+/* The one loud control. */
+html:not(#_) body:not(#_) .topbar #run-agent-btn,
+html:not(#_) body:not(#_) .topbar .generate-btn {
+  height: 30px !important;
+  padding: 0 14px !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+  background: var(--au-ink) !important;
+  color: var(--au-paper) !important;
+  font-family: var(--au-sans) !important;
+  font-size: 12.5px !important;
+  font-weight: 550 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: opacity var(--au-t-tap) var(--au-out), transform 380ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) .topbar #run-agent-btn:hover { opacity: 0.86 !important; transform: none !important; }
+html:not(#_) body:not(#_) .topbar #run-agent-btn:active { transform: scale(0.96) !important; }
+
+/* User chip: a name and an avatar, not a card. */
+html:not(#_) body:not(#_) .topbar-user-badge {
+  display: inline-flex !important; align-items: center; gap: 8px;
+  height: 34px !important;
+  padding: 0 8px 0 4px !important;
+  border-radius: 10px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: background-color var(--au-t-tap) var(--au-out) !important;
+}
+html:not(#_) body:not(#_) .topbar-user-badge:hover { background: var(--au-sunk) !important; }
+html:not(#_) body:not(#_) .topbar-avatar {
+  width: 26px !important; height: 26px !important;
+  border-radius: 50% !important;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--au-accent) !important;
+  color: var(--au-paper) !important;
+  font-family: var(--au-sans) !important;
+  font-size: 10.5px !important; font-weight: 700 !important;
+  letter-spacing: 0.03em;
+  box-shadow: none !important;
+}
+html:not(#_) body:not(#_) .topbar-user-info { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
+html:not(#_) body:not(#_) .topbar-user-name {
+  font-family: var(--au-sans) !important;
+  font-size: 12px !important; font-weight: 600 !important;
+  color: var(--au-ink) !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html:not(#_) body:not(#_) .topbar-user-company {
+  font-family: var(--au-sans) !important;
+  font-size: 9.5px !important; font-weight: 600 !important;
+  letter-spacing: 0.08em !important; text-transform: uppercase !important;
+  color: var(--au-faint) !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html:not(#_) body:not(#_) .topbar-profile-menu {
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 13px !important;
+  box-shadow: var(--au-lift-2) !important;
+  padding: 6px !important;
+}
+html:not(#_) body:not(#_) .tpm-item {
+  border-radius: 9px !important;
+  font-family: var(--au-sans) !important;
+  font-size: 13px !important;
+  color: var(--au-ink-2) !important;
+  transition: background-color var(--au-t-tap) var(--au-out), padding-left 220ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) .tpm-item:hover { background: var(--au-sunk) !important; padding-left: 14px !important; }
+html:not(#_) body:not(#_) .tpm-item.danger { color: var(--au-err) !important; }
+html:not(#_) body:not(#_) .tpm-divider { background: var(--au-line-2) !important; }
+
+/* The theme switch was the loudest thing in the bar. It is a
+   control you touch twice a year. */
+html:not(#_) body:not(#_) .lx-theme-toggle {
+  width: 42px !important; height: 24px !important;
+  border-radius: 999px !important;
+  background: var(--au-sunk) !important;
+  border: 1px solid var(--au-line) !important;
+  box-shadow: none !important;
+  filter: none !important;
+  transition: background-color var(--au-t-base) var(--au-out) !important;
+}
+html:not(#_) body:not(#_) .lx-theme-toggle .lx-toggle-ball {
+  width: 18px !important; height: 18px !important;
+  background: var(--au-panel) !important;
+  box-shadow: 0 1px 3px rgba(56,25,50,.22) !important;
+  transition: transform 420ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) .lx-theme-toggle .lx-icon { color: var(--au-mute) !important; stroke: var(--au-mute) !important; }
+html[data-theme="dark"] body .lx-theme-toggle { background: var(--au-sunk) !important; }
+
+/* Live pulse on Peek Tasks — a 7px dot is enough to say "running". */
+html:not(#_) body:not(#_) .csp-active-pulse-dot {
+  width: 6px !important; height: 6px !important;
+  background: var(--au-accent) !important;
+  box-shadow: none !important;
+}
+
+@media (max-width: 1240px) {
+  html:not(#_) body:not(#_) .topbar .tb-history-btn span,
+  html:not(#_) body:not(#_) .topbar .tb-shortcuts-btn span,
+  html:not(#_) body:not(#_) .topbar .tb-sneak-peek-btn span { display: none !important; }
+  html:not(#_) body:not(#_) .topbar .topbar-user-info { display: none !important; }
+}
+@media (max-width: 720px) {
+  html:not(#_) body:not(#_) .topbar .topbar-chip,
+  html:not(#_) body:not(#_) .topbar .lx-theme-toggle { display: none !important; }
+}
+
+/* ============================================================
+   5a-ter. THE PANEL'S LANGUAGE, EVERYWHERE ELSE
+   ------------------------------------------------------------
+   The floating surface reads well because of five decisions, not
+   fifty: a kicker above a serif headline, one hairline instead of
+   a border-and-shadow, numbers in a display face, one quiet
+   control shape, and a reveal that resolves rather than pops.
+   This section spends those same five on the rest of the app so
+   no page looks like it came from a different product.
+   ============================================================ */
+
+/* ── The page reveal. The single biggest reason the panel feels
+   different from the pages behind it is that it *arrives*. Every
+   view now arrives the same way. `backwards` so nothing is left
+   filtered at rest — see the note at the top of this file. */
+/* Opacity and travel only — no blur. A filter on the view is a
+   filter on everything inside it, and inside it is a live WebGL
+   orb. The blur language still belongs to the panels and modals,
+   where nothing is being rendered every frame. */
+@keyframes au-view-in {
+  0%   { opacity: 0; transform: translateY(7px); }
+  100% { opacity: 1; transform: none; }
+}
+html:not(#_) body:not(#_) .view.active:not(#_) {
+  animation: au-view-in 520ms var(--au-glass) backwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_) body:not(#_) .view.active:not(#_) { animation: none; }
+}
+
+/* ── Page headers ───────────────────────────────────────────── */
+html:not(#_) body:not(#_) .view-header {
+  border-bottom: 1px solid var(--au-line-2) !important;
+  background: none !important;
+  box-shadow: none !important;
+}
+html:not(#_) body:not(#_) .view-title,
+html:not(#_) body:not(#_) .card-title,
+html:not(#_) body:not(#_) .chart-card-header h3,
+html:not(#_) body:not(#_) .smodal-section-title {
+  font-family: var(--au-display) !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.014em !important;
+  color: var(--au-ink) !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+html:not(#_) body:not(#_) .view-subtitle,
+html:not(#_) body:not(#_) .smodal-section-desc,
+html:not(#_) body:not(#_) .smodal-hint {
+  font-family: var(--au-read) !important;
+  font-style: italic;
+  color: var(--au-mute) !important;
+}
+
+/* ── Cards: a hairline and a sheet, never a box ─────────────── */
+html:not(#_) body:not(#_) .card,
+html:not(#_) body:not(#_) .analytics-card,
+html:not(#_) body:not(#_) .chart-card,
+html:not(#_) body:not(#_) .agent-config-card,
+html:not(#_) body:not(#_) .agent-progress-card,
+html:not(#_) body:not(#_) .do-stat-card,
+html:not(#_) body:not(#_) .clavis-credential-card {
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--au-lift-1) !important;
+  backdrop-filter: none !important;
+  transition:
+    border-color var(--au-t-base) var(--au-out),
+    box-shadow var(--au-t-base) var(--au-out),
+    transform 460ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) .card:hover,
+html:not(#_) body:not(#_) .do-stat-card:hover,
+html:not(#_) body:not(#_) .analytics-card:hover {
+  box-shadow: var(--au-lift-2) !important;
+  transform: translateY(-1px) !important;
+}
+html:not(#_) body:not(#_) .card-header,
+html:not(#_) body:not(#_) .chart-card-header {
+  border-bottom: 1px solid var(--au-line-2) !important;
+  background: none !important;
+}
+/* Every number in the app lines up column to column. */
+html:not(#_) body:not(#_) .do-stat-card,
+html:not(#_) body:not(#_) .analytics-card,
+html:not(#_) body:not(#_) table { font-variant-numeric: tabular-nums; }
+
+/* ── Buttons: the topbar's two shapes, app-wide ─────────────── */
+html:not(#_) body:not(#_) .btn-primary,
+html:not(#_) body:not(#_) .smodal-btn-primary {
+  background: var(--au-ink) !important;
+  color: var(--au-paper) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  font-family: var(--au-sans) !important;
+  font-weight: 550 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+html:not(#_) body:not(#_) .btn-primary:hover,
+html:not(#_) body:not(#_) .smodal-btn-primary:hover { opacity: 0.86 !important; }
+html:not(#_) body:not(#_) .btn-secondary,
+html:not(#_) body:not(#_) .text-link {
+  background: transparent !important;
+  color: var(--au-mute) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  font-family: var(--au-sans) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+}
+html:not(#_) body:not(#_) .btn-secondary:hover { background: var(--au-sunk) !important; color: var(--au-ink) !important; }
+
+/* ── Tables: hairlines, a warm header, one hover ────────────── */
+html:not(#_) body:not(#_) .table-container,
+html:not(#_) body:not(#_) .leads-table {
+  border-color: var(--au-line) !important;
+  border-radius: 14px !important;
+  background: var(--au-panel) !important;
+  box-shadow: none !important;
+}
+html:not(#_) body:not(#_) table thead th {
+  background: var(--au-sunk) !important;
+  border-bottom: 1px solid var(--au-line) !important;
+  font-family: var(--au-sans) !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  color: var(--au-faint) !important;
+}
+html:not(#_) body:not(#_) table tbody td {
+  border-bottom: 1px solid var(--au-line-2) !important;
+  color: var(--au-ink-2) !important;
+  font-size: 13px !important;
+}
+html:not(#_) body:not(#_) table tbody tr {
+  transition: background-color var(--au-t-tap) var(--au-out) !important;
+}
+html:not(#_) body:not(#_) table tbody tr:hover { background: var(--au-sunk) !important; }
+
+/* ── Fields: one input, everywhere ──────────────────────────── */
+html:not(#_) body:not(#_) .auth-input,
+html:not(#_) body:not(#_) .filter-select,
+html:not(#_) body:not(#_) .smodal-input,
+html:not(#_) body:not(#_) .smodal-select,
+html:not(#_) body:not(#_) .form-group input,
+html:not(#_) body:not(#_) .form-group select,
+html:not(#_) body:not(#_) .form-group textarea {
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  color: var(--au-ink) !important;
+  font-family: var(--au-sans) !important;
+  font-size: 13.5px !important;
+  transition: border-color var(--au-t-fast) var(--au-out), box-shadow var(--au-t-fast) var(--au-out) !important;
+}
+html:not(#_) body:not(#_) .auth-input:focus,
+html:not(#_) body:not(#_) .smodal-input:focus,
+html:not(#_) body:not(#_) .form-group input:focus {
+  border-color: var(--au-accent) !important;
+  box-shadow: 0 0 0 3px var(--au-accent-soft) !important;
+  outline: none !important;
+}
+html:not(#_) body:not(#_) .form-group label,
+html:not(#_) body:not(#_) .smodal-label {
+  font-family: var(--au-sans) !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--au-ink-2) !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+}
+
+/* ── Settings modal: the app's biggest surface by control count ─ */
+html:not(#_) body:not(#_) .smodal-section { border-color: var(--au-line-2) !important; background: none !important; }
+html:not(#_) body:not(#_) .smodal-field { border-bottom: 1px solid var(--au-line-2) !important; }
+html:not(#_) body:not(#_) .smodal-nav-item {
+  border-radius: 9px !important;
+  font-family: var(--au-sans) !important;
+  font-size: 13px !important;
+  color: var(--au-mute) !important;
+  transition: background-color var(--au-t-tap) var(--au-out), color var(--au-t-tap) var(--au-out) !important;
+}
+html:not(#_) body:not(#_) .smodal-nav-item:hover { background: var(--au-sunk) !important; color: var(--au-ink) !important; }
+html:not(#_) body:not(#_) .smodal-nav-item.active { background: var(--au-accent-soft) !important; color: var(--au-accent) !important; }
+html:not(#_) body:not(#_) .smodal-switch-track {
+  background: var(--au-line) !important;
+  border-radius: 999px !important;
+  transition: background-color var(--au-t-base) var(--au-out) !important;
+}
+html:not(#_) body:not(#_) .smodal-switch.active .smodal-switch-track,
+html:not(#_) body:not(#_) .smodal-switch[aria-checked="true"] .smodal-switch-track { background: var(--au-accent) !important; }
+html:not(#_) body:not(#_) .smodal-switch-thumb {
+  background: #fff !important;
+  box-shadow: 0 1px 3px rgba(56,25,50,.25) !important;
+  transition: transform 420ms var(--au-spring) !important;
+}
+
+/* ── Empty states in the editorial voice ────────────────────── */
+html:not(#_) body:not(#_) .do-empty-title,
+html:not(#_) body:not(#_) .do-chart-empty {
+  font-family: var(--au-display) !important;
+  font-weight: 400 !important;
+  color: var(--au-ink) !important;
+}
+html:not(#_) body:not(#_) .do-empty-sub {
+  font-family: var(--au-read) !important;
+  font-style: italic;
+  color: var(--au-mute) !important;
+}
+html:not(#_) body:not(#_) .do-empty-badge {
+  background: var(--au-accent-soft) !important;
+  color: var(--au-accent) !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+}
+
+/* ── 5b. Responsive ─────────────────────────────────────────── */
+@media (max-width: 1180px) {
+  html body .cts { width: 300px !important; }
+}
+@media (max-width: 900px) {
+  /* The rail becomes an overlay, and the page gets its width back. */
+  html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___) {
+    box-shadow: inset -1px 0 0 var(--rail-seam), 18px 0 50px -26px rgba(56,25,50,.25) !important;
+  }
+  html:not(#_) body:not(#_) #main-content { margin-left: 64px !important; width: calc(100% - 64px) !important; max-width: calc(100% - 64px) !important; }
+  html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper #jarvis-messages { max-width: 100%; }
+}
+
+/* ── 5c. Reduced motion, for everything section 4 and 5 add ─── */
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-mark,
+  html body button, html body .btn-primary, html body .btn-secondary, html body .icon-btn {
+    transition-duration: 1ms !important;
+    transform: none !important;
+  }
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active::before,
+  html body .au-thread.is-new .au-thread-title { animation: none !important; }
+}
+
+/* ============================================================
+   6. ONE SURFACE
+   ------------------------------------------------------------
+   The app used to be three boxes with lines between them: a rail,
+   a bar, a page. Lines are the cheapest way to separate things
+   and the worst — they cost a pixel of contrast everywhere and
+   buy nothing, and three of them in a row is a wireframe, not a
+   product.
+
+   So there is now one ground. The rail sits on it, the top bar
+   sits on it, and the work sits on a white sheet with a radius
+   and a soft shadow. Nothing is drawn between them: the sheet's
+   own edge is the separation, the way it is in every app worth
+   copying. Every line that remains is a true hairline and there
+   are very few of them.
+   ============================================================ */
+
+/* ── 6a. The ground ─────────────────────────────────────────── */
+html:not(#_) body:not(#_),
+html:not(#_) body:not(#_) #main-content {
+  background: var(--au-paper) !important;
+}
+
+/* No rule down the seam. The rail IS the ground. */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___) {
+  border-right: 0 !important;
+  box-shadow: none !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-header {
+  border-bottom: 0 !important;
+  background: none !important;
+  padding: 12px 12px 6px !important;
+  margin-bottom: 0 !important;
+}
+
+/* ── 6b. The bar: no partition, and it gives space back ──────
+   Transparent, no border, shorter. The breadcrumb is the only
+   thing holding a line, and it holds it by being a serif — not
+   by having a rule under it. */
+html:not(#_) body:not(#_) .topbar {
+  position: relative;
+  height: 46px !important;
+  min-height: 46px !important;
+  padding: 0 14px 0 16px !important;
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html:not(#_) body:not(#_) .topbar:not(#_) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* ── 6c. The sheet ──────────────────────────────────────────
+   Everything you actually work in. One radius, one hairline, one
+   soft shadow — and because it is inset, the ground shows around
+   it and no divider is needed anywhere. */
+html:not(#_) body:not(#_) .views-container,
+html:not(#_) body:not(#_) #main-scroll-area {
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 16px !important;
+  box-shadow: var(--au-lift-1) !important;
+  margin: 0 12px 12px 0 !important;
+  /* `overflow: hidden` here would have killed vertical scrolling on
+     every long page in the app — Leads, Candidate DB, Settings,
+     Analytics. The sheet clips sideways (so the radius holds and
+     nothing escapes the corner) and scrolls down, which is what a
+     page container has to do. */
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+  /* The sheet takes whatever is left under the bar — a vh sum here
+     needs the bar's exact height and breaks the moment it changes,
+     which is how the composer ended up 46px past the bottom edge. */
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+/* The shell is the flex column that makes that possible. */
+html:not(#_) body:not(#_) #main-content,
+html:not(#_) body:not(#_) main#main-content.main-content {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+}
+html:not(#_) body:not(#_) .topbar { flex: 0 0 auto !important; }
+/* The studio page had its own frame inside the sheet — two frames
+   is one too many. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage {
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-split-layout {
+  padding: 0 !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper,
+html body #view-chat.view.active,
+html body #view-candidate-ai.view.active { background: transparent !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-header {
+  border-bottom: 1px solid var(--au-line-2) !important;
+}
+
+/* ── 6d. Hairlines, everywhere, once ───────────────────────── */
+html:not(#_) body:not(#_) .view-header,
+html:not(#_) body:not(#_) .card-header,
+html:not(#_) body:not(#_) .chart-card-header,
+html:not(#_) body:not(#_) .smodal-field,
+html:not(#_) body:not(#_) table tbody td { border-color: var(--au-line-2) !important; }
+html:not(#_) body:not(#_) .card,
+html:not(#_) body:not(#_) .analytics-card,
+html:not(#_) body:not(#_) .chart-card,
+html:not(#_) body:not(#_) .agent-config-card,
+html:not(#_) body:not(#_) .do-stat-card,
+html:not(#_) body:not(#_) .table-container,
+html:not(#_) body:not(#_) .leads-table { border-color: var(--au-line) !important; }
+/* A card sitting on the sheet needs no shadow of its own — the
+   sheet is already lifted. A hairline is the whole treatment. */
+html:not(#_) body:not(#_) .card,
+html:not(#_) body:not(#_) .analytics-card,
+html:not(#_) body:not(#_) .chart-card,
+html:not(#_) body:not(#_) .do-stat-card { box-shadow: none !important; }
+html:not(#_) body:not(#_) .card:hover,
+html:not(#_) body:not(#_) .analytics-card:hover,
+html:not(#_) body:not(#_) .do-stat-card:hover { box-shadow: var(--au-lift-1) !important; }
+
+/* ── 6e. Rail and sheet move as ONE ─────────────────────────
+   This is why collapsing looked broken. index.html transitions
+   #main-content's margin over 0.36s; clavis-sidebar.css springs
+   the rail's width over 520ms. Two speeds means that for ~160ms
+   the content's left edge is ahead of the rail's right edge — the
+   rail appears to slide *under* the page. Same duration, same
+   curve, both directions, and the illusion is gone. The rail also
+   gets a stacking floor it cannot lose during the move. */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___),
+html:not(#_) body:not(#_) aside#sidebar.sidebar:not(#__):not(#___) {
+  z-index: 300 !important;
+  transition:
+    width var(--au-rail-t) var(--au-rail-e),
+    min-width var(--au-rail-t) var(--au-rail-e),
+    max-width var(--au-rail-t) var(--au-rail-e) !important;
+}
+html:not(#_) body:not(#_) #main-content,
+html:not(#_) body:not(#_) main#main-content.main-content {
+  position: relative !important;
+  z-index: 1 !important;
+  transition:
+    margin-left var(--au-rail-t) var(--au-rail-e),
+    width var(--au-rail-t) var(--au-rail-e),
+    max-width var(--au-rail-t) var(--au-rail-e) !important;
+}
+/* The labels ride the same clock — they leave in a third of it and
+   come back in the last two thirds, so text is never squashed. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-brand-title,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-text,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .chevron-arrow {
+  transition:
+    opacity 180ms var(--au-out) 110ms,
+    max-width var(--au-rail-t) var(--au-rail-e),
+    transform 220ms var(--au-spring) 100ms !important;
+}
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .sidebar-brand-title,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .logo-text,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .chevron-arrow {
+  transition:
+    opacity 90ms var(--au-out) 0ms,
+    max-width 200ms var(--au-out) 0ms,
+    transform 90ms var(--au-out) 0ms !important;
+}
+
+/* ── 6f. Rail detail at the new tone ────────────────────────
+   On a ground this light the active row cannot be a tint — it
+   would vanish. It becomes a white pill: the same sheet material
+   as the content area, which is also what says "this row is the
+   page you are on". */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active {
+  background: var(--au-panel) !important;
+  box-shadow: var(--au-lift-1) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:hover {
+  background: rgba(46, 32, 42, 0.042) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active:hover,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active:hover {
+  background: var(--au-panel) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-items::before { background: var(--au-line) !important; }
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .nav-section-label { background: var(--au-line) !important; }
+/* The marker sat outside the pill and clipped on a light ground. */
+html body .au-rail-marker { left: 1px; }
+
+/* ── 6g. Peek is a sheet lifted off the ground ──────────────── */
+@media all {
+  html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___).collapsed.au-peek,
+  html:not(#_) body:not(#_) aside#sidebar.sidebar:not(#__):not(#___).collapsed.au-peek {
+    background: var(--au-panel) !important;
+    border-right: 1px solid var(--au-line) !important;
+    box-shadow: var(--au-lift-3) !important;
+  }
+}
+
+/* ── 6h. Space back ─────────────────────────────────────────
+   The bar lost 6px, the sheet's own padding does the rest, and
+   the studio page no longer pays for a frame inside a frame. */
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-center-orb-wrapper {
+  padding: 18px 20px 6px !important;
+}
+html:not(#_) body:not(#_) .view-header { padding-top: 14px !important; padding-bottom: 12px !important; }
+
+@media (max-width: 900px) {
+  html:not(#_) body:not(#_) .views-container,
+  html:not(#_) body:not(#_) #main-scroll-area {
+    margin: 0 8px 8px 0 !important;
+    border-radius: 12px !important;
+  }
+}
+
+/* ── 6i. The view fills the sheet, and nothing overflows it ──
+   The sheet owns the height now, so a view must not carry its own
+   min-height — a 100vh child inside a shorter sheet pushes the
+   composer off the bottom edge, which is exactly what a clipped
+   input looks like. */
+/* Only the three views that own an inner scroller may be clamped
+   to the sheet's height. Clamping every view would cut a long
+   leads table off at the fold with no way to reach the rest. */
+html:not(#_) body:not(#_) #view-jarvis.view.active,
+html:not(#_) body:not(#_) #view-chat.view.active,
+html:not(#_) body:not(#_) #view-candidate-ai.view.active {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-split-layout,
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-hero-stage {
+  height: 100% !important;
+  min-height: 0 !important;
+  max-height: 100% !important;
+}
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-chat-container { min-height: 0 !important; }
+html body #view-jarvis.jarvis-wrapper.claude-ui-wrapper .jarvis-input-container { margin-bottom: 14px !important; }
+
+/* ============================================================
+   7. HANDS OFF THE ORB, AND THE LAST OF THE POLISH
+   ============================================================ */
+
+/* ── 7a. The orb is not ours to style ────────────────────────
+   It is a live WebGL canvas the app owns. Nothing here may clip
+   it, filter it, promote it, or animate it — a clip is how it
+   ended up sliced flat once before. This block only guarantees
+   the absence of interference. */
+html:not(#_) body:not(#_) #orb-container,
+html:not(#_) body:not(#_) #orb-container * {
+  filter: none !important;
+  clip-path: none !important;
+  contain: none !important;
+  overflow: visible !important;
+  mask-image: none !important;
+  -webkit-mask-image: none !important;
+}
+html:not(#_) body:not(#_) #view-jarvis .jarvis-center-orb-wrapper {
+  overflow: visible !important;
+  contain: none !important;
+}
+
+/* ── 7b. The sheet's top edge ────────────────────────────────
+   Same idea as the rail: content that scrolls under the bar gets
+   a soft top edge, and only while there is something above. The
+   attribute is set by clavis-aurora.js. */
+html:not(#_) body:not(#_) .views-container[data-edge="scrolled"],
+html:not(#_) body:not(#_) #main-scroll-area[data-edge="scrolled"] {
+  /* An inset shadow, NOT a mask. A mask over a scroller also fades
+     whatever is stuck to its top — and the table header is stuck
+     to its top, so the header came out dimmed, which reads as a
+     rendering fault. An inset shadow is painted on the padding box
+     and never touches the content. */
+  box-shadow:
+    var(--au-lift-1),
+    inset 0 7px 6px -7px rgba(46, 32, 42, 0.13) !important;
+}
+html:not(#_) body:not(#_) .views-container,
+html:not(#_) body:not(#_) #main-scroll-area {
+  transition: box-shadow 260ms var(--au-out);
+}
+
+/* ── 7c. A table you can actually read while scrolling ───────
+   The header stays; the rows go past it. On a 300-row leads table
+   this is the difference between a list and a spreadsheet. */
+html:not(#_) body:not(#_) .views-container table thead th,
+html:not(#_) body:not(#_) #main-scroll-area table thead th {
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 2 !important;
+  background: var(--au-panel) !important;
+  box-shadow: inset 0 -1px 0 var(--au-line) !important;
+  border-bottom: 0 !important;
+}
+
+/* ── 7d. Rail rhythm ─────────────────────────────────────────
+   Groups need more air than rows do, or the list reads as one
+   long column with no shape. */
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .nav-section-label {
+  margin: 20px 0 5px !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > .nav-section-label:first-child {
+  margin-top: 8px !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item { margin: 1px 0 !important; }
+
+/* ── 7e. The last details ────────────────────────────────────
+   A caret in the brand colour, a selection that matches it, and
+   scrollbars that are only there when the pointer is. */
+html:not(#_) body:not(#_) input,
+html:not(#_) body:not(#_) textarea { caret-color: var(--au-accent); }
+html:not(#_) body:not(#_) *::-webkit-scrollbar-thumb { background: transparent; background-clip: content-box; }
+html:not(#_) body:not(#_) *:hover::-webkit-scrollbar-thumb,
+html:not(#_) body:not(#_) *:focus-within::-webkit-scrollbar-thumb { background: var(--au-line); background-clip: content-box; }
+/* Links and rows answer a hover in one place, not three. */
+html:not(#_) body:not(#_) a:not(.nav-item):not(.nav-sub-item) { text-underline-offset: 3px; }
+/* An image or icon never blocks a drag on the surfaces that move. */
+html body .cts-head img, html body .cts-head svg { pointer-events: none; }
+
+
+/* ============================================================
+   8. ONE COMPOSER
+   ------------------------------------------------------------
+   Clavis AI, Client AI and Candidate AI each shipped their own
+   composer, in two different stylesheets, with different radii,
+   padding, button sizes and easing. They are one component. It
+   is written once, here, and the three pages are three entries
+   in the same selector list — so a change to the physics is a
+   change everywhere, which is the whole point.
+
+   Specificity: `:not(#_)` buys id-weight, which is what it takes
+   to reach past clavis-chat.css (it loads after this file). Same
+   trick as sections 4 and 6; don't "simplify" it away.
+
+   The height is animated, so JS owns the number. CSS owns the
+   easing, the floor and the ceiling — see installComposer() in
+   clavis-aurora.js. Overflow stays hidden until the box is at
+   its ceiling, or a scrollbar flashes in and out of every grow.
+   ============================================================ */
+
+/* ── 8a. The box ─────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-input-container,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-input-container,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-input-container {
+  flex: 0 0 auto;
+  position: relative;
+  background: var(--au-panel) !important;
+  border: 1px solid var(--au-line) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--au-lift-1) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 12px 14px 10px !important;
+  /* The box hugs the textarea. It was a 112px-tall column with the
+     textarea set to flex:1, so the textarea inherited whatever slack
+     the container had — which is why the same empty composer stood
+     26px tall on one page and 46px on another. Height comes from the
+     text now, and from nowhere else. */
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: stretch !important;
+  gap: 0 !important;
+  height: auto !important;
+  min-height: 0 !important;
+  transition:
+    border-color var(--au-t-base) var(--au-out),
+    box-shadow var(--au-t-base) var(--au-out),
+    transform 760ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-input-container:focus-within,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-input-container:focus-within,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-input-container:focus-within {
+  border-color: #DCD0BE !important;
+  box-shadow: var(--au-lift-2) !important;
+  transform: translateY(-1px) !important;
+}
+
+/* ── 8b. The text ────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .claude-textarea,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-textarea,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-textarea {
+  font-family: var(--au-sans) !important;
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+  letter-spacing: 0.002em !important;
+  color: var(--au-ink) !important;
+  background: none !important;
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+  resize: none !important;
+  width: 100% !important;
+  min-height: 26px !important;
+  max-height: 208px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow-y: hidden !important;
+  flex: 0 0 auto !important;
+  /* The grow itself. Slow, and on the same spring as everything
+     else that moves in this app. */
+  transition: height 520ms var(--au-spring) !important;
+}
+/* growBox() reads scrollHeight at height:auto — which it can only do
+   with the transition off, and the transition above is !important. */
+html:not(#_) body:not(#_) .claude-textarea.au-measuring {
+  transition: none !important;
+}
+/* At the ceiling it becomes a scroller — and only then. */
+html:not(#_) body:not(#_) .claude-textarea[data-grow="full"] {
+  overflow-y: auto !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .claude-textarea::placeholder,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-textarea::placeholder,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-textarea::placeholder {
+  color: var(--au-faint) !important;
+  font-family: var(--au-read) !important;
+  font-style: italic;
+  font-size: 15.5px !important;
+}
+
+/* ── 8c. The tool row ────────────────────────────────────────── */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-bottom-bar,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-input-toolbar,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-input-toolbar {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  margin: 10px 0 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  min-height: 30px !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-left-tools,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-right-tools,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-toolbar-right,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-toolbar-right {
+  display: flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-right-tools,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-toolbar-right,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-toolbar-right {
+  margin-left: auto !important;
+}
+/* The wrappers around a menu button are furniture — they take the
+   button's height, not their own, or the tool row grows by a couple
+   of pixels on one page and not the others. */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-tool-menu-wrapper,
+html:not(#_) body:not(#_) #view-chat:not(#__) .candidate-source-picker,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .candidate-source-picker {
+  display: flex !important;
+  align-items: center !important;
+  height: 30px !important;
+  position: relative !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-input-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 8px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+/* ── 8d. The buttons ─────────────────────────────────────────
+   Same 30px square, same 9px radius, same quiet default, same
+   tap. `hidden` has to beat `display: inline-flex` or the stop
+   button sits next to send for the whole session. */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-btn,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-up-btn,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-clear-btn,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) #jarvis-send-btn,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) #jarvis-stop-btn,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-icon-btn,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-icon-btn {
+  width: 30px !important;
+  height: 30px !important;
+  /* min-height: 34px from jarvis-studio-polish outranks a bare
+     `height`, so the studio's send button stood 4px taller than the
+     same button on the other two pages. Pin all three. */
+  min-width: 30px !important;
+  min-height: 30px !important;
+  max-height: 30px !important;
+  padding: 0 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: var(--au-mute) !important;
+  border-radius: 9px !important;
+  cursor: pointer;
+  box-shadow: none !important;
+  transition:
+    background-color var(--au-t-tap) var(--au-out),
+    color var(--au-t-tap) var(--au-out),
+    opacity var(--au-t-tap) var(--au-out),
+    transform 380ms var(--au-spring) !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-btn[hidden],
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-up-btn[hidden],
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-icon-btn[hidden],
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-icon-btn[hidden] {
+  display: none !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-btn:hover,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-clear-btn:hover,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-icon-btn:hover,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-icon-btn:hover {
+  background: var(--au-sunk) !important;
+  color: var(--au-ink) !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-btn:active,
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-up-btn:active,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-icon-btn:active,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-icon-btn:active {
+  transform: scale(0.9) !important;
+}
+/* Send is the one filled thing in the row — Apple neutral grey (never black). */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) #jarvis-send-btn,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-send-btn,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-send-btn {
+  background: #8E8E93 !important;
+  color: #ffffff !important;
+  border-radius: 999px !important;
+  border: 0 !important;
+}
+html[data-theme="dark"]:not(#_) body:not(#_) #view-jarvis:not(#__) #jarvis-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-chat:not(#__) .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-send-btn {
+  background: #636366 !important;
+  color: #ffffff !important;
+}
+html:not(#_) body:not(#_) #view-jarvis:not(#__) #jarvis-send-btn:hover,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-send-btn:hover,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-send-btn:hover {
+  background: #707075 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+html[data-theme="dark"]:not(#_) body:not(#_) #view-jarvis:not(#__) #jarvis-send-btn:hover,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-chat:not(#__) .claude-send-btn:hover,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-send-btn:hover {
+  background: #787880 !important;
+  color: #ffffff !important;
+  opacity: 1 !important;
+}
+/* Nothing to send yet — soft grey pill */
+html:not(#_) body:not(#_) .jarvis-input-container[data-empty-input="1"] #jarvis-send-btn,
+html:not(#_) body:not(#_) #view-chat:not(#__) .chat-container[data-empty-input="1"] .claude-send-btn,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .chat-container[data-empty-input="1"] .claude-send-btn {
+  background: #E5E5EA !important;
+  color: #8E8E93 !important;
+  opacity: 1 !important;
+}
+html[data-theme="dark"]:not(#_) body:not(#_) .jarvis-input-container[data-empty-input="1"] #jarvis-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-chat:not(#__) .chat-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-candidate-ai:not(#__) .chat-container[data-empty-input="1"] .claude-send-btn {
+  background: #2C2C2E !important;
+  color: #636366 !important;
+  opacity: 1 !important;
+}
+
+/* ── 8e. Reduced motion ──────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_) body:not(#_) .claude-textarea { transition: none !important; }
+}
+
+/* ── 8f. One rail, one colour ────────────────────────────────
+   apple-polish paints #sidebar, .sidebar-header, .sidebar-nav,
+   #sidebar-nav-scroll and .sidebar-footer with #F5F4EF, each
+   !important. Section 4 overrides the rail itself but not the
+   nav, so the list below the brand sat a shade off the band
+   above it and the rail read as two panels stacked. The rail is
+   one surface: only the rail paints, everything inside it is
+   glass. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) #sidebar-nav-scroll,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-footer,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-header,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-brand-row,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-window-controls {
+  background: none !important;
+  background-color: transparent !important;
+  border-right: 0 !important;
+  box-shadow: none !important;
+}

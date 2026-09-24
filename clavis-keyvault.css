@@ -1,0 +1,359 @@
+/* ============================================================
+   clavis-keyvault.css
+   Ink on paper. Same type and hairlines as the floating window,
+   so the vault reads as part of the app rather than a settings
+   screen bolted on.
+   ============================================================ */
+
+.kv-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 10040;
+  background: rgba(23, 21, 18, 0.28);
+  backdrop-filter: blur(3px) saturate(115%);
+  -webkit-backdrop-filter: blur(3px) saturate(115%);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 300ms cubic-bezier(0.2, 0, 0, 1);
+}
+.kv-backdrop.is-open { opacity: 1; pointer-events: auto; }
+html[data-theme="dark"] .kv-backdrop { background: rgba(0, 0, 0, 0.52); }
+
+.kv-panel {
+  /* Same cream paper as the floating window, so the Keys panel reads as
+     the same product rather than a different screen bolted on. */
+  --kv-paper: #FBF7EE;
+  --kv-ink:   #27231B;
+  --kv-mute:  #756C59;
+  --kv-faint: #A69B84;
+  --kv-line:  #E7DFC9;
+  --kv-line-2:#F2EDDD;
+  --kv-green: #2F5233;
+  --kv-spring: cubic-bezier(0.22, 1, 0.36, 1);
+
+  position: fixed;
+  z-index: 10041;
+  top: 50%;
+  left: 50%;
+  width: min(520px, calc(100vw - 32px));
+  max-height: min(78vh, 700px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  background: var(--kv-paper);
+  color: var(--kv-ink);
+  border: 1px solid var(--kv-line);
+  border-radius: 20px;
+  font-family: "Inter", "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-feature-settings: "cv11", "ss01";
+
+  box-shadow:
+    0 2px 6px rgba(23, 21, 18, 0.05),
+    0 18px 40px -10px rgba(23, 21, 18, 0.2),
+    0 48px 90px -20px rgba(23, 21, 18, 0.26);
+
+  transform: translate(-50%, -48%) scale(0.965);
+  opacity: 0;
+  pointer-events: none;
+  transition:
+    opacity 260ms cubic-bezier(0.2, 0, 0, 1),
+    transform 560ms var(--kv-spring);
+}
+.kv-panel.is-open {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(1);
+  pointer-events: auto;
+}
+
+html[data-theme="dark"] .kv-panel {
+  --kv-paper: #1A1A18;
+  --kv-ink:   #ECEAE4;
+  --kv-mute:  #9A968E;
+  --kv-faint: #6E6B65;
+  --kv-line:  rgba(255, 255, 255, 0.11);
+  --kv-line-2:rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06) inset,
+    0 20px 48px -12px rgba(0, 0, 0, 0.8),
+    0 56px 100px -24px rgba(0, 0, 0, 0.9);
+}
+
+/* ── Head ─────────────────────────────────────────────────── */
+.kv-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 20px 20px 14px;
+  border-bottom: 1px solid var(--kv-line-2);
+}
+.kv-head-text { flex: 1; min-width: 0; }
+.kv-title {
+  margin: 0;
+  font-family: "Instrument Serif", "Newsreader", Georgia, serif;
+  font-size: 26px;
+  font-weight: 400;
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  color: var(--kv-ink);
+}
+.kv-sub {
+  margin: 5px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--kv-mute);
+  letter-spacing: -0.005em;
+}
+.kv-close {
+  flex: 0 0 26px;
+  width: 26px; height: 26px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; border-radius: 50%;
+  color: var(--kv-faint); cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease;
+}
+.kv-close:hover { background: var(--kv-line-2); color: var(--kv-ink); }
+
+/* ── List ─────────────────────────────────────────────────── */
+.kv-list {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  padding: 6px 20px 4px;
+  scrollbar-width: thin;
+}
+.kv-list::-webkit-scrollbar { width: 7px; }
+.kv-list::-webkit-scrollbar-thumb { background: var(--kv-line); border-radius: 4px; }
+
+.kv-row {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--kv-line-2);
+}
+.kv-row:last-child { border-bottom: none; }
+
+.kv-row-head { display: flex; align-items: baseline; gap: 10px; }
+
+.kv-order {
+  flex: 0 0 18px;
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  color: var(--kv-faint);
+  padding-top: 2px;
+}
+.kv-row-id { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.kv-name {
+  font-size: 13.5px;
+  font-weight: 550;
+  letter-spacing: -0.01em;
+  color: var(--kv-ink);
+}
+.kv-note { font-size: 11.5px; color: var(--kv-faint); line-height: 1.4; }
+
+/* State is carried by weight and words, never by colour alone. */
+.kv-state {
+  flex: 0 0 auto;
+  font-size: 11px;
+  letter-spacing: 0.01em;
+  color: var(--kv-faint);
+}
+.kv-row[data-state="live"] .kv-state { color: var(--kv-ink); font-weight: 500; }
+.kv-row[data-state="spent"] .kv-state { color: var(--kv-mute); font-style: italic; }
+
+.kv-keys { display: flex; flex-wrap: wrap; gap: 6px; margin: 9px 0 0 28px; }
+.kv-chip {
+  display: inline-flex; align-items: center; gap: 2px;
+  padding: 3px 3px 3px 9px;
+  border: 1px solid var(--kv-line);
+  border-radius: 999px;
+  background: var(--kv-line-2);
+}
+.kv-chip code {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.02em;
+  color: var(--kv-mute);
+}
+.kv-chip[data-health="spent"] code,
+.kv-chip[data-health="rejected"] code { opacity: 0.5; text-decoration: line-through; }
+.kv-chip-x {
+  width: 17px; height: 17px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: none; background: transparent; border-radius: 50%;
+  color: var(--kv-faint); cursor: pointer; padding: 0;
+  transition: color 150ms ease, background-color 150ms ease;
+}
+.kv-chip-x:hover { color: var(--kv-ink); background: rgba(0, 0, 0, 0.06); }
+html[data-theme="dark"] .kv-chip-x:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* ── Add a key ────────────────────────────────────────────── */
+.kv-add {
+  margin: 0 0 0 28px;
+  display: none;
+}
+.kv-add.is-open {
+  display: block;
+  margin-top: 10px;
+  animation: kv-unfold 420ms var(--kv-spring) both;
+}
+@keyframes kv-unfold {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.kv-get {
+  display: inline-flex; align-items: center; gap: 5px;
+  font-size: 12px; font-weight: 500;
+  color: var(--kv-ink);
+  text-decoration: none;
+  border-bottom: 1px solid var(--kv-line);
+  padding-bottom: 1px;
+  transition: border-color 180ms ease, opacity 180ms ease;
+}
+.kv-get:hover { border-color: var(--kv-ink); }
+.kv-get .kv-i { opacity: 0.55; }
+
+.kv-paste { display: flex; gap: 6px; margin-top: 9px; }
+.kv-input {
+  flex: 1; min-width: 0;
+  height: 34px;
+  padding: 0 12px;
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
+  letter-spacing: 0.02em;
+  color: var(--kv-ink);
+  background: rgba(0, 0, 0, 0.03);
+  border: 1px solid var(--kv-line);
+  border-radius: 9px;
+  outline: none;
+  transition: border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+}
+.kv-input::placeholder { color: var(--kv-faint); font-family: inherit; letter-spacing: 0; }
+.kv-input:focus {
+  border-color: rgba(26, 25, 23, 0.4);
+  background: var(--kv-paper);
+  box-shadow: 0 0 0 2px rgba(26, 25, 23, 0.05);
+}
+html[data-theme="dark"] .kv-input { background: rgba(255, 255, 255, 0.04); }
+html[data-theme="dark"] .kv-input:focus {
+  border-color: rgba(236, 234, 228, 0.38);
+  box-shadow: 0 0 0 2px rgba(236, 234, 228, 0.07);
+}
+
+.kv-save {
+  flex: 0 0 auto;
+  height: 34px;
+  padding: 0 15px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  letter-spacing: -0.005em;
+  color: var(--kv-paper);
+  /* The one place colour earns its keep: connecting a key is the moment
+     this whole panel exists for. */
+  background: var(--kv-green);
+  border: none;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: opacity 160ms ease, transform 160ms var(--kv-spring);
+}
+.kv-save:hover { opacity: 0.88; }
+.kv-save:active { transform: scale(0.97); }
+.kv-save:disabled { opacity: 0.45; cursor: default; }
+
+.kv-msg {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--kv-mute);
+  min-height: 0;
+}
+.kv-msg[data-tone="ok"]  { color: var(--kv-ink); }
+.kv-msg[data-tone="bad"] { color: #8C4A42; }
+html[data-theme="dark"] .kv-msg[data-tone="bad"] { color: #C88A82; }
+
+.kv-more {
+  margin: 10px 0 0 28px;
+  display: inline-flex; align-items: center; gap: 5px;
+  font-family: inherit;
+  font-size: 11.5px;
+  color: var(--kv-faint);
+  background: none; border: none; padding: 0;
+  cursor: pointer;
+  transition: color 160ms ease;
+}
+.kv-more:hover { color: var(--kv-ink); }
+
+/* ── Foot ─────────────────────────────────────────────────── */
+.kv-foot {
+  flex: 0 0 auto;
+  padding: 12px 20px 15px;
+  border-top: 1px solid var(--kv-line-2);
+}
+.kv-foot-note { font-size: 11.5px; color: var(--kv-faint); line-height: 1.45; }
+
+/* ── Refuel notice ────────────────────────────────────────── */
+.kv-refuel {
+  position: fixed;
+  z-index: 10045;
+  right: 24px;
+  bottom: 24px;
+  width: min(340px, calc(100vw - 32px));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 13px 13px 16px;
+  box-sizing: border-box;
+
+  background: #FFFFFF;
+  color: #1A1917;
+  border: 1px solid #E7E4DC;
+  border-radius: 14px;
+  font-family: "Inter", "Figtree", -apple-system, sans-serif;
+  box-shadow:
+    0 2px 5px rgba(23, 21, 18, 0.04),
+    0 14px 30px -8px rgba(23, 21, 18, 0.18),
+    0 36px 64px -18px rgba(23, 21, 18, 0.22);
+
+  opacity: 0;
+  transform: translateY(12px) scale(0.97);
+  transition:
+    opacity 260ms cubic-bezier(0.2, 0, 0, 1),
+    transform 520ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.kv-refuel.is-in { opacity: 1; transform: none; }
+html[data-theme="dark"] .kv-refuel {
+  background: #1A1A18; color: #ECEAE4; border-color: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 16px 40px -10px rgba(0, 0, 0, 0.8), 0 40px 80px -20px rgba(0, 0, 0, 0.9);
+}
+
+.kv-refuel-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.kv-refuel-title { font-size: 12.5px; font-weight: 550; letter-spacing: -0.01em; }
+.kv-refuel-sub { font-size: 11.5px; line-height: 1.4; color: #6B6862; }
+html[data-theme="dark"] .kv-refuel-sub { color: #9A968E; }
+
+.kv-refuel-acts { flex: 0 0 auto; display: flex; align-items: center; gap: 4px; }
+.kv-refuel-act {
+  height: 27px;
+  padding: 0 11px;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #6B6862;
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: opacity 150ms ease, background-color 150ms ease, transform 150ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+.kv-refuel-act.is-primary { background: #1A1917; color: #FFFFFF; }
+.kv-refuel-act.is-primary:hover { opacity: 0.88; }
+.kv-refuel-act:not(.is-primary) { width: 27px; padding: 0; }
+.kv-refuel-act:not(.is-primary):hover { background: rgba(0, 0, 0, 0.05); color: #1A1917; }
+.kv-refuel-act:active { transform: scale(0.95); }
+html[data-theme="dark"] .kv-refuel-act.is-primary { background: #ECEAE4; color: #1A1A18; }
+html[data-theme="dark"] .kv-refuel-act:not(.is-primary):hover { background: rgba(255, 255, 255, 0.08); color: #ECEAE4; }
+
+@media (prefers-reduced-motion: reduce) {
+  .kv-panel, .kv-backdrop, .kv-refuel, .kv-add { transition-duration: 1ms !important; }
+}

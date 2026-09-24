@@ -1,0 +1,597 @@
+/* ============================================================
+   CLAVIS POLISH v3.1
+   Loads LAST — after all other stylesheets.
+   ============================================================ */
+
+/* ── 0. UNIFIED THEME TRANSITION ──────────────────────────────
+   All major surfaces switch together. No jitter.
+   ──────────────────────────────────────────────────────────── */
+html body,
+html #sidebar,
+html .topbar,
+html .views-container,
+html #main-scroll-area,
+html .main-content,
+html #main-content {
+  transition:
+    background-color 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color     380ms cubic-bezier(0.22, 1, 0.36, 1),
+    color            380ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow       380ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+html.theme-transitioning *,
+html.theme-transitioning *::before,
+html.theme-transitioning *::after {
+  transition:
+    background-color 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color     380ms cubic-bezier(0.22, 1, 0.36, 1),
+    color            380ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow       380ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+
+/* ── 1. FLOATING TASK WINDOW — CRYSTAL CLEAR TEXT ─────────────
+   Remove any residual filter/blur. Force sharp rendering.
+   ──────────────────────────────────────────────────────────── */
+html body .cts {
+  filter: none !important;
+  -webkit-filter: none !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: geometricPrecision !important;
+  isolation: isolate !important;
+}
+html body .cts.is-open {
+  will-change: auto !important;
+  filter: none !important;
+}
+html body .cts.is-open:not(.au-focus-in) {
+  filter: none !important;
+  animation: none !important;
+}
+
+/* Crisp text on all content nodes */
+html body .cts-title,
+html body .cts-summary,
+html body .cts-list,
+html body .cts-kicker,
+html body .cts-live,
+html body .cts-note,
+html body .cts-body,
+html body .cts-body p,
+html body .cts-body span,
+html body .cts-body strong,
+html body .cts-body em,
+html body .cts-next-label,
+html body .cts-next-btn,
+html body .cts-head-label,
+html body .cts-rows li,
+html body .cts-rows b,
+html body .cts-rows i,
+html body .cts-more,
+html body .cts-figure b,
+html body .cts-figure span,
+html body .cts-chip,
+html body .cts-result p {
+  filter: none !important;
+  -webkit-font-smoothing: antialiased !important;
+  text-rendering: geometricPrecision !important;
+}
+
+html body .cts-title {
+  font-size: 18px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.016em !important;
+  line-height: 1.25 !important;
+  color: var(--au-ink, #381932) !important;
+}
+html body .cts-summary,
+html body .cts-list,
+html body .cts-result p {
+  font-size: 13.5px !important;
+  line-height: 1.68 !important;
+  letter-spacing: 0.001em !important;
+  color: var(--au-ink-2, #5A3A50) !important;
+}
+
+/* ── 1b. WORKING BUTTONS — fix z-index + pointer-events ────── */
+html body .cts-next {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 6px !important;
+  margin: 14px 0 0 !important;
+  padding-top: 12px !important;
+  border-top: 1px solid var(--au-line, #EDE7DD) !important;
+  position: relative !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+}
+
+html body .cts-next-label {
+  flex: 0 0 100% !important;
+  font-family: var(--au-sans, "Figtree", sans-serif) !important;
+  font-size: 9px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.14em !important;
+  text-transform: uppercase !important;
+  color: var(--au-faint, #AFA09B) !important;
+  margin-bottom: 2px !important;
+}
+
+html body .cts-next-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  padding: 6px 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--au-line, #EDE7DD) !important;
+  background: var(--au-panel, #FFFFFF) !important;
+  color: var(--au-ink-2, #5A3A50) !important;
+  font-family: var(--au-sans, "Figtree", sans-serif) !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  line-height: 1.3 !important;
+  cursor: pointer !important;
+  position: relative !important;
+  z-index: 10 !important;
+  pointer-events: auto !important;
+  -webkit-font-smoothing: antialiased !important;
+  text-rendering: geometricPrecision !important;
+  transition:
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color     160ms cubic-bezier(0.22, 1, 0.36, 1),
+    color            160ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform        380ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow       280ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html body .cts-next-btn:hover {
+  background: var(--au-sunk, #F4EFE7) !important;
+  border-color: #DCD0BE !important;
+  color: var(--au-ink, #381932) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.07) !important;
+}
+html body .cts-next-btn:active {
+  transform: scale(0.96) !important;
+  transition-duration: 80ms !important;
+}
+
+html[data-theme="dark"] body .cts-next-btn {
+  background: var(--au-sunk, #180B14) !important;
+  border-color: var(--au-line, #34202D) !important;
+  color: var(--au-ink-2, #E2CFD9) !important;
+}
+html[data-theme="dark"] body .cts-next-btn:hover {
+  background: var(--au-panel, #1E1019) !important;
+  border-color: #4A3040 !important;
+  color: var(--au-ink, #FFF3E6) !important;
+}
+
+html body .cts-next-btn.is-go {
+  color: var(--au-accent, #A63A5B) !important;
+  border-color: transparent !important;
+  background: var(--au-accent-soft, rgba(166, 58, 91, 0.10)) !important;
+}
+html body .cts-next-btn.is-go:hover {
+  background: rgba(166, 58, 91, 0.16) !important;
+  border-color: var(--au-accent, #A63A5B) !important;
+}
+
+html body .cts-body {
+  overflow: visible !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+html body .cts-foot {
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 2 !important;
+}
+
+html body .cts.au-focus-in {
+  animation: clavis-focus-in 640ms cubic-bezier(0.28, 0.5, 0.12, 1) backwards !important;
+}
+@keyframes clavis-focus-in {
+  0%   { filter: blur(16px) saturate(1.06); opacity: 0.4; transform: translateY(10px) scale(0.972); }
+  50%  { filter: blur(4px); }
+  100% { filter: none; opacity: 1; transform: none; }
+}
+
+
+/* ── 2. COMPOSER — CLEAN TOOLBAR ───────────────────────────────
+   Keep: + (add menu, useful) and 📎 (attach file, useful).
+   Remove: ⚡ Inspiration button (lightning bolt), mic button,
+           model selector (Brainwave), and the chevron/slash icon.
+   ──────────────────────────────────────────────────────────── */
+
+/* Model selector */
+#jarvis-composer-model-btn,
+.jarvis-composer-model-btn,
+#jarvis-composer-model-dropdown,
+.jarvis-composer-dropdown--right,
+.jarvis-tool-menu-wrapper:has(#jarvis-composer-model-btn) {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Mic / voice button */
+#jarvis-composer-voice-btn,
+.jarvis-composer-mic-btn {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Inspiration button (the ⚡ lightning bolt) */
+#jarvis-composer-inspiration-btn,
+.jarvis-composer-insp-btn,
+#jarvis-composer-insp-dropdown,
+.jarvis-tool-menu-wrapper:has(#jarvis-composer-inspiration-btn) {
+  display: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Also hide the separator color change on the composer bottom bar
+   now that we removed items — keep it clean */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-composer-bottom-bar {
+  padding-top: 6px !important;
+}
+
+
+/* ── 2a. COMPOSER AUTO-EXPAND — anti-fluctuation ──────────────
+   The key problem: on every keystroke the textarea was measuring
+   its scrollHeight and jumping up/down. Fix:
+   
+   1. Use overflow-y: hidden — prevents the scrollHeight from
+      including a scrollbar's width which causes measurement drift.
+   2. Only apply the height transition on the way UP (growing).
+      On the way down (user deleting text), snap immediately so
+      there's no "spring back" that looks like bouncing.
+   3. The textarea minimum is exactly 1 line tall (26px).
+      Only grows when text genuinely needs a new line.
+   ──────────────────────────────────────────────────────────── */
+html:not(#_) body:not(#_) .claude-textarea {
+  /* Smooth, slow Apple spring ONLY when growing.
+     The JS resets height to auto then to the new value,
+     so if scrollHeight <= current height the transition
+     still runs but the delta is 0 — no visible movement. */
+  transition: height 500ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  will-change: height !important;
+  /* Keep hidden unless at ceiling — prevents scrollbar flicker
+     which was causing the fluctuation visual */
+  overflow-y: hidden !important;
+}
+
+/* At ceiling — allow scroll, no fluctuation */
+html:not(#_) body:not(#_) .claude-textarea[data-grow="full"] {
+  overflow-y: auto !important;
+  transition: height 200ms cubic-bezier(0.4, 0, 0.6, 1) !important;
+}
+
+/* Measurement pass — no transition */
+html:not(#_) body:not(#_) .claude-textarea.au-measuring {
+  transition: none !important;
+  will-change: auto !important;
+}
+
+/* Shrinking pass — snap instantly, no spring bounce */
+html:not(#_) body:not(#_) .claude-textarea.au-shrinking {
+  transition: none !important;
+  will-change: auto !important;
+}
+
+/* Container — does NOT have a height transition. Only the textarea
+   inside it grows. Prevents the whole box from jumping. */
+html:not(#_) body:not(#_) #view-jarvis:not(#__) .jarvis-input-container,
+html:not(#_) body:not(#_) #view-chat:not(#__) .claude-input-container,
+html:not(#_) body:not(#_) #view-candidate-ai:not(#__) .claude-input-container {
+  transition:
+    border-color 320ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow   320ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform    760ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  /* No height transition on the container — it just follows the textarea */
+  height: auto !important;
+  min-height: 0 !important;
+}
+
+
+/* ── 3. SIDEBAR HOVER — section labels + all items visible ─────
+   The screenshot showed section labels (Ai assistant, Lead & data
+   hub, Automation, System) and ALL nav items visible in full state
+   but NOT in hover state. This section forces them all to appear.
+   ──────────────────────────────────────────────────────────── */
+
+/* Rail spring */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___) {
+  transition:
+    width     340ms cubic-bezier(0.16, 1, 0.3, 1),
+    min-width 340ms cubic-bezier(0.16, 1, 0.3, 1),
+    max-width 340ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 380ms cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 340ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow: hidden !important;
+}
+
+@media all {
+  /* ── Peek state width ─── */
+  html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___).collapsed.au-peek,
+  html:not(#_) body:not(#_) aside#sidebar.sidebar:not(#__):not(#___).collapsed.au-peek {
+    width: 236px !important;
+    min-width: 236px !important;
+    max-width: 236px !important;
+    overflow: visible !important;
+    /* Lifted card look */
+    box-shadow:
+      4px 0 32px -8px rgba(56, 25, 50, 0.18),
+      16px 0 48px -16px rgba(56, 25, 50, 0.12),
+      1px 0 0 rgba(220, 208, 190, 0.5) !important;
+    border-radius: 0 16px 16px 0 !important;
+    z-index: 100 !important;
+  }
+
+  html[data-theme="dark"] #sidebar.sidebar.collapsed.au-peek,
+  html[data-theme="dark"] aside#sidebar.sidebar.collapsed.au-peek {
+    box-shadow:
+      4px 0 32px -8px rgba(0, 0, 0, 0.55),
+      16px 0 48px -16px rgba(0, 0, 0, 0.45),
+      1px 0 0 rgba(52, 32, 45, 0.8) !important;
+  }
+
+  /* ── ALL text labels — fade in after rail opens ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item > span,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-item > span,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-label-wrap,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .sidebar-brand-title,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .logo-text,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .chevron-arrow {
+    opacity: 1 !important;
+    transform: translateX(0) !important;
+    pointer-events: auto !important;
+    max-width: 220px !important;
+    overflow: visible !important;
+    white-space: nowrap !important;
+    transition:
+      opacity   180ms cubic-bezier(0.16, 1, 0.3, 1) 40ms,
+      transform 200ms cubic-bezier(0.16, 1, 0.3, 1) 40ms,
+      max-width 280ms cubic-bezier(0.16, 1, 0.3, 1) 20ms !important;
+  }
+
+  /* ── Section labels (Ai assistant / Lead & data hub / Automation) ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-section-label,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek [class*="section-label"],
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .sidebar-section-title,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-group-label {
+    display: block !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    max-width: 220px !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: none !important;
+    transform: none !important;
+    background: none !important;
+    font-size: 10px !important;
+    font-weight: 650 !important;
+    letter-spacing: 0.085em !important;
+    text-transform: uppercase !important;
+    color: var(--csb-faint, #A9A49B) !important;
+    padding: 0 8px !important;
+    margin: 16px 0 5px !important;
+    white-space: nowrap !important;
+    transition:
+      opacity    180ms cubic-bezier(0.16, 1, 0.3, 1) 50ms,
+      max-width  280ms cubic-bezier(0.16, 1, 0.3, 1) 20ms !important;
+  }
+
+  /* ── Nav items — match expanded layout exactly ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-item {
+    justify-content: flex-start !important;
+    padding: 7px 10px !important;
+    gap: 10px !important;
+    width: 100% !important;
+  }
+
+  /* ── Sub-items — always visible on peek ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-items {
+    display: grid !important;
+    grid-template-rows: 1fr !important;
+    opacity: 1 !important;
+  }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-items::before {
+    display: block !important;
+  }
+
+  /* ── Sidebar scroll area — show all content ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek #sidebar-nav-scroll,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .sidebar-nav {
+    padding: 2px 8px 14px !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    max-height: 100vh !important;
+  }
+
+  /* ── Brand row ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .sidebar-brand-row {
+    display: flex !important;
+    justify-content: flex-start !important;
+    align-items: center !important;
+    min-height: 28px !important;
+    height: auto !important;
+    padding: 4px 6px !important;
+    opacity: 1 !important;
+  }
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .mac-window-controls {
+    justify-content: flex-start !important;
+    padding: 2px 4px 10px !important;
+  }
+
+  /* ── Tooltip arrows hidden — label is visible ── */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item::after,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-sub-item::after {
+    content: none !important;
+  }
+
+  /* ── Color change on hover item should NOT happen ─────────
+     The sidebar icon color was changing tint on peek.
+     Keep icons at their normal color on the rail. */
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item .nav-icon,
+  html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___).au-peek .nav-item svg {
+    color: inherit !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ── Sidebar EXIT — labels leave 110ms before rail closes ────── */
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .logo-text,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .chevron-arrow {
+  opacity: 0 !important;
+  transform: translateX(-4px) !important;
+  pointer-events: none !important;
+  transition:
+    opacity   110ms cubic-bezier(0.4, 0, 1, 1) 0ms,
+    transform 110ms cubic-bezier(0.4, 0, 1, 1) 0ms !important;
+}
+
+/* Section labels collapse back — immediate */
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .nav-section-label,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) [class*="section-label"],
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .sidebar-section-title,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___):not(.au-peek) .nav-group-label {
+  opacity: 0 !important;
+  max-width: 0 !important;
+  overflow: hidden !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  pointer-events: none !important;
+  transition:
+    opacity   100ms cubic-bezier(0.4, 0, 1, 1) 0ms,
+    max-width 100ms cubic-bezier(0.4, 0, 1, 1) 0ms !important;
+}
+
+
+/* ── 4. APPLE ANIMATIONS ───────────────────────────────────── */
+
+/* Send buttons */
+.claude-send-btn,
+#jarvis-send-btn,
+#chat-send-btn,
+#btn-candidate-ai-send {
+  transition:
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform        320ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow       240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.claude-send-btn:hover,
+#jarvis-send-btn:hover,
+#chat-send-btn:hover    { transform: scale(1.06) !important; }
+.claude-send-btn:active,
+#jarvis-send-btn:active,
+#chat-send-btn:active   { transform: scale(0.93) !important; transition-duration: 80ms !important; }
+
+/* Icon buttons */
+.claude-icon-btn,
+.jarvis-composer-btn,
+.jarvis-composer-plus-btn,
+.jarvis-composer-attach-btn,
+.jarvis-composer-clear-btn {
+  transition:
+    background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    color            140ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform        280ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+.claude-icon-btn:active,
+.jarvis-composer-btn:active { transform: scale(0.88) !important; transition-duration: 80ms !important; }
+
+/* Chat messages */
+html body .chat-message {
+  animation: clavis-msg-in 420ms cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+}
+@keyframes clavis-msg-in {
+  from { opacity: 0; transform: translateY(8px); filter: blur(3px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* Dropdowns */
+html body .jarvis-composer-dropdown,
+html body .cand-source-menu {
+  animation: clavis-menu-up 300ms cubic-bezier(0.16, 1, 0.3, 1) backwards !important;
+}
+@keyframes clavis-menu-up {
+  from { opacity: 0; transform: translateY(8px) scale(0.96); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* Topbar buttons */
+html:not(#_) body:not(#_) .topbar button,
+html:not(#_) body:not(#_) .jarvis-icon-pill {
+  transition:
+    background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform        280ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow       240ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+html:not(#_) body:not(#_) .topbar button:active,
+html:not(#_) body:not(#_) .jarvis-icon-pill:active {
+  transform: scale(0.92) !important;
+  transition-duration: 80ms !important;
+}
+
+/* Chips */
+html body .chat-chip {
+  transition:
+    background-color 160ms cubic-bezier(0.22, 1, 0.36, 1),
+    border-color     160ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform        380ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+html body .chat-chip:hover  { transform: translateY(-1px) !important; }
+html body .chat-chip:active { transform: scale(0.96) !important; }
+
+/* Theme toggle */
+.lx-theme-toggle,
+#mark-bennett-theme-btn {
+  transition:
+    background-color 240ms cubic-bezier(0.22, 1, 0.36, 1),
+    transform        280ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+.lx-theme-toggle:active,
+#mark-bennett-theme-btn:active { transform: scale(0.92) !important; }
+
+/* Nav items — color only */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item {
+  transition:
+    background-color 140ms cubic-bezier(0.22, 1, 0.36, 1),
+    color            140ms cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+
+/* ── 5. REDUCED MOTION ─────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html body .cts.au-focus-in,
+  html body .chat-message,
+  html body .jarvis-composer-dropdown { animation: none !important; filter: none !important; transform: none !important; }
+
+  html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___),
+  html:not(#_) body:not(#_) .claude-textarea,
+  html body .cts-next-btn,
+  html body .chat-chip { transition-duration: 1ms !important; transition-delay: 0ms !important; }
+}

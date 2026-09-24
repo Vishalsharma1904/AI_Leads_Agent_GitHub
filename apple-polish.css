@@ -1,0 +1,3916 @@
+/* =====================================================================
+   APPLE-POLISH  —  Clavis design system & interaction layer
+   Loads LAST. Purely additive: no markup or behaviour is removed.
+
+   Fixes the systemic issues found in the UI audit:
+     · 22+ ad-hoc type styles, mono font used for all UI copy
+     · 15 different corner radii, 21 different shadows, 21 border colours
+     · `transition: all` on 446 elements + 22 easing/duration combos
+     · invisible / inconsistent focus rings
+     · icon-only sidebar with no labels or tooltips
+     · composer pill buttons clamped to 28px so their labels overflow
+   ===================================================================== */
+
+/* ------------------------------------------------------------------
+   1 · TOKENS
+   ------------------------------------------------------------------ */
+:root {
+  /* — type stacks ------------------------------------------------ */
+  --ap-sans: 'Figtree', -apple-system, BlinkMacSystemFont, 'SF Pro Text',
+             'Inter', 'Segoe UI', system-ui, sans-serif;
+  --ap-display: 'Instrument Serif', 'New York', 'Iowan Old Style', Georgia, serif;
+  --ap-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
+
+  /* — type scale (size / line-height / weight / tracking) --------- */
+  --ap-fs-display: 40px;   --ap-lh-display: 1.08;
+  --ap-fs-t1: 24px;        --ap-lh-t1: 1.24;
+  --ap-fs-t2: 19px;        --ap-lh-t2: 1.30;
+  --ap-fs-t3: 16px;        --ap-lh-t3: 1.36;
+  --ap-fs-headline: 14px;  --ap-lh-headline: 1.42;
+  --ap-fs-body: 13.5px;    --ap-lh-body: 1.50;
+  --ap-fs-callout: 13px;   --ap-lh-callout: 1.44;
+  --ap-fs-sub: 12.5px;     --ap-lh-sub: 1.40;
+  --ap-fs-foot: 12px;      --ap-lh-foot: 1.36;
+  --ap-fs-caption: 11px;   --ap-lh-caption: 1.32;
+  --ap-fs-micro: 10.5px;   --ap-lh-micro: 1.30;
+
+  --ap-tracking-display: -0.022em;
+  --ap-tracking-title: -0.016em;
+  --ap-tracking-body: -0.006em;
+  --ap-tracking-micro: 0.055em;
+
+  /* — spacing (4px rhythm) --------------------------------------- */
+  --ap-s1: 4px;  --ap-s2: 6px;  --ap-s3: 8px;  --ap-s4: 10px; --ap-s5: 12px;
+  --ap-s6: 16px; --ap-s7: 20px; --ap-s8: 24px; --ap-s9: 32px; --ap-s10: 40px;
+
+  /* — radius scale ------------------------------------------------ */
+  --ap-r-xs: 6px;   /* chips, tags, tiny controls */
+  --ap-r-sm: 8px;   /* buttons, inputs, icon buttons */
+  --ap-r-md: 10px;  /* menu items, list rows, small tiles */
+  --ap-r-lg: 14px;  /* cards, panels */
+  --ap-r-xl: 18px;  /* modals, sheets, composer */
+  --ap-r-full: 999px;
+
+  /* — control heights --------------------------------------------- */
+  --ap-h-xs: 24px; --ap-h-sm: 28px; --ap-h-md: 32px; --ap-h-lg: 38px;
+
+  /* — motion ------------------------------------------------------ */
+  --ap-dur-micro: 90ms;   /* press / tonal feedback */
+  --ap-dur-fast: 140ms;   /* hover, small state change */
+  --ap-dur-base: 200ms;   /* popover, tab, selection */
+  --ap-dur-slow: 300ms;   /* modal, panel, sidebar */
+
+  --ap-ease-out: cubic-bezier(0.32, 0.72, 0, 1);
+  --ap-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ap-ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+
+  /* gentle spring — ~2% overshoot, natural settle */
+  --ap-spring: linear(0, 0.0733 3.6%, 0.2331 7.1%, 0.4162 10.7%, 0.5870 14.3%,
+    0.7290 17.9%, 0.8376 21.4%, 0.9146 25.0%, 0.9653 28.6%, 0.9959 32.1%,
+    1.0121 35.7%, 1.0188 39.3%, 1.0198 42.9%, 1.0177 46.4%, 1.0142 50.0%,
+    1.0106 53.6%, 1.0074 57.1%, 1.0047 60.7%, 1.0027 64.3%, 1.0014 67.9%,
+    1.0005 71.4%, 1.0000 75.0%, 0.9997 78.6%, 0.9996 82.1%, 0.9996 85.7%,
+    0.9997 89.3%, 0.9997 92.9%, 0.9998 96.4%, 1);
+  /* snappier spring — for toggles & selection indicators */
+  --ap-spring-snap: linear(0, 0.1256 3.6%, 0.3799 7.1%, 0.6378 10.7%, 0.8400 14.3%,
+    0.9708 17.9%, 1.0388 21.4%, 1.0622 25.0%, 1.0593 28.6%, 1.0447 32.1%,
+    1.0278 35.7%, 1.0137 39.3%, 1.0040 42.9%, 0.9985 46.4%, 0.9963 50.0%,
+    0.9961 53.6%, 0.9968 57.1%, 0.9979 60.7%, 0.9989 64.3%, 0.9996 67.9%,
+    1.0000 71.4%, 1.0002 75.0%, 1.0003 78.6%, 1.0002 82.1%, 1.0002 85.7%,
+    1.0001 89.3%, 1.0000 92.9%, 1.0000 96.4%, 1);
+
+  /* — layering ---------------------------------------------------- */
+  --ap-z-base: 0;
+  --ap-z-sticky: 100;
+  --ap-z-sidebar: 200;
+  --ap-z-topbar: 300;
+  --ap-z-dropdown: 600;
+  --ap-z-popover: 700;
+  --ap-z-modal-backdrop: 800;
+  --ap-z-modal: 810;
+  --ap-z-toast: 900;
+  --ap-z-tooltip: 1000;
+
+  /* — accent: solid Apple System Blue (#007AFF) ----------------- */
+  --ap-accent: #007AFF;
+  --ap-focus: #007AFF;
+}
+
+/* ---- light --------------------------------------------------------
+   Neutrals carry a trace of warmth so they sit correctly on the app's
+   #FEFDF5 paper ground instead of reading blue against it.          */
+html[data-theme="light"], :root {
+  --ap-ink: 26, 24, 21;                 /* warm near-black, as r,g,b */
+  --ap-text-1: rgb(var(--ap-ink));
+  --ap-text-2: rgba(var(--ap-ink), 0.68);
+  --ap-text-3: rgba(var(--ap-ink), 0.48);
+  --ap-text-4: rgba(var(--ap-ink), 0.34);
+  --ap-text-inv: #FFFFFF;
+
+  --ap-sep: rgba(var(--ap-ink), 0.10);
+  --ap-sep-strong: rgba(var(--ap-ink), 0.17);
+
+  --ap-fill-hover: rgba(var(--ap-ink), 0.045);
+  --ap-fill-press: rgba(var(--ap-ink), 0.085);
+  --ap-fill-sel: rgba(var(--ap-ink), 0.070);
+  --ap-fill-quiet: rgba(var(--ap-ink), 0.028);
+
+  --ap-e1: 0 1px 2px rgba(var(--ap-ink),.055), 0 0 0 .5px rgba(var(--ap-ink),.07);
+  --ap-e2: 0 2px 6px -1px rgba(var(--ap-ink),.085), 0 1px 2px rgba(var(--ap-ink),.05),
+           0 0 0 .5px rgba(var(--ap-ink),.075);
+  --ap-e3: 0 8px 24px -6px rgba(var(--ap-ink),.13), 0 2px 6px -2px rgba(var(--ap-ink),.06),
+           0 0 0 .5px rgba(var(--ap-ink),.085);
+  --ap-e4: 0 24px 64px -16px rgba(var(--ap-ink),.22), 0 8px 20px -8px rgba(var(--ap-ink),.10),
+           0 0 0 .5px rgba(var(--ap-ink),.09);
+}
+
+/* Re-point the app's own text tokens at the semantic scale so the ten
+   ad-hoc text colours found in the audit collapse to four. */
+html[data-theme="light"] {
+  --foreground: var(--ap-text-1) !important;
+  --do-t1: var(--ap-text-1) !important;
+  --do-t2: var(--ap-text-2) !important;
+  --do-t3: var(--ap-text-3) !important;
+  --gray-600: var(--ap-text-2) !important;
+  --gray-400: var(--ap-text-3) !important;
+  --border: var(--ap-sep) !important;
+  --do-border: var(--ap-sep) !important;
+  --do-card-border: var(--ap-sep) !important;
+  --do-border-strong: var(--ap-sep-strong) !important;
+}
+html[data-theme="dark"] {
+  --foreground: var(--ap-text-1) !important;
+  --do-t1: var(--ap-text-1) !important;
+  --do-t2: var(--ap-text-2) !important;
+  --do-t3: var(--ap-text-3) !important;
+  --gray-600: var(--ap-text-2) !important;
+  --gray-400: var(--ap-text-3) !important;
+  --border: var(--ap-sep) !important;
+  --do-border: var(--ap-sep) !important;
+  --do-card-border: var(--ap-sep) !important;
+  --do-border-strong: var(--ap-sep-strong) !important;
+}
+
+/* ---- dark --------------------------------------------------------- */
+html[data-theme="dark"] {
+  --ap-text-1: rgba(255, 255, 255, 0.94);
+  --ap-text-2: rgba(255, 255, 255, 0.66);
+  --ap-text-3: rgba(255, 255, 255, 0.46);
+  --ap-text-4: rgba(255, 255, 255, 0.32);
+  --ap-text-inv: #101012;
+
+  --ap-sep: rgba(255, 255, 255, 0.10);
+  --ap-sep-strong: rgba(255, 255, 255, 0.17);
+
+  --ap-fill-hover: rgba(255, 255, 255, 0.065);
+  --ap-fill-press: rgba(255, 255, 255, 0.115);
+  --ap-fill-sel: rgba(255, 255, 255, 0.10);
+  --ap-fill-quiet: rgba(255, 255, 255, 0.04);
+
+  --ap-e1: 0 1px 2px rgba(0,0,0,.4), 0 0 0 .5px rgba(255,255,255,.07);
+  --ap-e2: 0 2px 8px -1px rgba(0,0,0,.5), 0 0 0 .5px rgba(255,255,255,.08),
+           inset 0 1px 0 rgba(255,255,255,.045);
+  --ap-e3: 0 10px 28px -8px rgba(0,0,0,.62), 0 0 0 .5px rgba(255,255,255,.09),
+           inset 0 1px 0 rgba(255,255,255,.055);
+  --ap-e4: 0 28px 72px -20px rgba(0,0,0,.75), 0 8px 22px -10px rgba(0,0,0,.5),
+           0 0 0 .5px rgba(255,255,255,.10), inset 0 1px 0 rgba(255,255,255,.06);
+}
+
+
+/* ------------------------------------------------------------------
+   2 · TYPOGRAPHY
+   Undo the "everything is monospace" alias in luxury-ui.css and put a
+   real hierarchy back: sans for UI, serif for display, mono for data.
+   ------------------------------------------------------------------ */
+/* luxury-ui.css:3105 applies `font-family: var(--font-serif) !important`
+   to the universal selector, and :3117 applies var(--font-display) to
+   every heading — so BOTH tokens are really "the app's UI font", not
+   display faces. luxury-ui pointed them at monospace, which is what
+   turned the entire product into a terminal. Point them at the sans;
+   the editorial serif is applied explicitly, to the greeting only. */
+:root {
+  --font-sans: var(--ap-sans) !important;
+  --font-display: var(--ap-sans) !important;
+  --font-serif: var(--ap-sans) !important;
+  --font-mono-display: var(--ap-sans) !important;
+  --font-mono: var(--ap-mono) !important;
+  --flow-sans: var(--ap-sans) !important;
+}
+
+html body,
+html body *:not(code):not(pre):not(kbd):not(samp):not(.ap-mono):not(i):not(svg):not(path) {
+  font-family: var(--ap-sans);
+}
+/* beat luxury-ui.css's !important mono rules on the selectors it targets */
+html body .view-title, html body .view h1, html body .view h2, html body .view h3,
+html body .nav-item, html body .nav-section-label, html body .stat-label,
+html body .smodal-nav-item, html body .smodal-nav-group-label, html body .smodal-title,
+html body .smodal-section-title, html body .smodal-label, html body .smodal-hint,
+html body .view-subtitle, html body .chart-card-title, html body .do-chart-title,
+html body .sidebar .logo-brand, html body .logo-sub, html body .topbar-user-company,
+html body .do-dash-greeting-sub, html body .do-stat-label, html body .do-status-badge,
+html body .leads-table th, html body .leads-table td,
+html body .chat-message, html body .chat-bubble,
+html body button, html body input, html body textarea, html body select,
+html body label, html body p, html body span, html body a, html body li, html body td, html body th {
+  font-family: var(--ap-sans) !important;
+}
+
+/* display moments keep the serif */
+html body .claude-greeting, html body #welcome-greeting,
+html body .do-dash-greeting-title, html body .ap-display {
+  font-family: var(--ap-display) !important;
+  font-weight: 400 !important;
+  letter-spacing: var(--ap-tracking-display) !important;
+  line-height: var(--ap-lh-display) !important;
+}
+
+/* mono stays where it earns its place: figures, keys, code, tabular data */
+html body code, html body pre, html body kbd, html body samp, html body .ap-mono,
+html body .stat-value, html body .do-stat-value, html body .token-count-num,
+html body #home-token-counter, html body .smodal-stat-val,
+html body [class*="api-key"], html body [class*="token-value"],
+html body .prov-roster-lic {
+  font-family: var(--ap-mono) !important;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "calt" 0;
+}
+
+/* --- normalise weights: 650/660/750/800 -> 400/500/600/700 --------- */
+html body [style*="font-weight"], html body * { font-synthesis-weight: none; }
+
+/* --- the scale ----------------------------------------------------- */
+html body .view-title, html body .view h1 {
+  font-size: var(--ap-fs-t1) !important;
+  line-height: var(--ap-lh-t1) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--ap-tracking-title) !important;
+  color: var(--ap-text-1) !important;
+  text-transform: none !important;
+}
+html body .view-subtitle {
+  font-size: var(--ap-fs-body) !important;
+  line-height: var(--ap-lh-body) !important;
+  font-weight: 400 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  color: var(--ap-text-2) !important;
+  text-transform: none !important;   /* was ALL-CAPS mono */
+  max-width: 62ch;
+}
+html body .view h2, html body .smodal-section-title, html body .chart-card-title,
+html body .do-chart-title, html body .smodal-title {
+  font-size: var(--ap-fs-t3) !important;
+  line-height: var(--ap-lh-t3) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--ap-tracking-title) !important;
+  color: var(--ap-text-1) !important;
+}
+html body .view h3 {
+  font-size: var(--ap-fs-headline) !important;
+  line-height: var(--ap-lh-headline) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+}
+html body .do-chart-sub, html body .smodal-hint, html body .chart-card-sub {
+  font-size: var(--ap-fs-sub) !important;
+  line-height: var(--ap-lh-sub) !important;
+  color: var(--ap-text-3) !important;
+  font-weight: 400 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+}
+/* uppercase micro-labels — the one place tracking opens up */
+html body .nav-section-label, html body .smodal-nav-group-label,
+html body .leads-table th, html body .do-stat-label {
+  font-size: var(--ap-fs-caption) !important;
+  line-height: var(--ap-lh-caption) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--ap-tracking-micro) !important;
+  color: var(--ap-text-3) !important;
+}
+/* nothing readable renders below 11px (was 9px / 10px at weight 750) */
+html body { font-size: var(--ap-fs-body); }
+html body .stat-badge, html body .do-stat-badge, html body .badge, html body .chip,
+html body .tag, html body .status-badge, html body .do-status-badge,
+html body .logo-sub, html body .topbar-user-company, html body .smodal-status-pill,
+html body .flagship-badge, html body .nav-badge, html body .meta, html body small,
+html body [class*="-hint"], html body [class*="-caption"], html body [class*="-meta"] {
+  font-size: var(--ap-fs-caption) !important;
+  line-height: var(--ap-lh-caption) !important;
+  font-weight: 500 !important;
+}
+
+
+/* ------------------------------------------------------------------
+   3 · MOTION — one language, scoped properties, no `transition: all`
+   ------------------------------------------------------------------ */
+html body button, html body a, html body input, html body textarea, html body select,
+html body .nav-item, html body .card, html body .stat-card, html body .do-stat-card,
+html body .chart-card, html body .do-chart-card, html body [role="button"],
+html body .chip, html body .badge, html body .tag, html body .pill,
+html body .smodal-nav-item, html body .filter-chip, html body .lead-row,
+html body .leads-table tbody tr, html body .quick-action, html body .action-btn,
+html body .claude-icon-btn, html body .jarvis-composer-btn, html body .topbar-btn {
+  transition-property: background-color, border-color, color, box-shadow,
+                       opacity, transform, fill, stroke !important;
+  transition-duration: var(--ap-dur-fast) !important;
+  transition-timing-function: var(--ap-ease-out) !important;
+}
+/* press feedback: immediate, then spring back */
+html body button:active, html body [role="button"]:active,
+html body .nav-item:active, html body .claude-icon-btn:active,
+html body .jarvis-composer-btn:active, html body .topbar-btn:active {
+  transition-duration: var(--ap-dur-micro) !important;
+}
+/* larger surfaces move a little slower */
+html body .card, html body .stat-card, html body .do-stat-card,
+html body .chart-card, html body .do-chart-card {
+  transition-duration: var(--ap-dur-base) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   4 · SURFACES, RADIUS, ELEVATION
+   Replaces the dark-theme bevel (white inset + hard 1.5px line) that
+   was being applied in light mode on 37 elements.
+   ------------------------------------------------------------------ */
+html body .card, html body .stat-card, html body .do-stat-card,
+html body .chart-card, html body .do-chart-card, html body .panel,
+html body .lx-card, html body .glass-card, html body .leads-table-wrap {
+  border-radius: var(--ap-r-lg) !important;
+  box-shadow: var(--ap-e1) !important;
+  border: none !important;
+  background-clip: padding-box;
+}
+html body .card:hover, html body .stat-card:hover, html body .do-stat-card:hover,
+html body .chart-card:hover, html body .do-chart-card:hover {
+  box-shadow: var(--ap-e2) !important;
+  transform: none !important;   /* no hover-jump */
+}
+
+/* radius harmonisation — 15 values collapse to 6 */
+html body button, html body input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html body textarea, html body select, html body .btn, html body .topbar-btn {
+  border-radius: var(--ap-r-sm) !important;
+}
+html body .chip, html body .badge, html body .tag, html body .status-badge,
+html body .do-status-badge, html body .flagship-badge {
+  border-radius: var(--ap-r-full) !important;
+}
+html body .nav-item, html body .smodal-nav-item, html body .menu-item,
+html body .dropdown-item, html body .quick-action {
+  border-radius: var(--ap-r-md) !important;
+}
+html body .modal, html body .modal-content, html body .smodal-window,
+html body .mac-dialog, html body .dialog {
+  border-radius: var(--ap-r-xl) !important;
+  box-shadow: var(--ap-e4) !important;
+}
+html body .dropdown-menu, html body .menu, html body .popover,
+html body .context-menu, html body .cand-source-menu, html body .custom-dropdown,
+html body .jarvis-tool-menu, html body [role="menu"], html body [role="listbox"] {
+  border-radius: var(--ap-r-md) !important;
+  box-shadow: var(--ap-e3) !important;
+  border: none !important;
+}
+
+/* separators: one hairline colour, no double borders */
+html body hr, html body .divider, html body .separator {
+  border: none !important;
+  border-top: 1px solid var(--ap-sep) !important;
+  height: 0 !important;
+}
+
+
+/* ------------------------------------------------------------------
+   5 · CONTROLS
+   ------------------------------------------------------------------ */
+/* --- neutral / secondary buttons ---------------------------------- */
+html body .btn-secondary, html body .btn-ghost, html body .topbar-btn,
+html body .quick-action, html body .action-btn, html body .do-quick-btn {
+  background: var(--ap-fill-quiet) !important;
+  color: var(--ap-text-1) !important;
+  border: 1px solid var(--ap-sep) !important;
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 500 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  min-height: var(--ap-h-md);
+  box-shadow: none !important;
+}
+html body .btn-secondary:hover, html body .btn-ghost:hover, html body .topbar-btn:hover,
+html body .quick-action:hover, html body .action-btn:hover, html body .do-quick-btn:hover {
+  background: var(--ap-fill-hover) !important;
+  border-color: var(--ap-sep-strong) !important;
+  transform: none !important;
+}
+html body .btn-secondary:active, html body .btn-ghost:active, html body .topbar-btn:active,
+html body .quick-action:active, html body .action-btn:active, html body .do-quick-btn:active {
+  background: var(--ap-fill-press) !important;
+  transform: scale(0.985) !important;
+}
+
+/* --- primary: one solid accent, no gradient, no glow -------------- */
+html body .btn-primary, html body .primary-btn, html body .do-btn-primary,
+html body .lx-btn-primary, html body [class*="run-agent"], html body .btn-cta {
+  background: var(--ap-accent) !important;
+  background-image: none !important;
+  color: #fff !important;
+  border: none !important;
+  box-shadow: var(--ap-e1) !important;
+  font-weight: 550 !important;
+  font-size: var(--ap-fs-callout) !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  text-shadow: none !important;
+}
+html body .btn-primary:hover, html body .primary-btn:hover, html body .do-btn-primary:hover,
+html body .lx-btn-primary:hover, html body [class*="run-agent"]:hover, html body .btn-cta:hover {
+  filter: brightness(1.07) !important;
+  box-shadow: var(--ap-e2) !important;
+  transform: none !important;
+}
+html body .btn-primary:active, html body .primary-btn:active, html body .do-btn-primary:active,
+html body .lx-btn-primary:active, html body .btn-cta:active {
+  filter: brightness(0.94) !important;
+  transform: scale(0.985) !important;
+}
+
+/* --- icon buttons: real hover/press affordance -------------------- */
+html body .claude-icon-btn, html body .icon-btn, html body .jarvis-composer-btn,
+html body .topbar-icon-btn {
+  color: var(--ap-text-2) !important;
+  border-radius: var(--ap-r-sm) !important;
+}
+html body .claude-icon-btn:hover, html body .icon-btn:hover,
+html body .jarvis-composer-btn:hover, html body .topbar-icon-btn:hover {
+  background: var(--ap-fill-hover) !important;
+  color: var(--ap-text-1) !important;
+}
+html body .claude-icon-btn:active, html body .icon-btn:active,
+html body .jarvis-composer-btn:active, html body .topbar-icon-btn:active {
+  background: var(--ap-fill-press) !important;
+  transform: scale(0.94) !important;
+}
+
+/* --- disabled: one treatment everywhere --------------------------- */
+html body button:disabled, html body [aria-disabled="true"],
+html body input:disabled, html body select:disabled, html body textarea:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+  filter: none !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+/* --- inputs ------------------------------------------------------- */
+html body input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html body textarea, html body select {
+  background: var(--ap-surface-input, transparent) !important;
+  color: var(--ap-text-1) !important;
+  border: 1px solid var(--ap-sep) !important;
+  font-size: var(--ap-fs-body) !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  box-shadow: none !important;
+  min-height: var(--ap-h-md);
+  transition-property: border-color, box-shadow, background-color !important;
+  transition-duration: var(--ap-dur-fast) !important;
+  transition-timing-function: var(--ap-ease-out) !important;
+}
+html body input:hover:not(:focus):not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html body textarea:hover:not(:focus), html body select:hover:not(:focus) {
+  border-color: var(--ap-sep-strong) !important;
+}
+html body input:focus:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html body textarea:focus, html body select:focus {
+  border-color: color-mix(in srgb, var(--ap-accent) 55%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--ap-accent) 15%, transparent) !important;
+  outline: none !important;
+}
+html body ::placeholder {
+  color: var(--ap-text-4) !important;
+  opacity: 1 !important;
+}
+/* placeholder must never run under a trailing icon (auth screen bug) */
+html body input { text-overflow: ellipsis; }
+
+/* --- native checkboxes -> system-style ---------------------------- */
+html body input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 15px; height: 15px; min-height: 15px;
+  border: 1px solid var(--ap-sep-strong);
+  border-radius: 4px;
+  background: transparent;
+  display: inline-grid; place-content: center;
+  cursor: pointer; flex: 0 0 auto;
+  transition: background-color var(--ap-dur-micro) var(--ap-ease-out),
+              border-color var(--ap-dur-micro) var(--ap-ease-out);
+}
+html body input[type="checkbox"]::after {
+  content: ""; width: 9px; height: 9px;
+  transform: scale(0);
+  transition: transform var(--ap-dur-fast) var(--ap-spring-snap);
+  background: #fff;
+  clip-path: polygon(14% 47%, 0 60%, 39% 100%, 100% 22%, 86% 9%, 37% 71%);
+}
+html body input[type="checkbox"]:hover { border-color: var(--ap-accent); }
+html body input[type="checkbox"]:checked {
+  background: var(--ap-accent); border-color: var(--ap-accent);
+}
+html body input[type="checkbox"]:checked::after { transform: scale(1); }
+
+/* --- range sliders: 6px track was un-grabbable -------------------- */
+html body input[type="range"] {
+  appearance: none; -webkit-appearance: none;
+  background: transparent; height: 22px; min-height: 22px; cursor: pointer;
+}
+html body input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: var(--ap-r-full); background: var(--ap-fill-press);
+}
+html body input[type="range"]::-webkit-slider-thumb {
+  appearance: none; -webkit-appearance: none;
+  width: 15px; height: 15px; margin-top: -5.5px;
+  border-radius: 50%; background: #fff;
+  box-shadow: 0 1px 3px rgba(0,0,0,.28), 0 0 0 .5px rgba(0,0,0,.14);
+  transition: transform var(--ap-dur-micro) var(--ap-ease-out);
+}
+html body input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.12); }
+
+
+/* ------------------------------------------------------------------
+   6 · NAVIGATION — states you can actually read
+   ------------------------------------------------------------------ */
+html body .nav-item {
+  color: var(--ap-text-2) !important;
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 500 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  position: relative;
+}
+html body .nav-item:hover:not(.active) {
+  background: var(--ap-fill-hover) !important;
+  color: var(--ap-text-1) !important;
+}
+html body .nav-item:active:not(.active) { background: var(--ap-fill-press) !important; }
+html body .nav-item.active {
+  background: var(--ap-fill-sel) !important;
+  color: var(--ap-text-1) !important;
+  font-weight: 600 !important;
+}
+/* a quiet accent rail marks the current section */
+html body .nav-item.active::before {
+  content: ""; position: absolute; left: -6px; top: 50%;
+  width: 3px; height: 18px; margin-top: -9px;
+  border-radius: var(--ap-r-full);
+  background: var(--ap-accent);
+  animation: ap-rail var(--ap-dur-base) var(--ap-spring) both;
+}
+@keyframes ap-rail { from { transform: scaleY(0.2); opacity: 0 } to { transform: scaleY(1); opacity: 1 } }
+html body .nav-item svg { width: 17px !important; height: 17px !important; stroke-width: 1.75 !important; }
+
+
+/* ------------------------------------------------------------------
+   7 · TOOLTIPS for icon-only controls (built by apple-polish.js)
+   ------------------------------------------------------------------ */
+.ap-tip {
+  position: fixed;
+  z-index: var(--ap-z-tooltip);
+  pointer-events: none;
+  padding: 5px 9px;
+  border-radius: var(--ap-r-xs);
+  font-family: var(--ap-sans);
+  font-size: var(--ap-fs-foot);
+  font-weight: 500;
+  letter-spacing: var(--ap-tracking-body);
+  line-height: 1.3;
+  white-space: nowrap;
+  color: var(--ap-text-inv);
+  background: color-mix(in srgb, var(--ap-text-1) 92%, transparent);
+  box-shadow: var(--ap-e3);
+  opacity: 0;
+  transform: translateX(-4px) scale(0.96);
+  transform-origin: left center;
+  transition: opacity var(--ap-dur-fast) var(--ap-ease-out),
+              transform var(--ap-dur-base) var(--ap-spring);
+}
+.ap-tip[data-side="top"]    { transform: translateY(4px) scale(0.96); transform-origin: center bottom; }
+.ap-tip[data-side="bottom"] { transform: translateY(-4px) scale(0.96); transform-origin: center top; }
+.ap-tip.ap-tip-in { opacity: 1; transform: none; }
+
+
+/* ------------------------------------------------------------------
+   8 · MENUS · POPOVERS · MODALS — origin-aware, spring-settled
+   ------------------------------------------------------------------ */
+html body .dropdown-menu, html body .menu, html body .popover,
+html body .context-menu, html body .cand-source-menu,
+html body .jarvis-tool-menu, html body [role="menu"] {
+  z-index: var(--ap-z-dropdown) !important;
+  padding: var(--ap-s1) !important;
+  transform-origin: var(--ap-origin, top left);
+}
+html body .menu-item, html body .dropdown-item, html body [role="menuitem"] {
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 450 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  color: var(--ap-text-1) !important;
+  border-radius: var(--ap-r-xs) !important;
+  min-height: 28px;
+  transition: background-color var(--ap-dur-micro) var(--ap-ease-out) !important;
+}
+html body .menu-item:hover, html body .dropdown-item:hover,
+html body [role="menuitem"]:hover {
+  background: var(--ap-fill-hover) !important;
+}
+html body .menu-item:active, html body [role="menuitem"]:active {
+  background: var(--ap-fill-press) !important;
+}
+
+/* modal backdrop + window motion */
+html body .modal-backdrop, html body .smodal-backdrop, html body .overlay-backdrop {
+  z-index: var(--ap-z-modal-backdrop) !important;
+  animation: ap-fade var(--ap-dur-base) var(--ap-ease-out) both;
+}
+html body .modal, html body .modal-content, html body .smodal-window, html body .dialog {
+  z-index: var(--ap-z-modal) !important;
+  animation: ap-modal-in var(--ap-dur-slow) var(--ap-spring) both;
+}
+@keyframes ap-fade { from { opacity: 0 } to { opacity: 1 } }
+@keyframes ap-modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.985) }
+  to   { opacity: 1; transform: none }
+}
+
+/* toasts */
+html body .toast, html body .notification-toast, html body [class*="toast"] {
+  z-index: var(--ap-z-toast) !important;
+  border-radius: var(--ap-r-md) !important;
+  box-shadow: var(--ap-e3) !important;
+  font-size: var(--ap-fs-callout) !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   9 · SCROLLBARS — one overlay style (188 conflicting rules replaced)
+   ------------------------------------------------------------------ */
+html body *::-webkit-scrollbar { width: 11px; height: 11px; }
+html body *::-webkit-scrollbar-track { background: transparent; }
+html body *::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--ap-text-1) 20%, transparent);
+  border-radius: var(--ap-r-full);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  transition: background-color var(--ap-dur-fast) var(--ap-ease-out);
+}
+html body *::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in srgb, var(--ap-text-1) 34%, transparent);
+  background-clip: content-box;
+}
+html body *::-webkit-scrollbar-corner { background: transparent; }
+html body * { scrollbar-width: thin; scrollbar-color: color-mix(in srgb, var(--ap-text-1) 20%, transparent) transparent; }
+
+
+/* ------------------------------------------------------------------
+   10 · FOCUS & ACCESSIBILITY
+   Two of the audited focus rings were `solid 0px` — invisible.
+   ------------------------------------------------------------------ */
+html body :focus { outline: none; }
+html body :focus-visible {
+  outline: 2px solid var(--ap-focus) !important;
+  outline-offset: 2px !important;
+  box-shadow: none !important;
+  border-radius: inherit;
+}
+html body input:focus-visible, html body textarea:focus-visible {
+  outline-offset: 1px !important;
+}
+/* skip-to-content affordance for keyboard users */
+.ap-skip {
+  position: fixed; top: 8px; left: 8px; z-index: calc(var(--ap-z-tooltip) + 1);
+  padding: 8px 14px; border-radius: var(--ap-r-sm);
+  background: var(--ap-accent); color: #fff;
+  font: 500 var(--ap-fs-callout)/1.3 var(--ap-sans);
+  transform: translateY(-160%);
+  transition: transform var(--ap-dur-base) var(--ap-spring);
+}
+.ap-skip:focus-visible { transform: none; }
+
+
+/* ------------------------------------------------------------------
+   11 · TARGETED BUG FIXES (found in the browser audit)
+   ------------------------------------------------------------------ */
+
+/* (a) Composer pill buttons.
+   composer-overhaul.css clamps every .jarvis-composer-btn to 28x28,
+   but the Inspiration / model buttons carry a text label — so the
+   label overflowed the button and painted over its neighbours.
+   Give labelled buttons their intended pill width back.           */
+html body .jarvis-composer-insp-btn,
+html body .jarvis-composer-model-btn,
+html body .jarvis-composer-btn:has(> span:not(:empty)) {
+  width: auto !important;
+  min-width: var(--ap-h-sm) !important;
+  height: var(--ap-h-sm) !important;
+  min-height: var(--ap-h-sm) !important;
+  padding: 0 var(--ap-s3) !important;
+  gap: var(--ap-s2) !important;
+  max-width: 210px !important;
+  overflow: hidden !important;
+  font-size: var(--ap-fs-foot) !important;
+  font-weight: 500 !important;
+}
+html body .jarvis-insp-text,
+html body .jarvis-composer-model-btn > span,
+html body .jarvis-composer-insp-btn > span {
+  position: static !important;
+  display: inline-block !important;
+  max-width: 150px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  margin: 0 !important;
+  inset: auto !important;
+  transform: none !important;
+}
+/* the composer's dead vertical space */
+html body .jarvis-luxury-composer, html body .jarvis-input-container {
+  border-radius: var(--ap-r-xl) !important;
+  box-shadow: var(--ap-e2) !important;
+  border: 1px solid var(--ap-sep) !important;
+  transition: border-color var(--ap-dur-base) var(--ap-ease-out),
+              box-shadow var(--ap-dur-base) var(--ap-ease-out) !important;
+}
+html body .jarvis-luxury-composer:focus-within, html body .jarvis-input-container:focus-within {
+  border-color: color-mix(in srgb, var(--ap-accent) 45%, transparent) !important;
+  box-shadow: var(--ap-e2), 0 0 0 3px color-mix(in srgb, var(--ap-accent) 12%, transparent) !important;
+}
+
+/* (b) Closed overlays must not be reachable by Tab.
+   apple-polish.js parks their controls with tabindex="-1" and marks them
+   .ap-inert. This class is a KEYBOARD concern only — it must never touch
+   pointer-events, or an element parked during its entrance animation
+   would become permanently un-clickable and re-park itself forever. */
+html body .ap-inert { }
+
+/* (c) Accent swatches radiated a coloured glow each — flatten them. */
+html body .smodal-accent-swatch, html body [class*="accent-swatch"],
+html body [class*="accent-chip"] {
+  box-shadow: var(--ap-e1) !important;
+  background-image: none !important;
+  border-radius: var(--ap-r-sm) !important;
+  transition: transform var(--ap-dur-fast) var(--ap-spring),
+              box-shadow var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body .smodal-accent-swatch:hover, html body [class*="accent-swatch"]:hover {
+  transform: scale(1.06) !important;
+}
+html body .smodal-accent-swatch:active, html body [class*="accent-swatch"]:active {
+  transform: scale(0.97) !important;
+}
+
+/* (d) Destructive colour was on "Reset" (a non-destructive filter). */
+html body [class*="filter"] [class*="reset"], html body .filter-reset-btn {
+  background: var(--ap-fill-quiet) !important;
+  color: var(--ap-text-2) !important;
+  border: 1px solid var(--ap-sep) !important;
+}
+html body [class*="filter"] [class*="reset"]:hover, html body .filter-reset-btn:hover {
+  background: var(--ap-fill-hover) !important;
+  color: var(--ap-text-1) !important;
+}
+/* Genuinely destructive actions keep the red — matched precisely.
+   A `[class*="del-btn"]` substring match also caught
+   `jarvis-composer-model-btn` ("mo-DEL-BTN") and turned the model
+   picker red, so these are anchored instead. */
+html body .btn-danger, html body .delete-btn, html body [class*="delete-btn"],
+html body [class$="-del-btn"], html body .ch-del-conv-btn,
+html body .jarvis-qa-btn--danger {
+  color: #E5484D !important;
+  background: transparent !important;
+  border: 1px solid var(--ap-sep) !important;
+}
+html body .btn-danger:hover, html body .delete-btn:hover,
+html body [class*="delete-btn"]:hover, html body [class$="-del-btn"]:hover,
+html body .ch-del-conv-btn:hover, html body .jarvis-qa-btn--danger:hover {
+  background: color-mix(in srgb, #E5484D 10%, transparent) !important;
+  border-color: color-mix(in srgb, #E5484D 32%, transparent) !important;
+}
+
+/* (e) Empty states: coherent, quiet, one icon language. */
+html body .empty-state, html body .do-chart-empty, html body [class*="empty-state"] {
+  padding: var(--ap-s10) var(--ap-s8) !important;
+  gap: var(--ap-s3) !important;
+}
+html body .empty-state h3, html body .do-chart-empty h3,
+html body [class*="empty-state"] [class*="title"] {
+  font-size: var(--ap-fs-headline) !important;
+  font-weight: 600 !important;
+  color: var(--ap-text-1) !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+}
+html body .empty-state p, html body .do-chart-empty p,
+html body [class*="empty-state"] [class*="desc"] {
+  font-size: var(--ap-fs-callout) !important;
+  color: var(--ap-text-3) !important;
+  max-width: 42ch;
+  margin-inline: auto;
+  line-height: var(--ap-lh-body) !important;
+}
+
+/* (f) Tables */
+html body .leads-table th {
+  position: sticky; top: 0; z-index: var(--ap-z-sticky);
+  background: var(--ap-surface-head, inherit);
+  backdrop-filter: saturate(180%) blur(12px);
+  padding: var(--ap-s4) var(--ap-s5) !important;
+  border-bottom: 1px solid var(--ap-sep) !important;
+}
+html body .leads-table td {
+  font-size: var(--ap-fs-callout) !important;
+  color: var(--ap-text-1) !important;
+  padding: var(--ap-s4) var(--ap-s5) !important;
+  border-bottom: 1px solid var(--ap-sep) !important;
+}
+html body .leads-table tbody tr:hover { background: var(--ap-fill-hover) !important; }
+html body .leads-table th:last-child, html body .leads-table td:last-child {
+  padding-right: var(--ap-s6) !important;
+}
+
+/* (g) KPI tiles: one icon-tile treatment, hierarchy through type */
+html body .do-stat-value, html body .stat-value {
+  font-size: 28px !important;
+  line-height: 1.1 !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+  color: var(--ap-text-1) !important;
+}
+html body .do-stat-label, html body .stat-label {
+  text-transform: none !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  font-size: var(--ap-fs-sub) !important;
+  font-weight: 500 !important;
+  color: var(--ap-text-2) !important;
+}
+html body [class*="stat-icon"], html body [class*="kpi-icon"] {
+  border-radius: var(--ap-r-md) !important;
+  box-shadow: none !important;
+}
+
+/* (h) Sidebar rail: clear edge, no glow */
+html body .sidebar {
+  border-right: 1px solid var(--ap-sep) !important;
+  box-shadow: none !important;
+  z-index: var(--ap-z-sidebar) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   12 · REDUCED MOTION — was ignored on 143 transitions / 19 animations
+   ------------------------------------------------------------------ */
+@media (prefers-reduced-motion: reduce) {
+  /* The `:not(#\\9)` guards raise specificity above the class-level
+     !important motion rules spread across the nine stylesheets, so this
+     genuinely wins. It is scoped to the reduced-motion query only. */
+  html:not(#\9) body:not(#\9) *:not(#\9),
+  html:not(#\9) body:not(#\9) *:not(#\9)::before,
+  html:not(#\9) body:not(#\9) *:not(#\9)::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    scroll-behavior: auto !important;
+  }
+  html:not(#\9) body:not(#\9) *:not(#\9):active { transform: none !important; }
+  :root {
+    --ap-dur-micro: 1ms; --ap-dur-fast: 1ms;
+    --ap-dur-base: 1ms;  --ap-dur-slow: 1ms;
+  }
+  .ap-tip { transition: opacity 1ms linear !important; }
+}
+
+
+/* ------------------------------------------------------------------
+   13 · JS-DRIVEN PRESS STATE
+   Some controls had their :active rule overwritten further up the
+   stylesheet stack; apple-polish.js adds .ap-pressed on pointerdown so
+   every interactive surface answers immediately.
+   ------------------------------------------------------------------ */
+html body .ap-pressed:not(:disabled) {
+  transform: scale(0.985) !important;
+  transition-duration: var(--ap-dur-micro) !important;
+  filter: brightness(0.985);
+}
+html body .claude-icon-btn.ap-pressed, html body .icon-btn.ap-pressed,
+html body .jarvis-composer-btn.ap-pressed, html body .mac-dot.ap-pressed,
+html body .smodal-dot.ap-pressed, html body .jarvis-icon-pill.ap-pressed {
+  transform: scale(0.92) !important;
+}
+html body .nav-item.ap-pressed { transform: scale(0.975) !important; }
+/* full-width surfaces shift tonally instead of scaling */
+html body .vo-row.ap-pressed, html body .menu-item.ap-pressed,
+html body .dropdown-item.ap-pressed, html body .smodal-nav-item.ap-pressed {
+  transform: none !important;
+  background: var(--ap-fill-press) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   14 · SIDEBAR — legible in both states
+   The rail is 62px with no labels; tooltips come from apple-polish.js.
+   Give the icons a real hit area and optical centring.
+   ------------------------------------------------------------------ */
+html[data-sidebar-state="collapsed"] body .sidebar .nav-item {
+  justify-content: center !important;
+  padding-inline: 0 !important;
+}
+html[data-sidebar-state="collapsed"] body .sidebar .nav-item.active::before { left: -5px; }
+html body .sidebar .nav-item { min-height: 34px; }
+html body .sidebar .nav-section-label {
+  padding-inline: var(--ap-s4) !important;
+  margin-block: var(--ap-s5) var(--ap-s1) !important;
+}
+html[data-sidebar-state="collapsed"] body .sidebar .nav-section-label {
+  height: 1px; padding: 0 !important; margin: var(--ap-s5) var(--ap-s4) !important;
+  overflow: hidden; color: transparent !important;
+  background: var(--ap-sep);
+}
+
+
+/* ------------------------------------------------------------------
+   15 · TOP BAR — one control language
+   ------------------------------------------------------------------ */
+html body .topbar, html body .top-bar, html body .app-topbar {
+  border-bottom: 1px solid var(--ap-sep) !important;
+  box-shadow: none !important;
+  z-index: var(--ap-z-topbar) !important;
+}
+html body .topbar-title, html body .app-topbar-title {
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 500 !important;
+  color: var(--ap-text-2) !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   16 · RESPONSIVE — hierarchy survives narrow widths
+   ------------------------------------------------------------------ */
+@media (max-width: 1180px) {
+  html body .do-dash-greeting-title, html body .claude-greeting { font-size: 34px !important; }
+  html body .view-title { font-size: 21px !important; }
+}
+@media (max-width: 900px) {
+  html body .do-dash-greeting-title, html body .claude-greeting { font-size: 28px !important; }
+  html body .view-title { font-size: 19px !important; }
+  html body .jarvis-side, html body #jarvis-side-panel { display: none !important; }
+}
+@media (max-width: 720px) {
+  html body .view-subtitle { max-width: none; }
+  html body .leads-table-wrap, html body .table-wrap { overflow-x: auto !important; }
+}
+/* nothing may push the page sideways */
+html body { overflow-x: hidden; }
+
+
+/* ------------------------------------------------------------------
+   17 · REPAIRED SURFACES
+   Markup rendered by apple-polish.js for panels that previously threw
+   and stayed empty (voice list, Jarvis skills).
+   ------------------------------------------------------------------ */
+html body .vo-row {
+  display: flex; align-items: baseline; justify-content: space-between; gap: var(--ap-s3);
+  width: 100%; text-align: left;
+  padding: var(--ap-s2) var(--ap-s4);
+  border: 1px solid transparent;
+  border-radius: var(--ap-r-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--ap-dur-micro) var(--ap-ease-out),
+              border-color var(--ap-dur-micro) var(--ap-ease-out);
+}
+html body .vo-row:hover { background: var(--ap-fill-hover); }
+html body .vo-row:active { background: var(--ap-fill-press); }
+html body .vo-row-active {
+  background: var(--ap-fill-sel);
+  border-color: color-mix(in srgb, var(--ap-accent) 40%, transparent);
+}
+html body .vo-name {
+  font-size: var(--ap-fs-foot) !important; font-weight: 500 !important;
+  color: var(--ap-text-1) !important;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+html body .vo-lang {
+  font-family: var(--ap-mono) !important;
+  font-size: var(--ap-fs-caption) !important;
+  color: var(--ap-text-3) !important; flex: 0 0 auto;
+}
+html body .vo-empty, html body .ap-side-empty {
+  font-size: var(--ap-fs-foot) !important;
+  color: var(--ap-text-3) !important;
+  padding: var(--ap-s5) var(--ap-s4);
+  margin: 0;
+  text-align: center;
+}
+html body .ap-skill-row {
+  display: flex; flex-direction: column; gap: 1px;
+  padding: var(--ap-s2) var(--ap-s4);
+  border-radius: var(--ap-r-xs);
+  transition: background-color var(--ap-dur-micro) var(--ap-ease-out);
+}
+html body .ap-skill-row:hover { background: var(--ap-fill-hover); }
+html body .ap-skill-name {
+  font-size: var(--ap-fs-foot) !important; font-weight: 550 !important;
+  color: var(--ap-text-1) !important; text-transform: capitalize;
+}
+html body .ap-skill-desc {
+  font-size: var(--ap-fs-caption) !important; color: var(--ap-text-3) !important;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* the three side-panel cards were hollow boxes with only a heading */
+html body .jarvis-side-card {
+  border-radius: var(--ap-r-lg) !important;
+  box-shadow: var(--ap-e1) !important;
+  border: none !important;
+  padding: var(--ap-s5) !important;
+}
+html body .jarvis-side-card h4 {
+  font-size: var(--ap-fs-sub) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  color: var(--ap-text-2) !important;
+  margin: 0 0 var(--ap-s3) !important;
+}
+html body .jarvis-side-card .text-link {
+  font-size: var(--ap-fs-caption) !important;
+  font-weight: 500 !important;
+  color: var(--ap-text-3) !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: var(--ap-r-xs) !important;
+  padding: 3px 6px !important;
+}
+html body .jarvis-side-card .text-link:hover {
+  color: var(--ap-text-1) !important;
+  background: var(--ap-fill-hover) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   18 · NOTIFICATION LAYER
+   The stack started at top:24px, which put it on top of the global
+   top bar's own controls. Drop it clear of the chrome and give it the
+   shared elevation + motion language.
+   ------------------------------------------------------------------ */
+html body .desktop-notification-container {
+  top: 96px !important;
+  z-index: var(--ap-z-toast) !important;
+  gap: var(--ap-s3) !important;
+}
+html body .desktop-notification-card {
+  border-radius: var(--ap-r-lg) !important;
+  box-shadow: var(--ap-e3) !important;
+  border: none !important;
+  animation: ap-toast-in var(--ap-dur-slow) var(--ap-spring) both;
+}
+@keyframes ap-toast-in {
+  from { opacity: 0; transform: translateX(12px) scale(0.97) }
+  to   { opacity: 1; transform: none }
+}
+html body .desktop-notif-title {
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 600 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  color: var(--ap-text-1) !important;
+}
+html body .desktop-notif-body, html body .desktop-notif-detail {
+  font-size: var(--ap-fs-foot) !important;
+  line-height: var(--ap-lh-body) !important;
+  color: var(--ap-text-2) !important;
+}
+html body .desktop-notif-time { font-size: var(--ap-fs-caption) !important; color: var(--ap-text-3) !important; }
+
+
+/* ------------------------------------------------------------------
+   19 · DECORATION REMOVAL  (final pass, from the second browser audit)
+   ------------------------------------------------------------------ */
+/* luxury-ui.css:254 paints a diagonal shimmer that sweeps across every
+   primary button on hover. It reads as a template effect, not as
+   feedback, and it animates `left` (a layout property) for 450ms. */
+html body .btn-primary::after,
+html body .primary-btn::after,
+html body .lx-btn-primary::after {
+  content: none !important;
+  display: none !important;
+  animation: none !important;
+}
+
+/* "Reset" on the leads filter bar was styled as a destructive action
+   (`.filter-clear-btn`, red-50 fill on a red-200 border) although it
+   only clears filters. Neutral affordance, red reserved for real
+   destruction. */
+html body .filter-clear-btn {
+  background: var(--ap-fill-quiet) !important;
+  border: 1px solid var(--ap-sep) !important;
+  color: var(--ap-text-2) !important;
+  box-shadow: none !important;
+}
+html body .filter-clear-btn:hover {
+  background: var(--ap-fill-hover) !important;
+  border-color: var(--ap-sep-strong) !important;
+  color: var(--ap-text-1) !important;
+}
+
+/* Checkboxes were being rounded to 10px by an earlier sheet, which made
+   them read as radio buttons. Square-ish, per the control's meaning. */
+html body input[type="checkbox"] {
+  border-radius: 4px !important;
+  width: 15px !important; height: 15px !important;
+  min-width: 15px !important; min-height: 15px !important;
+}
+html body input[type="radio"] { border-radius: 50% !important; }
+
+/* Coloured glows around swatches / tiles / pills — depth should come
+   from elevation, never from an object radiating its own colour. */
+html body [class*="accent-swatch"], html body [class*="accent-chip"],
+html body [class*="stat-icon"], html body [class*="kpi-icon"],
+html body .jarvis-orb, html body [class*="-glow"] {
+  filter: none !important;
+}
+
+/* `.do-empty-badge` kept a light-mode lavender fill (#F5EEFF) in dark
+   mode, so every empty state showed a glaring white disc. Tie it to the
+   surface scale instead so it inverts with the theme. */
+html body .do-chart-empty .do-empty-badge,
+html body .do-empty-badge, html body [class*="empty-badge"],
+html body [class*="empty-icon"] {
+  background: var(--ap-fill-press) !important;
+  color: var(--ap-text-3) !important;
+  border-radius: var(--ap-r-full) !important;
+  box-shadow: none !important;
+}
+html body .do-chart-empty .do-empty-badge svg,
+html body .do-empty-badge svg, html body [class*="empty-icon"] svg {
+  color: var(--ap-text-3) !important;
+  stroke: currentColor !important;
+}
+
+
+/* ------------------------------------------------------------------
+   20 · GLOBAL MOTION SCOPING
+   `transition: all` was still resolving on ~400 visible elements. `all`
+   animates every animatable property, so an ordinary re-render (a card
+   growing, a label changing) turns into an unintended animation, and
+   hover states repaint far more than they need to.
+
+   This replaces `all` with a curated property list. It deliberately
+   KEEPS the layout properties this app genuinely animates — width,
+   padding, max-height (sidebar rail, composer, expanding panels) — and
+   drops the ones that only ever cause jank: font-size, letter-spacing,
+   line-height, background-image/position, margin, flex and grid tracks.
+   ------------------------------------------------------------------ */
+html body *:where(:not(svg):not(path):not(circle):not(rect):not(line):not(polyline)) {
+  transition-property:
+    color, background-color, border-color, border-radius, box-shadow,
+    opacity, transform, filter, backdrop-filter, fill, stroke, outline-color,
+    width, min-width, max-width, height, max-height, padding, gap,
+    top, right, bottom, left !important;
+}
+
+/* Anything slower than ~320ms on a hover-scale interaction reads as lag.
+   Structural surfaces may still take their time. */
+html body button, html body a, html body .nav-item, html body .chip,
+html body [role="button"], html body input, html body select, html body textarea {
+  transition-duration: var(--ap-dur-fast);
+}
+
+
+/* ------------------------------------------------------------------
+   21 · MICRO-LABEL FLOOR
+   9px and 10px uppercase labels survived inside the settings modal and
+   the shortcuts panel. 10.5px is the floor, with tracking to keep
+   all-caps legible at that size.
+   ------------------------------------------------------------------ */
+html body .smodal-nav-group-label, html body .smodal-status-pill,
+html body .sc-kbd, html body .sc-section-count, html body .sc-kbd-anywhere,
+html body .do-donut-total, html body [class*="kbd"], html body [class*="-count"] {
+  font-size: var(--ap-fs-micro) !important;
+  line-height: var(--ap-lh-micro) !important;
+  letter-spacing: var(--ap-tracking-micro) !important;
+  font-weight: 600 !important;
+}
+html body .sc-kbd, html body [class*="kbd"] {
+  font-family: var(--ap-mono) !important;
+  letter-spacing: 0 !important;
+  padding: 2px 5px !important;
+  border-radius: var(--ap-r-xs) !important;
+  background: var(--ap-fill-quiet) !important;
+  border: 1px solid var(--ap-sep) !important;
+  color: var(--ap-text-2) !important;
+}
+
+
+/* remaining sub-10.5px labels found in the second visual sweep */
+html body .do-stat-trend, html body [class*="stat-trend"],
+html body .topbar-avatar, html body [class*="-avatar"] {
+  font-size: var(--ap-fs-micro) !important;
+  line-height: var(--ap-lh-micro) !important;
+}
+
+
+/* ------------------------------------------------------------------
+   22 · SETTINGS MODAL
+   theme-flow.css scopes this surface behind #settings-overlay, so its
+   rules outrank class-level ones. Matching that specificity here keeps
+   the modal on the same type scale as the rest of the app instead of
+   dropping to 9px all-caps labels.
+   ------------------------------------------------------------------ */
+html body #settings-overlay .smodal-nav-group-label {
+  font-size: var(--ap-fs-micro) !important;
+  line-height: var(--ap-lh-micro) !important;
+  letter-spacing: var(--ap-tracking-micro) !important;
+  font-weight: 600 !important;
+  color: var(--ap-text-3) !important;
+  padding: var(--ap-s2) var(--ap-s4) var(--ap-s1) !important;
+}
+html body #settings-overlay .smodal-nav-item {
+  height: var(--ap-h-md) !important;
+  min-height: var(--ap-h-md) !important;
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 450 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  color: var(--ap-text-2) !important;
+  border-radius: var(--ap-r-md) !important;
+}
+html body #settings-overlay .smodal-nav-item:hover {
+  background: var(--ap-fill-hover) !important;
+  color: var(--ap-text-1) !important;
+}
+html body #settings-overlay .smodal-nav-item.active {
+  background: var(--ap-fill-sel) !important;
+  color: var(--ap-text-1) !important;
+  font-weight: 550 !important;
+}
+html body #settings-overlay .smodal-title {
+  font-size: var(--ap-fs-callout) !important;
+  font-weight: 550 !important;
+  color: var(--ap-text-2) !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+}
+html body #settings-overlay .smodal-status-pill {
+  font-size: var(--ap-fs-micro) !important;
+  letter-spacing: var(--ap-tracking-micro) !important;
+  border-radius: var(--ap-r-full) !important;
+}
+html body #settings-overlay #settings-modal {
+  border-radius: var(--ap-r-xl) !important;
+  box-shadow: var(--ap-e4) !important;
+}
+/* the modal body was clipping its last row — give the scroll area room */
+html body #settings-overlay .smodal-body { padding-bottom: var(--ap-s8) !important; }
+
+
+/* ------------------------------------------------------------------
+   23 · ACCENT PALETTE SWATCHES  (.lx-palette-swatch)
+   Each swatch carried a glossy gradient plus a coloured glow of its own
+   hue and a white inset bevel meant for dark mode. Eight tiles each
+   radiating a different colour is the single loudest thing in Settings.
+   Flat tile, shared elevation, selection shown by a ring — the way a
+   system colour picker does it.
+   ------------------------------------------------------------------ */
+html body .lx-palette-swatch {
+  background-image: none !important;
+  box-shadow: var(--ap-e1) !important;
+  border: none !important;
+  border-radius: var(--ap-r-sm) !important;
+  filter: none !important;
+  transition: transform var(--ap-dur-fast) var(--ap-spring),
+              box-shadow var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body .lx-palette-swatch:hover { transform: scale(1.05) !important; }
+html body .lx-palette-swatch:active { transform: scale(0.97) !important; }
+html body .lx-palette-swatch.active {
+  box-shadow: 0 0 0 2px var(--ap-surface-ring, #fff),
+              0 0 0 4px var(--ap-accent),
+              var(--ap-e1) !important;
+  transform: none !important;
+}
+html[data-theme="dark"] body .lx-palette-swatch.active {
+  box-shadow: 0 0 0 2px #1a1a1c, 0 0 0 4px var(--ap-accent), var(--ap-e1) !important;
+}
+html body .lx-palette-swatch svg, html body .lx-palette-swatch::after {
+  filter: drop-shadow(0 1px 1px rgba(0,0,0,.25));
+}
+
+/* Scroll affordance: a soft edge so a cut-off row reads as "more below"
+   rather than as a clipped layout. */
+html body #settings-overlay .smodal-content {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 20px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 20px), transparent 100%);
+}
+
+
+/* ------------------------------------------------------------------
+   24 · SIDEBAR OVERFLOW AT SHORT VIEWPORTS
+   At 800px tall the nav list overflows its scroll container instead of
+   scrolling inside it, so the last item ("Settings") renders underneath
+   the pinned sidebar footer and cannot be clicked at all.
+   ------------------------------------------------------------------ */
+html body #sidebar-nav-scroll, html body .sidebar-nav {
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  overscroll-behavior: contain;
+  padding-bottom: var(--ap-s3) !important;
+  min-height: 0 !important;
+}
+html body .sidebar { display: flex !important; flex-direction: column !important; }
+html body .sidebar-footer {
+  flex: 0 0 auto !important;
+  background: inherit;
+  border-top: 1px solid var(--ap-sep) !important;
+  box-shadow: none !important;
+}
+
+/* At short viewport heights the nav list scrolls, but nothing signalled
+   that the last items were below the fold. A soft bottom edge does. */
+html body #sidebar-nav-scroll {
+  -webkit-mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 16px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 0, #000 calc(100% - 16px), transparent 100%);
+}
+@media (min-height: 900px) {
+  html body #sidebar-nav-scroll { -webkit-mask-image: none; mask-image: none; }
+}
+
+
+/* ------------------------------------------------------------------
+   25 · THE `hidden` ATTRIBUTE MUST ACTUALLY HIDE
+   composer-overhaul.css defines the Sources dropdowns twice:
+
+     line 501:  .cand-source-menu[hidden], #client-source-chips[hidden]
+                { display: none !important }          -> (1,1,0)
+     line 518:  #view-chat .cand-source-menu, #client-source-chips
+                { display: flex !important }          -> (1,1,0), LATER
+
+   Equal specificity, both !important, the flex rule last — so it wins
+   and `hidden` stops hiding. The JS that closes those menus sets
+   `menu.hidden = true` and nothing happens, which is why the Sources
+   dropdown in Client AI and Candidate AI could be opened but never
+   closed. The `:not(#\9)` guard buys the specificity to settle it, and
+   restores the attribute's meaning app-wide.
+   ------------------------------------------------------------------ */
+html body [hidden]:not(#\9) { display: none !important; }
+html body .cand-source-menu[hidden]:not(#\9),
+html body #cand-source-chips[hidden]:not(#\9),
+html body #client-source-chips[hidden]:not(#\9),
+html body .jarvis-composer-dropdown[hidden]:not(#\9) {
+  display: none !important;
+  animation: none !important;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   26 · CLAVIS STUDIO — centred orb, calmer chrome, more room
+   In the .has-messages state the orb was demoted to a 36px avatar
+   pinned to the left of a 48px strip, stacked under a second 1px
+   border from the toolbar ribbon — two hard rules within 55px of each
+   other, and the orb (the app's one piece of character) reduced to a
+   favicon. The orb goes back to the centre, the two hard rules become
+   one soft hairline, and the column gets room to breathe.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* --- toolbar ribbon: no hard rule, more air ---------------------- */
+html body #view-jarvis.active .jarvis-hero-header {
+  border-bottom: none !important;
+  padding: var(--ap-s5) var(--ap-s8) var(--ap-s3) !important;
+  background: transparent !important;
+  min-height: 52px !important;
+}
+html body #view-jarvis.active .jarvis-hero-actions {
+  gap: var(--ap-s2) !important;
+}
+
+/* --- the orb band: centred column, soft edge --------------------- */
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper {
+  position: relative !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: var(--ap-s3) !important;
+  height: auto !important;
+  min-height: 132px !important;
+  max-height: none !important;
+  padding: var(--ap-s5) 0 var(--ap-s7) !important;
+  border-bottom: none !important;
+  background: transparent !important;
+  overflow: visible !important;
+  transition: min-height var(--ap-dur-slow) var(--ap-spring),
+              padding var(--ap-dur-slow) var(--ap-spring) !important;
+}
+
+/* one soft hairline that fades out at both ends, instead of two hard
+   full-bleed rules stacked 55px apart */
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  bottom: 0 !important;
+  transform: translateX(-50%) !important;
+  width: min(620px, 72%) !important;
+  height: 1px !important;
+  background: linear-gradient(90deg, transparent, var(--ap-sep) 22%, var(--ap-sep) 78%, transparent) !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+/* the orb itself — centred, and large enough to read as a presence */
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper #orb-container {
+  width: 76px !important;
+  height: 76px !important;
+  min-width: 76px !important;
+  min-height: 76px !important;
+  margin: 0 auto !important;
+  animation: none !important;
+  transition: width var(--ap-dur-slow) var(--ap-spring),
+              height var(--ap-dur-slow) var(--ap-spring),
+              transform var(--ap-dur-base) var(--ap-spring) !important;
+}
+
+/* caption sits under the orb, centred and quiet */
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper::after {
+  margin-left: 0 !important;
+  text-align: center !important;
+  font-size: var(--ap-fs-foot) !important;
+  font-weight: 500 !important;
+  letter-spacing: var(--ap-tracking-body) !important;
+  color: var(--ap-text-3) !important;
+}
+
+/* --- more room for the conversation ------------------------------ */
+html body #view-jarvis.active.has-messages .jarvis-chat-container {
+  width: min(880px, 100%) !important;
+  padding-inline: var(--ap-s8) !important;
+}
+html body #view-jarvis.active .jarvis-luxury-composer,
+html body #view-jarvis.active .jarvis-input-container {
+  width: min(880px, 100%) !important;
+  margin-inline: auto !important;
+}
+html body #view-jarvis.active #jarvis-messages > * + * { margin-top: var(--ap-s6) !important; }
+
+@media (max-height: 780px) {
+  html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper {
+    min-height: 96px !important; padding: var(--ap-s3) 0 var(--ap-s5) !important;
+  }
+  html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper #orb-container {
+    width: 56px !important; height: 56px !important; min-width: 56px !important; min-height: 56px !important;
+  }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   27 · THE ORB — material, grounding and state
+   ══════════════════════════════════════════════════════════════════ */
+html body #orb-container {
+  contain: none !important;
+  overflow: visible !important;
+  transform: translateZ(0);
+}
+
+html body .clavis-liquid-orb {
+  /* Rim light on top, occlusion at the bottom, a real contact shadow
+     underneath — the three things that make a sphere read as a solid
+     object rather than a flat circle. */
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.22),
+    inset 0 -10px 18px -8px rgba(0, 0, 0, 0.75),
+    inset 0 0 26px rgba(0, 0, 0, 0.55),
+    0 0 0 0.5px rgba(255, 255, 255, 0.10),
+    0 10px 26px -10px rgba(20, 18, 40, 0.55),
+    0 2px 6px -2px rgba(20, 18, 40, 0.35) !important;
+  transition: transform var(--ap-dur-base) var(--ap-spring),
+              box-shadow var(--ap-dur-base) var(--ap-ease-out) !important;
+}
+html body .clavis-liquid-orb:hover {
+  transform: scale(1.035) !important;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, 0.3),
+    inset 0 -10px 18px -8px rgba(0, 0, 0, 0.7),
+    inset 0 0 26px rgba(0, 0, 0, 0.5),
+    0 0 0 0.5px rgba(255, 255, 255, 0.16),
+    0 16px 34px -12px rgba(20, 18, 40, 0.6),
+    0 3px 8px -2px rgba(20, 18, 40, 0.4) !important;
+}
+html body #orb-container:active .clavis-liquid-orb {
+  transform: scale(0.965) !important;
+  transition-duration: var(--ap-dur-micro) !important;
+}
+
+/* second, weaker bounce highlight opposite the key light */
+html body .clavis-orb-sheen::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(ellipse 46% 30% at 68% 82%, rgba(255,255,255,0.11) 0%, transparent 62%);
+  pointer-events: none;
+}
+
+/* the ring element existed in the markup but had no styling — make it
+   the state indicator: a hairline halo that answers to what Clavis is
+   doing, instead of the whole orb changing colour. */
+html body .clavis-orb-ring {
+  position: absolute !important;
+  inset: -6px !important;
+  border-radius: 50% !important;
+  pointer-events: none !important;
+  z-index: 6 !important;
+  border: 1px solid transparent !important;
+  opacity: 0 !important;
+  transform: scale(0.94);
+  transition: opacity var(--ap-dur-base) var(--ap-ease-out),
+              transform var(--ap-dur-slow) var(--ap-spring),
+              border-color var(--ap-dur-base) var(--ap-ease-out) !important;
+}
+
+/* ---- state reactivity ------------------------------------------
+   jarvis-studio-polish.css declares a --orb-speed custom property per
+   state but never uses it, so every state drifted at exactly the same
+   pace. Drive animation-duration directly instead.               */
+html body #orb-container .clavis-orb-blob.b1 { animation-duration: calc(15s / var(--orb-rate, 1)) !important; }
+html body #orb-container .clavis-orb-blob.b2 { animation-duration: calc(19s / var(--orb-rate, 1)) !important; }
+html body #orb-container .clavis-orb-blob.b3 { animation-duration: calc(17s / var(--orb-rate, 1)) !important; }
+html body #orb-container .clavis-orb-blob.b4 { animation-duration: calc(13s / var(--orb-rate, 1)) !important; }
+
+html body #orb-container[data-orb-state="IDLE"]      { --orb-rate: 1; }
+html body #orb-container[data-orb-state="LISTENING"] { --orb-rate: 2.6; }
+html body #orb-container[data-orb-state="THINKING"]  { --orb-rate: 3.2; }
+html body #orb-container[data-orb-state="SPEAKING"]  { --orb-rate: 4.2; }
+html body #orb-container[data-orb-state="ERROR"]     { --orb-rate: 0.6; }
+
+html body #orb-container[data-orb-state="LISTENING"] .clavis-orb-ring {
+  opacity: 1 !important; transform: scale(1) !important;
+  border-color: color-mix(in srgb, #10B981 55%, transparent) !important;
+  animation: ap-orb-halo 2.4s var(--ap-ease-in-out) infinite !important;
+}
+html body #orb-container[data-orb-state="THINKING"] .clavis-orb-ring {
+  opacity: 1 !important; transform: scale(1) !important;
+  border-color: color-mix(in srgb, var(--ap-accent) 55%, transparent) !important;
+  animation: ap-orb-halo 1.6s var(--ap-ease-in-out) infinite !important;
+}
+html body #orb-container[data-orb-state="SPEAKING"] .clavis-orb-ring {
+  opacity: 1 !important; transform: scale(1) !important;
+  border-color: color-mix(in srgb, #F59E0B 60%, transparent) !important;
+  animation: ap-orb-halo 1.1s var(--ap-ease-in-out) infinite !important;
+}
+html body #orb-container[data-orb-state="ERROR"] .clavis-orb-ring {
+  opacity: 1 !important; transform: scale(1) !important;
+  border-color: color-mix(in srgb, #E5484D 60%, transparent) !important;
+}
+@keyframes ap-orb-halo {
+  0%, 100% { transform: scale(1);    opacity: 0.85; }
+  50%      { transform: scale(1.06); opacity: 0.35; }
+}
+
+/* a very slow breath so the orb is never completely inert */
+html body #orb-container[data-orb-state="IDLE"] .clavis-liquid-orb {
+  animation: ap-orb-breathe 7s var(--ap-ease-in-out) infinite !important;
+}
+@keyframes ap-orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.018); }
+}
+html body #orb-container:hover .clavis-liquid-orb { animation-play-state: paused !important; }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   28 · POPOVER ENTER / EXIT
+   These menus are toggled with the `hidden` attribute, so they had no
+   exit at all — they simply vanished. `transition-behavior:
+   allow-discrete` plus `@starting-style` gives a real enter AND exit
+   without touching any of the app's JavaScript.
+   ══════════════════════════════════════════════════════════════════ */
+html body .cand-source-menu,
+html body .jarvis-composer-dropdown,
+html body #jarvis-more-panel,
+html body .custom-dropdown-list,
+html body .dropdown-menu,
+html body [role="menu"] {
+  transition:
+    opacity 160ms var(--ap-ease-out),
+    transform 260ms var(--ap-spring),
+    overlay 260ms allow-discrete,
+    display 260ms allow-discrete !important;
+  transform-origin: var(--ap-origin, bottom center);
+}
+html body .cand-source-menu:not([hidden]),
+html body .jarvis-composer-dropdown:not([hidden]),
+html body #jarvis-more-panel:not([hidden]),
+html body .dropdown-menu:not([hidden]),
+html body [role="menu"]:not([hidden]) {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+/* Exit state — also the @starting-style entry state.
+
+   Exits run at roughly a third of the entrance. Two reasons: a surface
+   leaving should not make the user wait, and a 480ms exit meant that
+   closing a menu and immediately re-opening it was swallowed by the
+   outgoing transition. Slow in, fast out. */
+html body .cand-source-menu[hidden],
+html body .jarvis-composer-dropdown[hidden],
+html body #jarvis-more-panel[hidden],
+html body .dropdown-menu[hidden],
+html body [role="menu"][hidden] {
+  opacity: 0;
+  transform: translateY(6px) scale(0.97);
+  transition:
+    opacity 130ms var(--ap-ease-out),
+    transform 170ms var(--ap-ease-out),
+    overlay 170ms allow-discrete,
+    display 170ms allow-discrete !important;
+}
+@starting-style {
+  html body .cand-source-menu:not([hidden]),
+  html body .jarvis-composer-dropdown:not([hidden]),
+  html body #jarvis-more-panel:not([hidden]),
+  html body .dropdown-menu:not([hidden]),
+  html body [role="menu"]:not([hidden]) {
+    opacity: 0;
+    transform: translateY(6px) scale(0.97);
+  }
+}
+/* the source menus fly up from the button, so their origin is the bottom */
+html body #view-chat .client-source-picker .cand-source-menu { --ap-origin: bottom right; }
+html body #view-candidate-ai .candidate-source-picker .cand-source-menu { --ap-origin: bottom left; }
+
+/* stagger the rows in as the surface opens */
+html body .cand-source-menu:not([hidden]) > * {
+  animation: ap-menu-row 260ms var(--ap-ease-out) both;
+}
+html body .cand-source-menu:not([hidden]) > *:nth-child(1) { animation-delay: 20ms; }
+html body .cand-source-menu:not([hidden]) > *:nth-child(2) { animation-delay: 36ms; }
+html body .cand-source-menu:not([hidden]) > *:nth-child(3) { animation-delay: 52ms; }
+html body .cand-source-menu:not([hidden]) > *:nth-child(4) { animation-delay: 68ms; }
+html body .cand-source-menu:not([hidden]) > *:nth-child(5) { animation-delay: 84ms; }
+html body .cand-source-menu:not([hidden]) > *:nth-child(n+6) { animation-delay: 100ms; }
+@keyframes ap-menu-row {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   29 · TRANSITION PERFORMANCE
+   Measured on the dashboard: the sidebar took 700ms to draw 6-8 frames
+   — the animation was running, the browser just could not paint it.
+   Isolating the cost showed why (fps on an idle dashboard):
+
+       as-is .................. 31
+       animations paused ...... 42
+       backdrop-filter off .... 57
+       box-shadows off ........ 62
+       orb + pet hidden ....... 60
+
+   So the frame budget goes on blur and shadow, not on layout. The app
+   already flags the sidebar transition with .sidebar-animating on
+   <html>; this makes that flag mean something — the expensive effects
+   stand down for the ~260ms the layout is moving, then come back.
+   Nothing is removed from the resting design.
+   ══════════════════════════════════════════════════════════════════ */
+html.sidebar-animating body *,
+html.ap-quiet body * {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  animation-play-state: paused !important;
+}
+html.sidebar-animating body .clavis-orb-blob,
+html.ap-quiet body .clavis-orb-blob,
+html.sidebar-animating body [class*="ambient-orb"],
+html.sidebar-animating body .ag-floating-orb {
+  filter: none !important;
+}
+/* keep the sidebar and content themselves promoted while they move */
+html.sidebar-animating body #sidebar.sidebar,
+html.sidebar-animating body #main-content.main-content {
+  will-change: width, margin-left !important;
+}
+
+/* The rail and the content MUST share one timeline. theme-flow.css put
+   both on 560ms; measuring the collapse showed the two drifting up to
+   43px apart whenever they don't, which is the "stick" at the end of
+   the animation — the content lands, the rail is still gliding.
+   560ms is also simply too long for a rail: it reads as lag. Both are
+   pinned here to the same duration and the same curve, and the
+   selectors carry enough specificity to actually win (the element is
+   <aside id="sidebar" class="sidebar ...">). */
+html body aside#sidebar.sidebar.collapsed,
+html body #sidebar.sidebar.collapsed,
+html body aside#sidebar.sidebar,
+html body #sidebar.sidebar,
+html body #sidebar {
+  /* theme-flow.css:2750 reaches this element through
+     `#sidebar.sidebar.collapsed` — two classes plus an id — so the
+     collapsed-state selector has to be matched to win. */
+  transition-property: width, min-width, max-width, background-color, border-color !important;
+  transition-duration: var(--ap-dur-slow), var(--ap-dur-slow), var(--ap-dur-slow), 200ms, 200ms !important;
+  transition-timing-function: var(--ap-ease-glide), var(--ap-ease-glide), var(--ap-ease-glide), ease, ease !important;
+  transition-delay: 0s !important;
+}
+html body #main-content.main-content,
+html body #main-content {
+  transition-property: margin-left, width, max-width !important;
+  transition-duration: var(--ap-dur-slow), var(--ap-dur-slow), var(--ap-dur-slow) !important;
+  transition-timing-function: var(--ap-ease-glide), var(--ap-ease-glide), var(--ap-ease-glide) !important;
+  transition-delay: 0s !important;
+}
+/* nav labels must fade with the rail, not pop at the end */
+html body .sidebar .nav-item > span,
+html body .sidebar .nav-label,
+html body .sidebar .nav-text,
+html body .sidebar .nav-section-label {
+  transition: opacity 160ms var(--ap-ease-out) !important;
+}
+html[data-sidebar-state="collapsed"] body .sidebar .nav-item > span { opacity: 0 !important; }
+
+/* The sticky table header used a saturating backdrop blur on every
+   scroll frame. An opaque header costs nothing and looks the same. */
+html body .leads-table th {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  background: var(--ap-surface-head, var(--card, #fff)) !important;
+}
+html[data-theme="dark"] body .leads-table th { background: #1a1a1c !important; }
+
+/* Decorative background orbs are pure cost — they sit behind opaque
+   surfaces on every screen. Keep them, but stop them repainting. */
+html body .ag-floating-orb, html body [class*="ambient-orb"] {
+  will-change: auto !important;
+  contain: strict;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   30 · ORB — corrections found in the visual pass
+   ══════════════════════════════════════════════════════════════════ */
+
+/* (a) The blob blur was a fixed 18px, tuned for the 150px hero orb. At
+   the 76px conversation size that is a quarter of the diameter, so the
+   four coloured blobs smeared into one flat brown wash. Scale the blur
+   with the orb instead of hard-coding it. */
+html body #orb-container { --orb-blur: 18px; }
+html body #view-jarvis.active.has-messages #orb-container { --orb-blur: 9px; }
+@media (max-height: 780px) {
+  html body #view-jarvis.active.has-messages #orb-container { --orb-blur: 7px; }
+}
+html body .clavis-orb-blob {
+  filter: blur(var(--orb-blur)) !important;
+  /* a touch more chroma so the palette survives the blur */
+  saturate: 1;
+}
+html body #view-jarvis.active.has-messages .clavis-liquid-orb {
+  filter: saturate(1.18) contrast(1.04);
+}
+
+/* (b) `.clavis-liquid-orb` is `overflow: hidden` (it has to be — it
+   clips the blobs to the sphere), so the `.clavis-orb-ring` child was
+   cut off and the state halo never showed. Draw it on the container
+   instead, outside the clip. One pseudo-element carries both the ring
+   and the ambient bloom: `::before` is unusable here because
+   jarvis-studio-polish.css:491 and theme-flow.css:4093 both set
+   `content: none` on it at a specificity this layer would have to
+   fight for no benefit. */
+html body .clavis-orb-ring { display: none !important; }
+
+html body #view-jarvis #orb-container::after,
+html body #orb-container::after {
+  content: '' !important;
+  position: absolute !important;
+  inset: -7px !important;
+  border-radius: 50% !important;
+  border-width: 1.5px !important;
+  border-style: solid !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  background: none !important;
+  pointer-events: none !important;
+  opacity: 0;
+  transform: scale(0.93);
+  display: block !important;
+  transition: opacity var(--ap-dur-base) var(--ap-ease-out),
+              transform var(--ap-dur-slow) var(--ap-spring),
+              border-color var(--ap-dur-base) var(--ap-ease-out),
+              box-shadow var(--ap-dur-slow) var(--ap-ease-out) !important;
+}
+
+/* The ring states. The bloom rides along as a wide, very low-opacity
+   spread shadow so the orb tints the surface it sits on. */
+html body #view-jarvis #orb-container[data-orb-state="IDLE"]::after {
+  opacity: 1; transform: scale(1);
+  border-color: transparent !important;
+  box-shadow: 0 0 26px 2px rgba(99, 102, 241, 0.13) !important;
+}
+html body #view-jarvis #orb-container[data-orb-state="LISTENING"]::after {
+  opacity: 1; transform: scale(1);
+  border-color: color-mix(in srgb, #10B981 62%, transparent) !important;
+  box-shadow: 0 0 30px 3px rgba(16, 185, 129, 0.20) !important;
+  animation: ap-orb-halo 2.4s var(--ap-ease-in-out) infinite;
+}
+html body #view-jarvis #orb-container[data-orb-state="THINKING"]::after {
+  opacity: 1; transform: scale(1);
+  border-color: color-mix(in srgb, var(--ap-accent) 62%, transparent) !important;
+  box-shadow: 0 0 30px 3px rgba(124, 106, 247, 0.22) !important;
+  animation: ap-orb-halo 1.6s var(--ap-ease-in-out) infinite;
+}
+html body #view-jarvis #orb-container[data-orb-state="SPEAKING"]::after {
+  opacity: 1; transform: scale(1);
+  border-color: color-mix(in srgb, #F59E0B 68%, transparent) !important;
+  box-shadow: 0 0 32px 4px rgba(245, 158, 11, 0.22) !important;
+  animation: ap-orb-halo 1.1s var(--ap-ease-in-out) infinite;
+}
+html body #view-jarvis #orb-container[data-orb-state="ERROR"]::after {
+  opacity: 1; transform: scale(1);
+  border-color: color-mix(in srgb, #E5484D 68%, transparent) !important;
+  box-shadow: 0 0 28px 2px rgba(229, 72, 77, 0.20) !important;
+}
+
+/* (d) `contain: paint` on the container would clip the halo and bloom
+   that now live on its pseudo-elements — contain the sphere only. */
+html body #orb-container { contain: none !important; }
+html body .clavis-liquid-orb { contain: paint; }
+
+/* (e) grounding shadow so the orb sits on the surface rather than
+   floating in front of it */
+html body #view-jarvis.active.has-messages #orb-container {
+  filter: drop-shadow(0 6px 10px rgba(20, 18, 40, 0.14));
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   31 · MICRO-INTERACTIONS
+   Small, cheap, transform/opacity-only. Each one answers a specific
+   question the user is asking at that moment.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* --- disclosure chevrons point where the surface went -------------- */
+html body [aria-expanded] > svg:last-child,
+html body [aria-expanded] .chevron,
+html body [aria-expanded] [class*="chevron"],
+html body .jarvis-composer-btn > svg:last-of-type {
+  transition: transform var(--ap-dur-base) var(--ap-spring) !important;
+}
+html body [aria-expanded="true"] > svg:last-child,
+html body [aria-expanded="true"] .chevron,
+html body [aria-expanded="true"] [class*="chevron"],
+html body .client-source-picker.is-open .jarvis-composer-btn > svg:last-of-type,
+html body .candidate-source-picker.is-open .jarvis-composer-btn > svg:last-of-type {
+  transform: rotate(180deg) !important;
+}
+
+/* --- icon buttons: the icon reacts, not the whole control ---------- */
+html body .claude-icon-btn > svg,
+html body .icon-btn > svg,
+html body .jarvis-composer-btn > svg,
+html body .jarvis-icon-pill > svg,
+html body .topbar-btn > svg {
+  transition: transform var(--ap-dur-fast) var(--ap-spring),
+              opacity var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body .claude-icon-btn:hover > svg,
+html body .icon-btn:hover > svg,
+html body .jarvis-composer-btn:hover > svg,
+html body .jarvis-icon-pill:hover > svg {
+  transform: scale(1.08) !important;
+}
+html body .claude-icon-btn:active > svg,
+html body .icon-btn:active > svg,
+html body .jarvis-composer-btn:active > svg,
+html body .jarvis-icon-pill:active > svg {
+  transform: scale(0.92) !important;
+  transition-duration: var(--ap-dur-micro) !important;
+}
+
+/* --- nav icons settle rather than jump ---------------------------- */
+html body .sidebar .nav-item svg {
+  transition: transform var(--ap-dur-base) var(--ap-spring),
+              color var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body .sidebar .nav-item:hover svg { transform: scale(1.06) !important; }
+html body .sidebar .nav-item:active svg { transform: scale(0.94) !important; transition-duration: var(--ap-dur-micro) !important; }
+
+/* --- switches: the knob springs, the track just tints -------------- */
+html body .smodal-toggle, html body [class*="toggle-track"], html body .switch {
+  transition: background-color var(--ap-dur-base) var(--ap-ease-out) !important;
+}
+html body .smodal-toggle::after, html body .smodal-toggle > span,
+html body [class*="toggle-knob"], html body .switch > span {
+  transition: transform var(--ap-dur-base) var(--ap-spring-snap),
+              width var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+/* a real switch squashes slightly while being pressed */
+html body .smodal-toggle:active::after, html body .smodal-toggle:active > span,
+html body [class*="toggle-knob"]:active { width: 20px !important; }
+
+/* --- list & message rows ------------------------------------------ */
+html body .chat-message, html body #jarvis-messages > div,
+html body .lead-row, html body .cand-row {
+  transition: background-color var(--ap-dur-fast) var(--ap-ease-out) !important;
+  border-radius: var(--ap-r-md);
+}
+html body #jarvis-messages > div:hover { background: var(--ap-fill-quiet) !important; }
+
+/* new messages arrive, they don't blink into existence */
+html body #jarvis-messages > div {
+  animation: ap-msg-in 320ms var(--ap-ease-out) both;
+}
+@keyframes ap-msg-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- chips / source rows ------------------------------------------ */
+html body .cand-src-chip, html body [data-client-source] {
+  transition: background-color var(--ap-dur-fast) var(--ap-ease-out),
+              color var(--ap-dur-fast) var(--ap-ease-out),
+              transform var(--ap-dur-fast) var(--ap-spring) !important;
+}
+html body .cand-src-chip:active, html body [data-client-source]:active {
+  transform: scale(0.97) !important;
+}
+
+/* --- text links ---------------------------------------------------- */
+html body .text-link {
+  background-image: linear-gradient(currentColor, currentColor);
+  background-size: 0% 1px;
+  background-position: 0 100%;
+  background-repeat: no-repeat;
+  transition: background-size var(--ap-dur-base) var(--ap-ease-out),
+              color var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body .text-link:hover { background-size: 100% 1px; }
+
+/* --- the send button earns its accent once there is something to send */
+html body .jarvis-composer-send-btn, html body [class*="send-btn"] {
+  transition: background-color var(--ap-dur-base) var(--ap-ease-out),
+              transform var(--ap-dur-fast) var(--ap-spring),
+              opacity var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body [class*="send-btn"]:not(:disabled):hover { transform: scale(1.06) !important; }
+html body [class*="send-btn"]:not(:disabled):active { transform: scale(0.93) !important; }
+
+/* --- view transitions: content settles in ------------------------- */
+html body .view.active > * {
+  animation: ap-view-in 320ms var(--ap-ease-out) both;
+}
+@keyframes ap-view-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+html.ap-quiet body .view.active > * { animation: none !important; }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   32 · MOTION SCALE — cinematic
+   The first pass was tuned snappy (90-300ms). Re-tuned to Apple's
+   longer curve: feedback stays instant, but anything that MOVES A
+   SURFACE takes its time. Two rules hold it together —
+     · the user must never wait on feedback (press/hover stay <200ms)
+     · the bigger the surface, the longer and softer the curve
+   ══════════════════════════════════════════════════════════════════ */
+:root {
+  --ap-dur-micro: 100ms;   /* press, tonal shift — must feel instant   */
+  --ap-dur-fast:  180ms;   /* hover, icon, checkbox                    */
+  --ap-dur-base:  300ms;   /* chips, selection, small components       */
+  --ap-dur-slow:  480ms;   /* menus, popovers, sidebar, disclosure     */
+  --ap-dur-xslow: 620ms;   /* modals, toasts, panels, view transitions */
+
+  /* long expo-out — the curve Apple uses for a surface arriving */
+  --ap-ease-glide: cubic-bezier(0.16, 1, 0.3, 1);
+  /* soft spring, ~0.5% overshoot, settles slowly — for big surfaces */
+  --ap-spring-soft: linear(0, 0.0349 3.3%, 0.1183 6.7%, 0.2261 10.0%,
+    0.3418 13.3%, 0.4549 16.7%, 0.5591 20.0%, 0.6511 23.3%, 0.7298 26.7%,
+    0.7953 30.0%, 0.8485 33.3%, 0.8907 36.7%, 0.9235 40.0%, 0.9485 43.3%,
+    0.9671 46.7%, 0.9806 50.0%, 0.9900 53.3%, 0.9965 56.7%, 1.0006 60.0%,
+    1.0031 63.3%, 1.0044 66.7%, 1.0050 70.0%, 1.0050 73.3%, 1.0046 76.7%,
+    1.0042 80.0%, 1.0036 83.3%, 1.0030 86.7%, 1.0025 90.0%, 1.0020 93.3%,
+    1.0015 96.7%, 1);
+}
+
+/* Big surfaces move on the long curve. Small controls keep the crisp
+   one — a button that takes 480ms to tint feels broken, not luxurious. */
+html body .modal, html body .modal-content, html body .smodal-window,
+html body .dialog, html body .jarvis-modal, html body #settings-modal {
+  animation-duration: var(--ap-dur-xslow) !important;
+  animation-timing-function: var(--ap-spring-soft) !important;
+}
+html body .dropdown-menu:not([hidden]), html body .menu:not([hidden]),
+html body .popover:not([hidden]), html body .context-menu:not([hidden]),
+html body .cand-source-menu:not([hidden]),
+html body .jarvis-composer-dropdown:not([hidden]),
+html body [role="menu"]:not([hidden]) {
+  transition-duration: var(--ap-dur-slow) !important;
+}
+/* Sidebar timing is NOT set here. §29 owns it — defining it twice at
+   different specificities is exactly what desynced the rail from the
+   content the first time. One source of truth. */
+
+
+/* ══════════════════════════════════════════════════════════════════
+   33 · NOTIFICATION CENTRE
+   Rebuilt as a macOS notification stack: cards sit collapsed in a
+   physical pile, fan out under the pointer, arrive on a long spring
+   from off-screen right, and leave by sliding out and collapsing
+   their own height so the stack closes behind them.
+
+   notifications.js already writes the collapsed stack transform
+   inline (translateY + scale per index). Inline styles lose to
+   `!important`, so the fan-out lives here in CSS and the app's
+   own stacking maths is left untouched.
+   ══════════════════════════════════════════════════════════════════ */
+html body .desktop-notification-container {
+  top: 96px !important;
+  right: 20px !important;
+  width: min(392px, calc(100vw - 32px)) !important;
+  gap: 0 !important;
+  padding-bottom: 40px;              /* keeps the hover target alive
+                                        below the last card */
+  perspective: 1200px;
+}
+
+html body .desktop-notification-card {
+  margin-bottom: -52px !important;   /* the collapsed pile overlap */
+  padding: 13px 14px 13px 15px !important;
+  border: none !important;
+  border-radius: 16px !important;
+  background: #FFFFFF !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    0 0 0 0.5px rgba(var(--ap-ink), 0.10),
+    0 12px 32px -10px rgba(var(--ap-ink), 0.20),
+    0 3px 10px -4px rgba(var(--ap-ink), 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55) !important;
+  transition:
+    transform var(--ap-dur-xslow) var(--ap-spring-soft),
+    translate var(--ap-dur-xslow) var(--ap-spring-soft),
+    scale var(--ap-dur-xslow) var(--ap-spring-soft),
+    margin-bottom var(--ap-dur-xslow) var(--ap-spring-soft),
+    opacity var(--ap-dur-slow) var(--ap-ease-out),
+    box-shadow var(--ap-dur-slow) var(--ap-ease-out) !important;
+  animation: ap-notif-in var(--ap-dur-xslow) var(--ap-spring-soft) both !important;
+  will-change: transform;
+}
+html[data-theme="dark"] body .desktop-notification-card {
+  background: #1C1B1F !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.10),
+    0 16px 40px -12px rgba(0, 0, 0, 0.72),
+    0 4px 12px -4px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07) !important;
+}
+
+/* Arrives from off-screen right on the soft spring.
+
+   NOTE: this animates the INDIVIDUAL `translate` / `scale` properties,
+   not `transform`. notifications.js writes the collapsed pile's depth
+   into the inline `transform`, and a filled animation on `transform`
+   outranks an inline style — animating it here flattened the whole
+   stack. The individual properties compose with `transform` instead,
+   so the slide-in and the pile coexist. */
+@keyframes ap-notif-in {
+  from { opacity: 0; translate: 38px 0; scale: 0.94; }
+  to   { opacity: 1; translate: 0 0;    scale: 1; }
+}
+
+/* The pile fans out under the pointer. `!important` is what lets this
+   win over the inline stacking transform. */
+html body .desktop-notification-container:hover .desktop-notification-card,
+html body .desktop-notification-container:focus-within .desktop-notification-card {
+  transform: translate3d(0, 0, 0) scale(1) !important;
+  opacity: 1 !important;
+  margin-bottom: 10px !important;
+  box-shadow:
+    0 0 0 0.5px rgba(var(--ap-ink), 0.12),
+    0 18px 44px -12px rgba(var(--ap-ink), 0.24),
+    0 4px 12px -4px rgba(var(--ap-ink), 0.14),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55) !important;
+}
+/* cards deeper in the pile take slightly longer to arrive — the stack
+   unfolds instead of snapping open all at once */
+html body .desktop-notification-container:hover .desktop-notification-card:nth-child(2) { transition-delay: 26ms; }
+html body .desktop-notification-container:hover .desktop-notification-card:nth-child(3) { transition-delay: 52ms; }
+html body .desktop-notification-container:hover .desktop-notification-card:nth-child(n+4) { transition-delay: 78ms; }
+
+/* leaving: slide out right, then collapse the gap the card leaves */
+html body .desktop-notification-card.desktop-notif-exit,
+html body .desktop-notification-card.ap-notif-out {
+  animation: none !important;
+  transition:
+    translate 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    scale 200ms cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 180ms ease-out,
+    margin-bottom 200ms cubic-bezier(0.32, 0.72, 0, 1) !important;
+  translate: 120% 0 !important;
+  scale: 0.96 !important;
+  opacity: 0 !important;
+  margin-bottom: -40px !important;
+  pointer-events: none !important;
+}
+/* swipe dismissal is driven from apple-polish.js */
+html body .desktop-notification-card.ap-swiping {
+  transition: none !important;
+  cursor: grab;
+}
+
+/* --- contents ---------------------------------------------------- */
+html body .desktop-notif-icon-col {
+  width: 26px !important; height: 26px !important;
+  border-radius: 8px !important;
+  display: grid !important; place-items: center !important;
+  margin-top: 0 !important;
+  background: var(--ap-fill-press) !important;
+  color: var(--ap-text-2) !important;
+}
+html body .notif-success .desktop-notif-icon-col { background: color-mix(in srgb, #10B981 16%, transparent) !important; color: #0B8F63 !important; }
+html body .notif-warning .desktop-notif-icon-col { background: color-mix(in srgb, #F59E0B 18%, transparent) !important; color: #B4740A !important; }
+html body .notif-error   .desktop-notif-icon-col { background: color-mix(in srgb, #E5484D 16%, transparent) !important; color: #C13539 !important; }
+html body .notif-info    .desktop-notif-icon-col { background: color-mix(in srgb, var(--ap-accent) 16%, transparent) !important; color: var(--ap-accent) !important; }
+html body .desktop-notif-icon-col svg { width: 14px !important; height: 14px !important; }
+
+html body .desktop-notif-main { gap: 11px !important; align-items: flex-start !important; }
+html body .desktop-notif-header-row { gap: var(--ap-s2) !important; align-items: baseline !important; }
+html body .desktop-notif-close-btn {
+  width: 20px !important; height: 20px !important;
+  border-radius: 50% !important;
+  opacity: 0; transform: scale(0.85);
+  transition: opacity var(--ap-dur-fast) var(--ap-ease-out),
+              transform var(--ap-dur-base) var(--ap-spring),
+              background-color var(--ap-dur-fast) var(--ap-ease-out) !important;
+}
+html body .desktop-notification-card:hover .desktop-notif-close-btn,
+html body .desktop-notif-close-btn:focus-visible { opacity: 1; transform: scale(1); }
+html body .desktop-notif-close-btn:hover { background: var(--ap-fill-press) !important; }
+
+/* --- auto-dismiss hairline --------------------------------------- */
+html body .desktop-notification-card.ap-timed::after {
+  content: '';
+  position: absolute;
+  left: 15px; right: 15px; bottom: 7px;
+  height: 2px;
+  border-radius: 2px;
+  background: currentColor;
+  opacity: 0.16;
+  transform-origin: left center;
+  animation: ap-notif-timer var(--ap-toast-ms, 4500ms) linear both;
+}
+html body .desktop-notification-container:hover .desktop-notification-card.ap-timed::after {
+  animation-play-state: paused;      /* pointing at it stops the clock */
+}
+@keyframes ap-notif-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }
+
+
+/* ══════════════════════════════════════════════════════════════════
+   34 · OVERLAY MATERIAL
+   Glass is expensive — measured, it is the single largest item in this
+   app's frame budget (31 → 57fps with backdrop-filter off). So it is
+   spent only where it earns its cost: surfaces that float ABOVE
+   content and need to show what they're covering. Everything docked
+   (sidebar, top bar, cards) stays opaque.
+   ══════════════════════════════════════════════════════════════════ */
+html body .dropdown-menu, html body .menu, html body .popover,
+html body .context-menu, html body .cand-source-menu,
+html body .jarvis-composer-dropdown, html body #jarvis-more-panel,
+html body [role="menu"], html body .custom-dropdown-list,
+html body .modal, html body .modal-content, html body .smodal-window,
+html body #settings-overlay #settings-modal, html body .jarvis-modal,
+html body #cmd-palette-container, html body .command-palette {
+  /* NOT `[class*="palette"]` — that substring also matches
+     `.lx-palette-swatch`, and the glass background wiped the colour out
+     of all eight accent swatches in Settings. Same failure mode as the
+     `del-btn` match earlier; match real names, not substrings. */
+  background: color-mix(in srgb, var(--card, #fff) 76%, transparent) !important;
+  backdrop-filter: blur(30px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(30px) saturate(190%) !important;
+}
+html[data-theme="dark"] body .dropdown-menu, html[data-theme="dark"] body .menu,
+html[data-theme="dark"] body .popover, html[data-theme="dark"] body .context-menu,
+html[data-theme="dark"] body .cand-source-menu,
+html[data-theme="dark"] body .jarvis-composer-dropdown,
+html[data-theme="dark"] body #jarvis-more-panel,
+html[data-theme="dark"] body [role="menu"],
+html[data-theme="dark"] body .modal, html[data-theme="dark"] body .modal-content,
+html[data-theme="dark"] body .smodal-window,
+html[data-theme="dark"] body #settings-overlay #settings-modal {
+  background: color-mix(in srgb, #1c1c1f 78%, transparent) !important;
+}
+
+/* The backdrop dims and defocuses rather than just greying out. */
+html body .modal-backdrop, html body .smodal-backdrop,
+html body .overlay-backdrop, html body .settings-backdrop,
+html body .jarvis-modal-overlay {
+  background: color-mix(in srgb, var(--ap-text-1) 22%, transparent) !important;
+  backdrop-filter: blur(3px) saturate(105%) !important;
+  -webkit-backdrop-filter: blur(3px) saturate(105%) !important;
+  animation: ap-backdrop-in var(--ap-dur-xslow) var(--ap-ease-glide) both !important;
+}
+@keyframes ap-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* Modals rise; they do not pop. */
+@keyframes ap-modal-in {
+  from { opacity: 0; transform: translateY(16px) scale(0.975); }
+  to   { opacity: 1; transform: none; }
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   35 · VIEW TRANSITIONS & LOADING
+   ══════════════════════════════════════════════════════════════════ */
+html body .view.active > * {
+  animation: ap-view-in var(--ap-dur-xslow) var(--ap-ease-glide) both !important;
+}
+@keyframes ap-view-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: none; }
+}
+/* the first few blocks of a view arrive in sequence, not all at once */
+html body .view.active > *:nth-child(1) { animation-delay: 0ms; }
+html body .view.active > *:nth-child(2) { animation-delay: 45ms; }
+html body .view.active > *:nth-child(3) { animation-delay: 90ms; }
+html body .view.active > *:nth-child(n+4) { animation-delay: 130ms; }
+
+/* Cards and rows land in sequence inside a view. */
+html body .view.active .do-stat-card,
+html body .view.active .stat-card,
+html body .view.active .chart-card,
+html body .view.active .do-chart-card {
+  animation: ap-card-in var(--ap-dur-xslow) var(--ap-ease-glide) both;
+}
+html body .view.active .do-stat-card:nth-child(1),
+html body .view.active .stat-card:nth-child(1) { animation-delay: 60ms; }
+html body .view.active .do-stat-card:nth-child(2),
+html body .view.active .stat-card:nth-child(2) { animation-delay: 110ms; }
+html body .view.active .do-stat-card:nth-child(3),
+html body .view.active .stat-card:nth-child(3) { animation-delay: 160ms; }
+html body .view.active .do-stat-card:nth-child(4),
+html body .view.active .stat-card:nth-child(4) { animation-delay: 210ms; }
+@keyframes ap-card-in {
+  from { opacity: 0; transform: translateY(12px) scale(0.99); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- spinners: one arc, one speed, no easing wobble -------------- */
+html body .spinner, html body .ag-g-spinner, html body .diag-spinner,
+html body [class*="spinner"]:not([class*="-wrap"]):not([class*="-path"]) {
+  /* the -wrap and -path variants are the container and the SVG stroke;
+     rotating those too spins the arc twice at different rates */
+  animation: ap-spin 900ms linear infinite !important;
+}
+@keyframes ap-spin { to { transform: rotate(360deg); } }
+
+/* --- skeletons: a slow sheen, not a blinking pulse -------------- */
+html body .skeleton, html body [class*="skeleton"], html body .ag-g-loader-line,
+html body .ag-g-loader-bar {
+  position: relative;
+  overflow: hidden;
+  background: var(--ap-fill-press) !important;
+  border-radius: var(--ap-r-xs);
+}
+html body .skeleton::after, html body [class*="skeleton"]::after,
+html body .ag-g-loader-line::after, html body .ag-g-loader-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent,
+    color-mix(in srgb, var(--ap-text-1) 7%, transparent), transparent);
+  animation: ap-sheen 1.6s var(--ap-ease-in-out) infinite;
+}
+@keyframes ap-sheen { to { transform: translateX(100%); } }
+
+/* --- a control that is working says so, and stays put ------------ */
+html body button[data-loading="true"], html body button.is-loading,
+html body [aria-busy="true"] {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+}
+html body button[data-loading="true"]::after, html body button.is-loading::after {
+  content: '';
+  position: absolute;
+  inset: 0; margin: auto;
+  width: 15px; height: 15px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+  border-top-color: transparent;
+  color: var(--ap-text-2);
+  animation: ap-spin 700ms linear infinite;
+}
+
+
+/* ══════════════════════════════════════════════════════════════════
+   36 · ORB — final material pass
+   ══════════════════════════════════════════════════════════════════ */
+/* State changes take their time; the orb is the app's slowest object. */
+html body #view-jarvis #orb-container::after {
+  transition:
+    opacity var(--ap-dur-slow) var(--ap-ease-out),
+    transform var(--ap-dur-xslow) var(--ap-spring-soft),
+    border-color var(--ap-dur-slow) var(--ap-ease-out),
+    box-shadow var(--ap-dur-xslow) var(--ap-ease-out) !important;
+}
+html body .clavis-liquid-orb {
+  transition: transform var(--ap-dur-slow) var(--ap-spring-soft),
+              box-shadow var(--ap-dur-slow) var(--ap-ease-out) !important;
+}
+/* the idle breath is slower and shallower — presence, not a pulse */
+html body #orb-container[data-orb-state="IDLE"] .clavis-liquid-orb {
+  animation: ap-orb-breathe 9s var(--ap-ease-in-out) infinite !important;
+}
+@keyframes ap-orb-breathe {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.014); }
+}
+/* a second, counter-rotating halo gives the sphere parallax */
+html body #view-jarvis.active.has-messages #orb-container {
+  isolation: isolate;
+}
+html body .clavis-orb-sheen {
+  animation: ap-orb-sheen 14s var(--ap-ease-in-out) infinite alternate;
+}
+@keyframes ap-orb-sheen {
+  from { transform: translate(0, 0); }
+  to   { transform: translate(2.5%, -2%); }
+}
+
+/* Collapsed, only the front card is readable — the ones behind it show
+   as edges, the way macOS stacks notifications. Without this their text
+   ghosts through the front card's glass. Content fades back in as the
+   stack fans out. */
+html body .desktop-notification-card:not(:first-child) .desktop-notif-main {
+  opacity: 0;
+  transition: opacity var(--ap-dur-slow) var(--ap-ease-out) !important;
+}
+html body .desktop-notification-container:hover .desktop-notif-main,
+html body .desktop-notification-container:focus-within .desktop-notif-main {
+  opacity: 1;
+  transition-delay: 90ms;
+}
+html body .desktop-notification-card:not(:first-child).ap-timed::after { opacity: 0; }
+
+/* ══════════════════════════════════════════════════════════════════
+   37 · WISPR FLOW EDITORIAL MINIMAL & MACOS FLUID FRAME
+   Continuous outer frame (Sidebar + Topbar), curved inner canvas,
+   Wispr Flow lime accents, and silky macOS fluid spring physics.
+   ══════════════════════════════════════════════════════════════════ */
+
+:root {
+  --wf-font: 'Figtree', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
+  --wf-lime: #D4F458;
+  --wf-lime-glow: rgba(212, 244, 88, 0.28);
+  --wf-lime-dim: rgba(212, 244, 88, 0.12);
+  --wf-lime-fg: #142106;
+  --ease-macos-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-macos-fluid: cubic-bezier(0.2, 0.9, 0.3, 1.05);
+}
+
+html[data-theme="dark"] {
+  --wf-frame-bg: rgba(18, 18, 22, 0.76);
+  --wf-frame-border: rgba(255, 255, 255, 0.08);
+  --wf-canvas-bg: #1B1B1E;
+  --wf-canvas-border: rgba(255, 255, 255, 0.07);
+  --wf-canvas-shadow: -4px -4px 32px rgba(0, 0, 0, 0.45);
+  --wf-t1: rgba(255, 255, 255, 0.94);
+  --wf-t2: rgba(255, 255, 255, 0.62);
+  --wf-t3: rgba(255, 255, 255, 0.35);
+}
+
+html[data-theme="light"] {
+  --wf-frame-bg: rgba(245, 244, 239, 0.82);
+  --wf-frame-border: rgba(0, 0, 0, 0.07);
+  --wf-canvas-bg: #FFFFFF;
+  --wf-canvas-border: rgba(0, 0, 0, 0.06);
+  --wf-canvas-shadow: -4px -4px 24px rgba(0, 0, 0, 0.05);
+  --wf-t1: #19191B;
+  --wf-t2: #656569;
+  --wf-t3: #9C9CA1;
+}
+
+/* ── 1. Unified Sidebar & Topbar Outer Frame (Liquid Frosted Glass) ── */
+html body .app-shell {
+  background: var(--wf-frame-bg) !important;
+}
+html body #sidebar.sidebar,
+html body .sidebar {
+  background: var(--wf-frame-bg) !important;
+  border-right: 1px solid var(--wf-frame-border) !important;
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04) !important;
+  backdrop-filter: blur(32px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(190%) !important;
+}
+html body .main-content {
+  background: var(--wf-frame-bg) !important;
+}
+html body .topbar,
+html body .top-bar,
+html body .app-topbar {
+  background: var(--wf-frame-bg) !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(32px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(32px) saturate(190%) !important;
+}
+html body .page-breadcrumb {
+  color: var(--wf-t1) !important;
+  font-family: var(--wf-font) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.02em !important;
+}
+
+/* ── 2. Floating Curved Main Canvas (Wispr Editorial Architecture) ── */
+html body .views-container,
+html body #main-scroll-area {
+  background: var(--wf-canvas-bg) !important;
+  border-top-left-radius: 22px !important;
+  border-top: 1px solid var(--wf-canvas-border) !important;
+  border-left: 1px solid var(--wf-canvas-border) !important;
+  box-shadow: var(--wf-canvas-shadow) !important;
+  overflow: hidden !important;
+}
+
+/* Clavis AI View Seamless Integration inside Canvas */
+html body #view-jarvis.active {
+  background: var(--wf-canvas-bg) !important;
+  border-top-left-radius: 22px !important;
+}
+html body #view-jarvis.active .jarvis-hero-stage {
+  padding-top: var(--ap-s6) !important;
+}
+
+/* ── 3. Immunity for Center Stage: Clean & Spacious ── */
+html body #clavis-file-warning {
+  display: none !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  visibility: hidden !important;
+}
+
+/* ── 4. macOS Fluid Spring Dropdowns & Menus (Slow & Ultra-Smooth) ── */
+html body #jarvis-more-panel,
+html body .custom-dropdown-list,
+html body .dropdown-menu,
+html body [role="menu"],
+html body .topbar-user-menu {
+  transition:
+    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    filter 380ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+  transform-origin: top right !important;
+  background: color-mix(in srgb, var(--wf-canvas-bg, #1B1B1E) 85%, transparent) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 1px solid var(--wf-canvas-border, rgba(255, 255, 255, 0.08)) !important;
+  box-shadow: 0 16px 40px -8px rgba(0, 0, 0, 0.38), 0 0 0 0.5px var(--wf-canvas-border) !important;
+  border-radius: 16px !important;
+}
+html body #jarvis-more-panel:not([hidden]),
+html body .custom-dropdown-list:not([hidden]),
+html body .dropdown-menu:not([hidden]),
+html body [role="menu"]:not([hidden]),
+html body .topbar-user-menu.show {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+  filter: blur(0px) !important;
+}
+html body #jarvis-more-panel[hidden],
+html body .custom-dropdown-list[hidden],
+html body .dropdown-menu[hidden],
+html body [role="menu"][hidden],
+html body .topbar-user-menu:not(.show) {
+  opacity: 0 !important;
+  transform: translateY(-8px) scale(0.96) !important;
+  filter: blur(2px) !important;
+}
+
+/* ── 5. Wispr Flow Lime & Liquid Glass Accents ── */
+html body .nav-item.active::before {
+  background: var(--wf-lime, #D4F458) !important;
+  box-shadow: 0 0 12px var(--wf-lime-glow, rgba(212, 244, 88, 0.45)) !important;
+}
+html body .jarvis-status-pill {
+  border-color: rgba(212, 244, 88, 0.3) !important;
+  background: rgba(212, 244, 88, 0.08) !important;
+}
+html body #jarvis-status-text {
+  color: var(--wf-lime, #D4F458) !important;
+}
+html body .jarvis-newchat-pill:hover,
+html body .claude-send-btn:hover {
+  background: var(--wf-lime, #D4F458) !important;
+  color: #142106 !important;
+  box-shadow: 0 0 16px var(--wf-lime-glow, rgba(212, 244, 88, 0.35)) !important;
+}
+html body .jarvis-voice-center-btn:focus-visible,
+html body .jarvis-voice-center-btn:hover {
+  box-shadow: 0 0 0 4px var(--wf-lime-dim, rgba(212, 244, 88, 0.18)), 0 10px 30px rgba(0, 0, 0, 0.25) !important;
+}
+
+/* ── 6. Clavis Neural Orb: Vivid Internal Colors & NO Edge Glow ── */
+/* Strictly suppress any outer edge glow, ring, or halo across all states */
+html body #orb-container::before,
+html body #orb-container::after,
+html body #view-jarvis #orb-container::before,
+html body #view-jarvis #orb-container::after,
+html body #orb-container[data-orb-state]::after,
+html body #view-jarvis #orb-container[data-orb-state]::after,
+html body .clavis-orb-ring,
+html body .clavis-liquid-orb,
+html body .clavis-orb-blob,
+html body .arc-reactor,
+html body .hex-pattern,
+html body .energy-field,
+html body .energy-line,
+html body .jarvis-hud-glow,
+html body .orb-ring,
+html body .orb-inner-glow,
+html body .orb-reflection {
+  display: none !important;
+  content: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+}
+
+/* Minimalist Apple Clean Audio Emblem */
+html body #orb-container {
+  width: 96px !important;
+  height: 96px !important;
+  border-radius: 50% !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  margin: 0 auto 16px auto !important;
+  position: relative !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04) !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease !important;
+}
+
+html[data-theme="dark"] body #orb-container {
+  background: rgba(255, 255, 255, 0.05) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3) !important;
+}
+
+html body #orb-container[data-orb-state="LISTENING"] {
+  border-color: #007AFF !important;
+  transform: scale(1.04) !important;
+}
+
+html body #orb-container[data-orb-state="SPEAKING"] {
+  border-color: #34C759 !important;
+  transform: scale(1.02) !important;
+}
+
+/* =====================================================================
+   20 · macOS SEQUOIA 15 AUTHENTIC STUDIO VISUAL SYSTEM
+   Glass vibrancy, hairline materials, authentic traffic lights,
+   and instant tactile response.
+   ===================================================================== */
+
+/* ── 20a. Window Chrome & Traffic Lights ── */
+.mac-window-controls {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 2px 0 !important;
+  margin-bottom: 8px !important;
+}
+
+.mac-dot {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px !important;
+  min-height: 12px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  position: relative !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.22), 0 1px 2px rgba(0, 0, 0, 0.1) !important;
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), filter 0.12s ease !important;
+  flex-shrink: 0 !important;
+}
+
+.mac-dot:hover {
+  transform: scale(1.06) !important;
+  filter: brightness(1.08) !important;
+}
+
+.mac-dot:active {
+  transform: scale(0.92) !important;
+  filter: brightness(0.96) !important;
+}
+
+.mac-dot.mac-close { background: #ff5f57 !important; }
+.mac-dot.mac-minimize { background: #febc2e !important; }
+.mac-dot.mac-maximize { background: #28c840 !important; }
+
+/* Inactive window state: gracefully subdued dots */
+.window-inactive .mac-dot {
+  background: #4a4a4c !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* ── 20b. Liquid Glass Translucent Topbar ── */
+.topbar {
+  background: rgba(24, 24, 27, 0.75) !important;
+  backdrop-filter: blur(20px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(190%) !important;
+  border-bottom: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html[data-theme="light"] .topbar {
+  background: rgba(255, 255, 255, 0.78) !important;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ── 20c. Floating Curved Center Stage (macOS Canvas) ── */
+.views-container, #main-scroll-area {
+  border-top-left-radius: 18px !important;
+  border-top: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+  border-left: 0.5px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html[data-theme="light"] .views-container, 
+html[data-theme="light"] #main-scroll-area {
+  border-top: 0.5px solid rgba(0, 0, 0, 0.08) !important;
+  border-left: 0.5px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+/* ── 20d. Instant Tactile Press Feedback (Apple HIG Pointer-down) ── */
+.btn-primary:active,
+.btn-secondary:active,
+.lx-btn-primary:active,
+.generate-btn:active,
+.smodal-btn-primary:active,
+.smodal-btn-secondary:active,
+.ch-open-btn:active {
+  transform: scale(0.97) !important;
+  transition: transform 100ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.sidebar .nav-item:active {
+  transform: scale(0.98) !important;
+  transition: transform 80ms ease-out !important;
+}
+
+/* ── 20e. Accessibility: Reduced Motion Standard ── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .desktop-notification-card,
+  .modal, .modal-content, .smodal-window,
+  .view, .stat-card {
+    transform: none !important;
+    transition: opacity 120ms ease !important;
+    animation: none !important;
+  }
+  .clavis-orb-blob,
+  .clavis-orb-halo,
+  .clavis-orb-sheen {
+    animation: none !important;
+  }
+}
+
+/* =====================================================================
+   21 · STRICT APPLE HIG ENFORCEMENT: ZERO GRADIENTS & ZERO AI SLOPPINESS
+   Purge every linear/radial/conic gradient, neon halo, glowing cursor,
+   and 3D perspective tilt across the entire application.
+   ===================================================================== */
+
+/* ── 21a. Universal Gradient Extinguisher ── */
+html body .btn-primary,
+html body .btn-secondary,
+html body .generate-btn,
+html body .generate-leads-btn,
+html body .chat-send-btn,
+html body .claude-send-btn,
+html body .action-btn,
+html body .smodal-btn-primary,
+html body .smodal-btn-secondary,
+html body .smodal-btn-danger,
+html body .ag-btn-submit,
+html body .ch-open-btn,
+html body .stat-card,
+html body .do-stat-card,
+html body .chart-card,
+html body .do-chart-wrap,
+html body .analytics-card,
+html body .recent-leads-card,
+html body .card,
+html body .topbar,
+html body .sidebar,
+html body .modal-card,
+html body .smodal-window,
+html body .desktop-notification-card,
+html body .token-bar-fill,
+html body [class*="badge"],
+html body [class*="pill"],
+html body .smodal-switch input:checked + .smodal-switch-track,
+html body .mac-toggle input:checked + .mac-toggle-slider,
+html body #lx-cursor-glow,
+html body #pfx-cursor-glow {
+  background-image: none !important;
+}
+
+html body [class*="gradient-text"],
+html body .brand-gradient,
+html body .hero-gradient-text,
+html body .luxury-gradient-text {
+  background-image: none !important;
+  -webkit-background-clip: initial !important;
+  background-clip: initial !important;
+  -webkit-text-fill-color: inherit !important;
+  color: inherit !important;
+}
+
+/* ── 21b. Authentic Solid Apple Primary Buttons ── */
+html body .btn-primary,
+html body .generate-btn,
+html body .generate-leads-btn,
+html body .smodal-btn-primary,
+html body .ag-btn-submit,
+html body .chat-send-btn,
+html body .claude-send-btn {
+  background-color: #007AFF !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(0, 0, 0, 0.12) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08) !important;
+  text-shadow: none !important;
+  font-weight: 500 !important;
+}
+
+html[data-theme="dark"] body .btn-primary,
+html[data-theme="dark"] body .generate-btn,
+html[data-theme="dark"] body .generate-leads-btn,
+html[data-theme="dark"] body .smodal-btn-primary,
+html[data-theme="dark"] body .ag-btn-submit,
+html[data-theme="dark"] body .chat-send-btn,
+html[data-theme="dark"] body .claude-send-btn {
+  background-color: #0A84FF !important;
+  color: #FFFFFF !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.25) !important;
+}
+
+html body .btn-primary:hover,
+html body .generate-btn:hover,
+html body .generate-leads-btn:hover,
+html body .smodal-btn-primary:hover,
+html body .ag-btn-submit:hover,
+html body .chat-send-btn:hover,
+html body .claude-send-btn:hover {
+  background-color: #0062CC !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-0.5px) !important;
+}
+
+html[data-theme="dark"] body .btn-primary:hover,
+html[data-theme="dark"] body .generate-btn:hover,
+html[data-theme="dark"] body .generate-leads-btn:hover,
+html[data-theme="dark"] body .smodal-btn-primary:hover,
+html[data-theme="dark"] body .ag-btn-submit:hover,
+html[data-theme="dark"] body .chat-send-btn:hover,
+html[data-theme="dark"] body .claude-send-btn:hover {
+  background-color: #0071E3 !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35) !important;
+}
+
+html body .btn-primary:active,
+html body .generate-btn:active,
+html body .generate-leads-btn:active,
+html body .smodal-btn-primary:active,
+html body .ag-btn-submit:active,
+html body .chat-send-btn:active,
+html body .claude-send-btn:active {
+  background-color: #0051A8 !important;
+  transform: scale(0.97) !important;
+  box-shadow: 0 0.5px 1px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Extinguish moving shimmer lines across buttons */
+html body .btn-primary::after,
+html body .generate-btn::after,
+html body .smodal-btn-primary::after,
+html body .stat-card::after {
+  display: none !important;
+  content: none !important;
+  animation: none !important;
+}
+
+/* ── 21c. Solid Secondary Buttons ── */
+html body .btn-secondary,
+html body .smodal-btn-secondary {
+  background-color: rgba(0, 0, 0, 0.05) !important;
+  color: inherit !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] body .btn-secondary,
+html[data-theme="dark"] body .smodal-btn-secondary {
+  background-color: rgba(255, 255, 255, 0.08) !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+html body .btn-secondary:hover,
+html body .smodal-btn-secondary:hover {
+  background-color: rgba(0, 0, 0, 0.08) !important;
+}
+
+html[data-theme="dark"] body .btn-secondary:hover,
+html[data-theme="dark"] body .smodal-btn-secondary:hover {
+  background-color: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* ── 21d. Solid Toggle Switches (macOS Green #34C759) ── */
+html body .smodal-switch input:checked + .smodal-switch-track,
+html body .mac-toggle input:checked + .mac-toggle-slider {
+  background-color: #34C759 !important;
+  box-shadow: none !important;
+}
+
+/* ── 21e. Extinguish Cursor Glows, Card Spotlights & 3D Perspective Tilts ── */
+#lx-cursor-glow,
+#pfx-cursor-glow,
+.lx-card-glow,
+.pfx-card-glow,
+#nexus-pet-container,
+.nexus-pet-wrap,
+#pip-container {
+  display: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+
+/* Prevent cards from tilting in 3D or glowing on hover */
+.stat-card,
+.do-stat-card,
+.chart-card,
+.do-chart-wrap,
+.analytics-card,
+.recent-leads-card,
+.card {
+  perspective: none !important;
+  transform: none !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 0 0 0.5px rgba(0, 0, 0, 0.08) !important;
+}
+
+html[data-theme="dark"] .stat-card,
+html[data-theme="dark"] .do-stat-card,
+html[data-theme="dark"] .chart-card,
+html[data-theme="dark"] .do-chart-wrap,
+html[data-theme="dark"] .analytics-card,
+html[data-theme="dark"] .recent-leads-card,
+html[data-theme="dark"] .card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35), 0 0 0 0.5px rgba(255, 255, 255, 0.08) !important;
+}
+
+.stat-card:hover,
+.do-stat-card:hover,
+.chart-card:hover,
+.do-chart-wrap:hover,
+.analytics-card:hover,
+.recent-leads-card:hover,
+.card:hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(0, 122, 255, 0.35) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.09), 0 0 0 0.5px rgba(0, 122, 255, 0.3) !important;
+}
+
+html[data-theme="dark"] .stat-card:hover,
+html[data-theme="dark"] .do-stat-card:hover,
+html[data-theme="dark"] .chart-card:hover,
+html[data-theme="dark"] .do-chart-wrap:hover,
+html[data-theme="dark"] .analytics-card:hover,
+html[data-theme="dark"] .recent-leads-card:hover,
+html[data-theme="dark"] .card:hover {
+  border-color: rgba(10, 132, 255, 0.45) !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.45), 0 0 0 0.5px rgba(10, 132, 255, 0.35) !important;
+}
+
+/* ── 21f. Clean Audio Waveform Visualizer (Replace Sci-Fi Orbs) ── */
+#view-jarvis .jarvis-visualizer {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  height: 48px !important;
+  padding: 8px 16px !important;
+  background: rgba(0, 0, 0, 0.03) !important;
+  border-radius: 99px !important;
+  border: 0.5px solid rgba(0, 0, 0, 0.08) !important;
+  margin: 16px auto !important;
+  max-width: 220px !important;
+}
+
+html[data-theme="dark"] #view-jarvis .jarvis-visualizer {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+#view-jarvis .jarvis-visualizer .wave-bar {
+  width: 4px !important;
+  min-height: 8px !important;
+  border-radius: 2px !important;
+  background-color: #007AFF !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  transition: height 0.1s ease !important;
+}
+
+html[data-theme="dark"] #view-jarvis .jarvis-visualizer .wave-bar {
+  background-color: #0A84FF !important;
+}
+
+
+
+/* ══════════════════════════════════════════════════════════════════
+   28 · CLAVIS TAB — COMPLETE APPLE / MACOS HIG REDESIGN
+   ─ Header: Status & mic on LEFT, ALL action buttons on FAR RIGHT.
+   ─ Hero State: Neural Orb centered prominently (146px) with clean
+     greeting & tip pill. Chat container completely hidden on load.
+   ─ Active State: Orb stays centered at top (52px badge), not left-pinned.
+   ─ Composer: Clear glass skin (backdrop-filter blur, no gradients),
+     40% slimmer default (500px), pinned to bottom, smooth spring auto-expand.
+   ─ Primary Send Button: Apple System Blue (#007AFF).
+   ─ Easing: Apple macOS spring cubic-bezier(0.16, 1, 0.3, 1) throughout.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 28a. TOOLBAR: Status pill + mic LEFT, ALL buttons on FAR RIGHT ── */
+html body #view-jarvis .jarvis-hero-header,
+html body #view-jarvis.active .jarvis-hero-header {
+  width: 100% !important;
+  max-width: 100% !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin: 0 !important;
+  padding: 10px 24px !important;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.07) !important;
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  min-height: 52px !important;
+  position: sticky !important;
+  top: 0 !important;
+  z-index: 10 !important;
+  box-sizing: border-box !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-hero-header,
+html[data-theme="dark"] body #view-jarvis.active .jarvis-hero-header {
+  background: rgba(18, 22, 26, 0.94) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* Left cluster: Status pill & Mic status */
+html body #view-jarvis .jarvis-status-pill,
+html body #view-jarvis.active .jarvis-status-pill,
+html body #view-jarvis .jarvis-luxury-status-pill,
+html body #view-jarvis.active .jarvis-luxury-status-pill {
+  flex-shrink: 0 !important;
+  margin-right: 0 !important;
+}
+html body #view-jarvis .clavis-live-mic-status,
+html body #view-jarvis.active .clavis-live-mic-status {
+  flex-shrink: 0 !important;
+}
+
+/* Right cluster: ALL action buttons pushed to the far right */
+html body #view-jarvis .jarvis-hero-actions,
+html body #view-jarvis.active .jarvis-hero-actions,
+html body #view-jarvis .jarvis-hero-actions--compact,
+html body #view-jarvis.active .jarvis-hero-actions--compact {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  gap: 6px !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+/* ── 28b. HERO STAGE: Full height flex layout with centered elements ── */
+html body #view-jarvis .jarvis-split-layout,
+html body #view-jarvis.active .jarvis-split-layout {
+  height: 100% !important;
+  min-height: 100% !important;
+  display: flex !important;
+  flex-direction: column !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+html body #view-jarvis .jarvis-hero-stage,
+html body #view-jarvis.active .jarvis-hero-stage {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+  min-height: calc(100vh - 120px) !important;
+  padding: 0 20px 20px 20px !important;
+  box-sizing: border-box !important;
+  position: relative !important;
+}
+
+/* ── 28c. EMPTY / HERO STATE: Orb in the exact center ── */
+html body #view-jarvis:not(.has-messages) .jarvis-center-orb-wrapper,
+html body #view-jarvis.active:not(.has-messages) .jarvis-center-orb-wrapper {
+  flex: 1 1 auto !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  width: 100% !important;
+  max-width: 720px !important;
+  margin: auto auto !important;
+  padding: 30px 20px 10px !important;
+  border-bottom: none !important;
+  background: transparent !important;
+}
+
+/* Strands WebGL2 Orb (Large 220px sphere, pure transparent canvas, NO outer circle) */
+html body #view-jarvis:not(.has-messages) .jarvis-center-orb-wrapper #orb-container,
+html body #view-jarvis.active:not(.has-messages) .jarvis-center-orb-wrapper #orb-container,
+html body #view-jarvis:not(.has-messages) #orb-container,
+html body #view-jarvis #orb-container {
+  width: 220px !important;
+  height: 220px !important;
+  min-width: 220px !important;
+  min-height: 220px !important;
+  max-width: 220px !important;
+  max-height: 220px !important;
+  margin: 0 auto 16px auto !important;
+  cursor: pointer !important;
+  border-radius: 50% !important;
+  position: relative !important;
+  overflow: visible !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+html body #view-jarvis #orb-container:hover {
+  transform: scale(1.04) translateZ(0) !important;
+  box-shadow: none !important;
+}
+html body #view-jarvis #orb-container:active {
+  transform: scale(0.97) translateZ(0) !important;
+  box-shadow: none !important;
+}
+html body #view-jarvis #orb-container::before,
+html body #view-jarvis #orb-container::after,
+html body #view-jarvis .jarvis-center-orb-wrapper #orb-container::before,
+html body #view-jarvis .jarvis-center-orb-wrapper #orb-container::after {
+  display: none !important;
+  content: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+
+/* Welcome Greeting */
+html body #view-jarvis:not(.has-messages) #jarvis-welcome,
+html body #view-jarvis.active:not(.has-messages) #jarvis-welcome {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 10px !important;
+  margin: 0 auto !important;
+}
+
+html body #view-jarvis:not(.has-messages) #jarvis-welcome-text,
+html body #view-jarvis.active:not(.has-messages) #jarvis-welcome-text {
+  font-size: 26px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  color: var(--wf-t1, #19191B) !important;
+  margin: 0 !important;
+  text-align: center !important;
+}
+html[data-theme="dark"] body #view-jarvis:not(.has-messages) #jarvis-welcome-text {
+  color: rgba(255, 255, 255, 0.96) !important;
+}
+
+/* Feature Tip Pill */
+html body #view-jarvis .clavis-feature-tip-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 6px 14px !important;
+  background: rgba(0, 0, 0, 0.04) !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  border-radius: 999px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: var(--wf-t2, #656569) !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+html[data-theme="dark"] body #view-jarvis .clavis-feature-tip-pill {
+  background: rgba(255, 255, 255, 0.06) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: rgba(255, 255, 255, 0.70) !important;
+}
+html body #view-jarvis .clavis-feature-tip-pill:hover {
+  transform: translateY(-1px) !important;
+  background: rgba(0, 0, 0, 0.07) !important;
+}
+
+/* Clean: hide unneeded clutter */
+html body #view-jarvis #jarvis-hero-controls,
+html body #view-jarvis .clavis-voice-caption,
+html body #view-jarvis .jarvis-subtitles-box,
+html body #view-jarvis .jarvis-visualizer,
+html body #view-jarvis .jarvis-starters-grid {
+  display: none !important;
+}
+
+/* In empty state, hide the chat messages container entirely */
+html body #view-jarvis:not(.has-messages) .jarvis-chat-container,
+html body #view-jarvis.active:not(.has-messages) .jarvis-chat-container {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ── 28d. ACTIVE CHAT STATE: Orb stays centered at top ── */
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper {
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  width: 100% !important;
+  height: auto !important;
+  min-height: 76px !important;
+  max-height: none !important;
+  padding: 8px 16px 8px !important;
+  margin: 0 auto !important;
+  border-bottom: 0.5px solid rgba(0, 0, 0, 0.06) !important;
+  background: rgba(255, 255, 255, 0.88) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+}
+html[data-theme="dark"] body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper {
+  background: rgba(18, 22, 26, 0.88) !important;
+  border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+}
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper #orb-container {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  max-width: 44px !important;
+  max-height: 44px !important;
+  margin: 0 auto !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+}
+html body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper::after {
+  display: block !important;
+  margin: 3px auto 0 auto !important;
+  text-align: center !important;
+  font-size: 9.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.05em !important;
+  text-transform: uppercase !important;
+  color: rgba(0, 0, 0, 0.35) !important;
+}
+html[data-theme="dark"] body #view-jarvis.active.has-messages .jarvis-center-orb-wrapper::after {
+  color: rgba(255, 255, 255, 0.35) !important;
+}
+
+html body #view-jarvis.active.has-messages .jarvis-chat-container {
+  width: min(720px, 100%) !important;
+  max-width: 720px !important;
+  margin: 0 auto !important;
+  flex: 1 1 auto !important;
+  padding: 12px 16px 80px !important;
+}
+
+/* ── 28e. COMPOSER: Clear Glass Skin, 40% Slimmer, Bottom-Anchored ── */
+html body #view-jarvis .jarvis-input-container,
+html body #view-jarvis.active .jarvis-input-container,
+html body #view-jarvis .jarvis-luxury-composer,
+html body #view-jarvis.active .jarvis-luxury-composer {
+  background: rgba(255, 255, 255, 0.72) !important;
+  backdrop-filter: blur(28px) saturate(190%) !important;
+  -webkit-backdrop-filter: blur(28px) saturate(190%) !important;
+  border: 0.5px solid rgba(0, 0, 0, 0.10) !important;
+  border-radius: 18px !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    0 8px 24px rgba(0, 0, 0, 0.06) !important;
+  /* 40% slimmer default: 500px width */
+  width: min(500px, calc(100% - 32px)) !important;
+  max-width: 500px !important;
+  margin: 0 auto 16px auto !important;
+  padding: 10px 14px 8px !important;
+  box-sizing: border-box !important;
+  flex-shrink: 0 !important;
+  transition:
+    width 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.28s cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 0.28s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow: hidden !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-input-container,
+html[data-theme="dark"] body #view-jarvis.active .jarvis-input-container,
+html[data-theme="dark"] body #view-jarvis .jarvis-luxury-composer,
+html[data-theme="dark"] body #view-jarvis.active .jarvis-luxury-composer {
+  background: rgba(24, 26, 30, 0.75) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 2px 8px rgba(0, 0, 0, 0.35),
+    0 10px 30px rgba(0, 0, 0, 0.40) !important;
+}
+
+/* Glass composer focus ring */
+html body #view-jarvis .jarvis-input-container:focus-within,
+html body #view-jarvis.active .jarvis-input-container:focus-within,
+html body #view-jarvis .jarvis-luxury-composer:focus-within,
+html body #view-jarvis.active .jarvis-luxury-composer:focus-within {
+  border-color: rgba(0, 122, 255, 0.45) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.90),
+    0 0 0 3px rgba(0, 122, 255, 0.12),
+    0 8px 24px rgba(0, 0, 0, 0.08) !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-input-container:focus-within,
+html[data-theme="dark"] body #view-jarvis.active .jarvis-input-container:focus-within,
+html[data-theme="dark"] body #view-jarvis .jarvis-luxury-composer:focus-within,
+html[data-theme="dark"] body #view-jarvis.active .jarvis-luxury-composer:focus-within {
+  border-color: rgba(10, 132, 255, 0.50) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 0 0 3px rgba(10, 132, 255, 0.18),
+    0 10px 30px rgba(0, 0, 0, 0.45) !important;
+}
+
+/* Compact single-row textarea with spring auto-growth */
+html body #view-jarvis .jarvis-input-container #jarvis-input,
+html body #view-jarvis.active .jarvis-input-container #jarvis-input,
+html body #view-jarvis .jarvis-luxury-composer #jarvis-input,
+html body #view-jarvis.active .jarvis-luxury-composer #jarvis-input,
+html body #view-jarvis #jarvis-input {
+  min-height: 28px !important;
+  height: 28px !important;
+  max-height: 180px !important;
+  padding: 2px 2px !important;
+  font-size: 13.5px !important;
+  line-height: 1.45 !important;
+  font-family: inherit !important;
+  resize: none !important;
+  overflow-y: hidden !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  transition: height 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Bottom bar inside composer */
+html body #view-jarvis .jarvis-composer-bottom-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-top: 6px !important;
+  padding-top: 6px !important;
+  border-top: 0.5px solid rgba(0, 0, 0, 0.06) !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-composer-bottom-bar {
+  border-top-color: rgba(255, 255, 255, 0.07) !important;
+}
+
+/* Compact tool buttons */
+html body #view-jarvis .jarvis-composer-btn {
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 8px !important;
+  font-size: 11.5px !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+html body #view-jarvis .jarvis-composer-plus-btn,
+html body #view-jarvis .jarvis-composer-attach-btn,
+html body #view-jarvis .jarvis-composer-mic-btn {
+  width: 28px !important;
+  min-width: 28px !important;
+  padding: 0 !important;
+}
+
+/* Send & Stop Buttons: Circular, Apple Refined Grey (Strictly not black) */
+html body #view-jarvis .jarvis-composer-up-btn,
+html body #view-jarvis .claude-send-btn,
+html body #view-jarvis #jarvis-send-btn,
+html body #view-jarvis #jarvis-stop-btn {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  min-height: 34px !important;
+  border-radius: 50% !important;
+  background: #E5E7EB !important;
+  color: #6B7280 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1),
+              background 0.18s ease,
+              color 0.18s ease,
+              box-shadow 0.18s ease !important;
+}
+html body #view-jarvis .jarvis-composer-up-btn:hover,
+html body #view-jarvis .claude-send-btn:hover,
+html body #view-jarvis #jarvis-send-btn:hover {
+  background: #D1D5DB !important;
+  color: #374151 !important;
+  transform: scale(1.06) translateZ(0) !important;
+}
+html body #view-jarvis .jarvis-composer-up-btn.has-text,
+html body #view-jarvis .claude-send-btn.has-text,
+html body #view-jarvis #jarvis-send-btn.has-text {
+  background: #6B7280 !important; /* Neutral refined grey */
+  color: #FFFFFF !important;
+  border-color: #6B7280 !important;
+  box-shadow: 0 2px 8px rgba(107, 114, 128, 0.28) !important;
+}
+html body #view-jarvis .jarvis-composer-up-btn.has-text:hover,
+html body #view-jarvis .claude-send-btn.has-text:hover,
+html body #view-jarvis #jarvis-send-btn.has-text:hover {
+  background: #4B5563 !important; /* Rich grey on hover, strictly not black */
+  color: #FFFFFF !important;
+  transform: scale(1.08) translateZ(0) !important;
+  box-shadow: 0 4px 12px rgba(75, 85, 99, 0.32) !important;
+}
+html body #view-jarvis .jarvis-composer-up-btn:active,
+html body #view-jarvis .claude-send-btn:active,
+html body #view-jarvis #jarvis-send-btn:active {
+  transform: scale(0.95) translateZ(0) !important;
+}
+
+/* Stop Button (Circle) */
+html body #view-jarvis #jarvis-stop-btn {
+  border-radius: 50% !important;
+  background: #EF4444 !important;
+  color: #FFFFFF !important;
+  border: none !important;
+}
+html body #view-jarvis #jarvis-stop-btn:hover {
+  background: #DC2626 !important;
+  transform: scale(1.06) translateZ(0) !important;
+}
+
+/* Dark mode overrides for Send Button */
+html[data-theme="dark"] body #view-jarvis .jarvis-composer-up-btn,
+html[data-theme="dark"] body #view-jarvis .claude-send-btn,
+html[data-theme="dark"] body #view-jarvis #jarvis-send-btn {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: rgba(255, 255, 255, 0.45) !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-composer-up-btn:hover,
+html[data-theme="dark"] body #view-jarvis .claude-send-btn:hover,
+html[data-theme="dark"] body #view-jarvis #jarvis-send-btn:hover {
+  background: rgba(255, 255, 255, 0.18) !important;
+  color: rgba(255, 255, 255, 0.85) !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-composer-up-btn.has-text,
+html[data-theme="dark"] body #view-jarvis .claude-send-btn.has-text,
+html[data-theme="dark"] body #view-jarvis #jarvis-send-btn.has-text {
+  background: #52525B !important; /* Zinc grey, never black */
+  color: #FFFFFF !important;
+  border-color: #52525B !important;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35) !important;
+}
+html[data-theme="dark"] body #view-jarvis .jarvis-composer-up-btn.has-text:hover,
+html[data-theme="dark"] body #view-jarvis .claude-send-btn.has-text:hover,
+html[data-theme="dark"] body #view-jarvis #jarvis-send-btn.has-text:hover {
+  background: #71717A !important;
+  color: #FFFFFF !important;
+}
+
+/* ── 28f. REDUCED MOTION ── */
+@media (prefers-reduced-motion: reduce) {
+  html body #view-jarvis .jarvis-center-orb-wrapper,
+  html body #view-jarvis #orb-container,
+  html body #view-jarvis .jarvis-input-container,
+  html body #view-jarvis .jarvis-luxury-composer,
+  html body #view-jarvis #jarvis-input,
+  html body #view-jarvis .claude-send-btn,
+  html body #view-jarvis .jarvis-composer-up-btn {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+ * 29 · LEFT SIDEBAR REDESIGN, WISPR FLOW PALETTE & MACOS SPRING
+ * Pure Apple / Wispr Flow polish:
+ *   - Lead Credits widget permanently removed
+ *   - Unified background from top to bottom (Light: #F5F4EF / Dark: #131417)
+ *   - Clear & dark high-contrast typography
+ *   - Wispr Flow pine green (#0B3B32) active pills with 12px round corners
+ *   - macOS slow & smooth 460ms spring animations
+ *   - Right side panel desktop grid & right-slide transition
+ *   - Header more-options dropdown specificity resolution
+ * ============================================================ */
+
+/* ── 29a. LEAD CREDITS WIDGET & FOOTER SUPPRESSION ── */
+#sidebar .sidebar-footer,
+#sidebar .lx-usage-card,
+#sidebar #token-meter,
+.sidebar-footer .lx-usage-card,
+.sidebar-footer #token-meter,
+.sidebar-footer .token-meter,
+.sidebar-footer {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-top: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* ── 29b. UNIFIED SIDEBAR CANVAS (WISPR FLOW WARM OAT / OBSIDIAN) ── */
+/* Light mode: warm ivory/cream editorial tone from user screenshots */
+html[data-theme="light"] body #sidebar.sidebar,
+html[data-theme="light"] body aside#sidebar,
+html[data-theme="light"] body #sidebar .sidebar-header,
+html[data-theme="light"] body #sidebar .sidebar-nav,
+html[data-theme="light"] body #sidebar-nav-scroll,
+html[data-theme="light"] body .sidebar-nav,
+html[data-theme="light"] body .sidebar-footer {
+  background: #F5F4EF !important;
+  background-color: #F5F4EF !important;
+  border-right: 1px solid rgba(0, 0, 0, 0.06) !important;
+  box-shadow: none !important;
+}
+
+/* Dark mode: deep obsidian slate */
+html[data-theme="dark"] body #sidebar.sidebar,
+html[data-theme="dark"] body aside#sidebar,
+html[data-theme="dark"] body #sidebar .sidebar-header,
+html[data-theme="dark"] body #sidebar .sidebar-nav,
+html[data-theme="dark"] body #sidebar-nav-scroll,
+html[data-theme="dark"] body .sidebar-nav,
+html[data-theme="dark"] body .sidebar-footer {
+  background: #131417 !important;
+  background-color: #131417 !important;
+  border-right: 1px solid rgba(255, 255, 255, 0.07) !important;
+  box-shadow: none !important;
+}
+
+/* Ensure whole sidebar is flex column with zero gaps */
+html body #sidebar.sidebar,
+html body aside#sidebar.sidebar {
+  display: flex !important;
+  flex-direction: column !important;
+  flex-shrink: 0 !important;
+  height: 100vh !important;
+  max-height: 100vh !important;
+  overflow: hidden !important;
+  /* FIXED, not relative: every #main-content rule in this file and in
+     index.html's authoritative block offsets by margin-left:220px, which
+     assumes the rail is out of flow. position:relative made the rail take
+     220px of flow AND the margin apply -> a 220px dead gap. */
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  z-index: 25 !important;
+}
+
+/* ── 29c. TYPOGRAPHY: CLEAR, DARK & POLISHED ── */
+html body #sidebar .nav-item,
+html body #sidebar .nav-sub-item,
+html body #sidebar .logo-brand,
+html body #sidebar .nav-section-label {
+  font-family: 'Figtree', 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Inter', sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+}
+
+/* Section labels (AI ASSISTANT, LEAD & DATA HUB, AUTOMATION, SYSTEM) */
+html[data-theme="light"] body #sidebar .nav-section-label {
+  color: #78716C !important; /* Stone-500: crisp, elegant, muted */
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  padding: 12px 14px 4px !important;
+}
+
+html[data-theme="dark"] body #sidebar .nav-section-label {
+  color: rgba(255, 255, 255, 0.40) !important;
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  padding: 12px 14px 4px !important;
+}
+
+/* Navigation items — clear, dark, legible, rounded (12px) */
+html[data-theme="light"] body #sidebar .nav-item {
+  color: #1C1917 !important; /* Stone-900: clear and dark */
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: 12px !important;
+  margin: 2px 8px !important;
+  padding: 8px 12px !important;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease !important;
+}
+
+html[data-theme="light"] body #sidebar .nav-item:hover {
+  background-color: rgba(0, 0, 0, 0.045) !important;
+  color: #000000 !important;
+}
+
+/* Active navigation item: Wispr Flow Pine Green (#0B3B32) */
+html[data-theme="light"] body #sidebar .nav-item.active,
+html[data-theme="light"] body #sidebar .nav-item[data-active="true"] {
+  background-color: rgba(11, 59, 50, 0.09) !important;
+  color: #0B3B32 !important;
+  font-weight: 700 !important;
+}
+
+html[data-theme="light"] body #sidebar .nav-item.active svg,
+html[data-theme="light"] body #sidebar .nav-item[data-active="true"] svg {
+  color: #0B3B32 !important;
+  stroke: #0B3B32 !important;
+}
+
+/* Dark mode nav items */
+html[data-theme="dark"] body #sidebar .nav-item {
+  color: rgba(255, 255, 255, 0.72) !important;
+  font-size: 13.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  border-radius: 12px !important;
+  margin: 2px 8px !important;
+  padding: 8px 12px !important;
+  transition: background-color 0.2s ease, color 0.2s ease, transform 0.15s ease !important;
+}
+
+html[data-theme="dark"] body #sidebar .nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.06) !important;
+  color: #FFFFFF !important;
+}
+
+html[data-theme="dark"] body #sidebar .nav-item.active,
+html[data-theme="dark"] body #sidebar .nav-item[data-active="true"] {
+  background-color: rgba(255, 255, 255, 0.09) !important;
+  color: #FFFFFF !important;
+  font-weight: 600 !important;
+}
+
+/* Sub-items (All Leads, Candidate DB, Excel Manager, Analytics) */
+html[data-theme="light"] body #sidebar .nav-sub-item {
+  color: #44403C !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  border-radius: 10px !important;
+  margin: 2px 8px 2px 20px !important;
+  padding: 6px 10px !important;
+}
+
+html[data-theme="light"] body #sidebar .nav-sub-item:hover {
+  background-color: rgba(0, 0, 0, 0.04) !important;
+  color: #0B3B32 !important;
+}
+
+html[data-theme="light"] body #sidebar .nav-sub-item.active {
+  background-color: rgba(11, 59, 50, 0.08) !important;
+  color: #0B3B32 !important;
+  font-weight: 600 !important;
+}
+
+/* ── 29d. MACOS SMOOTH & SLOW SPRING ANIMATION ── */
+html body aside#sidebar.sidebar.collapsed,
+html body #sidebar.sidebar.collapsed,
+html body aside#sidebar.sidebar,
+html body #sidebar.sidebar,
+html body #sidebar {
+  transition:
+    width 0.46s cubic-bezier(0.16, 1, 0.3, 1),
+    min-width 0.46s cubic-bezier(0.16, 1, 0.3, 1),
+    max-width 0.46s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.25s ease !important;
+}
+
+/* Sidebar rail expanded state */
+html body #sidebar.sidebar:not(.collapsed),
+html body aside#sidebar:not(.collapsed) {
+  width: 220px !important;
+  min-width: 220px !important;
+  max-width: 220px !important;
+}
+
+/* Sidebar rail collapsed state */
+html body #sidebar.sidebar.collapsed,
+html body aside#sidebar.sidebar.collapsed {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+}
+
+html body #main-content.main-content,
+html body #main-content {
+  margin-left: 220px !important;
+  width: calc(100% - 220px) !important;
+  max-width: calc(100% - 220px) !important;
+  transition:
+    margin-left 0.32s cubic-bezier(0.16, 1, 0.3, 1),
+    width 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+html[data-sidebar-state="collapsed"] body #main-content.main-content,
+html[data-sidebar-state="collapsed"] body #main-content,
+html:has(#sidebar.collapsed) body #main-content.main-content,
+html:has(#sidebar.collapsed) body #main-content {
+  margin-left: 64px !important;
+  width: calc(100% - 64px) !important;
+  max-width: calc(100% - 64px) !important;
+}
+
+/* Nav labels fade softly */
+html body #sidebar .nav-item > span,
+html body #sidebar .nav-label,
+html body #sidebar .nav-section-label,
+html body #sidebar .logo-text,
+html body #sidebar .chevron-arrow,
+html body #sidebar .nav-badge {
+  transition: opacity 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  white-space: nowrap !important;
+}
+
+html[data-sidebar-state="collapsed"] body #sidebar .nav-item > span,
+html[data-sidebar-state="collapsed"] body #sidebar .nav-section-label,
+html[data-sidebar-state="collapsed"] body #sidebar .logo-text,
+html[data-sidebar-state="collapsed"] body #sidebar .chevron-arrow,
+html[data-sidebar-state="collapsed"] body #sidebar .nav-badge {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Window controls: macOS Traffic Lights */
+html body #sidebar .mac-window-controls {
+  display: flex !important;
+  gap: 7px !important;
+  align-items: center !important;
+  margin-bottom: 12px !important;
+}
+
+html body #sidebar .mac-dot {
+  width: 12px !important;
+  height: 12px !important;
+  min-width: 12px !important;
+  min-height: 12px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  cursor: pointer !important;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease !important;
+}
+
+html body #sidebar .mac-dot:hover {
+  transform: scale(1.18) !important;
+}
+
+html body #sidebar .mac-close {
+  background: #FF5F56 !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.18) !important;
+}
+
+html body #sidebar .mac-minimize {
+  background: #FFBD2E !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.18) !important;
+}
+
+html body #sidebar .mac-maximize {
+  background: #27C93F !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.18) !important;
+}
+
+/* Brand Row: Clean & Premium */
+html body #sidebar .sidebar-brand-row {
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  padding: 4px 2px 10px !important;
+}
+
+html body #sidebar .logo-mark {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 10px !important;
+  background: #0B3B32 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  box-shadow: 0 2px 8px rgba(11, 59, 50, 0.25) !important;
+}
+
+html body #sidebar .logo-brand {
+  font-size: 13.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.02em !important;
+  line-height: 1.2 !important;
+}
+
+html[data-theme="light"] body #sidebar .logo-brand { color: #1C1917 !important; }
+html[data-theme="dark"] body #sidebar .logo-brand { color: #FFFFFF !important; }
+
+html body #sidebar .logo-sub {
+  font-size: 10.5px !important;
+  font-weight: 500 !important;
+  color: #78716C !important;
+}
+
+/* Scroll area: hide scrollbars cleanly */
+html body #sidebar-nav-scroll {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+  overflow-y: auto !important;
+  padding-bottom: 24px !important;
+}
+
+html body #sidebar-nav-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+}
+
+/* ── 29e. TOP RIGHT MORE OPTIONS DROPDOWN FIX ── */
+html body #view-jarvis #jarvis-more-panel.open,
+html body #view-jarvis #jarvis-more-menu.open #jarvis-more-panel {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1) !important;
+  z-index: 10000 !important;
+}
+
+html body #view-jarvis #jarvis-more-panel:not(.open),
+html body #view-jarvis #jarvis-more-panel[hidden]:not(.open) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+html body #view-jarvis #jarvis-more-panel {
+  position: absolute !important;
+  top: calc(100% + 8px) !important;
+  right: 0 !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  min-width: 204px !important;
+  padding: 6px !important;
+  border-radius: 14px !important;
+  z-index: 10000 !important;
+  box-shadow: 0 16px 36px rgba(0, 0, 0, 0.14), 0 0 0 1px rgba(0, 0, 0, 0.06) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  transition: opacity 0.24s cubic-bezier(0.16, 1, 0.3, 1), transform 0.24s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+html body #view-jarvis .jarvis-more-menu,
+html body #view-jarvis .jarvis-hero-actions {
+  position: relative !important;
+  overflow: visible !important;
+}
+
+/* ── 29f. RIGHT SIDE PANEL: OPEN TO THE RIGHT, NOT DOWN BELOW ── */
+@media (min-width: 961px) {
+  html body #view-jarvis.active .jarvis-split-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) 0px !important;
+    transition: grid-template-columns 0.48s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    width: 100% !important;
+    height: 100% !important;
+    overflow: clip !important;
+    position: relative !important;
+  }
+
+  html body #view-jarvis.active:has(.jarvis-side:not(.closed)) .jarvis-split-layout {
+    grid-template-columns: minmax(0, 1fr) 280px !important;
+  }
+
+  html body #view-jarvis.active .jarvis-hero-stage {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    transition: none !important;
+  }
+
+  html body #view-jarvis.active .jarvis-side {
+    position: relative !important;
+    width: 280px !important;
+    max-width: 280px !important;
+    min-width: 280px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    overflow-y: auto !important;
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    transition:
+      transform 0.48s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.32s ease !important;
+    border-left: 1px solid var(--clavis-line, rgba(0,0,0,0.08)) !important;
+  }
+
+  html body #view-jarvis.active .jarvis-side.closed {
+    transform: translateX(0) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    overflow: hidden !important;
+  }
+
+  html body #jarvis-side-backdrop {
+    display: none !important;
+  }
+}
+
+@media (max-width: 960px) {
+  html body #view-jarvis.active .jarvis-side {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: min(340px, 86vw) !important;
+    height: 100vh !important;
+    z-index: 10000 !important;
+    transform: translateX(0) !important;
+    opacity: 1 !important;
+    transition:
+      transform 0.46s cubic-bezier(0.16, 1, 0.3, 1),
+      opacity 0.28s ease !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  html body #view-jarvis.active .jarvis-side.closed {
+    transform: translateX(105%) !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+
+  html body .jarvis-side-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 9999 !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+    transition: opacity 0.28s ease !important;
+    background: rgba(15, 23, 42, 0.45) !important;
+    backdrop-filter: blur(2px) !important;
+  }
+
+  html body .jarvis-side-backdrop.active {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+
+

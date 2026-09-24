@@ -1,0 +1,125 @@
+/* ============================================================
+   DIAGNOSTICS & REPAIR PANEL — diagnostics.css
+   ============================================================ */
+
+.diag-modal { position: fixed; inset: 0; z-index: 100000; display: none; align-items: center; justify-content: center; padding: 20px; }
+.diag-modal.is-open { display: flex; }
+.diag-backdrop { position: absolute; inset: 0; background: rgba(0,0,0,.62); backdrop-filter: blur(6px); }
+
+.diag-card {
+  position: relative; width: 100%; max-width: 660px; max-height: 88vh;
+  display: flex; flex-direction: column;
+  border-radius: 18px; background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 30px 70px -20px rgba(0,0,0,.65);
+  animation: diag-pop .2s cubic-bezier(.16,1,.3,1);
+}
+@keyframes diag-pop { from { opacity: 0; transform: scale(.97) translateY(10px); } to { opacity: 1; transform: none; } }
+
+.diag-head {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 20px 22px 15px; border-bottom: 1px solid var(--border);
+}
+.diag-head h3 { margin: 0; font-size: 17px; font-weight: 800; color: var(--foreground); }
+.diag-sub { margin: 4px 0 0; font-size: 12.5px; color: var(--gray-400); line-height: 1.5; }
+.diag-close {
+  margin-left: auto; background: transparent; border: 0; cursor: pointer;
+  color: var(--gray-400); font-size: 17px; padding: 4px 8px; border-radius: 8px; font-family: inherit;
+}
+.diag-close:hover { color: var(--foreground); background: rgba(148,163,184,.12); }
+
+.diag-body { flex: 1; overflow-y: auto; padding: 18px 22px; }
+
+.diag-foot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 14px 22px; border-top: 1px solid var(--border);
+}
+.diag-foot-note { font-size: 11.5px; color: var(--gray-400); }
+.diag-foot-actions { display: flex; gap: 8px; }
+
+/* ── Progress ───────────────────────────────────────────── */
+.diag-progress { display: flex; align-items: center; gap: 14px; padding: 22px 0 16px; }
+.diag-spinner {
+  width: 26px; height: 26px; flex-shrink: 0; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--primary);
+  animation: diag-spin .8s linear infinite;
+}
+@keyframes diag-spin { to { transform: rotate(360deg); } }
+.diag-progress-title { font-size: 13.5px; font-weight: 600; color: var(--foreground); }
+.diag-progress-count { margin-top: 3px; font-size: 12px; color: var(--gray-400); }
+
+.diag-bar { height: 5px; border-radius: 99px; background: var(--border); overflow: hidden; }
+.diag-bar-fill { height: 100%; background: var(--primary); border-radius: 99px; transition: width .25s ease; }
+
+/* ── Headline ───────────────────────────────────────────── */
+.diag-headline { padding: 14px 16px; border-radius: 13px; margin-bottom: 18px; border: 1px solid transparent; }
+.diag-headline-text { font-size: 15px; font-weight: 800; }
+.diag-headline-meta { margin-top: 3px; font-size: 12.5px; opacity: .85; }
+.diag-headline--good { background: rgba(16,185,129,.10); border-color: rgba(16,185,129,.28); color: #34d399; }
+.diag-headline--warn { background: rgba(245,158,11,.10); border-color: rgba(245,158,11,.28); color: #fbbf24; }
+.diag-headline--bad  { background: rgba(239,68,68,.10);  border-color: rgba(239,68,68,.28);  color: #f87171; }
+
+/* ── Sections ───────────────────────────────────────────── */
+.diag-section { margin-bottom: 20px; }
+.diag-section-title {
+  margin: 0 0 9px; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--gray-400);
+  display: flex; align-items: center; gap: 7px;
+}
+.diag-section-title span {
+  padding: 1px 7px; border-radius: 99px; font-size: 10.5px;
+  background: rgba(148,163,184,.16); color: var(--gray-400);
+}
+
+/* ── Rows ───────────────────────────────────────────────── */
+.diag-row {
+  display: flex; gap: 11px; padding: 12px 13px; border-radius: 11px;
+  border: 1px solid var(--border); margin-bottom: 8px;
+  background: rgba(148,163,184,.04);
+}
+.diag-row--failed { border-color: rgba(239,68,68,.25); background: rgba(239,68,68,.05); }
+.diag-row--fixed  { border-color: rgba(16,185,129,.25); background: rgba(16,185,129,.05); }
+
+.diag-icon {
+  flex-shrink: 0; width: 21px; height: 21px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; color: #fff;
+}
+.diag-icon--ok     { background: #10b981; }
+.diag-icon--fixed  { background: transparent; font-size: 14px; }
+.diag-icon--failed { background: #ef4444; }
+
+.diag-row-main { flex: 1; min-width: 0; }
+.diag-row-title {
+  display: flex; align-items: center; gap: 7px; flex-wrap: wrap;
+  font-size: 13px; font-weight: 700; color: var(--foreground);
+}
+.diag-tag {
+  padding: 2px 7px; border-radius: 5px; font-size: 10px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .04em;
+}
+.diag-tag--ok     { background: rgba(16,185,129,.16); color: #34d399; }
+.diag-tag--fixed  { background: rgba(16,185,129,.20); color: #34d399; }
+.diag-tag--failed { background: rgba(239,68,68,.16);  color: #f87171; }
+.diag-cat { font-size: 10.5px; color: var(--gray-400); font-weight: 600; }
+
+.diag-row-msg { margin-top: 4px; font-size: 12.5px; line-height: 1.55; color: var(--gray-400); }
+.diag-row-fix { margin-top: 6px; font-size: 12.5px; line-height: 1.5; color: #34d399; font-weight: 600; }
+.diag-row-warn { margin-top: 6px; font-size: 12.5px; line-height: 1.5; color: #fbbf24; }
+.diag-row-guide {
+  margin-top: 7px; padding: 8px 11px; border-radius: 8px;
+  background: rgba(99,102,241,.08); border: 1px solid rgba(99,102,241,.18);
+  font-size: 12px; line-height: 1.55; color: var(--foreground);
+}
+.diag-row-manual { margin-top: 6px; font-size: 11.5px; color: var(--gray-400); font-style: italic; }
+
+@media (prefers-reduced-motion: reduce) {
+  .diag-card { animation: none; }
+  .diag-spinner { animation-duration: 2.4s; }
+  .diag-bar-fill { transition: none; }
+}
+
+@media (max-width: 640px) {
+  .diag-body { padding: 15px; }
+  .diag-foot { flex-direction: column; align-items: stretch; }
+}

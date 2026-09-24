@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Voice Orb</title>
+<style>
+  :root {
+    --bg-color: #0a0a0f;
+  }
+  body, html {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: var(--bg-color);
+    /* Vignette effect */
+    background: radial-gradient(circle at center, #1a1a24 0%, var(--bg-color) 100%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+    user-select: none;
+  }
+  #orb-container {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  canvas {
+    cursor: pointer;
+    /* Subtle outer glow applied to canvas container */
+    filter: drop-shadow(0 0 20px rgba(59, 130, 246, 0.2));
+    transition: filter 0.5s cubic-bezier(0.23, 1, 0.32, 1);
+  }
+  #status-text {
+    position: absolute;
+    bottom: 20px;
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    pointer-events: none;
+    transition: color 0.3s ease, opacity 0.3s ease;
+  }
+</style>
+</head>
+<body>
+
+<div id="orb-container">
+  <canvas id="orbCanvas"></canvas>
+  <div id="status-text">Tap to speak</div>
+</div>
+
+<script>
+/**
+ * AI Voice Orb - Ultra Premium Particle System
+ * Includes Fibonacci Sphere distribution, 3D projection, and Web Audio API integration
+ */
+
+// Utility Functions
+const lerp = (start, end, amt) => (1 - amt) * start + amt * end;
+const easeOutCubic = x => 1 - Math.pow(1 - x, 3);
+// Simple noise function replacement for organic jitter
+const noise = (t) => Math.sin(t * 1.3) * Math.cos(t * 1.7) * Math.sin(t * 0.5);
+
+class AudioAnalyzer {
+  constructor() {
+    this.ctx = null;
+    this.analyser = null;
+    this.source = null;
+    this.dataArray = null;
+    this.timeData = null;
+    this.listening = false;
+    
+    // Smoothed values
+    this.volume = 0;
+    this.pitch = 0;
+    this.targetVolume = 0;
+    this.targetPitch = 0;
+  }
+
+  async init() {
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      this.ctx = new AudioContextClass();
+      this.analyser = this.ctx.createAnalyser();
+      this.analyser.fftSize = 2048;
+      
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+      this.source = this.ctx.createMediaStreamSource(stream);
+      this.source.connect(this.analyser);
+      
+      this.dataArray = new Uint8Array(this.analyser.frequencyBinCount);
+      this.timeData = new Float32Array(this.analyser.fftSize);
+      
+      this.listening = true;
+      return true;
+    } catch (err) {
+      console.warn('Microphone access denied:', err);
+      return false;
+    }
+  }
+
+  update() {
+    if (!this.listening) {
+      // Demo mode fluctuation
+      const t = performance.now() * 0.001;
+      this.targetVolume = (Math.sin(t * 2) + 1) * 0.15; // fake volume
+      this.targetPitch = 400 + Math.sin(t * 0.5) * 200; // fake pitch
+    } else {
+      // Real Audio Analysis
+      this.analyser.getByteFrequencyData(this.dataArray);
+      this.analyser.getFloatTimeDomainData(this.timeData);
+      
+      // Calculate RMS Volume
+      let sumSquares = 0;
+      for (let i = 0; i < this.timeData.length; i++) {
+        sumSquares += this.timeData[i] * this.timeData[i];
+      }
+      const rms = Math.sqrt(sumSquares / this.timeData.length);
+      this.targetVolume = Math.min(1.0, rms * 5.0); // scale up for visual impact
+
+      // Pitch detection using Autocorrelation
+      this.targetPitch = this.autoCorrelate(this.timeData, this.ctx.sampleRate);
+      if (this.targetPitch === -1) this.targetPitch = 0;
+    }
+
+    // Exponential moving average for buttery smooth transitions
+    const alpha = 0.15;
+    this.volume = lerp(this.volume, this.targetVolume, alpha);
+    this.pitch = lerp(this.pitch, this.targetPitch, alpha);
+  }
+
+  // Basic Autocorrelation for pitch detection
+  autoCorrelate(buf, sampleRate) {
+    let SIZE = buf.length;
+    let rms = 0;
+    for (let i=0; i<SIZE; i++) {
+      let val = buf[i];
+      rms += val * val;
+    }
+    rms = Math.sqrt(rms / SIZE);
+    if (rms < 0.01) return -1;
+
+    let r1 = 0, r2 = SIZE - 1, thres = 0.2;
+    for (let i=0; i<SIZE/2; i++)
+      if (Math.abs(buf[i]) < thres) { r1 = i; break; }
+    for (let i=1; i<SIZE/2; i++)
+      if (Math.abs(buf[SIZE-i]) < thres) { r2 = SIZE-i; break; }
+
+    buf = buf.slice(r1, r2);
+    SIZE = buf.length;
+
+    let c = new Array(SIZE).fill(0);
+    for (let i=0; i<SIZE; i++)
+      for (let j=0; j<SIZE-i; j++)
+        c[i] = c[i] + buf[j] * buf[j+i];
+
+    let d = 0;
+    while (c[d] > c[d+1]) d++;
+    let maxval = -1, maxpos = -1;
+    for (let i=d; i<SIZE; i++) {
+      if (c[i] > maxval) { maxval = c[i]; maxpos = i; }
+    }
+    let T0 = maxpos;
+    let x1 = c[T0-1], x2 = c[T0], x3 = c[T0+1];
+    let a = (x1 + x3 - 2*x2) / 2;
+    let b = (x3 - x1) / 2;
+    if (a) T0 = T0 - b/(2*a);
+
+    return sampleRate / T0;
+  }
+}
+
+class Particle {
+  constructor(index, total) {
+    // Fibonacci sphere distribution
+    const phi = Math.acos(1 - 2 * (index + 0.5) / total);
+    const theta = Math.PI * (1 + Math.sqrt(5)) * index;
+    
+    // Base 3D coordinates on unit sphere
+    this.baseX = Math.cos(theta) * Math.sin(phi);
+    this.baseY = Math.cos(phi);
+    this.baseZ = Math.sin(theta) * Math.sin(phi);
+    
+    // Current 3D coordinates
+    this.x = this.baseX;
+    this.y = this.baseY;
+    this.z = this.baseZ;
+    
+    // Individual particle properties
+    this.size = 1.0 + Math.random();
+    this.randomOffset = Math.random() * Math.PI * 2;
+    this.noiseSpeed = 0.002 + Math.random() * 0.003;
+    this.colorOffset = Math.random(); // To add slight color variation
+  }
+}
+
+class Orb {
+  constructor(canvas) {
+    this.canvas = canvas;
+    this.ctx = canvas.getContext('2d', { alpha: true, desynchronized: true });
+    
+    this.particles = [];
+    this.numParticles = 700;
+    this.baseRadius = 60; // 120px diameter
+    this.radius = this.baseRadius;
+    this.targetRadius = this.baseRadius;
+    
+    // Rotation state
+    this.rotationY = 0;
+    this.rotationX = 0;
+    
+    // States: IDLE, LISTENING, THINKING, SPEAKING
+    this.state = 'IDLE'; 
+    this.stateBlend = 0; // 0 to 1 for smooth state transitions
+    
+    // Mouse Interaction
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.isHovered = false;
+    
+    this.init();
+    this.bindEvents();
+  }
+
+  init() {
+    // Generate particles
+    for (let i = 0; i < this.numParticles; i++) {
+      this.particles.push(new Particle(i, this.numParticles));
+    }
+  }
+
+  resize(width, height) {
+    const dpr = window.devicePixelRatio || 1;
+    this.canvas.width = width * dpr;
+    this.canvas.height = height * dpr;
+    this.canvas.style.width = width + 'px';
+    this.canvas.style.height = height + 'px';
+    this.ctx.scale(dpr, dpr);
+    this.width = width;
+    this.height = height;
+    this.centerX = width / 2;
+    this.centerY = height / 2;
+  }
+
+  bindEvents() {
+    this.canvas.addEventListener('mousemove', (e) => {
+      const rect = this.canvas.getBoundingClientRect();
+      this.mouseX = e.clientX - rect.left - this.centerX;
+      this.mouseY = e.clientY - rect.top - this.centerY;
+    });
+    this.canvas.addEventListener('mouseenter', () => this.isHovered = true);
+    this.canvas.addEventListener('mouseleave', () => this.isHovered = false);
+  }
+
+  update(time, audio) {
+    // 1. Determine State
+    if (audio.listening) {
+      if (audio.volume > 0.02) this.state = 'LISTENING';
+      else this.state = 'IDLE';
+    } else {
+      this.state = 'IDLE';
+    }
+
+    // 2. Physics & Spring logic for Scale
+    let scaleTarget = 1.0;
+    
+    // Idle breathing
+    const idlePulse = Math.sin(time * 0.002) * 0.02;
+    scaleTarget += idlePulse;
+
+    // Hover scale
+    if (this.isHovered) scaleTarget += 0.05;
+
+    // Audio volume scale expansion (up to 1.4x)
+    if (this.state === 'LISTENING') {
+      scaleTarget += (audio.volume * 0.4);
+    }
+
+    // Apply spring physics to target radius
+    const targetR = this.baseRadius * scaleTarget;
+    this.radius = lerp(this.radius, targetR, 0.1); // Damping
+
+    // 3. Update Rotation
+    // Continuous Y-axis rotation
+    let rotSpeed = 0.003;
+    if (this.state === 'LISTENING') rotSpeed += (audio.volume * 0.02);
+    this.rotationY += rotSpeed;
+    
+    // Subtle X-axis wobble
+    this.rotationX = Math.sin(time * 0.001) * 0.1;
+
+    // Hover tilt
+    if (this.isHovered) {
+      this.rotationY += this.mouseX * 0.0001;
+      this.rotationX -= this.mouseY * 0.0001;
+    }
+  }
+
+  draw(time, audio) {
+    this.ctx.clearRect(0, 0, this.width, this.height);
+    
+    // Calculate color based on Pitch and Volume
+    // Pitch: low(100Hz) -> high(1000Hz)
+    // Low: Purple/Blue, High: Cyan/White
+    let hueOffset = 0;
+    let lightness = 50;
+    
+    if (this.state === 'LISTENING') {
+      const normalizedPitch = Math.min(Math.max((audio.pitch - 100) / 900, 0), 1);
+      hueOffset = lerp(0, -60, normalizedPitch); // Shift towards cyan
+      lightness = lerp(50, 70, audio.volume); // Brighter on volume
+    }
+
+    // Sort particles by Z-index for correct depth rendering (painter's algorithm)
+    const projected = [];
+    const cosY = Math.cos(this.rotationY);
+    const sinY = Math.sin(this.rotationY);
+    const cosX = Math.cos(this.rotationX);
+    const sinX = Math.sin(this.rotationX);
+
+    for (let i = 0; i < this.numParticles; i++) {
+      const p = this.particles[i];
+      
+      // Organic micro-jitter
+      const n = noise(time * p.noiseSpeed + p.randomOffset);
+      const jx = p.baseX + n * 0.05;
+      const jy = p.baseY + n * 0.05;
+      const jz = p.baseZ + n * 0.05;
+
+      // Audio ripple effect on volume spikes
+      let expansion = 1.0;
+      if (this.state === 'LISTENING' && audio.volume > 0.1) {
+        // Create ripples based on particle's Y position
+        const ripple = Math.sin(p.baseY * 10 - time * 0.01) * audio.volume * 0.2;
+        expansion += Math.max(0, ripple);
+      }
+
+      const x = jx * expansion;
+      const y = jy * expansion;
+      const z = jz * expansion;
+
+      // Rotate Y
+      const x1 = x * cosY - z * sinY;
+      const z1 = z * cosY + x * sinY;
+      
+      // Rotate X
+      const y2 = y * cosX - z1 * sinX;
+      const z2 = z1 * cosX + y * sinX;
+
+      projected.push({
+        p: p,
+        x: x1,
+        y: y2,
+        z: z2
+      });
+    }
+
+    // Sort by Z (back to front)
+    projected.sort((a, b) => a.z - b.z);
+
+    // Draw Particles
+    for (let i = 0; i < projected.length; i++) {
+      const proj = projected[i];
+      
+      // Map Z from [-1, 1] to screen parameters
+      // Z=-1 is back, Z=1 is front
+      const screenX = this.centerX + proj.x * this.radius;
+      const screenY = this.centerY + proj.y * this.radius;
+      
+      // Depth-based Opacity and Size (Parallax feel)
+      const depth = (proj.z + 1) / 2; // 0 to 1
+      const opacity = lerp(0.15, 1.0, depth);
+      const size = proj.p.size * lerp(0.5, 1.5, depth) * (this.radius / this.baseRadius);
+
+      // Mouse gravity
+      let finalX = screenX;
+      let finalY = screenY;
+      if (this.isHovered) {
+        const dx = screenX - (this.centerX + this.mouseX);
+        const dy = screenY - (this.centerY + this.mouseY);
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 50) {
+          const pull = (50 - dist) * 0.1;
+          finalX += (dx / dist) * pull;
+          finalY += (dy / dist) * pull;
+        }
+      }
+
+      // Color selection
+      // Base electric blue HSL(217, 90%, 60%)
+      const h = 217 + hueOffset + (proj.p.colorOffset * 10 - 5);
+      const s = 90;
+      const l = lightness + (depth * 10);
+      
+      this.ctx.fillStyle = `hsla(${h}, ${s}%, ${l}%, ${opacity})`;
+      this.ctx.beginPath();
+      this.ctx.arc(finalX, finalY, size, 0, Math.PI * 2);
+      this.ctx.fill();
+    }
+    
+    // Draw subtle bloom halo when loud
+    if (this.state === 'LISTENING' && audio.volume > 0.3) {
+      const bloomRadius = this.radius * (1 + audio.volume * 0.5);
+      const grad = this.ctx.createRadialGradient(this.centerX, this.centerY, this.radius * 0.8, this.centerX, this.centerY, bloomRadius);
+      grad.addColorStop(0, `hsla(190, 100%, 60%, ${audio.volume * 0.2})`);
+      grad.addColorStop(1, `hsla(190, 100%, 60%, 0)`);
+      
+      this.ctx.globalCompositeOperation = 'screen';
+      this.ctx.fillStyle = grad;
+      this.ctx.beginPath();
+      this.ctx.arc(this.centerX, this.centerY, bloomRadius, 0, Math.PI * 2);
+      this.ctx.fill();
+      this.ctx.globalCompositeOperation = 'source-over';
+    }
+  }
+}
+
+class App {
+  constructor() {
+    this.canvas = document.getElementById('orbCanvas');
+    this.statusText = document.getElementById('status-text');
+    this.orb = new Orb(this.canvas);
+    this.audio = new AudioAnalyzer();
+    
+    this.resize();
+    window.addEventListener('resize', () => this.resize());
+    
+    this.bindEvents();
+    
+    this.lastTime = performance.now();
+    requestAnimationFrame((t) => this.loop(t));
+  }
+
+  resize() {
+    const container = document.getElementById('orb-container');
+    const width = container.clientWidth;
+    const height = container.clientHeight;
+    this.orb.resize(width, height);
+  }
+
+  bindEvents() {
+    this.canvas.addEventListener('click', async () => {
+      if (!this.audio.listening) {
+        this.statusText.textContent = 'Requesting mic...';
+        const success = await this.audio.init();
+        if (success) {
+          this.statusText.textContent = 'Listening...';
+          this.statusText.style.color = '#3b82f6';
+        } else {
+          this.statusText.textContent = 'Mic denied - Demo mode';
+          this.statusText.style.color = '#ef4444';
+        }
+      } else {
+        // Toggle off (not fully implemented in AudioContext teardown for simplicity, just UI state)
+        this.statusText.textContent = 'Tap to speak';
+        this.statusText.style.color = 'rgba(255, 255, 255, 0.5)';
+      }
+    });
+  }
+
+  loop(time) {
+    // Delta time calculation (though not strictly needed for time-based trig functions)
+    const dt = (time - this.lastTime) / 1000;
+    this.lastTime = time;
+
+    this.audio.update();
+    this.orb.update(time, this.audio);
+    this.orb.draw(time, this.audio);
+
+    requestAnimationFrame((t) => this.loop(t));
+  }
+}
+
+// Initialize App
+document.addEventListener('DOMContentLoaded', () => {
+  window.app = new App();
+});
+
+</script>
+</body>
+</html>

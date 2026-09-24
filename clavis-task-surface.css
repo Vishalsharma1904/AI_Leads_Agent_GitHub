@@ -1,0 +1,2381 @@
+/* ============================================================
+   clavis-task-surface.css
+   The intent-adaptive floating task surface.
+   Replaces the fixed agent-pipeline popover.
+
+   Everything that moves is transform / opacity, except the panel's
+   own height — and the panel is `contain: layout paint style`, so
+   that height change is isolated from the page behind it.
+   ============================================================ */
+
+.cts {
+  /* tokens are local so the surface survives theme files changing */
+  --cts-panel:  #FFFFFF;
+  --cts-line:   #E7E4DC;
+  --cts-line-2: #F1EEE7;
+  --cts-text:   #1A1917;
+  --cts-mute:   #6B6862;
+  --cts-faint:  #9C9890;
+  --cts-accent: #1A1917;
+  --cts-ok:     #5F7F5A;
+  --cts-err:    #B4544A;
+  --cts-sans:   "Figtree", "Plus Jakarta Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --cts-serif:  "Cormorant Garamond", "Instrument Serif", Georgia, serif;
+  --cts-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --cts-spring-slow: cubic-bezier(0.25, 1, 0.35, 1);
+  --cts-out:    cubic-bezier(0.2, 0, 0, 1);
+
+  position: fixed !important;
+  top: 76px;
+  right: 24px;
+  z-index: 9995;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  /* Grows down, not sideways: a long answer gets height up to most of
+     the window, while the measure stays narrow enough to read. */
+  max-height: min(78vh, calc(100vh - 100px));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-sizing: border-box;
+
+  background: var(--cts-panel) !important;
+  color: var(--cts-text);
+  font-family: var(--cts-sans);
+  border: 1px solid var(--cts-line);
+  border-radius: 18px;
+
+  /* Enhanced, deep, soft, high-fidelity luxury shadow */
+  box-shadow:
+    0 0 0 0.5px rgba(23, 21, 18, 0.05),
+    0 2px 5px rgba(23, 21, 18, 0.04),
+    0 12px 28px -6px rgba(23, 21, 18, 0.16),
+    0 32px 64px -12px rgba(23, 21, 18, 0.24),
+    0 64px 110px -30px rgba(23, 21, 18, 0.28);
+
+  contain: layout paint style;
+  will-change: transform, opacity, height, width, border-radius;
+  transform: translateY(10px) scale(0.97);
+  transform-origin: top right;
+  opacity: 0;
+  pointer-events: none !important;
+  visibility: hidden !important;
+
+  transition:
+    opacity 360ms var(--cts-out),
+    transform 820ms var(--cts-spring),
+    height 840ms var(--cts-spring),
+    width 800ms var(--cts-spring),
+    border-radius 760ms var(--cts-spring),
+    box-shadow 600ms var(--cts-out);
+}
+.cts.is-open {
+  opacity: 1 !important;
+  transform: translateY(0) scale(1) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+}
+
+/* Apple/Plot Capsule-to-Card Reveal Animation:
+   Starts as a sleek top pill/capsule, then smoothly and gracefully expands downwards into full card */
+.cts.is-revealing {
+  animation: cts-capsule-reveal 800ms var(--cts-spring) forwards;
+  will-change: transform, opacity, border-radius, clip-path;
+}
+
+@keyframes cts-capsule-reveal {
+  0% {
+    opacity: 0;
+    transform: translateY(-12px) scale(0.95);
+    border-radius: 9999px;
+    clip-path: inset(0 0 calc(100% - 40px) 0 round 9999px);
+  }
+  24% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+    border-radius: 9999px;
+    clip-path: inset(0 0 calc(100% - 40px) 0 round 9999px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    border-radius: 18px;
+    clip-path: inset(0 0 0 0 round 18px);
+  }
+}
+
+/* ── Dark theme overrides ─────────────────────────────────── */
+html[data-theme="dark"] .cts {
+  --cts-panel:  #17171A;
+  --cts-line:   rgba(255, 255, 255, 0.11);
+  --cts-line-2: rgba(255, 255, 255, 0.07);
+  --cts-text:   #F4F4F6;
+  --cts-mute:   #A1A1AA;
+  --cts-faint:  #71717A;
+  --cts-accent: #FFFFFF;
+  --cts-ok:     #34C759;
+  --cts-err:    #FF6B6B;
+  border-color: rgba(255, 255, 255, 0.11) !important;
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 4px 12px rgba(0, 0, 0, 0.5),
+    0 18px 42px -8px rgba(0, 0, 0, 0.75),
+    0 40px 80px -14px rgba(0, 0, 0, 0.85),
+    0 72px 130px -24px rgba(0, 0, 0, 0.9) !important;
+}.cts:not(.is-open),
+#clavis-task-surface:not(.is-open) {
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+}
+.cts:not(.is-open) *,
+#clavis-task-surface:not(.is-open) * {
+  pointer-events: none !important;
+  visibility: hidden !important;
+  cursor: default !important;
+}
+.cts.is-moved { right: auto; }
+.cts.is-dragging {
+  transition: none !important;
+  box-shadow:
+    0 0 0 0.5px rgba(23, 21, 18, 0.05),
+    0 16px 30px -12px rgba(23, 21, 18, 0.18),
+    0 44px 80px -28px rgba(23, 21, 18, 0.3),
+    0 80px 130px -50px rgba(23, 21, 18, 0.28);
+}
+
+html[data-theme="dark"] .cts {
+  --cts-panel:  #1A1A18;
+  --cts-line:   #2E2D29;
+  --cts-line-2: #242320;
+  --cts-text:   #ECEAE4;
+  --cts-mute:   #9A968E;
+  --cts-faint:  #6E6B65;
+  --cts-accent: #ECEAE4;
+  --cts-ok:     #85A37F;
+  --cts-err:    #D2695C;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.05),
+    0 10px 22px -10px rgba(0, 0, 0, 0.6),
+    0 30px 60px -22px rgba(0, 0, 0, 0.7),
+    0 64px 110px -46px rgba(0, 0, 0, 0.6);
+}
+
+/* ── Header ─────────────────────────────────────────────────
+   Also the drag handle. Deliberately near-empty: the task title
+   lives in the body where it can wrap. */
+.cts-head {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 8px 9px 12px;
+  border-bottom: 1px solid var(--cts-line-2);
+  cursor: grab; user-select: none; touch-action: none;
+  flex: 0 0 auto;
+}
+.cts-head:active { cursor: grabbing; }
+.cts-head-label {
+  flex: 1;
+  font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.07em; text-transform: uppercase;
+  color: var(--cts-mute);
+}
+.cts-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--cts-faint);
+  flex: 0 0 auto;
+  transition: background-color 260ms var(--cts-out);
+}
+.cts[data-phase="working"] .cts-dot,
+.cts[data-phase="understanding"] .cts-dot { background: var(--cts-accent); animation: cts-breathe 2s ease-in-out infinite; }
+.cts[data-phase="waiting"] .cts-dot   { background: var(--cts-accent); }
+.cts[data-phase="completed"] .cts-dot { background: var(--cts-ok); }
+.cts[data-phase="failed"] .cts-dot    { background: var(--cts-err); }
+@keyframes cts-breathe { 0%, 100% { opacity: 1 } 50% { opacity: 0.35 } }
+
+.cts-x {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: transparent; border: 0; border-radius: 6px;
+  color: var(--cts-faint); cursor: pointer; padding: 0;
+  transition: background-color 130ms var(--cts-out), color 130ms var(--cts-out);
+}
+.cts-x:hover { background: var(--cts-line-2); color: var(--cts-text); }
+
+/* ── Body ───────────────────────────────────────────────────
+   The only element that swaps content, so the only one that
+   needs an entrance. */
+.cts-body {
+  padding: 13px 14px 14px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cts-line) transparent;
+}
+.cts-body::-webkit-scrollbar { width: 7px; }
+.cts-body::-webkit-scrollbar-thumb { background: var(--cts-line); border-radius: 4px; }
+.cts-body::-webkit-scrollbar-track { background: transparent; }
+.cts-body.cts-enter { animation: cts-in 280ms var(--cts-spring) both; }
+/* Tells you there is more below without adding a scrollbar chrome. */
+.cts-body.is-scrollable {
+  /* Keep the scroll affordance structural and quiet; no decorative fades. */
+  border-bottom: 1px solid var(--cts-line-2);
+}
+@keyframes cts-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.cts-title {
+  margin: 0;
+  font-family: var(--cts-serif);
+  font-size: 17px; font-weight: 400;
+  line-height: 1.25; letter-spacing: -0.006em;
+  color: var(--cts-text);
+}
+.cts[data-density="expanded"] .cts-title { font-size: 19px; }
+
+/* The live activity line. One line, replaced in place — the shimmer
+   is a masked gradient on the text itself, so it costs no layout. */
+.cts-live {
+  margin: 7px 0 0;
+  font-size: 12.5px; line-height: 1.45;
+  color: var(--cts-mute);
+}
+.cts[data-phase="working"] .cts-live-text,
+.cts[data-phase="understanding"] .cts-live-text {
+  color: var(--cts-text);
+  opacity: 0.82;
+}
+
+.cts-result { margin-top: 9px; }
+.cts-summary {
+  margin: 0 0 9px;
+  font-size: 12.5px; line-height: 1.62;
+  color: var(--cts-text);
+  filter: none;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overflow-wrap: anywhere;      /* long urls must not widen the panel */
+}
+.cts-result > :last-child { margin-bottom: 0; }
+.cts-list {
+  margin: 0 0 9px; padding: 0; list-style: none;
+  font-size: 12.5px; line-height: 1.62; color: var(--cts-mute);
+}
+.cts-list li { position: relative; padding-left: 14px; margin-bottom: 4px; }
+.cts-list li::before {
+  content: ""; position: absolute; left: 3px; top: 0.62em;
+  width: 3px; height: 3px; border-radius: 50%; background: var(--cts-faint);
+}
+.cts-result strong { color: var(--cts-text); font-weight: 550; }
+.cts-result code {
+  font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  font-size: 0.92em; padding: 1px 4px; border-radius: 4px;
+  background: var(--cts-line-2); color: var(--cts-text);
+}
+
+/* A hairline above the counts, so the numbers read as a footer to the
+   answer rather than another paragraph. */
+.cts-result + .cts-stats {
+  margin-top: 12px; padding-top: 11px;
+  border-top: 1px solid var(--cts-line-2);
+}
+.cts-note {
+  margin: 7px 0 0;
+  font-size: 12px; line-height: 1.5;
+  color: var(--cts-faint);
+}
+
+/* Counts. Only ever real numbers the engine reported. */
+.cts-stats {
+  display: flex; flex-wrap: wrap; gap: 16px;
+  margin: 11px 0 0; padding: 0;
+}
+.cts-stats div { margin: 0; }
+.cts-stats dt {
+  font-size: 9.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--cts-faint);
+}
+.cts-stats dd {
+  margin: 2px 0 0;
+  font-size: 15px; font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--cts-text);
+}
+
+/* Progress. Determinate only when the engine gives a number;
+   otherwise a travelling hairline that promises nothing. */
+.cts-meter {
+  position: relative;
+  height: 2px; margin-top: 12px;
+  background: var(--cts-line-2);
+  border-radius: 2px; overflow: hidden;
+}
+.cts-meter > i {
+  display: block; height: 100%;
+  background: var(--cts-accent); border-radius: 2px;
+  transition: width 400ms var(--cts-spring);
+}
+.cts-meter-idle > i {
+  width: 38%;
+  animation: cts-slide 1.9s var(--cts-out) infinite;
+}
+@keyframes cts-slide {
+  0%   { transform: translateX(-105%); }
+  100% { transform: translateX(305%); }
+}
+
+/* ── Footer actions ─────────────────────────────────────────── */
+.cts-foot {
+  display: flex; align-items: center; justify-content: flex-end; gap: 8px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--cts-line-2);
+  flex: 0 0 auto;
+}
+.cts-act {
+  font-family: var(--cts-sans);
+  font-size: 12px; font-weight: 500;
+  padding: 5px 11px;
+  border-radius: 7px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--cts-mute);
+  cursor: pointer;
+  transition: background-color 130ms var(--cts-out), color 130ms var(--cts-out), opacity 130ms var(--cts-out);
+}
+.cts-act:hover { background: var(--cts-line-2); color: var(--cts-text); }
+.cts-act.is-primary {
+  background: var(--cts-text); color: var(--cts-panel); border-color: transparent;
+}
+.cts-act.is-primary:hover { opacity: 0.85; background: var(--cts-text); color: var(--cts-panel); }
+
+/* ── Reduced motion: keep the information, drop the movement ── */
+@media (prefers-reduced-motion: reduce) {
+  .cts { transition: opacity 120ms linear; transform: none !important; }
+  .cts-body.cts-enter { animation: none; }
+  .cts-live-text { animation: none !important; color: var(--cts-mute) !important; background: none !important; }
+  .cts-meter-idle > i { animation: none; width: 100%; opacity: 0.35; }
+  .cts[data-phase] .cts-dot { animation: none; }
+}
+
+/* Narrow windows: sit above the composer, full-bleed but inset. */
+@media (max-width: 900px) {
+  .cts { left: 12px; right: 12px; width: auto !important; max-height: 46vh; }
+  .cts.is-moved { left: 12px; right: 12px; top: auto; }
+}
+
+/* The retired agent-pipeline popover: belt and braces, in case a cached
+   page still carries its markup. */
+.clavis-sneak-peek-window,
+.clavis-sneak-peek-overlay { display: none !important; }
+
+/* ============================================================
+   EMBEDDED BOTTOM COMPOSER (.cts-composer)
+   Sits inside .cts at the very bottom.
+   Matches exact fill, color, typography, and border of .cts.
+   Solid theme-based (NOT transparent). Moves seamlessly with window.
+   ============================================================ */
+.cts-composer {
+  flex: 0 0 auto;
+  background: var(--cts-panel) !important;
+  border-top: 1px solid var(--cts-line-2);
+  padding: 8px 10px 9px 12px;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  position: relative;
+  z-index: 5;
+  transition: border-color 180ms ease, background-color 180ms ease;
+}
+
+.cts-composer-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.cts-composer.is-multiline .cts-composer-row {
+  align-items: flex-end;
+}
+
+.cts-composer-icon {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cts-mute);
+  opacity: 0.85;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms ease, background-color 180ms ease, opacity 180ms ease;
+}
+
+.cts-composer:hover .cts-composer-icon,
+.cts-composer-icon:hover {
+  opacity: 1;
+  color: var(--cts-text);
+  background: rgba(0, 0, 0, 0.05);
+  transform: scale(1.08);
+}
+
+html[data-theme="dark"] .cts-composer:hover .cts-composer-icon,
+html[data-theme="dark"] .cts-composer-icon:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Quick Actions popover in composer */
+.cts-composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 8px 0 10px 0;
+  animation: cts-fade-up 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cts-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 11.5px;
+  font-weight: 500;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.04);
+  color: var(--cts-text);
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  user-select: none;
+  transition: all 140ms ease;
+}
+
+.cts-action-pill:hover {
+  background: rgba(0, 0, 0, 0.06);
+  border-color: rgba(0, 0, 0, 0.16);
+  color: var(--cts-text);
+  transform: translateY(-1px);
+}
+
+html[data-theme="dark"] .cts-action-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+html[data-theme="dark"] .cts-action-pill:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.22);
+  color: var(--cts-text);
+  transform: translateY(-1px);
+}
+
+/* ── Attachments Tray (Plot-grade Animated Chips) ──────── */
+.cts-composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0 8px 0;
+  max-height: 150px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  transition: max-height 520ms var(--cts-spring), opacity 380ms ease, padding 380ms ease;
+  scrollbar-width: thin;
+}
+
+.cts-composer-attachments[hidden] {
+  display: none !important;
+}
+
+.cts-attach-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 9px 5px 6px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.82);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--cts-line);
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  max-width: 100%;
+  box-sizing: border-box;
+  animation: cts-chip-enter 520ms var(--cts-spring) both;
+  transition: transform 240ms var(--cts-spring), border-color 220ms ease, box-shadow 220ms ease;
+  position: relative;
+  overflow: hidden;
+}
+
+html[data-theme="dark"] .cts-attach-chip {
+  background: rgba(36, 35, 32, 0.85);
+  border-color: var(--cts-line);
+  box-shadow: 0 2px 10px -2px rgba(0, 0, 0, 0.4), 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.cts-attach-chip:hover {
+  border-color: var(--cts-faint);
+  box-shadow: 0 4px 14px -3px rgba(0, 0, 0, 0.09);
+  transform: translateY(-1px);
+}
+
+html[data-theme="dark"] .cts-attach-chip:hover {
+  box-shadow: 0 4px 16px -3px rgba(0, 0, 0, 0.5);
+}
+
+/* Scanner beam pulse upon paste: futuristic subtle light sweep */
+.cts-attach-chip::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -120%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.45) 50%,
+    transparent 100%
+  );
+  pointer-events: none;
+  animation: cts-scanner-sweep 950ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+html[data-theme="dark"] .cts-attach-chip::after {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.18) 50%,
+    transparent 100%
+  );
+}
+
+@keyframes cts-scanner-sweep {
+  0% { left: -120%; opacity: 0; }
+  20% { opacity: 1; }
+  100% { left: 160%; opacity: 0; }
+}
+
+@keyframes cts-chip-enter {
+  0% {
+    opacity: 0;
+    transform: scale(0.86) translateY(12px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.cts-attach-chip.is-leaving {
+  animation: cts-chip-leave 260ms var(--cts-out) forwards !important;
+}
+
+@keyframes cts-chip-leave {
+  0% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    max-width: 260px;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.82) translateY(-8px);
+    max-width: 0;
+    padding: 0;
+    margin: 0;
+    border-width: 0;
+  }
+}
+
+.cts-attach-thumb {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.05);
+  flex: 0 0 42px;
+  cursor: pointer;
+  position: relative;
+  transition: transform 220ms var(--cts-spring), opacity 180ms ease;
+}
+
+.cts-attach-thumb:hover {
+  transform: scale(1.04);
+}
+
+html[data-theme="dark"] .cts-attach-thumb {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.cts-attach-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.cts-attach-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #FFFFFF;
+  opacity: 0;
+  transition: opacity 160ms ease;
+}
+
+.cts-attach-thumb:hover .cts-attach-thumb-overlay {
+  opacity: 1;
+}
+
+.cts-attach-meta {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: 170px;
+}
+
+.cts-attach-name {
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--cts-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+.cts-attach-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 2px;
+}
+
+.cts-attach-badge {
+  font-size: 9px;
+  font-weight: 600;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--cts-mute);
+  line-height: 1.2;
+}
+
+html[data-theme="dark"] .cts-attach-badge {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--cts-faint);
+}
+
+.cts-attach-size {
+  font-size: 10px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, Consolas, monospace;
+  color: var(--cts-faint);
+  line-height: 1.2;
+}
+
+.cts-attach-remove {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--cts-faint);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 2px;
+  flex: 0 0 22px;
+  transition: background-color 160ms ease, color 160ms ease, transform 200ms var(--cts-spring);
+}
+
+.cts-attach-remove:hover {
+  background: rgba(0, 0, 0, 0.08);
+  color: var(--cts-text);
+  transform: scale(1.1) rotate(90deg);
+}
+
+html[data-theme="dark"] .cts-attach-remove:hover {
+  background: rgba(255, 255, 255, 0.14);
+  color: #ffffff;
+}
+
+.cts-attach-remove:active {
+  transform: scale(0.92);
+}
+
+/* Attach button in composer row */
+.cts-composer-attach {
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--cts-mute);
+  opacity: 0.85;
+  border: none;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  outline: none !important;
+  box-shadow: none !important;
+  transition: transform 180ms cubic-bezier(0.16, 1, 0.3, 1), color 180ms ease, background-color 180ms ease, opacity 180ms ease;
+}
+
+.cts-composer-attach:hover {
+  opacity: 1;
+  color: var(--cts-text);
+  background: rgba(0, 0, 0, 0.05);
+  transform: scale(1.08);
+}
+
+html[data-theme="dark"] .cts-composer-attach:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Drag over drop target */
+.cts-composer.cts-drop-target {
+  background: rgba(0, 0, 0, 0.02) !important;
+  outline: 1.5px dashed var(--cts-faint) !important;
+  outline-offset: -3px;
+  border-radius: 0 0 16px 16px;
+}
+
+html[data-theme="dark"] .cts-composer.cts-drop-target {
+  background: rgba(255, 255, 255, 0.03) !important;
+  outline-color: var(--cts-mute) !important;
+}
+
+/* ============================================================
+   STRICT MONOCHROMATIC ISOLATION & ZERO BLUE ACCENT POLICY
+   Completely protects the floating window and mini composer from
+   any global styles (e.g. apple-polish.css / styles.css) that
+   inject harsh colored borders, outlines, or box-shadows.
+   ============================================================ */
+html body .cts,
+html body .cts *,
+html body #clavis-task-surface,
+html body #clavis-task-surface *,
+html body .cts-composer,
+html body .cts-composer * {
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+html body .cts textarea,
+html body .cts textarea:focus,
+html body .cts textarea:focus-visible,
+html body .cts input,
+html body .cts input:focus,
+html body .cts input:focus-visible,
+html body .cts button,
+html body .cts button:focus,
+html body .cts button:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+
+.cts-composer-input-wrap {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  background: rgba(0, 0, 0, 0.035) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 20px !important;
+  padding: 6px 14px !important;
+  min-height: 38px !important;
+  box-sizing: border-box !important;
+  transition: border-color 340ms var(--cts-spring), background-color 340ms var(--cts-spring), box-shadow 340ms var(--cts-spring) !important;
+}
+
+/* Monochromatic Editorial Focus (Zero Blue Highlights!) */
+.cts-composer-input-wrap:focus-within {
+  border-color: rgba(26, 25, 23, 0.35) !important;
+  background: #FFFFFF !important;
+  box-shadow: 0 0 0 2px rgba(26, 25, 23, 0.06), 0 2px 8px rgba(0, 0, 0, 0.04) !important;
+}
+
+html[data-theme="dark"] .cts-composer-input-wrap {
+  background: rgba(255, 255, 255, 0.04) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+html[data-theme="dark"] .cts-composer-input-wrap:focus-within {
+  border-color: rgba(236, 234, 228, 0.38) !important;
+  background: #1C1C1A !important;
+  box-shadow: 0 0 0 2px rgba(236, 234, 228, 0.08), 0 2px 8px rgba(0, 0, 0, 0.35) !important;
+}
+
+.cts-composer-input,
+html body .cts .cts-composer-input,
+html body .cts .cts-composer-input:focus,
+html body .cts .cts-composer-input:focus-visible {
+  width: 100% !important;
+  min-height: 24px !important;
+  max-height: 120px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  resize: none !important;
+  overflow-y: hidden !important;
+  font-family: var(--cts-sans) !important;
+  font-size: 13px !important;
+  font-weight: 400 !important;
+  line-height: 1.45 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--cts-text) !important;
+  caret-color: var(--cts-text) !important;
+  box-sizing: border-box !important;
+}
+
+.cts-composer-input::placeholder {
+  color: var(--cts-faint, #9C9890) !important;
+  font-family: var(--cts-sans) !important;
+  font-size: 13px !important;
+  opacity: 0.88 !important;
+}
+
+/* Circular Enter Button (100% Round: 28px x 28px) */
+.cts-composer-send,
+button.cts-composer-send {
+  width: 28px !important;
+  height: 28px !important;
+  min-width: 28px !important;
+  min-height: 28px !important;
+  max-width: 28px !important;
+  max-height: 28px !important;
+  flex: 0 0 28px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  outline: none !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  box-sizing: border-box !important;
+  padding: 0 !important;
+  margin: 0 !important;
+
+  /* Idle state */
+  background: #E8E8E8 !important;
+  color: #6B6862 !important;
+
+  transition:
+    background-color 160ms cubic-bezier(0.2, 0, 0, 1),
+    transform 140ms cubic-bezier(0.16, 1, 0.3, 1),
+    color 160ms cubic-bezier(0.2, 0, 0, 1),
+    box-shadow 160ms ease !important;
+}
+
+.cts-composer-send:hover {
+  background: #DADADA !important;
+  color: #1A1917 !important;
+  transform: scale(1.06) !important;
+}
+
+.cts-composer-send:active {
+  transform: scale(0.92) !important;
+}
+
+html[data-theme="dark"] .cts-composer-send {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #9A968E !important;
+}
+
+html[data-theme="dark"] .cts-composer-send:hover {
+  background: rgba(255, 255, 255, 0.20) !important;
+  color: #FFFFFF !important;
+}
+
+/* Active typed / has-attachments state */
+.cts-composer.has-text .cts-composer-send,
+.cts-composer.has-attachments .cts-composer-send {
+  background: var(--cts-text, #1A1917) !important;
+  color: var(--cts-panel, #FFFFFF) !important;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15) !important;
+}
+
+.cts-composer.has-text .cts-composer-send:hover,
+.cts-composer.has-attachments .cts-composer-send:hover {
+  opacity: 0.92 !important;
+  transform: scale(1.06) !important;
+}
+
+html[data-theme="dark"] .cts-composer.has-text .cts-composer-send,
+html[data-theme="dark"] .cts-composer.has-attachments .cts-composer-send {
+  background: #FFFFFF !important;
+  color: #1A1A18 !important;
+  box-shadow: 0 2px 8px rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Narrow windows: full-bleed but inset */
+@media (max-width: 900px) {
+  .cts {
+    left: 12px !important;
+    right: 12px !important;
+    width: auto !important;
+    max-width: calc(100vw - 24px) !important;
+    max-height: min(70vh, calc(100vh - 100px)) !important;
+  }
+  .cts.is-moved {
+    left: 12px !important;
+    right: 12px !important;
+    top: auto !important;
+  }
+}
+
+/* ============================================================
+   AUTHENTIC 4-STAGE LIVE PIPELINE & PREVIEW TABLE
+   1. Google Maps Discovery
+   2. Website Contact Scrape
+   3. Mobile & Landline Verification
+   4. Excel Lead Sheet
+   ============================================================ */
+
+.cts-pipeline {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 10px 0 6px;
+  position: relative;
+}
+
+.cts-pipe-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  position: relative;
+  padding-bottom: 12px;
+}
+
+.cts-pipe-step:last-child {
+  padding-bottom: 2px;
+}
+
+/* Connecting vertical rail */
+.cts-pipe-step:not(:last-child)::after {
+  content: "";
+  position: absolute;
+  left: 9px;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  background: var(--cts-line-2);
+  transition: background-color 260ms ease;
+}
+
+.cts-pipe-step.is-done:not(:last-child)::after {
+  background: var(--cts-ok);
+  opacity: 0.55;
+}
+
+.cts-pipe-num {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  border: 1.5px solid var(--cts-line);
+  background: var(--cts-panel);
+  color: var(--cts-mute);
+  position: relative;
+  z-index: 2;
+  transition: all 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.cts-pipe-step.is-done .cts-pipe-num {
+  background: var(--cts-ok);
+  border-color: var(--cts-ok);
+  color: #FFFFFF;
+}
+
+.cts-pipe-step.is-active .cts-pipe-num {
+  background: var(--cts-text);
+  border-color: var(--cts-text);
+  color: var(--cts-panel);
+  box-shadow: 0 0 0 3px rgba(26, 25, 23, 0.12);
+  animation: cts-step-pulse 2.2s cubic-bezier(0.2, 0, 0, 1) infinite;
+}
+
+html[data-theme="dark"] .cts-pipe-step.is-active .cts-pipe-num {
+  box-shadow: 0 0 0 3px rgba(236, 234, 228, 0.18);
+}
+
+@keyframes cts-step-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(26, 25, 23, 0.12); }
+  50% { box-shadow: 0 0 0 6px rgba(26, 25, 23, 0.03); }
+}
+
+html[data-theme="dark"] @keyframes cts-step-pulse {
+  0%, 100% { box-shadow: 0 0 0 3px rgba(236, 234, 228, 0.18); }
+  50% { box-shadow: 0 0 0 6px rgba(236, 234, 228, 0.05); }
+}
+
+.cts-pipe-step.is-pending .cts-pipe-num {
+  background: transparent;
+  border-color: var(--cts-line-2);
+  color: var(--cts-faint);
+  opacity: 0.65;
+}
+
+.cts-pipe-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding-top: 1px;
+}
+
+.cts-pipe-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cts-text);
+  line-height: 1.35;
+  transition: color 200ms ease;
+}
+
+.cts-pipe-step.is-pending .cts-pipe-title {
+  color: var(--cts-faint);
+  font-weight: 500;
+}
+
+.cts-pipe-step.is-active .cts-pipe-title {
+  color: var(--cts-text);
+  font-weight: 650;
+}
+
+.cts-pipe-sub {
+  font-size: 11px;
+  color: var(--cts-mute);
+  line-height: 1.4;
+  margin-top: 1px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cts-pipe-step.is-pending .cts-pipe-sub {
+  color: var(--cts-faint);
+  opacity: 0.7;
+}
+
+/* ── Live Preview Table for Task Completion ── */
+.cts-preview-wrap {
+  margin: 10px 0 6px;
+  border: 1px solid var(--cts-line-2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--cts-panel);
+}
+
+.cts-preview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  text-align: left;
+}
+
+.cts-preview-table th {
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.025);
+  font-weight: 600;
+  font-size: 9.5px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--cts-faint);
+  border-bottom: 1px solid var(--cts-line-2);
+}
+
+html[data-theme="dark"] .cts-preview-table th {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.cts-preview-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--cts-line-2);
+  color: var(--cts-text);
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cts-preview-table tr:last-child td {
+  border-bottom: none;
+}
+
+.cts-badge-phone {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-family: ui-monospace, "JetBrains Mono", Menlo, monospace;
+  background: rgba(16, 185, 129, 0.08);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.2);
+}
+
+html[data-theme="dark"] .cts-badge-phone {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+/* ── Lightbox Modal for Screenshot Preview ──────────────── */
+.cts-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  box-sizing: border-box;
+}
+
+.cts-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  opacity: 0;
+  transition: opacity 240ms var(--cts-out);
+}
+
+.cts-lightbox-dialog {
+  position: relative;
+  z-index: 2;
+  max-width: min(90vw, 1000px);
+  max-height: min(88vh, 800px);
+  background: var(--cts-panel, #ffffff);
+  border: 1px solid var(--cts-line, #e7e4dc);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.4);
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: scale(0.94) translateY(10px);
+  transition: opacity 300ms var(--cts-spring), transform 340ms var(--cts-spring);
+}
+
+html[data-theme="dark"] .cts-lightbox-dialog {
+  background: #1A1A18;
+  border-color: #2E2D29;
+}
+
+.cts-lightbox.is-open .cts-lightbox-backdrop {
+  opacity: 1;
+}
+
+.cts-lightbox.is-open .cts-lightbox-dialog {
+  opacity: 1;
+  transform: scale(1) translateY(0);
+}
+
+.cts-lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--cts-line-2, #f1eee7);
+  background: var(--cts-panel, #ffffff);
+}
+
+html[data-theme="dark"] .cts-lightbox-header {
+  background: #1A1A18;
+  border-bottom-color: #242320;
+}
+
+.cts-lightbox-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--cts-text, #1a1917);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cts-lightbox-close {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--cts-mute, #6b6862);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: background-color 140ms ease, color 140ms ease;
+}
+
+.cts-lightbox-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--cts-text, #1a1917);
+}
+
+html[data-theme="dark"] .cts-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+}
+
+.cts-lightbox-body {
+  padding: 12px;
+  overflow: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.02);
+}
+
+html[data-theme="dark"] .cts-lightbox-body {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.cts-lightbox-img {
+  max-width: 100%;
+  max-height: calc(88vh - 80px);
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* ============================================================
+ * CLAVIS TAB: PERMANENT CHAT REMOVAL & FLOATING WINDOW DEFENSE
+ * ============================================================ */
+#view-jarvis #jarvis-chat-scroll {
+  display: none !important;
+}
+
+/* ============================================================
+ * CLAUDE / APPLE STYLE MULTI-SCREENSHOT ATTACHMENT DOCK
+ * Appears directly above the Clavis composer on paste (Ctrl+V)
+ * or upload with fluid spring animations.
+ * ============================================================ */
+.clavis-composer-attachment-dock {
+  display: none;
+  width: 100%;
+  padding: 10px 14px 4px;
+  gap: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  align-items: center;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  box-sizing: border-box;
+}
+
+[data-theme="light"] .clavis-composer-attachment-dock {
+  border-bottom-color: rgba(0, 0, 0, 0.06);
+  scrollbar-color: rgba(0, 0, 0, 0.15) transparent;
+}
+
+.clavis-composer-attachment-dock.has-items {
+  display: flex !important;
+  animation: clavisDockSlideDown 320ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes clavisDockSlideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    max-height: 120px;
+    transform: translateY(0);
+  }
+}
+
+.clavis-att-card {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 5px 11px 5px 5px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  position: relative;
+  animation: clavisAttPopIn 380ms cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  transition: transform 180ms ease, box-shadow 180ms ease, border-color 180ms ease;
+  user-select: none;
+}
+
+[data-theme="light"] .clavis-att-card {
+  background: rgba(255, 255, 255, 0.85);
+  border-color: rgba(0, 0, 0, 0.09);
+  box-shadow: 0 4px 14px -4px rgba(0, 0, 0, 0.10);
+}
+
+.clavis-att-card:hover {
+  transform: translateY(-1.5px);
+  border-color: rgba(108, 92, 231, 0.45);
+  box-shadow: 0 6px 20px -4px rgba(108, 92, 231, 0.35);
+}
+
+.clavis-att-card.is-removing {
+  animation: clavisAttPopOut 220ms cubic-bezier(0.32, 0.72, 0, 1) forwards;
+}
+
+@keyframes clavisAttPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes clavisAttPopOut {
+  0% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(0.85) translateY(-6px);
+  }
+}
+
+.clavis-att-thumb-wrap {
+  width: 52px;
+  height: 52px;
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.clavis-att-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: transform 260ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.clavis-att-thumb-wrap:hover .clavis-att-thumb {
+  transform: scale(1.08);
+}
+
+.clavis-att-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 140px;
+}
+
+.clavis-att-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: #ffffff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: -0.01em;
+}
+
+[data-theme="light"] .clavis-att-name {
+  color: #1d1d1f;
+}
+
+.clavis-att-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 500;
+}
+
+[data-theme="light"] .clavis-att-badge {
+  color: #86868b;
+}
+
+.clavis-att-badge-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
+}
+
+.clavis-att-close {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.14);
+  color: rgba(255, 255, 255, 0.75);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  margin-left: 3px;
+  transition: transform 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.clavis-att-close:hover {
+  background: rgba(239, 68, 68, 0.85);
+  color: #ffffff;
+  transform: scale(1.1);
+}
+
+.clavis-att-close:active {
+  transform: scale(0.92);
+}
+
+[data-theme="light"] .clavis-att-close {
+  background: rgba(0, 0, 0, 0.07);
+  color: #555;
+}
+
+[data-theme="light"] .clavis-att-close:hover {
+  background: #ef4444;
+  color: #ffffff;
+}
+
+/* Composer acceptance haptic feedback (Claude / Apple-like) */
+.jarvis-luxury-composer.composer-accepting {
+  box-shadow: 0 0 0 2.5px rgba(99, 102, 241, 0.5), 0 16px 40px rgba(99, 102, 241, 0.2) !important;
+  transform: translateY(-2px) scale(1.004) !important;
+  transition: all 0.35s cubic-bezier(0.22, 1, 0.36, 1) !important;
+}
+
+/* Floating Task Surface rich typography */
+.cts-heading {
+  font-family: var(--cts-sans);
+  font-weight: 600;
+  color: var(--cts-text);
+  margin: 14px 0 6px;
+  line-height: 1.35;
+}
+.cts-h2 { font-size: 15px; }
+.cts-h3 { font-size: 14px; }
+.cts-h4 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--cts-mute); }
+
+/* Code blocks in floating window */
+.cts-code-block {
+  margin: 10px 0;
+  background: rgba(18, 18, 24, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 9px;
+  overflow: hidden;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 12px;
+}
+[data-theme="light"] .cts-code-block {
+  background: #f6f8fa;
+  border-color: #d0d7de;
+}
+
+.cts-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 10px;
+  background: rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.6);
+}
+[data-theme="light"] .cts-code-header {
+  background: #eaeef2;
+  border-bottom-color: #d0d7de;
+  color: #57606a;
+}
+
+.cts-code-copy {
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  color: #fff;
+  font-size: 10.5px;
+  cursor: pointer;
+  transition: background 120ms ease;
+}
+.cts-code-copy:hover {
+  background: rgba(99, 102, 241, 0.8);
+}
+[data-theme="light"] .cts-code-copy {
+  background: #fff;
+  border: 1px solid #d0d7de;
+  color: #24292f;
+}
+
+.cts-code-block code {
+  display: block;
+  padding: 10px 12px;
+  overflow-x: auto;
+  color: #e2e8f0;
+  line-height: 1.5;
+}
+[data-theme="light"] .cts-code-block code {
+  color: #24292f;
+}
+
+/* ── Idle Pulse Animation ─────────────────────────────────── */
+.cts[data-phase="idle"] .cts-dot {
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  animation: cts-pulse-dot 2.4s ease-in-out infinite;
+}
+@keyframes cts-pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.45; transform: scale(0.85); }
+}
+
+/* ── Task Banner (Cormorant Garamond Title & Pipeline Track) ─ */
+.cts-task-banner {
+  padding: 2px 2px 10px;
+  border-bottom: 1px solid var(--cts-line-2);
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.cts-task-eyebrow {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.14em;
+  color: #C0392B;
+  margin-bottom: 3px;
+}
+html[data-theme="dark"] .cts-task-eyebrow {
+  color: #FF6B6B;
+}
+
+.cts-task-title {
+  font-family: var(--cts-serif);
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+  color: var(--cts-text);
+  margin: 0 0 4px 0;
+}
+
+.cts-task-title em {
+  font-style: italic;
+  font-weight: 400;
+}
+
+.cts-task-subtitle {
+  font-size: 11.5px;
+  line-height: 1.42;
+  color: var(--cts-mute);
+  margin: 0 0 8px 0;
+}
+
+/* ── Minimalist Horizontal Pipeline Track ─────────────────── */
+.cts-pipeline-track {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 8px;
+  position: relative;
+  padding: 4px 8px;
+}
+
+.cts-pipeline-track::before {
+  content: '';
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  top: 12px;
+  height: 2px;
+  background: var(--cts-line);
+  z-index: 1;
+}
+
+.cts-pipe-node-wrap {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.cts-pipe-node {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--cts-panel);
+  border: 2px solid var(--cts-line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--cts-faint);
+  transition: all 0.25s var(--cts-spring);
+}
+
+.cts-pipe-node-wrap.done .cts-pipe-node {
+  background: #10b981;
+  border-color: #10b981;
+  color: #ffffff;
+}
+
+.cts-pipe-node-wrap.active .cts-pipe-node {
+  background: #C0392B;
+  border-color: #C0392B;
+  color: #ffffff;
+  box-shadow: 0 0 8px rgba(192, 57, 43, 0.45);
+  transform: scale(1.15);
+}
+html[data-theme="dark"] .cts-pipe-node-wrap.active .cts-pipe-node {
+  background: #E74C3C;
+  border-color: #E74C3C;
+  box-shadow: 0 0 10px rgba(231, 76, 60, 0.55);
+}
+
+.cts-pipe-node-label {
+  font-size: 8.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--cts-mute);
+}
+
+.cts-pipe-node-wrap.active .cts-pipe-node-label {
+  color: #C0392B;
+  font-weight: 700;
+}
+html[data-theme="dark"] .cts-pipe-node-wrap.active .cts-pipe-node-label {
+  color: #FF6B6B;
+}
+
+/* ── Autonomous Agent Cards Stack ─────────────────────────── */
+.cts-agent-cards-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+
+.cts-agent-card {
+  background: var(--cts-panel);
+  border: 1px solid var(--cts-line);
+  border-radius: 11px;
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.cts-agent-card:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+html[data-theme="dark"] .cts-agent-card:hover {
+  border-color: rgba(255, 255, 255, 0.16);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+.cts-agent-card.active-agent {
+  border-left: 3px solid #C0392B;
+  box-shadow: 0 2px 8px rgba(192, 57, 43, 0.08);
+}
+html[data-theme="dark"] .cts-agent-card.active-agent {
+  border-left: 3px solid #E74C3C;
+  box-shadow: 0 2px 10px rgba(231, 76, 60, 0.15);
+}
+
+.cts-agent-card.done-agent {
+  border-left: 3px solid #10b981;
+}
+
+.cts-agent-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cts-agent-meta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cts-agent-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  background: var(--cts-line-2);
+}
+
+.cts-agent-name {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--cts-text);
+  letter-spacing: -0.01em;
+}
+
+.cts-agent-badge {
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--cts-line-2);
+  color: var(--cts-mute);
+}
+
+.cts-agent-card.active-agent .cts-agent-badge {
+  background: rgba(192, 57, 43, 0.1);
+  color: #C0392B;
+}
+html[data-theme="dark"] .cts-agent-card.active-agent .cts-agent-badge {
+  background: rgba(231, 76, 60, 0.18);
+  color: #FF6B6B;
+}
+
+.cts-agent-log {
+  font-size: 11.5px;
+  line-height: 1.42;
+  color: var(--cts-mute);
+  margin: 0;
+}
+
+.cts-agent-card.active-agent .cts-agent-log {
+  background: linear-gradient(
+    90deg,
+    var(--cts-text) 0%,
+    var(--cts-text) 35%,
+    #C0392B 50%,
+    var(--cts-text) 65%,
+    var(--cts-text) 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: csp-shimmer 2.2s linear infinite;
+  font-weight: 500;
+}
+html[data-theme="dark"] .cts-agent-card.active-agent .cts-agent-log {
+  background: linear-gradient(
+    90deg,
+    #9c9ca1 0%,
+    #9c9ca1 35%,
+    #ffffff 50%,
+    #FF6B6B 58%,
+    #9c9ca1 70%,
+    #9c9ca1 100%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: csp-shimmer 2.2s linear infinite;
+}
+
+.cts-agent-metrics {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.cts-metric-chip {
+  font-size: 9.5px;
+  color: var(--cts-faint);
+  font-family: "JetBrains Mono", monospace;
+  background: var(--cts-line-2);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+
+/* ── Suggested Prompt Pills ───────────────────────────────── */
+.cts-prompt-section {
+  margin-top: 8px;
+  margin-bottom: 4px;
+}
+
+.cts-prompt-heading {
+  font-size: 9.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--cts-mute);
+  margin-bottom: 6px;
+}
+
+.cts-prompt-pills {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cts-prompt-pill {
+  background: var(--cts-line-2);
+  border: 1px solid var(--cts-line);
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--cts-text);
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-family: var(--cts-sans);
+}
+
+.cts-prompt-pill:hover {
+  background: var(--cts-panel);
+  border-color: var(--cts-accent);
+  transform: translateX(2px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.cts-prompt-pill svg {
+  opacity: 0.4;
+  transition: opacity 0.18s, transform 0.18s;
+  flex-shrink: 0;
+}
+
+.cts-prompt-pill:hover svg {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+/* ── Integrated Floating Surface Composer ─────────────────── */
+.cts-composer {
+  border-top: 1px solid var(--cts-line-2);
+  background: var(--cts-panel);
+  padding: 8px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 10;
+}
+
+.cts-composer.cts-drop-target {
+  background: rgba(192, 57, 43, 0.04);
+  border-top-color: #C0392B;
+}
+
+.cts-composer-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.025);
+  border: 1px solid var(--cts-line);
+  border-radius: 12px;
+  padding: 4px 6px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+html[data-theme="dark"] .cts-composer-row {
+  background: rgba(255, 255, 255, 0.035);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+
+.cts-composer-row:focus-within {
+  border-color: var(--cts-accent);
+  box-shadow: 0 0 0 2px rgba(26, 25, 23, 0.06);
+}
+html[data-theme="dark"] .cts-composer-row:focus-within {
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.1);
+}
+
+.cts-composer-attach,
+.cts-composer-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  border: none;
+  background: transparent;
+  color: var(--cts-mute);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-bottom: 2px;
+  transition: all 0.15s ease;
+}
+
+.cts-composer-attach:hover,
+.cts-composer-icon:hover {
+  background: var(--cts-line-2);
+  color: var(--cts-text);
+}
+
+.cts-composer-input-wrap {
+  flex: 1;
+  min-height: 38px;
+  display: flex;
+  align-items: center;
+  padding: 6px 4px;
+  box-sizing: border-box;
+}
+
+.cts-composer-input {
+  width: 100%;
+  min-height: 24px;
+  max-height: 120px;
+  border: none;
+  outline: none;
+  background: transparent;
+  resize: none;
+  font-family: var(--cts-sans);
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--cts-text);
+  padding: 0;
+  margin: 0;
+  overflow-y: hidden;
+  box-sizing: border-box;
+}
+
+.cts-composer-input::placeholder {
+  color: var(--cts-faint);
+  font-style: normal;
+  opacity: 0.85;
+}
+
+.cts-composer-send {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: none;
+  background: var(--cts-accent);
+  color: var(--cts-panel);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  padding: 0;
+  margin-bottom: 2px;
+  opacity: 0.35;
+  pointer-events: none;
+  transition: all 0.2s var(--cts-spring);
+}
+
+.cts-composer.has-text .cts-composer-send {
+  opacity: 1;
+  pointer-events: auto;
+  transform: scale(1.04);
+  background: #18181b;
+  color: #ffffff;
+}
+html[data-theme="dark"] .cts-composer.has-text .cts-composer-send {
+  background: #ffffff;
+  color: #18181b;
+}
+
+/* ── Composer Attachments Dock / Chips ────────────────────── */
+.cts-composer-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 2px 2px 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.cts-attach-chip {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  background: var(--cts-panel);
+  border: 1px solid var(--cts-line);
+  border-radius: 8px;
+  padding: 4px 6px 4px 5px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  animation: cts-chip-in 0.2s var(--cts-spring);
+  max-width: 100%;
+}
+@keyframes cts-chip-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+.cts-attach-chip.is-leaving {
+  animation: cts-chip-out 0.2s ease forwards;
+}
+@keyframes cts-chip-out {
+  to { opacity: 0; transform: scale(0.85); }
+}
+
+.cts-attach-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--cts-line-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.cts-attach-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.cts-attach-thumb-overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.cts-attach-thumb:hover .cts-attach-thumb-overlay {
+  opacity: 1;
+}
+
+.cts-attach-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+  max-width: 180px;
+}
+
+.cts-attach-name {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--cts-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.cts-attach-sub-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.cts-attach-badge {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  background: var(--cts-line-2);
+  color: var(--cts-mute);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.cts-attach-size {
+  font-size: 9px;
+  color: var(--cts-faint);
+  font-family: "JetBrains Mono", monospace;
+}
+
+.cts-attach-remove {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--cts-faint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.cts-attach-remove:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* ── Quick Actions Popover inside Composer ────────────────── */
+.cts-composer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  padding: 6px 2px;
+  animation: cts-in 0.18s var(--cts-spring);
+}
+.cts-action-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: var(--cts-line-2);
+  border: 1px solid var(--cts-line);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--cts-text);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.cts-action-pill:hover {
+  background: var(--cts-panel);
+  border-color: var(--cts-accent);
+}
+
+/* ── Lightbox for Full-Size Screenshot Previews ────────────── */
+.cts-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.24s ease;
+}
+.cts-lightbox.is-open {
+  opacity: 1;
+}
+.cts-lightbox-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(8px);
+}
+.cts-lightbox-dialog {
+  position: relative;
+  z-index: 2;
+  max-width: 90vw;
+  max-height: 88vh;
+  background: #17171A;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 14px;
+  overflow: hidden;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
+  display: flex;
+  flex-direction: column;
+}
+.cts-lightbox-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+}
+.cts-lightbox-close {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.7);
+  cursor: pointer;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.15s ease;
+}
+.cts-lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+}
+.cts-lightbox-body {
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+.cts-lightbox-img {
+  max-width: 100%;
+  max-height: calc(88vh - 70px);
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+
+/* ============================================================
+   CLAVIS SURFACE — ENHANCEMENT LAYER (added Sep 2026)
+   Requested polish, kept as an additive override layer so the
+   structure above is untouched:
+     · green CTAs (green by default AND on hover — no colour flip)
+     · roomier window + larger, more legible type (spacious feel)
+     · the planning "track" now stacks vertically like the numbered
+       steps, so the layout never jumps sideways on a lead task
+     · footer buttons a touch smaller and they float up on a soft,
+       slow spring
+     · text uses the full column instead of being clipped by a gutter
+   ============================================================ */
+
+.cts { --cts-green: #4F583B; --cts-green-strong: #3f4630; }
+
+/* ── Roomier window + body ──────────────────────────────── */
+.cts { width: 440px; }
+.cts-body { padding: 18px 20px 18px; }
+@media (max-width: 900px) { .cts { width: auto !important; } }
+
+/* ── Larger, more readable type (spacious) ──────────────── */
+.cts-task-title    { font-size: 23px !important; line-height: 1.22; }
+.cts-task-subtitle { font-size: 13px !important; line-height: 1.5; margin-bottom: 12px; }
+.cts-title         { font-size: 19px; }
+.cts-live          { font-size: 13.5px; line-height: 1.55; }
+.cts-summary, .cts-list { font-size: 13.5px !important; line-height: 1.62; }
+.cts-pipe-title    { font-size: 13.5px !important; }
+.cts-pipe-sub      { font-size: 12px !important; line-height: 1.5; }
+.cts-agent-name    { font-size: 13px !important; }
+.cts-agent-log     { font-size: 12.5px !important; line-height: 1.5; }
+.cts-agent-badge   { font-size: 9.5px !important; }
+.cts-agent-card    { padding: 12px 14px !important; }
+.cts-agent-cards-stack { gap: 10px !important; }
+.cts-stats dd      { font-size: 16px; }
+
+/* Full-width, un-clipped text column */
+.cts-summary, .cts-live, .cts-agent-log, .cts-pipe-sub, .cts-list, .cts-note {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+.cts-task-banner { padding-left: 0; padding-right: 0; }
+
+/* ── Vertical, roomier numbered pipeline ────────────────── */
+.cts-pipeline  { margin: 14px 0 10px; }
+.cts-pipe-step { gap: 12px; padding-bottom: 16px; }
+.cts-pipe-num  { width: 22px; height: 22px; min-width: 22px; font-size: 11px; }
+.cts-pipe-step:not(:last-child)::after { left: 10px; }
+
+/* Make the horizontal planning "track" stack vertically so a lead
+   task keeps the same vertical shape as the idle greeting. */
+.cts-pipeline-track {
+  flex-direction: column !important;
+  align-items: stretch !important;
+  justify-content: flex-start !important;
+  gap: 15px !important;
+  padding: 6px 2px 2px !important;
+}
+.cts-pipeline-track::before {
+  left: 11px !important;
+  right: auto !important;
+  top: 8px !important;
+  bottom: 8px !important;
+  width: 2px !important;
+  height: auto !important;
+}
+.cts-pipe-node-wrap {
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  gap: 12px !important;
+}
+.cts-pipe-node {
+  width: 22px !important;
+  height: 22px !important;
+  font-size: 10.5px !important;
+}
+.cts-pipe-node-label {
+  font-size: 13px !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+}
+
+/* ── Green CTAs: green by default, still green on hover ──── */
+.cts .cts-act.is-primary,
+.cts .cts-act.is-primary:hover,
+.cts .cts-act.is-primary:focus-visible {
+  background: var(--cts-green) !important;
+  color: #ffffff !important;
+  border-color: transparent !important;
+  opacity: 1 !important;
+}
+.cts .cts-act.is-primary {
+  box-shadow: 0 1px 2px rgba(79, 88, 59, 0.25);
+  transition: box-shadow 160ms var(--cts-out), transform 160ms var(--cts-spring);
+}
+/* Hover = a soft lift, not a colour change */
+.cts .cts-act.is-primary:hover {
+  box-shadow: 0 6px 16px rgba(79, 88, 59, 0.42);
+  transform: translateY(-1px);
+}
+
+/* Composer send button green once there is something to send */
+.cts .cts-composer.has-text .cts-composer-send,
+.cts .cts-composer.has-attachments .cts-composer-send,
+.cts .cts-composer.has-text .cts-composer-send:hover,
+.cts .cts-composer.has-attachments .cts-composer-send:hover {
+  background: var(--cts-green) !important;
+  color: #ffffff !important;
+}
+html[data-theme="dark"] .cts .cts-composer.has-text .cts-composer-send,
+html[data-theme="dark"] .cts .cts-composer.has-attachments .cts-composer-send {
+  background: var(--cts-green) !important;
+  color: #ffffff !important;
+}
+
+/* ── Footer buttons: a touch smaller, floating in on a slow spring ── */
+.cts-foot { gap: 9px; padding: 11px 14px; }
+.cts-foot .cts-act {
+  font-size: 11px;
+  padding: 5px 12px;
+  animation: cts-foot-pop 640ms var(--cts-spring-slow) both;
+}
+.cts-foot .cts-act.is-primary { padding: 6px 14px; border-radius: 9px; }
+@keyframes cts-foot-pop {
+  0%   { opacity: 0; transform: translateY(12px) scale(0.94); }
+  55%  { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cts-foot .cts-act { animation: none !important; }
+}

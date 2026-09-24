@@ -1,0 +1,482 @@
+/* ============================================================
+   clavis-sidebar.css — the rail, rebuilt.
+
+   NOTE ON THE `--csb-` PREFIX: macos.css already owns `--sb-*`
+   (`.sidebar .nav-item { color: var(--sb-text) !important }`).
+   Defining `--sb-text` here did not override that rule — it fed it,
+   and the app's own definition won, so items kept rendering in a
+   stray Tailwind slate no matter how specific the selector got.
+   Never reuse the `--sb-` prefix in this file.
+   Loaded last. Selectors carry `:not(#_)` so they outrank the
+   app's own `html body .x !important` rules on specificity
+   rather than on load order.
+
+   Design notes, so the next person does not undo them by accident:
+   · The active item is a soft filled pill, not a coloured left bar.
+     A 3px red rule reads as an alert; a fill reads as "you are here",
+     which is what Claude and ChatGPT desktop both do.
+   · Sub-items hang off a hairline guide rail. The indent alone is
+     ambiguous once there are three levels of muted grey text.
+   · Nothing moves on hover except colour. Items that slide or scale
+     under the cursor make a 14-item list feel restless.
+   · Collapse is one spring on width; the labels are a separate,
+     shorter fade so text is gone before the rail reaches icon size.
+     Doing both on one timeline is what makes text look squashed.
+   ============================================================ */
+
+:root {
+  --csb-bg:        #FAF9F5;
+  --csb-line:      #EAE7DF;
+  --csb-hover:     #F1EEE7;
+  --csb-active:    #EBE7DC;
+  --csb-text:      #1A1917;
+  --csb-label:     #55524C;
+  --csb-mute:      #827E76;
+  --csb-faint:     #A9A49B;
+  --csb-accent:    #C96442;
+  --csb-focus:     #B8916F;
+
+  /* One motion vocabulary for the whole rail. */
+  --csb-spring:    cubic-bezier(0.16, 1, 0.3, 1);   /* settles, no overshoot */
+  --csb-out:       cubic-bezier(0.2, 0, 0, 1);
+  --csb-rail:      450ms;   /* fluid Apple-grade width spring */
+  --csb-label-out: 100ms;   /* labels leave first */
+  --csb-label-in:  220ms;
+  --csb-tap:       120ms;
+}
+html[data-theme="dark"] {
+  --csb-bg:     #121211;
+  --csb-line:   #262521;
+  --csb-hover:  #1D1C1A;
+  --csb-active: #262521;
+  --csb-text:   #ECEAE4;
+  --csb-label:  #A6A199;
+  --csb-mute:   #8A867E;
+  --csb-faint:  #625E58;
+  --csb-accent: #D97757;
+  --csb-focus:  #7A5F46;
+}
+
+/* ── Shell ───────────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___) {
+  background: var(--csb-bg) !important;
+  border-right: 1px solid var(--csb-line) !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  /* Width springs on its own timeline — see the labels below. */
+  transition:
+    width var(--csb-rail) var(--csb-spring),
+    min-width var(--csb-rail) var(--csb-spring),
+    max-width var(--csb-rail) var(--csb-spring),
+    background-color 240ms var(--csb-out),
+    border-color 240ms var(--csb-out) !important;
+}
+
+/* Collapsed width lives here, once. apple-polish said 60, index.html's
+   inline block said 62, luxury-ui said var(--sidebar-current) — three
+   files disagreeing is why the rail used to land on a different width
+   depending on which one loaded last. */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___).collapsed,
+html:not(#_) body:not(#_) aside#sidebar.sidebar:not(#__):not(#___).collapsed {
+  width: 64px !important;
+  min-width: 64px !important;
+  max-width: 64px !important;
+}
+
+/* ── Header · window dots + brand ────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-header {
+  padding: 10px 10px 12px !important;
+  border-bottom: 1px solid var(--csb-line) !important;
+  background: none !important;
+  margin-bottom: 6px !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-window-controls {
+  display: flex !important; gap: 7px !important;
+  padding: 2px 4px 12px !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-dot {
+  width: 11px !important; height: 11px !important; border-radius: 50% !important;
+  border: 0 !important; box-shadow: none !important; padding: 0 !important;
+  opacity: 0.9;
+  transition: opacity var(--csb-tap) var(--csb-out), transform var(--csb-tap) var(--csb-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-dot:hover  { opacity: 1; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-dot:active { transform: scale(0.88); }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-close    { background: #ED6A5E !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-minimize { background: #F4BF4F !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-maximize { background: #61C554 !important; }
+
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-brand-row {
+  display: flex !important; align-items: center !important;
+  padding: 4px 6px !important; border-radius: 9px !important;
+  background: none !important; border: 0 !important;
+  min-height: 28px !important;
+  overflow: hidden !important;
+  transition: background-color var(--csb-tap) var(--csb-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-mark {
+  display: none !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-brand-title {
+  font-family: var(--cr-sans, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif) !important;
+  font-size: 15.5px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.025em !important;
+  color: var(--csb-text) !important;
+  line-height: 1.2 !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  user-select: none !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-brand {
+  font-family: var(--cr-sans, -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif) !important;
+  font-size: 15px !important; font-weight: 700 !important;
+  letter-spacing: -0.02em !important; color: var(--csb-text) !important;
+  line-height: 1.25 !important;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-sub {
+  display: none !important;
+}
+
+/* ── Nav scroller ────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav {
+  padding: 2px 8px 14px !important;
+  overflow-y: auto !important; overflow-x: hidden !important;
+  scrollbar-width: none !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav::-webkit-scrollbar { width: 0 !important; }
+
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-section-label {
+  font-size: 10px !important; font-weight: 650 !important;
+  letter-spacing: 0.085em !important; text-transform: uppercase !important;
+  color: var(--csb-faint) !important;
+  padding: 0 8px !important;
+  margin: 16px 0 5px !important;
+  white-space: nowrap; overflow: hidden;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > .nav-section-label:first-child { margin-top: 6px !important; }
+
+/* ── Items ───────────────────────────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item {
+  position: relative !important;
+  display: flex !important; align-items: center !important;
+  gap: 10px !important;
+  width: 100% !important; box-sizing: border-box !important;
+  padding: 7px 9px !important;
+  margin: 1px 0 !important;
+  border: 0 !important; border-radius: 8px !important;
+  background: transparent !important; box-shadow: none !important;
+  color: var(--csb-label) !important;
+  font-size: 13.5px !important; font-weight: 500 !important;
+  letter-spacing: -0.002em !important; text-decoration: none !important;
+  white-space: nowrap !important;
+  /* Animate-UI: colour transition only — ghost handles bg highlight */
+  transition:
+    color var(--csb-tap) var(--csb-out) !important;
+  /* Allow stagger-in entrance animations to play */
+}
+/* the old glow/rail pseudo-elements */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item::before,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item::after,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item::before,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item::after { content: none !important; }
+
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:hover {
+  /* Background is handled by the JS ghost highlight (#au-nav-ghost) */
+  background: transparent !important;
+  color: var(--csb-text) !important;
+  transform: none !important;
+}
+/* Animate-UI icon micro-spring: icon nudges 2px right on hover */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:hover svg {
+  transform: translateX(2px) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:active,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:active {
+  background: var(--csb-active) !important;
+}
+
+/* Active = a filled pill. Weight and colour carry the state; no bar. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active {
+  background: var(--csb-active) !important;
+  color: var(--csb-text) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  /* Smooth in when this item becomes active */
+  transition: background-color 180ms var(--csb-out), color 120ms var(--csb-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active svg { color: var(--csb-text) !important; opacity: 1 !important; }
+
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg {
+  width: 17px !important; height: 17px !important; min-width: 17px !important;
+  stroke-width: 1.6 !important;
+  color: var(--csb-mute) !important; opacity: 1 !important;
+  flex: 0 0 auto !important;
+  /* Animate-UI: icon has its own spring for color + transform */
+  transition:
+    color 120ms var(--csb-out),
+    stroke 120ms var(--csb-out),
+    transform 160ms cubic-bezier(0.34,1.56,0.64,1) !important;
+  transform: translateX(0px) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:hover svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:hover svg {
+  color: var(--csb-text) !important; stroke: var(--csb-text) !important;
+  /* The translateX(2px) from the hover rule above applies here */
+}
+/* nexus-enhancements.css paints these with an explicit `stroke`, so
+   setting `color` alone leaves the icons a stray Tailwind slate. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg { stroke: var(--csb-mute) !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item.active svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item.active svg { stroke: var(--csb-text) !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg [fill="currentColor"],
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg circle[fill] { fill: currentColor !important; }
+/* label text must not keep its own colour */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-label-wrap { color: inherit !important; }
+/* the DEV chip was stretching to fill the row */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-badge,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .dev-badge { flex: 0 0 auto !important; width: auto !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-label-wrap { flex: 1 1 auto !important; gap: 6px !important; }
+
+/* Keyboard focus must be visible and must not look like hover. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item:focus-visible,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item:focus-visible,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .mac-dot:focus-visible {
+  outline: 2px solid var(--csb-focus) !important;
+  outline-offset: 1px !important;
+}
+
+/* Badge (DEV) — quiet until you look for it. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-badge,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .dev-badge {
+  font-size: 8.5px !important; font-weight: 700 !important;
+  letter-spacing: 0.07em !important; text-transform: uppercase !important;
+  padding: 1.5px 5px !important; border-radius: 4px !important;
+  background: rgba(201, 100, 66, 0.12) !important;
+  color: var(--csb-accent) !important;
+  border: 0 !important; box-shadow: none !important;
+  margin-left: 6px !important; vertical-align: middle;
+  animation: none !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-label-wrap {
+  display: inline-flex !important; align-items: center !important;
+  min-width: 0; overflow: hidden;
+}
+
+/* ── Sub-items on a guide rail ───────────────────────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-items {
+  position: relative !important;
+  margin: 2px 0 2px 18px !important;
+  padding-left: 12px !important;
+  /* 0fr → 1fr animates a height the browser computes for us, so no
+     JS measuring and no jump when the content changes. */
+  display: grid !important;
+  grid-template-rows: 1fr;
+  /* Tighter spring matching animate-ui accordion — 300ms + opacity */
+  transition: grid-template-rows 300ms var(--csb-spring), opacity 180ms var(--csb-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-items::before {
+  content: "" !important;
+  position: absolute !important; left: 0; top: 4px; bottom: 4px;
+  width: 1px !important;
+  background: var(--csb-line) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block:not(.expanded) .nav-sub-items {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-items > * { min-height: 0; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item {
+  font-size: 13px !important; font-weight: 450 !important;
+  padding: 6px 9px !important; gap: 9px !important;
+}
+/* Animate-UI: sub-items slide in from below with stagger when dropdown opens */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block.expanded .nav-sub-item {
+  animation: au-subitem-in 220ms var(--csb-spring) both;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block.expanded .nav-sub-items > *:nth-child(1)  { animation-delay: 30ms; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block.expanded .nav-sub-items > *:nth-child(2)  { animation-delay: 60ms; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block.expanded .nav-sub-items > *:nth-child(3)  { animation-delay: 90ms; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block.expanded .nav-sub-items > *:nth-child(n+4) { animation-delay: 110ms; }
+@keyframes au-subitem-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg { width: 15px !important; height: 15px !important; min-width: 15px !important; }
+
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .chevron-arrow {
+  width: 13px !important; height: 13px !important; min-width: 13px !important;
+  margin-left: auto !important;
+  color: var(--csb-faint) !important; stroke-width: 2 !important;
+  transform: rotate(180deg);
+  transition: transform 360ms var(--csb-spring), color var(--csb-tap) var(--csb-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-category-block.expanded .chevron-arrow { transform: rotate(0deg); }
+
+/* ── Collapse ────────────────────────────────────────────────
+   Labels leave in 130ms and come back over 300ms, staggered top to
+   bottom. The rail itself takes 520ms, so on the way out the text is
+   already gone before the width closes in on it, and on the way back
+   the rail is nearly open before the first label appears. That gap
+   is the whole trick — it is what stops the text from looking
+   crushed mid-animation. */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-brand-title,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-text,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-section-label,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .chevron-arrow {
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    opacity var(--csb-label-in) var(--csb-out) 100ms,
+    transform var(--csb-label-in) var(--csb-spring) 100ms !important;
+}
+/* a light stagger so the list "unrolls" instead of blinking on */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > *:nth-child(-n+4)  { transition-delay: 110ms !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > *:nth-child(n+5)   { transition-delay: 140ms !important; }
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > *:nth-child(n+10)  { transition-delay: 170ms !important; }
+
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-sub-item > span,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-label-wrap,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .sidebar-brand-title,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .logo-text,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-section-label,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .chevron-arrow {
+  opacity: 0 !important;
+  transform: translateX(-6px) !important;
+  transition:
+    opacity var(--csb-label-out) var(--csb-out) 0ms,
+    transform var(--csb-label-out) var(--csb-out) 0ms !important;
+  transition-delay: 0ms !important;
+  pointer-events: none !important;
+}
+
+/* Collapsed rail: icons centred, empty gap eliminated cleanly. */
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .sidebar-nav { padding: 2px 7px 14px !important; }
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-item,
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-sub-item {
+  justify-content: center !important;
+  padding: 8px 0 !important;
+  gap: 0 !important;
+}
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-sub-items {
+  display: none !important;
+}
+
+/* The section label has no text to show at this width, so it earns its
+   space back as the divider between groups. */
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-section-label {
+  opacity: 1 !important;
+  transform: none !important;
+  height: 1px !important;
+  min-height: 1px !important;
+  margin: 12px 10px !important;
+  padding: 0 !important;
+  background: var(--csb-line) !important;
+  border-radius: 1px !important;
+  font-size: 0 !important;
+  overflow: hidden !important;
+}
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-sub-items::before { display: none !important; }
+
+/* In collapsed view, collapse empty brand row to remove dead space above first tab */
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .sidebar-header {
+  padding: 10px 10px 6px !important;
+  margin-bottom: 2px !important;
+}
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .mac-window-controls {
+  justify-content: center !important;
+  padding: 2px 0 4px !important;
+}
+html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .sidebar-brand-row {
+  height: 0 !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* In peek hover or expanded state, ensure left-alignment and smooth reveal */
+html:not(#_) body:not(#_) #sidebar.au-peek:not(#__):not(#___) .sidebar-brand-row,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .sidebar-brand-row {
+  display: flex !important;
+  justify-content: flex-start !important;
+  align-items: center !important;
+  min-height: 28px !important;
+  height: auto !important;
+  padding: 4px 6px !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+html:not(#_) body:not(#_) #sidebar.au-peek:not(#__):not(#___) .sidebar-brand-title,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .sidebar-brand-title {
+  opacity: 1 !important;
+  transform: translateX(0) !important;
+  pointer-events: auto !important;
+  text-align: left !important;
+}
+html:not(#_) body:not(#_) #sidebar.au-peek:not(#__):not(#___) .mac-window-controls,
+html:not(#_) body:not(#_) #sidebar:not(.collapsed):not(#__):not(#___) .mac-window-controls {
+  justify-content: flex-start !important;
+  padding: 2px 4px 12px !important;
+}
+html:not(#_) body:not(#_) #sidebar.collapsed:not(#__):not(#___) .sidebar-resizer { display: none !important; }
+
+/* ── Resizer: invisible until you reach for it ───────────────── */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-resizer {
+  background: transparent !important; border: 0 !important;
+  width: 5px !important; cursor: col-resize;
+  transition: background-color 160ms var(--csb-out) !important;
+}
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-resizer:hover { background: var(--csb-line) !important; }
+
+/* ── Motion-sensitive users keep the layout, lose the movement ── */
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___),
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-items,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .chevron-arrow,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item > span,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-label-wrap,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .logo-text,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-section-label,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg,
+  html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg {
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+    transform: none !important;
+    animation: none !important;
+  }
+  #au-nav-ghost { display: none !important; }
+}
+
+/* ── Orb: a circle, all the way round ────────────────────────── */
+html:not(#_) body:not(#_) #orb-container,
+html:not(#_) body:not(#_) #orb-container > * {
+  border-radius: 50% !important;
+}
+html:not(#_) body:not(#_) #orb-container {
+  overflow: visible !important;
+  clip-path: none !important;
+  mask: none !important; -webkit-mask: none !important;
+}

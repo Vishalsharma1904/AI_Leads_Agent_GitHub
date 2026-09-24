@@ -1,0 +1,2028 @@
+/* ============================================================
+ * CLAVIS AI STUDIO — targeted polish pass
+ * Scope: #view-jarvis only. The orb (#orb-container / .clavis-liquid-orb /
+ * #orbCanvas / .jarvis-hud-*) is deliberately untouched — everything else
+ * (top bar, side panel, chat scroll, input, lists) gets scrollbar styling,
+ * missing micro-interactions and small consistency fixes. Loaded last so
+ * it wins the cascade without needing !important everywhere.
+ * ============================================================ */
+
+/* Scrollbars: every scrollable region here fell back to the raw OS
+   scrollbar; give them the thin/rounded treatment used elsewhere. */
+#view-jarvis .jarvis-chat-container,
+#view-jarvis .jarvis-side,
+#view-jarvis .jarvis-facts-list,
+#view-jarvis .jarvis-scripts-list,
+#view-jarvis .jarvis-skills-list {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.16) transparent;
+}
+#view-jarvis .jarvis-chat-container::-webkit-scrollbar,
+#view-jarvis .jarvis-side::-webkit-scrollbar,
+#view-jarvis .jarvis-facts-list::-webkit-scrollbar,
+#view-jarvis .jarvis-scripts-list::-webkit-scrollbar,
+#view-jarvis .jarvis-skills-list::-webkit-scrollbar {
+  width: 7px;
+}
+#view-jarvis .jarvis-chat-container::-webkit-scrollbar-track,
+#view-jarvis .jarvis-side::-webkit-scrollbar-track,
+#view-jarvis .jarvis-facts-list::-webkit-scrollbar-track,
+#view-jarvis .jarvis-scripts-list::-webkit-scrollbar-track,
+#view-jarvis .jarvis-skills-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+#view-jarvis .jarvis-chat-container::-webkit-scrollbar-thumb,
+#view-jarvis .jarvis-side::-webkit-scrollbar-thumb,
+#view-jarvis .jarvis-facts-list::-webkit-scrollbar-thumb,
+#view-jarvis .jarvis-scripts-list::-webkit-scrollbar-thumb,
+#view-jarvis .jarvis-skills-list::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.16);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+#view-jarvis .jarvis-chat-container:hover::-webkit-scrollbar-thumb,
+#view-jarvis .jarvis-side:hover::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.28);
+}
+html[data-theme="dark"] #view-jarvis .jarvis-chat-container,
+html[data-theme="dark"] #view-jarvis .jarvis-side {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+html[data-theme="dark"] #view-jarvis .jarvis-chat-container::-webkit-scrollbar-thumb,
+html[data-theme="dark"] #view-jarvis .jarvis-side::-webkit-scrollbar-thumb,
+html[data-theme="dark"] #view-jarvis .jarvis-facts-list::-webkit-scrollbar-thumb,
+html[data-theme="dark"] #view-jarvis .jarvis-scripts-list::-webkit-scrollbar-thumb,
+html[data-theme="dark"] #view-jarvis .jarvis-skills-list::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* Side panel cards: quiet hover lift so the panel feels alive, not static text. */
+#view-jarvis .jarvis-side-card {
+  transition: transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease;
+}
+#view-jarvis .jarvis-side-card:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+}
+#view-jarvis .jarvis-side-card h4 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: -0.01em;
+}
+
+/* Input bar: visible focus state so it reads as an active control. */
+#view-jarvis .jarvis-input-container {
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+#view-jarvis .jarvis-input-container:focus-within {
+  border-color: rgba(99, 102, 241, 0.45) !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.12), 0 8px 30px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* More-menu items: hover existed, pressed state didn't. */
+#view-jarvis .jarvis-more-item {
+  gap: 10px;
+}
+#view-jarvis .jarvis-more-item:active {
+  background: var(--gray-150);
+  transform: scale(0.98);
+}
+#view-jarvis .jarvis-more-item svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+/* Native range sliders in the voice panel were unstyled browser defaults. */
+#view-jarvis .jarvis-voice-panel input[type="range"] {
+  accent-color: #6366f1;
+}
+
+/* Quick actions: small press-down feedback on click. */
+#view-jarvis .jarvis-side-card .jarvis-handsfree-pill:active {
+  transform: scale(0.97);
+}
+
+/* Status pill: smooth transition instead of an abrupt flip between states. */
+#view-jarvis .jarvis-status-pill {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view-jarvis .jarvis-side-card,
+  #view-jarvis .jarvis-input-container,
+  #view-jarvis .jarvis-more-item,
+  #view-jarvis .jarvis-status-pill {
+    transition: none !important;
+  }
+  #view-jarvis .jarvis-side-card:hover {
+    transform: none;
+  }
+}
+
+/* ============================================================
+ * CLAVIS CALM SURFACE — editorial interaction pass
+ * The live app is vanilla HTML/CSS, so this keeps the existing DOM and
+ * behavior while applying the same semantic, composable treatment we use
+ * for a component system: one accent, quiet surfaces, clear focus, and
+ * explicit responsive touch sizing. The liquid orb remains the Clavis cue.
+ * ============================================================ */
+#view-jarvis.active {
+  --clavis-ink: #20282d;
+  --clavis-muted: #6c777e;
+  --clavis-subtle: #89939a;
+  --clavis-line: #e3e8ea;
+  --clavis-line-strong: #cbd4d8;
+  --clavis-surface: #ffffff;
+  --clavis-canvas: #f7f9f8;
+  --clavis-accent: #0f766e;
+  --clavis-accent-soft: #e8f4f1;
+  --clavis-focus: rgba(15, 118, 110, .18);
+  background: var(--clavis-canvas) !important;
+  color: var(--clavis-ink) !important;
+}
+
+#view-jarvis.active .jarvis-hero-stage,
+#view-jarvis.active .jarvis-hero-header,
+#view-jarvis.active .jarvis-center-orb-wrapper {
+  background: var(--clavis-surface) !important;
+}
+
+#view-jarvis.active .jarvis-hero-header {
+  min-height: 54px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--clavis-line) !important;
+}
+
+#view-jarvis.active .jarvis-status-pill {
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 1px solid var(--clavis-line) !important;
+  border-radius: 8px;
+  background: #fbfcfc !important;
+  color: var(--clavis-muted) !important;
+  font-size: 10.5px;
+  font-weight: 650;
+  letter-spacing: .01em;
+}
+
+/* User explicitly requested: pulse dot removed completely */
+#view-jarvis.active .jarvis-pulse-dot {
+  display: none !important;
+}
+
+#view-jarvis.active .jarvis-status-pill,
+#view-jarvis.active .jarvis-luxury-status-pill {
+  min-height: 32px !important;
+  padding: 6px 14px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  border-radius: 20px !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.01em !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 0 !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active .jarvis-status-pill {
+  background: #182024 !important;
+  border-color: rgba(255, 255, 255, 0.1) !important;
+  color: #cbd5e1 !important;
+}
+
+/* Toolbar controls use one restrained accent; no decorative gradient fill. */
+#view-jarvis.active .jarvis-icon-pill,
+#view-jarvis.active .jarvis-newchat-pill {
+  border: 1px solid var(--clavis-line) !important;
+  background: var(--clavis-surface) !important;
+  color: var(--clavis-muted) !important;
+  box-shadow: none !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+#view-jarvis.active .jarvis-newchat-pill {
+  height: 32px;
+  min-height: 32px;
+  border-radius: 8px;
+  padding-inline: 10px;
+  font-size: 11px;
+}
+
+#view-jarvis.active .jarvis-icon-pill:hover,
+#view-jarvis.active .jarvis-newchat-pill:hover {
+  background: var(--clavis-canvas) !important;
+  border-color: var(--clavis-line-strong) !important;
+  color: var(--clavis-ink) !important;
+  transform: translateY(-1px) translateZ(0) !important;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.9), 0 3px 8px rgba(0, 0, 0, 0.06) !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill.active,
+#view-jarvis.active .jarvis-icon-pill[aria-pressed="true"] {
+  background: var(--clavis-ink) !important;
+  border-color: var(--clavis-ink) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+
+#view-jarvis.active #jarvis-sound-trigger-btn.active,
+#view-jarvis.active .jarvis-voice-main-btn.recording {
+  background: var(--clavis-accent) !important;
+  border-color: var(--clavis-accent) !important;
+  color: #fff !important;
+}
+
+#view-jarvis.active .jarvis-more-panel {
+  min-width: 204px;
+  padding: 6px;
+  border: 1px solid var(--clavis-line) !important;
+  border-radius: 12px;
+  background: var(--clavis-surface) !important;
+  box-shadow: 0 14px 34px rgba(21, 33, 36, .12) !important;
+}
+
+#view-jarvis.active .jarvis-more-item {
+  min-height: 34px;
+  border-radius: 8px;
+  color: var(--clavis-ink) !important;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+#view-jarvis.active .jarvis-more-item:hover,
+#view-jarvis.active .jarvis-more-item:focus-visible {
+  background: var(--clavis-canvas) !important;
+}
+
+/* ============================================================
+   CLAVIS DYNAMIC STAGE & SPACE MANAGEMENT (EMPTY vs ACTIVE CHAT)
+   - Empty State: Full spacious hero, breathing orb with organic levitation,
+     ambient glowing aura, clean typography and Claude prompt starters.
+   - Active Chat State: Smooth macOS spring transition collapses hero into
+     an elegant compact companion header (36px orb), granting 100% of the
+     height to comfortable, readable conversation with zero cramp!
+   ============================================================ */
+
+/* ── STAGE BASE ───────────────────────────────────────────── */
+#view-jarvis.active .jarvis-hero-stage {
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  overflow: hidden !important;
+  position: relative !important;
+  background: var(--clavis-surface) !important;
+}
+
+/* ── STATE A: EMPTY HERO STAGE (:not(.has-messages)) ──────── */
+#view-jarvis.active:not(.has-messages) .jarvis-center-orb-wrapper {
+  flex: 1 1 auto !important;
+  min-height: 360px !important;
+  max-height: none !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 32px 20px 20px !important;
+  text-align: center !important;
+  position: relative !important;
+  transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#view-jarvis.active:not(.has-messages) .jarvis-center-orb-wrapper #orb-container,
+#orb-container {
+  width: 220px !important;
+  height: 220px !important;
+  min-width: 220px !important;
+  min-height: 220px !important;
+  margin: 0 auto 16px !important;
+  position: relative !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  animation: none !important;
+  transition: all 0.45s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* NO gradient blue wash or extra rings behind the orb */
+#view-jarvis.active #orb-container::before,
+#orb-container::before,
+#view-jarvis.active #orb-container::after,
+#orb-container::after {
+  display: none !important;
+  content: none !important;
+}
+
+#view-jarvis.active .jarvis-greeting {
+  display: none !important;
+}
+
+#view-jarvis.active .jarvis-greeting-container {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  margin: 8px 0 10px 0 !important;
+  padding: 0 !important;
+  min-height: auto !important;
+}
+
+/* Short Dynamic Feature Tip Ticker (Linear / macOS subtle card) */
+#clavis-feature-tip-pill {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 5px 12px !important;
+  border-radius: 8px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, system-ui, sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  color: #475569 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: opacity 0.2s ease, transform 0.2s ease, background 0.15s ease, border-color 0.15s ease !important;
+  letter-spacing: -0.01em !important;
+  user-select: none !important;
+  margin: 4px 0 10px 0 !important;
+}
+
+html[data-theme="dark"] #clavis-feature-tip-pill {
+  background: #182024 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #94a3b8 !important;
+}
+
+#clavis-feature-tip-pill:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.12) !important;
+  transform: translateY(-1px) !important;
+}
+
+html[data-theme="dark"] #clavis-feature-tip-pill:hover {
+  background: #1e293b !important;
+  color: #ffffff !important;
+}
+
+.clavis-tip-icon {
+  font-size: 13px !important;
+  line-height: 1 !important;
+}
+
+.clavis-tip-text {
+  font-size: 11.5px !important;
+  line-height: 1.3 !important;
+}
+
+#view-jarvis.active .jarvis-subgreeting,
+#view-jarvis.active .clavis-voice-caption {
+  color: var(--clavis-muted) !important;
+}
+
+#view-jarvis.active .jarvis-subgreeting { font-size: 13px; margin-top: 4px; }
+#view-jarvis.active .clavis-voice-caption { margin: 8px 0 10px; font-size: 11px; }
+
+#view-jarvis.active .jarvis-voice-main-btn {
+  min-height: 38px;
+  padding-inline: 18px;
+  border: 1px solid var(--clavis-ink) !important;
+  border-radius: 20px;
+  background: var(--clavis-ink) !important;
+  color: #fff !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08) !important;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+
+#view-jarvis.active .jarvis-voice-main-btn:hover {
+  background: #35434a !important;
+  transform: translateY(-1px) translateZ(0) !important;
+  box-shadow: 0 4px 14px rgba(0,0,0,0.12) !important;
+}
+
+/* Claude-Style Empty State Starter Chips */
+.jarvis-starters-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 18px;
+  max-width: 640px;
+}
+
+.jarvis-starter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 8px 15px;
+  border-radius: 14px;
+  border: 1px solid var(--clavis-line);
+  background: var(--clavis-surface);
+  color: var(--clavis-ink);
+  font-size: 12px;
+  font-weight: 550;
+  cursor: pointer;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, color 0.16s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+}
+
+.jarvis-starter-chip:hover {
+  background: var(--clavis-canvas);
+  border-color: rgba(99, 102, 241, 0.35);
+  color: #4f46e5;
+  transform: translateY(-1px) translateZ(0);
+  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.08);
+}
+
+.jarvis-starter-chip:active {
+  transform: scale(0.95) translateZ(0);
+}
+
+/* Empty state chat container is cleanly collapsed */
+#view-jarvis.active:not(.has-messages) .jarvis-chat-container {
+  display: none !important;
+  height: 0 !important;
+  min-height: 0 !important;
+  max-height: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ── STATE B: ACTIVE CHAT STATE (.has-messages) ───────────── */
+#view-jarvis.active.has-messages .jarvis-center-orb-wrapper {
+  flex: 0 0 auto !important;
+  min-height: 48px !important;
+  height: 48px !important;
+  max-height: 48px !important;
+  padding: 4px 18px !important;
+  margin: 0 !important;
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  border-bottom: 1px solid var(--clavis-line) !important;
+  background: var(--clavis-surface) !important;
+  transition: all 0.42s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  overflow: hidden !important;
+}
+
+#view-jarvis.active.has-messages .jarvis-center-orb-wrapper #orb-container {
+  width: 36px !important;
+  height: 36px !important;
+  min-width: 36px !important;
+  min-height: 36px !important;
+  margin: 0 !important;
+  cursor: pointer !important;
+  animation: none !important;
+  transition: all 0.42s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#view-jarvis.active.has-messages #orb-container::before {
+  display: none !important;
+}
+
+/* In active chat, hide large greeting and hero controls */
+#view-jarvis.active.has-messages #jarvis-welcome,
+#view-jarvis.active.has-messages .clavis-voice-caption,
+#view-jarvis.active.has-messages #jarvis-hero-controls,
+#view-jarvis.active.has-messages .jarvis-starters-grid {
+  display: none !important;
+}
+
+#view-jarvis.active.has-messages .jarvis-center-orb-wrapper::after {
+  content: 'Clavis Active · Realtime Neural Companion';
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: var(--clavis-muted);
+  margin-left: 10px;
+}
+
+/* Chat container expands to full available stage height with zero cramp */
+#view-jarvis.active.has-messages .jarvis-chat-container {
+  display: flex !important;
+  flex-direction: column !important;
+  flex: 1 1 auto !important;
+  height: 100% !important;
+  max-height: none !important;
+  min-height: 0 !important;
+  width: min(840px, 100%) !important;
+  margin: 0 auto !important;
+  padding: 18px 22px 12px !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#view-jarvis.active #jarvis-messages {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 16px !important;
+  padding-bottom: 10px;
+}
+
+#view-jarvis.active .chat-message {
+  margin-bottom: 0 !important;
+  animation: clavisSlideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+@keyframes clavisSlideUp {
+  0% {
+    opacity: 0;
+    transform: translateY(12px) scale(0.99) translateZ(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+  }
+}
+
+@keyframes clavisOrbLevitate {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.02);
+  }
+}
+
+@keyframes clavisAmbientGlow {
+  0%, 100% {
+    opacity: 0.4;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+/* Claude & macOS Chat Typography & Bubbles */
+#view-jarvis.active .chat-message.assistant .chat-bubble {
+  max-width: 100% !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--clavis-ink) !important;
+  font-size: 14.5px !important;
+  line-height: 1.68 !important;
+  letter-spacing: -0.01em !important;
+}
+
+#view-jarvis.active .chat-message.assistant .chat-bubble p {
+  margin-bottom: 10px !important;
+}
+#view-jarvis.active .chat-message.assistant .chat-bubble p:last-child {
+  margin-bottom: 0 !important;
+}
+
+#view-jarvis.active .chat-message.assistant .chat-avatar {
+  width: 26px !important;
+  height: 26px !important;
+  margin-right: 12px !important;
+  border: 1px solid var(--clavis-line-strong) !important;
+  background: var(--clavis-surface) !important;
+  color: var(--clavis-muted) !important;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04) !important;
+  border-radius: 8px !important;
+}
+
+#view-jarvis.active .chat-message.user {
+  justify-content: flex-end !important;
+}
+
+#view-jarvis.active .chat-message.user .chat-bubble {
+  max-width: min(680px, 80%) !important;
+  padding: 10px 16px !important;
+  border: 1px solid var(--clavis-line) !important;
+  border-radius: 18px 18px 4px 18px !important;
+  background: #f1f5f9 !important;
+  color: var(--clavis-ink) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.03) !important;
+  font-size: 14.5px !important;
+  line-height: 1.55 !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active .chat-message.user .chat-bubble {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+}
+
+/* Composer is the primary action: stronger than the canvas, quieter than a
+   card, and visibly keyboard-focusable. */
+#view-jarvis.active .jarvis-input-container {
+  max-width: 620px !important;
+  width: min(620px, calc(100% - 28px)) !important;
+  margin-bottom: 16px;
+  padding: 13px 14px 10px;
+  border: 1px solid var(--clavis-line-strong) !important;
+  border-radius: 20px !important;
+  background: rgba(255, 255, 255, 0.92) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  box-shadow: 0 2px 8px rgba(21, 33, 36, .04), 0 12px 32px rgba(21, 33, 36, .06) !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active .jarvis-input-container {
+  background: rgba(23, 31, 32, 0.92) !important;
+  border-color: var(--clavis-line) !important;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.35) !important;
+}
+
+#view-jarvis.active .jarvis-input-container:focus-within {
+  border-color: var(--clavis-accent) !important;
+  box-shadow: 0 0 0 3px var(--clavis-focus), 0 4px 14px rgba(21, 33, 36, .07) !important;
+}
+
+#view-jarvis.active .claude-textarea {
+  min-height: 44px !important;
+  height: auto !important;
+  max-height: 180px;
+  padding: 2px 2px 0 !important;
+  color: var(--clavis-ink) !important;
+  font-size: 15px;
+  line-height: 1.45;
+  resize: none;
+  overflow-y: hidden;
+}
+
+#view-jarvis.active .jarvis-composer-editor { min-width: 0; }
+#view-jarvis.active .jarvis-composer-hint { margin: 5px 2px 0; color: var(--clavis-muted); font-size: 11px; line-height: 1.2; opacity: .78; }
+#view-jarvis.active .jarvis-composer-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 7px; min-height: 34px; }
+#view-jarvis.active .jarvis-composer-tools, #view-jarvis.active .jarvis-composer-actions { display: flex; align-items: center; gap: 6px; }
+#view-jarvis.active .jarvis-composer-label { color: var(--clavis-muted); font-size: 12px; font-weight: 600; letter-spacing: .01em; }
+#view-jarvis.active .jarvis-composer-divider { width: 1px; height: 18px; background: var(--clavis-line); margin: 0 3px; }
+#view-jarvis.active .jarvis-composer-status { max-width: min(420px, 55vw); overflow: hidden; color: #9a5b18; font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+#view-jarvis.active .nexus-pet-host { display: none !important; }
+
+#view-jarvis.active .claude-icon-btn {
+  width: 32px;
+  min-width: 32px;
+  height: 32px;
+  min-height: 32px;
+  border-radius: 8px;
+  color: var(--clavis-muted) !important;
+}
+
+#view-jarvis.active .claude-icon-btn:hover {
+  background: var(--clavis-canvas) !important;
+  color: var(--clavis-ink) !important;
+}
+
+#view-jarvis.active .claude-send-btn {
+  background: var(--clavis-ink) !important;
+  color: #fff !important;
+  border-radius: 10px !important;
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+#view-jarvis.active .claude-send-btn:hover {
+  background: #4f46e5 !important;
+  transform: scale(1.08) translateZ(0) !important;
+}
+
+#view-jarvis.active .claude-send-btn:active {
+  transform: scale(0.92) translateZ(0) !important;
+}
+
+#view-jarvis.active .claude-send-btn.has-text {
+  background: linear-gradient(135deg, #6366f1, #4f46e5) !important;
+  color: #ffffff !important;
+  box-shadow: 0 2px 10px rgba(99, 102, 241, 0.45) !important;
+  transform: scale(1.05) translateZ(0) !important;
+}
+
+/* Lively Orb hover bloom */
+.clavis-liquid-orb:hover {
+  transform: scale(1.035) translateZ(0) !important;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.4), 0 16px 54px -4px rgba(124, 58, 237, 0.5), inset 0 0 32px rgba(0,0,0,0.5) !important;
+}
+
+#view-jarvis.active :is(button, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--clavis-accent) !important;
+  outline-offset: 2px;
+}
+
+/* Side panel reads as a secondary rail, not a second floating dashboard. */
+#view-jarvis.active .jarvis-side {
+  padding: 16px;
+  gap: 10px;
+  border: 0;
+  border-left: 1px solid var(--clavis-line);
+  border-radius: 0;
+  background: var(--clavis-canvas) !important;
+}
+
+#view-jarvis.active .jarvis-side-card {
+  padding: 13px;
+  border: 1px solid var(--clavis-line) !important;
+  border-radius: 10px !important;
+  background: var(--clavis-surface) !important;
+  box-shadow: none !important;
+}
+
+#view-jarvis.active .jarvis-side-card:hover {
+  border-color: var(--clavis-line-strong) !important;
+  box-shadow: 0 4px 12px rgba(21, 33, 36, .05) !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active {
+  --clavis-ink: #e7efee;
+  --clavis-muted: #a2b2b1;
+  --clavis-line: #2c3b3d;
+  --clavis-line-strong: #3d5051;
+  --clavis-surface: #171f20;
+  --clavis-canvas: #111819;
+  --clavis-accent: #53b8a9;
+  --clavis-accent-soft: #1b3835;
+  --clavis-focus: rgba(83, 184, 169, .24);
+}
+
+html[data-theme="dark"] #view-jarvis.active .chat-message.user .chat-bubble {
+  background: #263131 !important;
+}
+
+@media (max-width: 760px) {
+  #view-jarvis.active .jarvis-hero-header {
+    padding: 10px 12px;
+  }
+
+  #view-jarvis.active .jarvis-center-orb-wrapper {
+    flex-basis: 320px;
+    min-height: 320px !important;
+  }
+
+  #view-jarvis.active .jarvis-center-orb-wrapper #orb-container {
+    width: 146px !important;
+    height: 146px !important;
+  }
+
+  #view-jarvis.active .jarvis-chat-container,
+  #view-jarvis.active .jarvis-input-container {
+    width: calc(100% - 24px);
+  }
+
+  #view-jarvis.active .jarvis-chat-container {
+    max-height: 30vh;
+  }
+
+  #view-jarvis.active .jarvis-composer-hint { display: none; }
+  #view-jarvis.active .jarvis-composer-status { max-width: 45vw; }
+
+  #view-jarvis.active .jarvis-icon-pill,
+  #view-jarvis.active .jarvis-newchat-pill,
+  #view-jarvis.active .claude-icon-btn {
+    min-width: 44px;
+    width: 44px;
+    min-height: 44px;
+    height: 44px;
+  }
+
+  #view-jarvis.active .jarvis-newchat-pill {
+    padding-inline: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #view-jarvis.active *,
+  #view-jarvis.active *::before,
+  #view-jarvis.active *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
+
+
+/* ============================================================
+   CLAVIS RESPONSIVE & ANTI-BLUR SVG SYSTEM
+   - Fixes all button clickability, active states, and hover feedback
+   - Crisp SVG rendering across Retina and standard displays
+   - Mobile / Tablet / Desktop adaptive grid and off-canvas drawer
+   - Dropdown menu stuck-open resolution
+   ============================================================ */
+
+/* 1. ANTI-BLUR VECTOR SVG PRECISION */
+#view-jarvis svg,
+#view-jarvis .chat-bubble svg,
+#view-jarvis .jarvis-hero-header svg,
+#view-jarvis .jarvis-side svg,
+.jarvis-modal-overlay svg {
+  shape-rendering: geometricPrecision !important;
+  text-rendering: geometricPrecision !important;
+  image-rendering: -webkit-optimize-contrast !important;
+  flex-shrink: 0;
+  vertical-align: middle;
+}
+
+/* 2. UNIVERSAL BUTTON CLICKABILITY & INSTANT FEEDBACK */
+#view-jarvis button,
+#view-jarvis .jarvis-icon-pill,
+#view-jarvis .jarvis-newchat-pill,
+#view-jarvis .jarvis-handsfree-pill,
+#view-jarvis .jarvis-voice-main-btn,
+#view-jarvis .claude-icon-btn,
+#view-jarvis .jarvis-more-item,
+#view-jarvis .gf-btn,
+#view-jarvis .jarvis-qa-btn,
+#view-jarvis .jarvis-side-close-btn,
+.jarvis-modal button {
+  cursor: pointer !important;
+  pointer-events: auto !important;
+  touch-action: manipulation;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+#view-jarvis button:active,
+#view-jarvis .jarvis-icon-pill:active,
+#view-jarvis .jarvis-newchat-pill:active,
+#view-jarvis .jarvis-handsfree-pill:active,
+#view-jarvis .jarvis-voice-main-btn:active,
+#view-jarvis .claude-icon-btn:active,
+#view-jarvis .jarvis-more-item:active,
+#view-jarvis .gf-btn:active,
+#view-jarvis .jarvis-qa-btn:active,
+#view-jarvis .jarvis-side-close-btn:active {
+  transform: scale(0.94) !important;
+}
+
+/* 3. DROPDOWN MORE-MENU STRICT VISIBILITY */
+#view-jarvis #jarvis-more-panel[hidden],
+#view-jarvis #jarvis-more-panel:not(.open) {
+  display: none !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+}
+
+#view-jarvis #jarvis-more-panel.open,
+#view-jarvis #jarvis-more-panel:not([hidden]) {
+  display: flex !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 9999 !important;
+}
+
+/* 4. QUICK ACTION BUTTONS & CLOSE BUTTON */
+#view-jarvis .jarvis-qa-btn {
+  width: 100%;
+  border: 1px solid var(--clavis-line, #e2e8f0);
+  border-radius: 9px;
+  background: var(--clavis-surface, #ffffff);
+  color: var(--clavis-ink, #1e293b);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  text-align: left;
+}
+
+#view-jarvis .jarvis-qa-btn:hover {
+  background: var(--clavis-canvas, #f8fafc);
+  border-color: var(--clavis-accent, #6366f1);
+  color: var(--clavis-accent, #6366f1);
+}
+
+#view-jarvis .jarvis-qa-btn--danger {
+  color: #ef4444;
+}
+
+#view-jarvis .jarvis-qa-btn--danger:hover {
+  background: #fef2f2 !important;
+  border-color: #fca5a5 !important;
+  color: #dc2626 !important;
+}
+
+#view-jarvis .jarvis-side-close-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--clavis-line, #e2e8f0);
+  background: var(--clavis-surface, #ffffff);
+  color: var(--clavis-muted, #64748b);
+  flex-shrink: 0;
+}
+
+#view-jarvis .jarvis-side-close-btn:hover {
+  background: var(--clavis-canvas, #f1f5f9);
+  color: var(--clavis-ink, #0f172a);
+}
+
+/* 5. AVATAR SVG SHARPNESS */
+#view-jarvis .chat-message .chat-avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#view-jarvis .chat-message .chat-avatar svg {
+  width: 15px;
+  height: 15px;
+}
+
+/* 6. RESPONSIVE GEOMETRY ACROSS EVERY SCREEN SIZE */
+
+/* --- DESKTOP (> 960px) --- */
+@media (min-width: 961px) {
+  #view-jarvis.active .jarvis-split-layout {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr) !important;
+    width: 100% !important;
+    height: 100% !important;
+    min-height: 100% !important;
+    position: relative;
+    gap: 0;
+  }
+
+  #view-jarvis.active:has(.jarvis-side:not(.closed)) .jarvis-split-layout {
+    grid-template-columns: minmax(0, 1fr) 280px !important;
+  }
+
+  #view-jarvis.active .jarvis-hero-stage {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+  }
+
+  #view-jarvis.active .jarvis-side {
+    position: relative !important;
+    width: 280px !important;
+    max-width: 280px !important;
+    display: flex !important;
+    flex-direction: column !important;
+    transform: none !important;
+  }
+
+  #view-jarvis.active .jarvis-side.closed {
+    display: none !important;
+    width: 0 !important;
+  }
+
+  #jarvis-side-backdrop {
+    display: none !important;
+  }
+}
+
+/* --- TABLET & MOBILE (<= 960px) --- */
+@media (max-width: 960px) {
+  #view-jarvis.active .jarvis-split-layout {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    position: relative;
+  }
+
+  #view-jarvis.active .jarvis-hero-stage {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    flex: 1 1 auto !important;
+    height: 100% !important;
+  }
+
+  /* Side panel transforms into an elegant off-canvas drawer */
+  #view-jarvis.active .jarvis-side {
+    position: fixed !important;
+    top: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: min(340px, 86vw) !important;
+    max-width: 86vw !important;
+    height: 100vh !important;
+    max-height: 100vh !important;
+    background: var(--clavis-surface, #ffffff) !important;
+    box-shadow: -8px 0 28px rgba(0, 0, 0, 0.22) !important;
+    z-index: 10000 !important;
+    transform: translateX(0) !important;
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.2s ease !important;
+    overflow-y: auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    border-left: 1px solid var(--clavis-line, #e2e8f0) !important;
+  }
+
+  #view-jarvis.active .jarvis-side.closed {
+    transform: translateX(105%) !important;
+    pointer-events: none !important;
+    visibility: hidden !important;
+  }
+
+  /* Semi-transparent blur backdrop */
+  .jarvis-side-backdrop {
+    position: fixed !important;
+    inset: 0 !important;
+    background: rgba(15, 23, 42, 0.45) !important;
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
+    z-index: 9999 !important;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s ease;
+  }
+
+  .jarvis-side-backdrop.active {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* --- MOBILE SPECIFIC (<= 640px) --- */
+@media (max-width: 640px) {
+  #view-jarvis.active .jarvis-hero-header {
+    padding: 8px 10px !important;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  #view-jarvis.active .jarvis-status-pill {
+    padding: 4px 10px;
+    font-size: 11px;
+  }
+
+  #view-jarvis.active .jarvis-hero-actions {
+    gap: 4px;
+    margin-left: auto;
+  }
+
+  #view-jarvis.active .jarvis-icon-pill {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 !important;
+  }
+
+  #view-jarvis.active .jarvis-newchat-pill {
+    height: 36px !important;
+    min-height: 36px !important;
+    padding: 0 10px !important;
+    font-size: 12px !important;
+  }
+
+  /* Fluid Orb scaling so it never pushes the chat off-screen on mobile */
+  #view-jarvis.active .jarvis-center-orb-wrapper {
+    flex-basis: auto !important;
+    min-height: 200px !important;
+    padding: 12px 10px !important;
+  }
+
+  #view-jarvis.active .jarvis-center-orb-wrapper #orb-container {
+    width: 140px !important;
+    height: 140px !important;
+  }
+
+  #view-jarvis.active .jarvis-greeting-container {
+    margin-top: 6px !important;
+  }
+
+  #view-jarvis.active .jarvis-greeting {
+    font-size: 16px !important;
+  }
+
+  #view-jarvis.active .jarvis-subgreeting {
+    font-size: 13px !important;
+  }
+
+  #view-jarvis.active .clavis-voice-caption {
+    font-size: 11px !important;
+    margin-top: 4px !important;
+  }
+
+  #view-jarvis.active .jarvis-voice-main-btn {
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    min-height: 40px !important;
+  }
+
+  /* Chat message area */
+  #view-jarvis.active .jarvis-chat-container {
+    width: calc(100% - 16px) !important;
+    padding: 6px !important;
+  }
+
+  #view-jarvis.active .chat-bubble {
+    font-size: 13.5px !important;
+    padding: 10px 14px !important;
+    max-width: 90% !important;
+  }
+
+  /* Input composer on small screens */
+  #view-jarvis.active .jarvis-input-container {
+    width: calc(100% - 16px) !important;
+    margin: 6px auto !important;
+    padding: 10px 10px 8px !important;
+    border-radius: 14px !important;
+  }
+
+  #view-jarvis.active .claude-textarea {
+    font-size: 14px !important;
+    min-height: 38px !important;
+  }
+
+  #view-jarvis.active .jarvis-composer-label {
+    display: none;
+  }
+
+  #view-jarvis.active .jarvis-composer-divider {
+    display: none;
+  }
+
+  #view-jarvis.active .claude-icon-btn {
+    width: 36px !important;
+    min-width: 36px !important;
+    height: 36px !important;
+    min-height: 36px !important;
+  }
+}
+
+/* --- MODAL RESPONSIVENESS --- */
+.jarvis-modal-overlay {
+  padding: 12px !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.jarvis-modal {
+  width: min(540px, 94vw) !important;
+  max-width: 94vw !important;
+  max-height: 90vh !important;
+  border-radius: 16px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.jarvis-modal-body {
+  overflow-y: auto !important;
+  max-height: calc(90vh - 120px) !important;
+}
+
+
+/* ============================================================
+   MACOS SPRING LAYOUT TRANSITIONS & 1.8X DYNAMIC ORB SYSTEM
+   ============================================================ */
+
+/* 1. ZERO-BLUR CRYSTAL CLEAR ANTI-ALIASING */
+#view-jarvis,
+#view-jarvis *,
+#view-jarvis *::before,
+#view-jarvis *::after {
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: geometricPrecision !important;
+}
+
+#view-jarvis button,
+#view-jarvis .jarvis-icon-pill,
+#view-jarvis .jarvis-newchat-pill,
+#view-jarvis .jarvis-handsfree-pill,
+#view-jarvis .jarvis-side-close-btn,
+#view-jarvis .jarvis-qa-btn,
+#view-jarvis .jarvis-side-card {
+  transform: translateZ(0) !important;
+  -webkit-transform: translateZ(0) !important;
+  backface-visibility: hidden !important;
+  -webkit-backface-visibility: hidden !important;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+#view-jarvis .jarvis-side-card:hover,
+#view-jarvis .jarvis-qa-btn:hover {
+  transform: translateY(-1px) translateZ(0) !important;
+  -webkit-transform: translateY(-1px) translateZ(0) !important;
+  filter: none !important;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* 2. THREE-DOT DROPDOWN STRICT VISIBILITY */
+#jarvis-more-panel,
+.jarvis-more-panel,
+#view-jarvis #jarvis-more-panel {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: translateY(-4px) scale(0.97);
+  transition: opacity 0.18s ease, transform 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#jarvis-more-panel.open,
+.jarvis-more-panel.open,
+#jarvis-more-menu.open #jarvis-more-panel {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+  transform: translateY(0) scale(1) !important;
+}
+
+/* 3. MACOS-STYLE SPRING LAYOUT TRANSITION */
+#view-jarvis.active .jarvis-split-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) 0px !important;
+  width: 100% !important;
+  height: 100% !important;
+  min-height: 100% !important;
+  position: relative;
+  transition: grid-template-columns 0.62s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#view-jarvis.active:has(.jarvis-side:not(.closed)) .jarvis-split-layout {
+  grid-template-columns: minmax(0, 1fr) 280px !important;
+}
+
+#view-jarvis.active .jarvis-hero-stage {
+  width: 100% !important;
+  max-width: 100% !important;
+  min-width: 0 !important;
+  transition: transform 0.62s cubic-bezier(0.16, 1, 0.3, 1), padding 0.42s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Center stage orb container */
+#view-jarvis.active #jarvis-orb-stage {
+  transition: transform 0.62s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Side panel spring open/close */
+#view-jarvis.active .jarvis-side {
+  width: 280px !important;
+  max-width: 280px !important;
+  overflow-y: auto !important;
+  border-left: 1px solid var(--clavis-line, #e2e8f0) !important;
+  transition: transform 0.62s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s ease !important;
+  transform: translateX(0) !important;
+  opacity: 1 !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+#view-jarvis.active .jarvis-side.closed {
+  transform: translateX(100%) !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  visibility: hidden !important;
+  width: 0 !important;
+  padding: 0 !important;
+  border-left: none !important;
+}
+
+/* 4. LUXURY CELESTIAL ORB (SCREENSHOT 2 DAY-MODE COLORS & SLOW FLUID DRIFT) */
+.clavis-liquid-orb {
+  position: absolute !important;
+  inset: 0 !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  background: radial-gradient(circle at 36% 30%, #161926 0%, #0d101a 58%, #07080e 100%) !important;
+  box-shadow: 
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 8px 30px -4px rgba(15, 23, 42, 0.35),
+    0 0 22px rgba(99, 102, 241, 0.16),
+    inset 0 0 28px rgba(0, 0, 0, 0.65) !important;
+  cursor: pointer !important;
+  transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s ease !important;
+}
+
+.clavis-liquid-orb:hover {
+  transform: scale(1.025) !important;
+  box-shadow: 
+    0 0 0 1.5px rgba(255, 255, 255, 0.12),
+    0 12px 36px -4px rgba(15, 23, 42, 0.4),
+    0 0 28px rgba(124, 58, 237, 0.25),
+    inset 0 0 30px rgba(0, 0, 0, 0.7) !important;
+}
+
+/* Mesmerizing Slow Fluid Blobs matching Image 2 */
+.clavis-orb-blob {
+  position: absolute !important;
+  border-radius: 46% 54% 52% 48% / 50% 48% 52% 50% !important;
+  filter: blur(18px) !important;
+  mix-blend-mode: screen !important;
+  will-change: transform, opacity !important;
+}
+
+/* Blob 1: Top-Left Amber-Copper Sunset Flame (Image 2 signature warmth) */
+.clavis-orb-blob.b1 {
+  width: 80% !important;
+  height: 80% !important;
+  top: -10% !important;
+  left: -8% !important;
+  background: radial-gradient(circle, rgba(249, 115, 22, 0.95) 0%, rgba(234, 88, 12, 0.75) 45%, rgba(194, 65, 12, 0) 75%) !important;
+  opacity: 0.9 !important;
+  animation: clavisOrbBlob1 15s ease-in-out infinite alternate !important;
+}
+
+/* Blob 2: Center Royal Indigo & Deep Violet Swirl */
+.clavis-orb-blob.b2 {
+  width: 90% !important;
+  height: 90% !important;
+  top: 10% !important;
+  left: 18% !important;
+  background: radial-gradient(circle, rgba(99, 102, 241, 0.9) 0%, rgba(124, 58, 237, 0.75) 48%, rgba(79, 70, 229, 0) 78%) !important;
+  opacity: 0.85 !important;
+  animation: clavisOrbBlob2 19s ease-in-out infinite alternate !important;
+}
+
+/* Blob 3: Lower-Right Ocean Sapphire & Cyan Edge */
+.clavis-orb-blob.b3 {
+  width: 74% !important;
+  height: 74% !important;
+  bottom: -10% !important;
+  right: -6% !important;
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.85) 0%, rgba(13, 148, 136, 0.65) 46%, rgba(2, 132, 199, 0) 76%) !important;
+  opacity: 0.8 !important;
+  animation: clavisOrbBlob3 17s ease-in-out infinite alternate !important;
+}
+
+/* Blob 4: Center Core Depth Ambient Light */
+.clavis-orb-blob.b4 {
+  width: 65% !important;
+  height: 65% !important;
+  bottom: 8% !important;
+  left: 2% !important;
+  background: radial-gradient(circle, rgba(79, 70, 229, 0.6) 0%, rgba(30, 27, 75, 0.4) 50%, transparent 75%) !important;
+  opacity: 0.65 !important;
+  animation: clavisOrbBlob4 13s ease-in-out infinite alternate !important;
+}
+
+/* Subtle Specular Sheen (Curved Glass Highlight on Top-Left) */
+.clavis-orb-sheen {
+  position: absolute !important;
+  inset: 0 !important;
+  border-radius: 50% !important;
+  background: radial-gradient(circle at 32% 24%, rgba(255, 255, 255, 0.22) 0%, rgba(255, 255, 255, 0.04) 38%, transparent 62%) !important;
+  pointer-events: none !important;
+  z-index: 5 !important;
+}
+
+/* Gentle Keyframe Drifts: slow, hypnotic, organic liquid motion */
+@keyframes clavisOrbBlob1 {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+  35%  { transform: translate(6%, 5%) scale(1.06) rotate(12deg); }
+  70%  { transform: translate(-4%, 8%) scale(0.95) rotate(-10deg); }
+  100% { transform: translate(4%, -3%) scale(1.04) rotate(8deg); }
+}
+
+@keyframes clavisOrbBlob2 {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+  30%  { transform: translate(-8%, -5%) scale(1.05) rotate(-15deg); }
+  65%  { transform: translate(5%, 7%) scale(0.94) rotate(10deg); }
+  100% { transform: translate(-3%, 4%) scale(1.03) rotate(-8deg); }
+}
+
+@keyframes clavisOrbBlob3 {
+  0%   { transform: translate(0, 0) scale(1) rotate(0deg); }
+  40%  { transform: translate(-7%, -6%) scale(1.08) rotate(16deg); }
+  75%  { transform: translate(5%, -4%) scale(0.93) rotate(-12deg); }
+  100% { transform: translate(-2%, 5%) scale(1.02) rotate(6deg); }
+}
+
+@keyframes clavisOrbBlob4 {
+  0%   { transform: translate(0, 0) scale(1); }
+  50%  { transform: translate(5%, -5%) scale(1.1); }
+  100% { transform: translate(-4%, 3%) scale(0.96); }
+}
+
+/* Dynamic state reactivity (Quiet, functional product element) */
+#orb-container[data-orb-state="IDLE"] .clavis-liquid-orb {
+  transform: scale(1);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.05), inset 0 0 24px rgba(0, 0, 0, 0.25);
+}
+#orb-container[data-orb-state="IDLE"] .clavis-orb-blob {
+  --orb-speed: 0.35 !important;
+}
+
+#orb-container[data-orb-state="LISTENING"] .clavis-liquid-orb {
+  transform: scale(1.02);
+  box-shadow: 0 4px 24px -2px rgba(16, 185, 129, 0.25), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 0 24px rgba(0, 0, 0, 0.25);
+}
+#orb-container[data-orb-state="LISTENING"] .clavis-orb-blob {
+  --orb-speed: 1.2 !important;
+}
+
+#orb-container[data-orb-state="SPEAKING"] .clavis-liquid-orb {
+  transform: scale(1.03);
+  box-shadow: 0 4px 24px -2px rgba(245, 158, 11, 0.25), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 0 24px rgba(0, 0, 0, 0.25);
+}
+#orb-container[data-orb-state="SPEAKING"] .clavis-orb-blob {
+  --orb-speed: 1.5 !important;
+}
+
+#orb-container[data-orb-state="THINKING"] .clavis-liquid-orb {
+  transform: scale(1.02);
+  box-shadow: 0 4px 24px -2px rgba(99, 102, 241, 0.25), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 0 24px rgba(0, 0, 0, 0.25);
+}
+#orb-container[data-orb-state="THINKING"] .clavis-orb-blob {
+  --orb-speed: 1.3 !important;
+}
+
+#orb-container[data-orb-state="ERROR"] .clavis-liquid-orb {
+  transform: scale(1);
+  box-shadow: 0 4px 24px -2px rgba(239, 68, 68, 0.25), 0 1px 3px rgba(0, 0, 0, 0.08), inset 0 0 24px rgba(0, 0, 0, 0.25);
+}
+#orb-container[data-orb-state="ERROR"] .clavis-orb-blob {
+  --orb-speed: 0.5 !important;
+}
+
+/* 5. SIDE PANEL CLOSE BUTTON MACOS STYLE */
+#view-jarvis .jarvis-side-close-btn {
+  width: 26px !important;
+  height: 26px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--clavis-line, #e2e8f0) !important;
+  background: var(--clavis-surface, #ffffff) !important;
+  color: var(--clavis-muted, #64748b) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.16s ease !important;
+}
+
+#view-jarvis .jarvis-side-close-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: #cbd5e1 !important;
+}
+
+
+/* ============================================================
+   SCREENSHOT 2 LUXURY COMPOSER & PREMIUM TOOLBAR STYLING
+   ============================================================ */
+
+/* Top Header Toolbar Action Buttons (matching Screenshot 3) */
+#view-jarvis.active .jarvis-icon-pill {
+  width: 36px !important;
+  min-width: 36px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  border-radius: 10px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.16) !important;
+  transform: translateY(-1px) translateZ(0) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06) !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill:active {
+  transform: scale(0.94) translateZ(0) !important;
+}
+
+/* Sleek, Delicate Header Buttons (32px, Crisp Icons) */
+#view-jarvis.active .jarvis-icon-pill {
+  width: 32px !important;
+  min-width: 32px !important;
+  height: 32px !important;
+  min-height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #ffffff !important;
+  color: #475569 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  cursor: pointer !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill svg {
+  width: 14px !important;
+  height: 14px !important;
+  stroke-width: 1.7 !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+  transform: translateY(-1px) translateZ(0) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+#view-jarvis.active .jarvis-icon-pill:active {
+  transform: scale(0.95) translateZ(0) !important;
+}
+
+#view-jarvis.active #jarvis-speak-toggle,
+#view-jarvis.active #jarvis-header-panel-toggle,
+#view-jarvis.active #jarvis-handsfree-btn,
+#view-jarvis.active #jarvis-sound-trigger-btn,
+#view-jarvis.active #jarvis-more-btn {
+  background: #ffffff !important;
+  color: #475569 !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+}
+
+#view-jarvis.active #jarvis-speak-toggle:hover,
+#view-jarvis.active #jarvis-header-panel-toggle:hover,
+#view-jarvis.active #jarvis-handsfree-btn:hover,
+#view-jarvis.active #jarvis-sound-trigger-btn:hover,
+#view-jarvis.active #jarvis-more-btn:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+}
+
+#view-jarvis.active #jarvis-speak-toggle.active,
+#view-jarvis.active #jarvis-header-panel-toggle.active,
+#view-jarvis.active #jarvis-handsfree-btn.active,
+#view-jarvis.active #jarvis-sound-trigger-btn.active,
+#view-jarvis.active .jarvis-icon-pill.active {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.18) !important;
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active #jarvis-speak-toggle.active,
+html[data-theme="dark"] #view-jarvis.active #jarvis-header-panel-toggle.active,
+html[data-theme="dark"] #view-jarvis.active #jarvis-handsfree-btn.active,
+html[data-theme="dark"] #view-jarvis.active #jarvis-sound-trigger-btn.active,
+html[data-theme="dark"] #view-jarvis.active .jarvis-icon-pill.active {
+  background: rgba(255, 255, 255, 0.12) !important;
+  color: #f8fafc !important;
+  border-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+#view-jarvis.active .jarvis-actions-sep {
+  width: 1px !important;
+  height: 18px !important;
+  background: rgba(0, 0, 0, 0.09) !important;
+  margin: 0 4px !important;
+  display: inline-block !important;
+  flex-shrink: 0 !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active .jarvis-actions-sep {
+  background: rgba(255, 255, 255, 0.12) !important;
+}
+
+/* Status Pill in Header: compact badge */
+#view-jarvis.active #jarvis-status-pill,
+#view-jarvis.active .jarvis-status-pill {
+  height: 28px !important;
+  min-height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 6px !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  background: #f8fafc !important;
+  color: #475569 !important;
+  font-size: 11px !important;
+  font-weight: 550 !important;
+  letter-spacing: -0.01em !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  max-width: 140px !important;
+}
+
+/* New Chat Pill Button */
+#view-jarvis.active .jarvis-newchat-pill {
+  height: 32px !important;
+  min-height: 32px !important;
+  padding: 0 11px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #ffffff !important;
+  color: #0f172a !important;
+  font-size: 12px !important;
+  font-weight: 550 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+  transition: all 0.15s ease !important;
+}
+
+#view-jarvis.active .jarvis-newchat-pill svg {
+  width: 12px !important;
+  height: 12px !important;
+  stroke-width: 2.2 !important;
+}
+
+#view-jarvis.active .jarvis-newchat-pill:hover {
+  background: #f8fafc !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.14) !important;
+  transform: translateY(-1px) translateZ(0) !important;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.05) !important;
+}
+
+#view-jarvis.active .jarvis-newchat-pill:active {
+  transform: scale(0.95) translateZ(0) !important;
+}
+
+/* ── COMPOSER MAIN CAPSULE (SCREENSHOT 2 EXACT COMPACT REFINEMENT) ── */
+#view-jarvis.active .jarvis-luxury-composer,
+#view-jarvis.active .jarvis-input-container {
+  max-width: 620px !important;
+  width: min(620px, calc(100% - 28px)) !important;
+  margin: 0 auto 18px auto !important;
+  border-radius: 12px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 4px 16px -2px rgba(0, 0, 0, 0.05) !important;
+  padding: 10px 14px 10px 14px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  box-sizing: border-box !important;
+  cursor: text !important;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease !important;
+}
+
+#view-jarvis.active .jarvis-luxury-composer:focus-within,
+#view-jarvis.active .jarvis-input-container:focus-within {
+  border-color: rgba(0, 0, 0, 0.24) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03), 0 0 0 1px rgba(0, 0, 0, 0.08), 0 6px 20px -2px rgba(0, 0, 0, 0.07) !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active .jarvis-luxury-composer,
+html[data-theme="dark"] #view-jarvis.active .jarvis-input-container {
+  background: #182024 !important;
+  border-color: rgba(255, 255, 255, 0.09) !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active .jarvis-luxury-composer:focus-within,
+html[data-theme="dark"] #view-jarvis.active .jarvis-input-container:focus-within {
+  border-color: rgba(255, 255, 255, 0.22) !important;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.12), 0 8px 24px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* Upper Input Row with Live Typing Active Dot */
+.jarvis-composer-input-row {
+  display: flex !important;
+  align-items: center !important;
+  position: relative !important;
+  width: 100% !important;
+  min-height: 46px !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+}
+
+/* COMPLETE OVERRIDE OF INNER TEXTAREA: NO BORDERS, NO GRAY BOX, 100% CLICKABLE */
+#view-jarvis.active textarea#jarvis-input,
+#view-jarvis.active textarea.jarvis-luxury-textarea,
+#view-jarvis.active textarea.claude-textarea,
+textarea#jarvis-input {
+  flex: 1 !important;
+  width: 100% !important;
+  min-height: 44px !important;
+  height: auto !important;
+  max-height: 180px !important;
+  padding: 4px 0 !important;
+  margin: 0 !important;
+  border: none !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  resize: none !important;
+  color: #1e293b !important;
+  font-size: 14.5px !important;
+  line-height: 1.5 !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  letter-spacing: -0.01em !important;
+  cursor: text !important;
+  pointer-events: auto !important;
+  z-index: 10 !important;
+}
+
+#view-jarvis.active textarea#jarvis-input:focus,
+#view-jarvis.active textarea.jarvis-luxury-textarea:focus,
+#view-jarvis.active textarea.claude-textarea:focus {
+  border: none !important;
+  box-shadow: none !important;
+  outline: none !important;
+  background: transparent !important;
+}
+
+html[data-theme="dark"] #view-jarvis.active textarea#jarvis-input,
+html[data-theme="dark"] #view-jarvis.active textarea.jarvis-luxury-textarea,
+html[data-theme="dark"] #view-jarvis.active textarea.claude-textarea {
+  color: #f1f5f9 !important;
+}
+
+/* Discrete Typing Indicator */
+.jarvis-composer-active-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #94a3b8;
+  margin-left: 8px;
+  margin-right: 4px;
+  flex-shrink: 0;
+  opacity: 0.6;
+  transition: background-color 0.2s ease, opacity 0.2s ease;
+}
+
+.jarvis-luxury-composer:focus-within .jarvis-composer-active-dot {
+  background: #0f172a;
+  opacity: 0.85;
+}
+
+html[data-theme="dark"] .jarvis-composer-active-dot {
+  background: #64748b;
+}
+
+html[data-theme="dark"] .jarvis-luxury-composer:focus-within .jarvis-composer-active-dot {
+  background: #f8fafc;
+}
+
+/* Bottom Toolbar (Exact Screenshot 2 structure) */
+.jarvis-composer-bottom-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  margin-top: 8px !important;
+  padding-top: 4px !important;
+  gap: 12px !important;
+}
+
+.jarvis-composer-left-tools,
+.jarvis-composer-right-tools {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+}
+
+/* Quick Action / Plus Button [ + ] */
+.jarvis-composer-plus-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #f8fafc !important;
+  color: #64748b !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.jarvis-composer-plus-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.16) !important;
+  transform: translateY(-1px) translateZ(0) !important;
+}
+
+/* Inspiration Pill Button [ ⚡ Inspiration ⌵ ] */
+.jarvis-composer-insp-btn {
+  height: 32px !important;
+  padding: 0 12px !important;
+  border-radius: 8px !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #f8fafc !important;
+  color: #334155 !important;
+  font-size: 12px !important;
+  font-weight: 550 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.jarvis-composer-insp-btn:hover {
+  background: #f1f5f9 !important;
+  border-color: rgba(0, 0, 0, 0.16) !important;
+  color: #0f172a !important;
+  transform: translateY(-1px) translateZ(0) !important;
+}
+
+/* Model Selector Pill [ Brainwave 2.5 ⌵ ] */
+.jarvis-composer-model-btn {
+  height: 32px !important;
+  padding: 0 10px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  color: #475569 !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 5px !important;
+  cursor: pointer !important;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.jarvis-composer-model-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  border-color: rgba(0, 0, 0, 0.06) !important;
+}
+
+/* Clear Input Button [ ✕ ] (appears when text is typed, as in Screenshot 2) */
+.jarvis-composer-clear-btn {
+  width: 28px !important;
+  height: 28px !important;
+  border-radius: 50% !important;
+  border: none !important;
+  background: transparent !important;
+  color: #94a3b8 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.18s ease !important;
+}
+
+.jarvis-composer-clear-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  transform: scale(1.12) translateZ(0) !important;
+}
+
+/* Mic Voice Button [ 🎙 ] */
+.jarvis-composer-mic-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  color: #64748b !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.2s ease !important;
+}
+
+.jarvis-composer-mic-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+  transform: scale(1.08) translateZ(0) !important;
+}
+
+/* Up-Arrow Send Button [ ↑ ] (Round, Grey styling - strictly not black) */
+.jarvis-composer-up-btn,
+#view-jarvis .claude-send-btn,
+#jarvis-send-btn,
+#jarvis-stop-btn {
+  width: 34px !important;
+  min-width: 34px !important;
+  height: 34px !important;
+  min-height: 34px !important;
+  border-radius: 50% !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: #e2e8f0 !important;
+  color: #64748b !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  cursor: pointer !important;
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1) !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03) !important;
+}
+
+.jarvis-composer-up-btn:hover,
+#view-jarvis .claude-send-btn:hover,
+#jarvis-send-btn:hover {
+  transform: scale(1.06) translateZ(0) !important;
+  background: #cbd5e1 !important;
+  color: #334155 !important;
+}
+
+.jarvis-composer-up-btn.has-text,
+#view-jarvis .claude-send-btn.has-text,
+#jarvis-send-btn.has-text {
+  background: #6b7280 !important;
+  color: #ffffff !important;
+  border-color: #6b7280 !important;
+  box-shadow: 0 2px 10px rgba(107, 114, 128, 0.28) !important;
+  transform: scale(1.04) translateZ(0) !important;
+}
+
+.jarvis-composer-up-btn.has-text:hover,
+#view-jarvis .claude-send-btn.has-text:hover,
+#jarvis-send-btn.has-text:hover {
+  background: #4b5563 !important;
+  color: #ffffff !important;
+  transform: scale(1.08) translateZ(0) !important;
+  box-shadow: 0 4px 14px rgba(75, 85, 99, 0.35) !important;
+}
+
+/* Luxury Dropdown Menus */
+.jarvis-composer-dropdown {
+  position: absolute !important;
+  bottom: calc(100% + 10px) !important;
+  left: 0 !important;
+  min-width: 250px !important;
+  background: #ffffff !important;
+  border: 1px solid rgba(0, 0, 0, 0.09) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.14), 0 2px 6px rgba(0, 0, 0, 0.04) !important;
+  padding: 6px !important;
+  z-index: 9999 !important;
+  animation: clavisDropdownPop 0.22s cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+.jarvis-composer-dropdown--right {
+  left: auto !important;
+  right: 0 !important;
+}
+
+html[data-theme="dark"] .jarvis-composer-dropdown {
+  background: #1e293b !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.45) !important;
+}
+
+.jarvis-dropdown-item {
+  width: 100% !important;
+  border: none !important;
+  background: transparent !important;
+  padding: 8px 12px !important;
+  border-radius: 8px !important;
+  font-size: 12.5px !important;
+  font-weight: 550 !important;
+  color: #334155 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  text-align: left !important;
+  cursor: pointer !important;
+  transition: all 0.15s ease !important;
+}
+
+html[data-theme="dark"] .jarvis-dropdown-item {
+  color: #cbd5e1 !important;
+}
+
+.jarvis-dropdown-item:hover {
+  background: #f1f5f9 !important;
+  color: #0f172a !important;
+}
+
+html[data-theme="dark"] .jarvis-dropdown-item:hover {
+  background: #334155 !important;
+  color: #ffffff !important;
+}
+
+.jarvis-dropdown-item.active {
+  background: rgba(99, 102, 241, 0.08) !important;
+  color: #4f46e5 !important;
+}
+
+@keyframes clavisDropdownPop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.97); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* Slow, Silky-Smooth Sidebar Transitions */
+#view-jarvis.active .jarvis-side {
+  transition: transform 0.62s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.5s ease, width 0.62s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#view-jarvis.active .jarvis-split-layout {
+  transition: grid-template-columns 0.62s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#jarvis-side-backdrop {
+  transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1) !important;
+}

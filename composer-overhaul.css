@@ -1,0 +1,1196 @@
+/* ============================================================
+   COMPOSER OVERHAUL v2.0 — FINAL FIX
+   Loads last in the cascade (after all other CSS files).
+
+   Problems solved:
+   1. Pill shape INSIDE composer — luxury-ui.css line 320 adds
+      border + border-radius + background to .claude-textarea globally.
+      We kill that here.
+   2. Composer not clickable — overflow:hidden + isolation + z-index
+      stacking from luxury-ui.css blocks events in some browsers.
+   3. Send button needs grey fill + round circle shape.
+   4. Consistent design across all 3 AI composers.
+   ============================================================ */
+
+
+/* ── 1. KILL THE INNER PILL ──────────────────────────────────
+   Ensure textareas across ALL AI tabs have zero border, zero
+   background, zero radius, and zero shadow. No pill shape ever.
+   ──────────────────────────────────────────────────────────── */
+textarea.claude-textarea,
+textarea.claude-textarea:not(#jarvis-input):not(.jarvis-luxury-textarea),
+textarea:not(#jarvis-input):not(.jarvis-luxury-textarea),
+.claude-textarea,
+.claude-input-container textarea,
+.claude-input-container .claude-textarea,
+.candidate-composer textarea,
+.candidate-composer .claude-textarea,
+.jarvis-input-container textarea,
+.jarvis-input-container .claude-textarea,
+#view-jarvis textarea,
+#view-jarvis .claude-textarea,
+#view-chat textarea,
+#view-chat .claude-textarea,
+#view-candidate-ai textarea,
+#view-candidate-ai .claude-textarea,
+#chat-input,
+#candidate-ai-input,
+#jarvis-input,
+#view-chat #chat-input,
+#view-candidate-ai #candidate-ai-input,
+#view-jarvis #jarvis-input {
+  /* Remove every border/bg the luxury/design layer adds */
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  border-style: none !important;
+  border-color: transparent !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  -webkit-appearance: none !important;
+  appearance: none !important;
+
+  /* Correct padding so text sits naturally inside the container */
+  padding: 6px 4px 6px 4px !important;
+
+  /* Typography */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Figtree", sans-serif !important;
+  font-size: 15px !important;
+  font-weight: 400 !important;
+  line-height: 1.55 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--foreground, #111) !important;
+  caret-color: var(--foreground, #111) !important;
+
+  /* Layout */
+  width: 100% !important;
+  min-height: 28px !important;
+  max-height: 200px !important;
+  resize: none !important;
+  overflow-y: auto !important;
+  display: block !important;
+  box-sizing: border-box !important;
+
+  /* These make the element interactive */
+  pointer-events: auto !important;
+  cursor: text !important;
+  position: relative !important;
+  z-index: 5 !important;
+
+  /* No transition on the textarea content itself */
+  transition: none !important;
+}
+
+/* Placeholder */
+.claude-textarea::placeholder,
+#chat-input::placeholder,
+#candidate-ai-input::placeholder,
+#jarvis-input::placeholder {
+  color: rgba(127, 127, 127, 0.6) !important;
+  font-style: normal !important;
+  opacity: 1 !important;
+}
+
+/* Focused state — absolutely zero box or outline */
+textarea.claude-textarea:focus,
+textarea:not(#jarvis-input):not(.jarvis-luxury-textarea):focus,
+.claude-textarea:focus,
+.claude-input-container textarea:focus,
+.candidate-composer textarea:focus,
+.jarvis-input-container textarea:focus,
+#chat-input:focus,
+#candidate-ai-input:focus,
+#jarvis-input:focus,
+#view-chat #chat-input:focus,
+#view-candidate-ai #candidate-ai-input:focus,
+#view-jarvis #jarvis-input:focus {
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  border-width: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+}
+
+
+/* ── 2. FIX THE COMPOSER CONTAINER (ChatGPT Style) ───────────
+   Clean rounded rectangle (radius 24px) with subtle border
+   and elevation. Uniform across all 3 AI tabs.
+   ──────────────────────────────────────────────────────────── */
+.claude-input-container,
+.jarvis-input-container,
+.jarvis-luxury-composer,
+#view-candidate-ai .candidate-composer,
+#view-chat .claude-input-container,
+#view-jarvis .jarvis-input-container {
+  /* Un-clip so events and upward menus pass through correctly */
+  overflow: visible !important;
+  isolation: auto !important;
+
+  /* Clean ChatGPT-style geometry */
+  border-radius: 24px !important;
+  padding: 12px 16px 10px 18px !important;
+  position: relative !important;
+
+  /* Layout */
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0 !important;
+  box-sizing: border-box !important;
+
+  /* Smooth transitions */
+  transition:
+    border-color  240ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow    240ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform     240ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+/* Light mode */
+html[data-theme="light"] .claude-input-container,
+html[data-theme="light"] .jarvis-input-container,
+html[data-theme="light"] .jarvis-luxury-composer {
+  background: #FFFFFF !important;
+  border: 1px solid rgba(0, 0, 0, 0.09) !important;
+  box-shadow:
+    0 2px 6px rgba(0, 0, 0, 0.05),
+    0 8px 24px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Dark mode */
+html[data-theme="dark"] .claude-input-container,
+html[data-theme="dark"] .jarvis-input-container,
+html[data-theme="dark"] .jarvis-luxury-composer {
+  background: #1C1C1E !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 8px 28px rgba(0, 0, 0, 0.55) !important;
+}
+
+/* Hover — barely perceptible lift */
+html[data-theme="light"] .claude-input-container:hover,
+html[data-theme="light"] .jarvis-input-container:hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(0, 0, 0, 0.13) !important;
+  box-shadow:
+    0 4px 10px rgba(0, 0, 0, 0.07),
+    0 12px 32px rgba(0, 0, 0, 0.05) !important;
+}
+
+html[data-theme="dark"] .claude-input-container:hover,
+html[data-theme="dark"] .jarvis-input-container:hover {
+  transform: translateY(-1px) !important;
+  border-color: rgba(255, 255, 255, 0.12) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 36px rgba(0, 0, 0, 0.65) !important;
+}
+
+/* Focus — subtle ring */
+html[data-theme="light"] .claude-input-container:focus-within,
+html[data-theme="light"] .jarvis-input-container:focus-within {
+  transform: translateY(-1px) !important;
+  border-color: rgba(0, 0, 0, 0.15) !important;
+  box-shadow:
+    0 0 0 3px rgba(0, 0, 0, 0.05),
+    0 4px 12px rgba(0, 0, 0, 0.07),
+    0 12px 32px rgba(0, 0, 0, 0.04) !important;
+}
+
+html[data-theme="dark"] .claude-input-container:focus-within,
+html[data-theme="dark"] .jarvis-input-container:focus-within {
+  transform: translateY(-1px) !important;
+  border-color: rgba(255, 255, 255, 0.14) !important;
+  box-shadow:
+    0 0 0 3px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 12px 40px rgba(0, 0, 0, 0.7) !important;
+}
+
+
+/* ── 3. POINTER EVENTS — Ensure ALL content is clickable ────
+   The ::before/::after pseudo-elements are 400×95px overlays
+   that intercept click events. Must be pointer-events:none.
+   ──────────────────────────────────────────────────────────── */
+.claude-input-container::before,
+.claude-input-container::after,
+.claude-input-container .lx-hover-glow,
+.claude-input-container .lx-caret-dust,
+.claude-input-container .lx-caret-dust *,
+.claude-input-container .lx-dust,
+.jarvis-input-container::before,
+.jarvis-input-container::after,
+.jarvis-luxury-composer::before,
+.jarvis-luxury-composer::after {
+  pointer-events: none !important;
+  user-select: none !important;
+  z-index: 0 !important;
+}
+
+/* Force all clickable content above pseudo-elements */
+.claude-input-container .claude-textarea,
+.claude-input-container .claude-input-toolbar,
+.claude-input-container .claude-toolbar-left,
+.claude-input-container .claude-toolbar-right,
+.claude-input-container .claude-icon-btn,
+.claude-input-container button,
+.claude-input-container input,
+.claude-input-container .candidate-source-trigger,
+.claude-input-container .custom-dropdown,
+.claude-input-container .custom-dropdown-header,
+.jarvis-input-container .claude-textarea,
+.jarvis-input-container .jarvis-composer-input-row,
+.jarvis-input-container .jarvis-composer-bottom-bar,
+.jarvis-input-container button {
+  position: relative !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+}
+
+
+/* ── 4. TOOLBAR ROW ─────────────────────────────────────────*/
+.claude-input-toolbar,
+.jarvis-composer-bottom-bar {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: space-between !important;
+  gap: 4px !important;
+  padding-top: 4px !important;
+  margin-top: 0 !important;
+  flex-wrap: nowrap !important;
+  border-top: none !important;
+  position: relative !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+}
+
+.claude-toolbar-left,
+.jarvis-composer-left-tools {
+  display: flex !important;
+  align-items: center !important;
+  gap: 2px !important;
+  flex-shrink: 0 !important;
+}
+
+.claude-toolbar-right,
+.jarvis-composer-right-tools {
+  display: flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  flex-shrink: 0 !important;
+  margin-left: auto !important;
+}
+
+
+/* ── 5. ICON BUTTONS — Compact, not oversized ───────────────*/
+.claude-icon-btn,
+.jarvis-composer-btn,
+.jarvis-composer-plus-btn,
+.jarvis-composer-attach-btn,
+.jarvis-composer-insp-btn,
+.jarvis-composer-mic-btn,
+.jarvis-composer-clear-btn {
+  width:  28px !important;
+  height: 28px !important;
+  min-width:  28px !important;
+  min-height: 28px !important;
+  padding: 0 !important;
+  flex-shrink: 0 !important;
+  border: none !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  white-space: nowrap !important;
+  color: var(--do-t2, #888) !important;
+  position: relative !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+  transition:
+    background-color 160ms ease,
+    color            160ms ease,
+    transform         80ms ease !important;
+}
+
+.claude-icon-btn svg,
+.jarvis-composer-btn svg {
+  width: 15px !important;
+  height: 15px !important;
+  flex-shrink: 0 !important;
+}
+
+html[data-theme="light"] .claude-icon-btn:hover,
+html[data-theme="light"] .jarvis-composer-btn:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #111111 !important;
+  transform: none !important;
+}
+
+html[data-theme="dark"] .claude-icon-btn:hover,
+html[data-theme="dark"] .jarvis-composer-btn:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #ffffff !important;
+  transform: none !important;
+}
+
+.claude-icon-btn:active,
+.jarvis-composer-btn:active {
+  transform: scale(0.90) !important;
+  transition-duration: 60ms !important;
+}
+
+
+/* ── 6. SEND BUTTON — Grey fill, round circle ───────────────
+   User wants: grey fill background, round shape, no gradients.
+   ──────────────────────────────────────────────────────────── */
+.claude-send-btn,
+.jarvis-composer-up-btn.claude-send-btn,
+#jarvis-send-btn,
+#chat-send-btn,
+#btn-candidate-ai-send {
+  /* Size — slightly larger than other icon btns */
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  padding: 0 !important;
+
+  /* Shape — round circle */
+  border-radius: 50% !important;
+  border: none !important;
+  cursor: pointer !important;
+
+  /* Layout */
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  position: relative !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+
+  /* Smooth transitions */
+  transition:
+    background-color 160ms ease,
+    transform        120ms cubic-bezier(0.175, 0.885, 0.32, 1.275),
+    box-shadow       160ms ease !important;
+}
+
+/* Light mode send — Apple neutral grey (NEVER black) */
+html[data-theme="light"] .claude-send-btn,
+html[data-theme="light"] #jarvis-send-btn,
+html[data-theme="light"] #chat-send-btn,
+html[data-theme="light"] #btn-candidate-ai-send,
+html:not(#_) body:not(#_) #view-chat .claude-send-btn,
+html:not(#_) body:not(#_) #view-candidate-ai .claude-send-btn,
+html:not(#_) body:not(#_) #btn-candidate-ai-send,
+html:not(#_) body:not(#_) #chat-send-btn {
+  background: #8E8E93 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+}
+
+/* Dark mode send — Apple neutral grey */
+html[data-theme="dark"] .claude-send-btn,
+html[data-theme="dark"] #jarvis-send-btn,
+html[data-theme="dark"] #chat-send-btn,
+html[data-theme="dark"] #btn-candidate-ai-send,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-chat .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-candidate-ai .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #btn-candidate-ai-send,
+html[data-theme="dark"]:not(#_) body:not(#_) #chat-send-btn {
+  background: #636366 !important;
+  color: #ffffff !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Empty composer state: soft light grey */
+html[data-theme="light"] .claude-input-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="light"] .candidate-composer[data-empty-input="1"] .claude-send-btn,
+html[data-theme="light"] .jarvis-input-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="light"] .chat-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="light"] .claude-input-container:has(textarea:placeholder-shown) .claude-send-btn,
+html[data-theme="light"] .candidate-composer:has(textarea:placeholder-shown) .claude-send-btn,
+html:not(#_) body:not(#_) .claude-input-container[data-empty-input="1"] .claude-send-btn,
+html:not(#_) body:not(#_) .candidate-composer[data-empty-input="1"] .claude-send-btn,
+html:not(#_) body:not(#_) #view-chat .chat-container[data-empty-input="1"] .claude-send-btn,
+html:not(#_) body:not(#_) #view-candidate-ai .chat-container[data-empty-input="1"] .claude-send-btn {
+  background: #E5E5EA !important;
+  color: #8E8E93 !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .claude-input-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"] .candidate-composer[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"] .jarvis-input-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"] .chat-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"] .claude-input-container:has(textarea:placeholder-shown) .claude-send-btn,
+html[data-theme="dark"] .candidate-composer:has(textarea:placeholder-shown) .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) .claude-input-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) .candidate-composer[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-chat .chat-container[data-empty-input="1"] .claude-send-btn,
+html[data-theme="dark"]:not(#_) body:not(#_) #view-candidate-ai .chat-container[data-empty-input="1"] .claude-send-btn {
+  background: #2C2C2E !important;
+  color: #636366 !important;
+  box-shadow: none !important;
+}
+
+/* Send icon size */
+.claude-send-btn svg,
+#jarvis-send-btn svg,
+#chat-send-btn svg,
+#btn-candidate-ai-send svg {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+/* Send hover — refined neutral grey lift */
+html[data-theme="light"] .claude-send-btn:hover,
+html[data-theme="light"] #chat-send-btn:hover,
+html[data-theme="light"] #jarvis-send-btn:hover,
+html[data-theme="light"] #btn-candidate-ai-send:hover {
+  background: #707075 !important;
+  color: #ffffff !important;
+  transform: scale(1.05) !important;
+}
+
+html[data-theme="dark"] .claude-send-btn:hover,
+html[data-theme="dark"] #chat-send-btn:hover,
+html[data-theme="dark"] #jarvis-send-btn:hover,
+html[data-theme="dark"] #btn-candidate-ai-send:hover {
+  background: #787880 !important;
+  color: #ffffff !important;
+  transform: scale(1.05) !important;
+}
+
+/* Active press */
+.claude-send-btn:active,
+#jarvis-send-btn:active,
+#chat-send-btn:active,
+#btn-candidate-ai-send:active {
+  transform: scale(0.93) !important;
+  transition-duration: 60ms !important;
+}
+
+
+/* ── 7. SOURCES PILL ────────────────────────────────────────*/
+.candidate-source-trigger {
+  height: 28px !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 4px !important;
+  cursor: pointer !important;
+  color: var(--do-t2, #888) !important;
+  white-space: nowrap !important;
+  position: relative !important;
+  z-index: 5 !important;
+  pointer-events: auto !important;
+  transition: background-color 160ms ease, color 160ms ease !important;
+}
+
+html[data-theme="light"] .candidate-source-trigger:hover {
+  background: rgba(0, 0, 0, 0.06) !important;
+  color: #111 !important;
+}
+
+html[data-theme="dark"] .candidate-source-trigger:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+  color: #fff !important;
+}
+
+.candidate-source-count {
+  min-width: 16px !important;
+  height: 16px !important;
+  padding: 0 4px !important;
+  border-radius: 99px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  line-height: 1 !important;
+  background: rgba(127, 127, 127, 0.15) !important;
+}
+
+.candidate-source-chevron {
+  opacity: 0.45 !important;
+  transition: transform 160ms ease !important;
+}
+
+.candidate-source-trigger[aria-expanded="true"] .candidate-source-chevron {
+  transform: rotate(180deg) !important;
+}
+
+
+/* ── 8. SOURCE DROPDOWN (UPWARDS FLOATING OVERLAY) ──────────
+   Must float strictly ABOVE the Sources button with upwards animation.
+   Never stretches or pushes the composer layout.
+   ──────────────────────────────────────────────────────────── */
+.cand-source-menu[hidden],
+#cand-source-chips[hidden],
+#client-source-chips[hidden] {
+  display: none !important;
+}
+
+.candidate-source-picker,
+.client-source-picker,
+.claude-toolbar-left .candidate-source-picker,
+.claude-toolbar-right .candidate-source-picker {
+  position: relative !important;
+  z-index: 60 !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
+
+.cand-source-menu,
+.claude-input-container .cand-source-menu,
+.candidate-composer .cand-source-menu,
+#view-candidate-ai .cand-source-menu,
+#view-chat .cand-source-menu,
+#cand-source-chips,
+#client-source-chips {
+  /* Floating overlay — completely removed from document flow */
+  position: absolute !important;
+  bottom: calc(100% + 10px) !important;
+  top: auto !important;
+  z-index: 9999 !important;
+  pointer-events: auto !important;
+
+  /* Sizing */
+  min-width: 220px !important;
+  max-width: 260px !important;
+  width: max-content !important;
+  padding: 8px !important;
+  border-radius: 16px !important;
+
+  /* Layout */
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 2px !important;
+  box-sizing: border-box !important;
+
+  /* Upward opening animation */
+  animation: cand-menu-flyup 220ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+/* Candidate AI: button is in left toolbar -> align menu to left edge of button */
+#view-candidate-ai .candidate-source-picker .cand-source-menu,
+#view-candidate-ai #cand-source-chips {
+  left: 0 !important;
+  right: auto !important;
+  transform-origin: bottom left !important;
+}
+
+/* Client AI: button is in right toolbar -> align menu to right edge of button */
+#view-chat .client-source-picker .cand-source-menu,
+#view-chat #client-source-chips {
+  right: 0 !important;
+  left: auto !important;
+  transform-origin: bottom right !important;
+}
+
+#view-candidate-ai .candidate-source-picker.is-open .cand-source-menu,
+#view-chat .client-source-picker.is-open .cand-source-menu {
+  animation: cand-menu-flyup 220ms cubic-bezier(0.16, 1, 0.3, 1) both !important;
+}
+
+/* Smooth upward spring animation */
+@keyframes cand-menu-flyup {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* Glassmorphic card styling in light mode */
+html[data-theme="light"] .cand-source-menu,
+html[data-theme="light"] #cand-source-chips,
+html[data-theme="light"] #client-source-chips {
+  background: rgba(255, 255, 255, 0.98) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.04),
+    0 16px 36px -4px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(0, 0, 0, 0.04) !important;
+}
+
+/* Glassmorphic card styling in dark mode */
+html[data-theme="dark"] .cand-source-menu,
+html[data-theme="dark"] #cand-source-chips,
+html[data-theme="dark"] #client-source-chips {
+  background: rgba(28, 28, 30, 0.96) !important;
+  backdrop-filter: blur(20px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.10) !important;
+  box-shadow:
+    0 4px 6px -1px rgba(0, 0, 0, 0.3),
+    0 20px 48px -4px rgba(0, 0, 0, 0.7),
+    0 0 0 1px rgba(255, 255, 255, 0.06) !important;
+}
+
+/* Chips inside dropdown */
+.cand-src-chip {
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  padding: 7px 10px !important;
+  min-height: 32px !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: var(--foreground, #111) !important;
+  text-align: left !important;
+  width: 100% !important;
+  box-sizing: border-box !important;
+  pointer-events: auto !important;
+  transition: background-color 140ms ease, color 140ms ease, transform 100ms ease !important;
+}
+
+html[data-theme="light"] .cand-src-chip:hover {
+  background: rgba(0, 0, 0, 0.05) !important;
+}
+
+html[data-theme="dark"] .cand-src-chip:hover {
+  background: rgba(255, 255, 255, 0.08) !important;
+}
+
+.cand-src-chip:active {
+  transform: scale(0.98) !important;
+}
+
+.cand-src-dot {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  background: rgba(127, 127, 127, 0.35) !important;
+  flex-shrink: 0 !important;
+  transition: background 160ms ease !important;
+}
+
+.cand-src-chip.active .cand-src-dot {
+  background: #10b981 !important;
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4) !important;
+}
+
+.cand-src-check {
+  margin-left: auto !important;
+  font-size: 12px !important;
+  font-weight: 700 !important;
+  color: #10b981 !important;
+  opacity: 0 !important;
+  transform: scale(0.8) !important;
+  transition: opacity 140ms ease, transform 140ms ease !important;
+}
+
+.cand-src-chip.active .cand-src-check {
+  opacity: 1 !important;
+  transform: scale(1) !important;
+}
+
+.cand-source-menu-head {
+  padding: 6px 10px 8px !important;
+  border-bottom: 1px solid rgba(127, 127, 127, 0.12) !important;
+  margin-bottom: 4px !important;
+}
+
+.cand-source-menu-head span {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Figtree", sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--foreground, #111) !important;
+  display: block !important;
+}
+
+.cand-source-menu-head small {
+  font-size: 10.5px !important;
+  color: var(--do-t2, #888) !important;
+  opacity: 0.8 !important;
+  display: block !important;
+  margin-top: 1px !important;
+}
+
+
+/* ── 9. COMPOSER WIDTH & POSITIONING ────────────────────────*/
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  width: min(100%, 660px) !important;
+  max-width: 660px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-bottom: 20px !important;
+  transform: none !important;
+}
+
+#view-chat .claude-input-container:focus-within,
+#view-candidate-ai .claude-input-container:focus-within {
+  transform: translateY(-1px) !important;
+}
+
+/* Clavis/Jarvis */
+#view-jarvis.active .jarvis-input-container,
+#view-jarvis.active .jarvis-luxury-composer {
+  width: min(100%, 660px) !important;
+  max-width: 660px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  margin-bottom: 20px !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* Pet host */
+.nexus-pet-host {
+  width: min(100%, 660px) !important;
+  max-width: 660px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  transform: none !important;
+}
+
+/* Quick chips */
+.chat-quick-chips {
+  width: min(100%, 660px) !important;
+  max-width: 660px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+
+/* ── 10. CLAVIS COMPOSER STRUCTURE FIX ──────────────────────
+   Old rule: display:block — breaks flex layout.
+   ──────────────────────────────────────────────────────────── */
+#view-jarvis.active .jarvis-input-container {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.jarvis-composer-input-row {
+  display: flex !important;
+  align-items: flex-start !important;
+  cursor: text !important;
+  flex: 1 1 auto !important;
+  pointer-events: auto !important;
+  position: relative !important;
+  z-index: 5 !important;
+}
+
+.jarvis-composer-active-dot {
+  width: 7px !important;
+  height: 7px !important;
+  border-radius: 50% !important;
+  background: #22c55e !important;
+  flex-shrink: 0 !important;
+  margin-top: 10px !important;
+}
+
+#view-jarvis.active .jarvis-luxury-textarea,
+#view-jarvis.active textarea {
+  min-height: 26px !important;
+  height: auto !important;
+}
+
+
+/* ── 11. SIDEBAR ─────────────────────────────────────────────*/
+.sidebar .nav-item,
+.sidebar .nav-sub-item {
+  min-height: 32px !important;
+  height: 32px !important;
+  max-height: 32px !important;
+  padding: 0 10px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  border-radius: 8px !important;
+  gap: 8px !important;
+}
+
+.sidebar .nav-item svg,
+.sidebar .nav-sub-item svg {
+  width: 14px !important;
+  height: 14px !important;
+  flex-shrink: 0 !important;
+  opacity: 0.7 !important;
+}
+
+.sidebar .nav-item.active svg { opacity: 1 !important; }
+
+.lx-usage-card {
+  margin: 6px 8px 8px !important;
+  padding: 10px 12px !important;
+  border-radius: 10px !important;
+  font-size: 12px !important;
+}
+
+
+/* ── 12. TOPBAR ─────────────────────────────────────────────*/
+.topbar {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 16px !important;
+}
+
+.tb-history-btn,
+.tb-shortcuts-btn,
+.tb-run-agent-btn {
+  height: 28px !important;
+  padding: 0 10px !important;
+  border-radius: 7px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+
+/* ── 13. CLEAN UP GLOBAL BUTTON TRANSFORMS ──────────────────
+   luxury-ui.css adds `transform: scale(1.1)` etc to many btns.
+   Reset to sensible defaults.
+   ──────────────────────────────────────────────────────────── */
+button:hover { transform: none !important; }
+button:active { opacity: 0.82 !important; }
+
+/* Exceptions that SHOULD animate */
+.claude-send-btn:hover,
+#jarvis-send-btn:hover,
+#chat-send-btn:hover,
+#btn-candidate-ai-send:hover {
+  transform: scale(1.05) !important;
+  opacity: 1 !important;
+}
+
+.claude-send-btn:active,
+#jarvis-send-btn:active,
+#chat-send-btn:active,
+#btn-candidate-ai-send:active {
+  transform: scale(0.93) !important;
+  opacity: 1 !important;
+}
+
+/* Card hover — only mild lift */
+.stat-card:hover,
+.do-stat-card:hover,
+.chart-card:hover {
+  transform: translate3d(0, -2px, 0) !important;
+}
+
+
+/* ── 14. SMOOTH PAGE + MESSAGE ANIMATIONS ────────────────────*/
+@keyframes view-enter {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.view.active {
+  animation: view-enter 480ms cubic-bezier(0.22, 1, 0.36, 1) backwards !important;
+}
+
+.view.active > *:nth-child(1) { animation-delay:   0ms !important; }
+.view.active > *:nth-child(2) { animation-delay:  45ms !important; }
+.view.active > *:nth-child(3) { animation-delay:  80ms !important; }
+.view.active > *:nth-child(n+4) { animation-delay: 110ms !important; }
+
+@keyframes msg-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.chat-message {
+  animation: msg-in 260ms cubic-bezier(0.22, 1, 0.36, 1) backwards !important;
+}
+
+
+/* ── 15. SCROLLBARS — macOS style ────────────────────────────*/
+*::-webkit-scrollbar { width: 4px !important; height: 4px !important; }
+*::-webkit-scrollbar-track { background: transparent !important; }
+
+html[data-theme="light"] *::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.14) !important;
+  border-radius: 10px !important;
+}
+
+html[data-theme="dark"] *::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.13) !important;
+  border-radius: 10px !important;
+}
+
+
+/* ── 16. FOCUS RING — system-like ───────────────────────────*/
+:focus-visible {
+  outline: 2px solid rgba(99, 102, 241, 0.45) !important;
+  outline-offset: 2px !important;
+  border-radius: 4px !important;
+}
+
+html[data-theme="dark"] :focus-visible {
+  outline-color: rgba(210, 210, 210, 0.3) !important;
+}
+
+/* No outline on textarea — container shows focus state */
+.claude-textarea:focus-visible,
+#chat-input:focus-visible,
+#candidate-ai-input:focus-visible,
+#jarvis-input:focus-visible {
+  outline: none !important;
+}
+
+
+/* ── 17. CHIP BUTTONS (quick suggestions) ───────────────────*/
+.chat-chip {
+  border-radius: 8px !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  padding: 6px 11px !important;
+  transition:
+    background-color 160ms ease,
+    border-color     160ms ease,
+    transform        120ms ease !important;
+}
+
+html[data-theme="light"] .chat-chip:hover {
+  transform: translateY(-1px) !important;
+  opacity: 1 !important;
+}
+
+html[data-theme="dark"] .chat-chip:hover {
+  transform: translateY(-1px) !important;
+  opacity: 1 !important;
+}
+
+
+/* ── 18. STOP TRANSFORM WARS ────────────────────────────────
+   Old rules set translateY(10px) on the containers.
+   Single source of truth here.
+   ──────────────────────────────────────────────────────────── */
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  transform: none !important;
+}
+
+#view-chat .claude-input-container:focus-within,
+#view-candidate-ai .claude-input-container:focus-within {
+  transform: translateY(-1px) !important;
+}
+
+
+/* ── 19. RESPONSIVE ─────────────────────────────────────────*/
+@media (max-width: 600px) {
+  #view-chat .claude-input-container,
+  #view-candidate-ai .claude-input-container,
+  #view-jarvis.active .jarvis-input-container {
+    border-radius: 14px !important;
+    padding: 8px 10px 6px !important;
+    margin-bottom: 12px !important;
+  }
+}
+
+/* ── 20. CHAT ALIGNMENT — User Right, AI Left ───────────────
+   Candidate AI & Client AI user bubbles right-aligned,
+   AI assistant replies and thinking indicator left-aligned.
+   ──────────────────────────────────────────────────────────── */
+#view-chat .chat-message.user,
+#view-candidate-ai .chat-message.user,
+.chat-messages .chat-message.user {
+  display: flex !important;
+  flex-direction: row-reverse !important;
+  justify-content: flex-end !important;
+  align-items: flex-end !important;
+  align-self: flex-end !important;
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  width: auto !important;
+  max-width: 82% !important;
+}
+
+#view-chat .chat-message.user .chat-bubble,
+#view-candidate-ai .chat-message.user .chat-bubble,
+.chat-messages .chat-message.user .chat-bubble {
+  margin-left: auto !important;
+  margin-right: 0 !important;
+  align-self: flex-end !important;
+  border-radius: 18px 18px 4px 18px !important;
+  background: #f0f0ec !important;
+  color: #1a1a19 !important;
+  border: 1px solid rgba(0, 0, 0, 0.06) !important;
+  padding: 10px 16px !important;
+}
+
+html[data-theme="dark"] #view-chat .chat-message.user .chat-bubble,
+html[data-theme="dark"] #view-candidate-ai .chat-message.user .chat-bubble,
+html[data-theme="dark"] .chat-messages .chat-message.user .chat-bubble {
+  background: #2a2a28 !important;
+  color: #f3f3ee !important;
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+}
+
+#view-chat .chat-message.user .chat-avatar,
+#view-candidate-ai .chat-message.user .chat-avatar,
+.chat-messages .chat-message.user .chat-avatar {
+  display: none !important;
+}
+
+#view-chat .chat-message.assistant,
+#view-candidate-ai .chat-message.assistant,
+.chat-messages .chat-message.assistant,
+.lx-status-row,
+#cand-typing-indicator,
+#typing-indicator,
+.cc-typing {
+  display: flex !important;
+  flex-direction: row !important;
+  justify-content: flex-start !important;
+  align-items: flex-start !important;
+  align-self: flex-start !important;
+  margin-left: 0 !important;
+  margin-right: auto !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
+
+/* ── 21. COMPOSER PINNED AT BOTTOM & SPATIOUS CHAT AREA ─────
+   More room for reading conversation, composer sits firmly
+   at the bottom.
+   ──────────────────────────────────────────────────────────── */
+#view-chat .chat-container,
+#view-candidate-ai .chat-container {
+  padding-bottom: 8px !important;
+  justify-content: flex-end !important;
+}
+
+#view-chat .chat-container[data-chat-state="empty"],
+#view-candidate-ai .chat-container[data-chat-state="empty"] {
+  justify-content: center !important;
+}
+
+#view-chat .chat-messages,
+#view-candidate-ai .chat-messages {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;
+}
+
+#view-candidate-ai .candidate-composer,
+#view-chat .claude-input-container {
+  margin-bottom: 0 !important;
+  flex-shrink: 0 !important;
+}
+
+#candidate-ai-status:empty,
+#candidate-ai-status:blank,
+#candidate-ai-status[style*="display:none"],
+#candidate-ai-status[style*="display: none"] {
+  display: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  height: 0 !important;
+  min-height: 0 !important;
+}
+
+/* Avatar must NEVER spin or rotate while thinking */
+.lx-status-avatar svg,
+.cc-typing-avatar svg,
+#cand-typing-indicator svg,
+#typing-indicator svg {
+  animation: none !important;
+  transform: none !important;
+}
+
+/* ── 22. NEW CHAT BUTTON (Candidate AI & Client AI) ─────────
+   Prominent, beautifully styled Apple-grade pill button.
+   ──────────────────────────────────────────────────────────── */
+.chat-top-header {
+  position: absolute !important;
+  top: 14px !important;
+  left: 20px !important;
+  z-index: 20 !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+}
+
+.claude-new-chat-btn {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 6px 14px !important;
+  border-radius: 999px !important;
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+  cursor: pointer !important;
+  border: 1px solid rgba(0, 0, 0, 0.08) !important;
+  background: rgba(255, 255, 255, 0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  color: #374151 !important;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05) !important;
+  transition: all 180ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+.claude-new-chat-btn svg {
+  color: #6b7280 !important;
+  stroke: #6b7280 !important;
+  flex-shrink: 0 !important;
+  transition: transform 180ms ease !important;
+}
+
+.claude-new-chat-btn:hover {
+  background: #ffffff !important;
+  border-color: rgba(0, 0, 0, 0.16) !important;
+  color: #111827 !important;
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.08) !important;
+  transform: translateY(-1px) !important;
+}
+
+.claude-new-chat-btn:hover svg {
+  color: #111827 !important;
+  stroke: #111827 !important;
+  transform: rotate(90deg) !important;
+}
+
+.claude-new-chat-btn:active {
+  transform: scale(0.96) !important;
+}
+
+html[data-theme="dark"] .claude-new-chat-btn {
+  background: rgba(36, 36, 40, 0.85) !important;
+  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  color: #e5e7eb !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+html[data-theme="dark"] .claude-new-chat-btn svg {
+  color: #9ca3af !important;
+  stroke: #9ca3af !important;
+}
+
+html[data-theme="dark"] .claude-new-chat-btn:hover {
+  background: rgba(48, 48, 54, 0.95) !important;
+  border-color: rgba(255, 255, 255, 0.2) !important;
+  color: #ffffff !important;
+}
+
+html[data-theme="dark"] .claude-new-chat-btn:hover svg {
+  color: #ffffff !important;
+  stroke: #ffffff !important;
+}

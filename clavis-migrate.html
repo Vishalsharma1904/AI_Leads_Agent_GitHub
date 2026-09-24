@@ -1,0 +1,33 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Clavis migrate</title>
+<script>
+/* Receives settings + keys from the file:// copy of Clavis (see
+   file-protocol-guard.js) and stores them for http://localhost:3000.
+   Only fills gaps — nothing that already exists here is overwritten — and
+   only Clavis's own settings namespaces are accepted. */
+(function () {
+  'use strict';
+  var ALLOW = /^(clavis_|jarvis_|skylark|nexus_|app_|theme|lang)/i;
+  var NEVER = /^(clavis_vault_|clavis_mic_permission|sb-)/i;
+  window.addEventListener('message', function (e) {
+    // A file:// page posts with origin "file://" in Chrome ("null" per spec).
+    if ((e.origin !== 'file://' && e.origin !== 'null') || !e.data || e.data.type !== 'clavis-migrate') return;
+    var wrote = 0;
+    var ls = e.data.ls || {};
+    Object.keys(ls).forEach(function (k) {
+      if (!ALLOW.test(k) || NEVER.test(k) || localStorage.getItem(k) !== null) return;
+      try { localStorage.setItem(k, String(ls[k])); wrote++; } catch (_) {}
+    });
+    var keys = e.data.keys || {};
+    var map = {};
+    try { map = JSON.parse(localStorage.getItem('clavis_provider_keys') || '{}') || {}; } catch (_) {}
+    Object.keys(keys).forEach(function (p) {
+      var list = (keys[p] || []).filter(function (k) { return typeof k === 'string' && k.length > 10 && k.length < 300; });
+      if (list.length && !map[p]) { map[p] = list[0]; wrote++; }
+    });
+    try { localStorage.setItem('clavis_provider_keys', JSON.stringify(map)); } catch (_) {}
+    try { e.source.postMessage({ type: 'clavis-migrate-ok', wrote: wrote }, '*'); } catch (_) {}
+  });
+})();
+</script>

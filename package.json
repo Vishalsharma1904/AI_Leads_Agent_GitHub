@@ -1,0 +1,31 @@
+{
+  "name": "a.i.-leads-agent",
+  "version": "1.0.0",
+  "description": "Clavis \u2014 B2B Lead Generation Agent for security & housekeeping staffing agencies. Built by Rudra24 Secure Group. Yeh project aapki company ke liye un buyer companies ko dhundhta hai jinhe security guards aur housekeeping staff ki zarurat hoti hai (jaise Hotels, Hospitals, IT Parks, Malls).",
+  "main": "agent.js",
+  "scripts": {
+    "start": "npm run dev",
+    "frontend": "node serve-clavis.js",
+    "ui:root": "node serve-clavis.js",
+    "backend": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start-backend.ps1",
+    "dev": "concurrently \"npm run frontend\" \"npm run backend\"",
+    "build:css": "npx @tailwindcss/cli -i ./src/input.css -o ./styles_tailwind.css",
+    "test": "node scripts/run-all-checks.js",
+    "test:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-speech.ps1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "autoprefixer": "^10.5.4",
+    "concurrently": "^10.0.4",
+    "postcss": "^8.5.25",
+    "serve": "^14.2.4",
+    "tailwindcss": "^4.3.3"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.116.0",
+    "ogl": "^1.0.11"
+  }
+}

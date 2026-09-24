@@ -1,0 +1,14 @@
+/* Reliability affordances: actions must match the failure, and retry should
+   read as the calm, warm primary action requested for provider throttles. */
+.cts[data-phase="failed"] .cts-act.is-primary {
+  background: #d7bd7b !important;
+  color: #3d3421 !important;
+  border-color: #c9ad68 !important;
+  box-shadow: 0 1px 2px rgba(91, 70, 26, 0.18) !important;
+}
+.cts[data-phase="failed"] .cts-act.is-primary:hover,
+.cts[data-phase="failed"] .cts-act.is-primary:focus-visible {
+  background: #cdb06a !important;
+  color: #302816 !important;
+  box-shadow: 0 5px 14px rgba(91, 70, 26, 0.22) !important;
+}

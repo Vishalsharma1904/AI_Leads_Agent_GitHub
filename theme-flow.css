@@ -1,0 +1,4272 @@
+/* ============================================================
+   THEME: FLOW  (theme-flow.css)
+
+   Design direction taken from Wispr Flow's published rebrand notes:
+
+     Colour     "soft neutrals and thoughtful contrast", deliberately away from
+                clinical AI palettes; "inspired more by quiet luxury and
+                editorial design than by dashboards"; "subtle green accents
+                used in CTAs and UI details" that read as "calm vitality, not
+                urgency".
+     Type       Figtree for clean modernism, paired with an editorial serif for
+                warmth and expression. "Utilitarian but airy", with humanistic
+                quirks in numerals and punctuation.
+     Layout     Gentle curves, generous spacing, soft corners. Wide margins and
+                clear hierarchy — "less SaaS dashboard, more editorial Sunday".
+     Motion     "Subtle microinteractions and slow fades create emotional
+                pacing." Restraint over spectacle: brand through rhythm, not noise.
+
+   THIS FILE MUST LOAD LAST. The app has several older stylesheets that use
+   !important heavily, so the custom properties here are marked !important to
+   win without needing those files rewritten.
+
+   PERFORMANCE RULE
+   Everything animated below is limited to `transform`, `opacity` and `color`.
+   Those are the only properties the browser can animate on the compositor
+   without recalculating layout, which is what keeps interaction at 60fps.
+   ============================================================ */
+
+/* ── 1. PALETTE ─────────────────────────────────────────── */
+:root {
+  /* Signature accents. Lilac is the action colour for the Wispr-style neo-brutalist theme. */
+  --flow-green:        #EBD9FF;   /* Lilac primary */
+  --flow-green-hover:  #E0C7FE;
+  --flow-green-soft:   #F5EEFF;
+  --flow-green-ring:   rgba(17, 17, 17, 0.24);
+  --flow-lumen:        #EBC88F;   /* warm sand */
+  --flow-pulse:        #E2603C;   /* coral, for genuine urgency only */
+  --flow-dawn:         #DDD8D0;   /* warm neutral gray */
+  --flow-border-strong: #111111;  /* High contrast border */
+
+  /* Editorial rhythm */
+  --flow-radius-sm: 10px;
+  --flow-radius:    14px;
+  --flow-radius-lg: 20px;
+
+  /* Slow, calm easing. Used everywhere instead of ad-hoc cubic-beziers. */
+  --flow-ease:      cubic-bezier(0.22, 1, 0.36, 1);
+  --flow-ease-soft: cubic-bezier(0.4, 0, 0.2, 1);
+  --flow-fast:      140ms;
+  --flow-normal:    260ms;
+  --flow-slow:      480ms;
+
+  /* Type stacks */
+  --flow-sans:  'Figtree', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --flow-serif: 'Instrument Serif', 'Iowan Old Style', Georgia, 'Times New Roman', serif;
+  --flow-mono:  'JetBrains Mono', 'SFMono-Regular', ui-monospace, monospace;
+}
+
+/* Warm paper light mode — creamy Wispr off-white */
+html[data-theme="light"] {
+  --background:  #FEFDF5 !important;
+  --foreground:  #111111 !important;
+  --card:        #FFFFFF !important;
+  --border:      rgba(17, 17, 17, 0.12) !important;
+  --primary:     var(--flow-green) !important;
+  --gray-400:    #6E6A63 !important;
+  --gray-600:    #4A4741 !important;
+
+  --do-bg-primary:    #FEFDF5 !important;
+  --do-bg-secondary:  #FFFFFF !important;
+  --do-border:        rgba(17, 17, 17, 0.12) !important;
+  --do-border-strong: rgba(17, 17, 17, 0.2) !important;
+  --do-t1:            #111111 !important;
+  --do-t2:            #4A4741 !important;
+  --do-t3:            #857F76 !important;
+  --do-blue:          var(--flow-green) !important;
+  --do-blue-soft:     var(--flow-green-soft) !important;
+  --do-card-bg:       #FFFFFF !important;
+  --do-card-border:   rgba(17, 17, 17, 0.12) !important;
+
+  --flow-shadow:    0 1px 2px rgba(17, 17, 17, .04), 0 8px 24px -12px rgba(17, 17, 17, .10);
+  --flow-shadow-lg: 0 2px 4px rgba(17, 17, 17, .05), 0 20px 48px -16px rgba(17, 17, 17, .16);
+}
+
+/* Warm near-black dark mode — deep charcoal for stark contrast */
+html[data-theme="dark"] {
+  --background:  #111111 !important;
+  --foreground:  #FEFDF5 !important;
+  --card:        #1A1A1A !important;
+  --border:      rgba(254, 253, 245, 0.12) !important;
+  --primary:     #C0A3E5 !important; /* Muted Lilac */
+  --gray-400:    #9C958B !important;
+  --gray-600:    #B9B2A7 !important;
+
+  --do-bg-primary:    #111111 !important;
+  --do-bg-secondary:  #1A1A1A !important;
+  --do-border:        rgba(254, 253, 245, 0.12) !important;
+  --do-border-strong: rgba(254, 253, 245, 0.2) !important;
+  --do-t1:            #FEFDF5 !important;
+  --do-t2:            #C6BFB4 !important;
+  --do-t3:            #8E877D !important;
+  --do-blue:          #C0A3E5 !important;
+  --do-blue-soft:     rgba(192, 163, 229, 0.15) !important;
+  --do-card-bg:       #1A1A1A !important;
+  --do-card-border:   rgba(254, 253, 245, 0.12) !important;
+
+  --lx-dark-bg:     #111111 !important;
+  --flow-shadow:    0 1px 2px rgba(0, 0, 0, .4), 0 10px 28px -14px rgba(0, 0, 0, .65);
+  --flow-shadow-lg: 0 2px 6px rgba(0, 0, 0, .45), 0 24px 56px -18px rgba(0, 0, 0, .8);
+}
+
+/* ── 2. TYPOGRAPHY ──────────────────────────────────────── */
+body,
+input, textarea, select, button {
+  font-family: var(--flow-sans) !important;
+  /* Humanistic numerals and proper punctuation, as the reference describes. */
+  font-feature-settings: 'ss01' 1, 'cv01' 1, 'kern' 1, 'liga' 1 !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body { letter-spacing: -0.011em !important; }
+
+/* Editorial serif for expressive headings. Tight leading, generous size. */
+.flow-display,
+#welcome-greeting,
+#candidate-welcome-greeting,
+#do-greeting-title,
+.pg-head-text h1,
+.view-title {
+  font-family: var(--flow-serif) !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.03em !important;
+  line-height: 1.0 !important;
+  color: var(--foreground) !important;
+}
+
+/* Added for Wispr Flow overline text */
+.flow-overline {
+  font-family: var(--flow-sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  font-size: 0.75rem !important;
+  color: var(--gray-600) !important;
+  margin-bottom: 1.2rem !important;
+  display: block !important;
+}
+
+/* The large hero line above the chat composer. This is the signature moment:
+   oversized editorial serif, generous space beneath, nothing competing. */
+#welcome-greeting,
+#candidate-welcome-greeting {
+  font-size: clamp(3.0rem, 6.5vw, 5.0rem) !important;
+  margin: 0 0 0.8em !important;
+  max-width: 20ch;
+  text-wrap: balance;
+}
+#welcome-greeting .lx-greet-name {
+  font-style: italic;
+  color: var(--primary) !important;
+}
+
+#do-greeting-title { font-size: clamp(1.7rem, 3vw, 2.5rem) !important; }
+.view-title        { font-size: clamp(1.5rem, 2.4vw, 2rem) !important; }
+.pg-head-text h1   { font-size: clamp(1.5rem, 2.4vw, 2rem) !important; }
+
+/* Small labels stay in the sans, uppercase and quiet. */
+.nav-section-label,
+.smodal-nav-group-label,
+.pg-stat-label,
+.diag-section-title {
+  font-family: var(--flow-sans) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.08em !important;
+}
+
+code, kbd, pre, .pg-list code { font-family: var(--flow-mono) !important; }
+
+/* ── 3. SOFT GEOMETRY ───────────────────────────────────── */
+.stat-card, .do-stat-card, .chart-card, .do-chart-wrap, .analytics-card,
+.recent-leads-card, .email-sidebar-card, .agent-config-card, .agent-progress-card,
+.pg-card, .diag-card, .pg-modal-card {
+  border-radius: var(--flow-radius-lg) !important;
+  box-shadow: var(--flow-shadow) !important;
+}
+
+.btn-primary, .btn-secondary, .pg-btn, .smodal-btn-primary, .smodal-btn-secondary,
+.generate-btn, input, textarea, select, .pg-input, .filter-select {
+  border-radius: var(--flow-radius-sm) !important;
+}
+
+.nav-item, .nav-sub-item { border-radius: var(--flow-radius-sm) !important; }
+
+/* ── 4. REFINED BUTTONS (Soft Depth, Minimal Chrome) ──────────────────────── */
+.btn-primary,
+.pg-btn--primary,
+.smodal-btn-primary,
+.generate-btn,
+.ag-btn-submit {
+  background: var(--flow-green) !important;
+  border: 1px solid rgba(0,0,0,0.04) !important;
+  color: #111111 !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 4px 12px rgba(235, 217, 255, 0.4) !important;
+}
+html[data-theme="dark"] .btn-primary,
+html[data-theme="dark"] .pg-btn--primary,
+html[data-theme="dark"] .smodal-btn-primary,
+html[data-theme="dark"] .generate-btn,
+html[data-theme="dark"] .ag-btn-submit {
+  color: #111111 !important;
+  border: 1px solid rgba(255,255,255,0.04) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), 0 4px 12px rgba(192, 163, 229, 0.15) !important;
+}
+.btn-primary:hover:not(:disabled),
+.pg-btn--primary:hover:not(:disabled),
+.smodal-btn-primary:hover:not(:disabled),
+.generate-btn:hover:not(:disabled),
+.ag-btn-submit:hover:not(:disabled) {
+  background: var(--flow-green-hover) !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.04), 0 8px 16px rgba(235, 217, 255, 0.5) !important;
+}
+html[data-theme="dark"] .btn-primary:hover:not(:disabled),
+html[data-theme="dark"] .pg-btn--primary:hover:not(:disabled),
+html[data-theme="dark"] .smodal-btn-primary:hover:not(:disabled),
+html[data-theme="dark"] .generate-btn:hover:not(:disabled),
+html[data-theme="dark"] .ag-btn-submit:hover:not(:disabled) {
+  box-shadow: 0 4px 6px rgba(0,0,0,0.2), 0 8px 16px rgba(192, 163, 229, 0.25) !important;
+}
+
+/* Focus ring: visible, calm, and never removed. */
+:focus-visible {
+  outline: 2px solid var(--flow-border-strong) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px;
+}
+input:focus, textarea:focus, select:focus, .pg-input:focus {
+  border-color: var(--flow-border-strong) !important;
+  box-shadow: 0 0 0 3px var(--flow-green-ring) !important;
+}
+
+/* Sidebar active state: a quiet green marker rather than a filled block. */
+.sidebar .nav-item.active {
+  color: var(--foreground) !important;
+  background: var(--flow-green-soft) !important;
+}
+.sidebar .nav-item.active::before {
+  background: var(--flow-green) !important;
+}
+
+/* ── 5. MOTION — compositor-only, so it stays at 60fps ──── */
+/* `transition: all` forces the browser to watch layout properties. Replacing it
+   with an explicit list keeps these animations off the main thread. */
+.nav-item, .nav-sub-item, .btn-primary, .btn-secondary, .pg-btn,
+.stat-card, .do-stat-card, .chart-card, .pg-card, .pg-chip,
+.smodal-nav-item, .lead-row, tr {
+  transition:
+    transform var(--flow-normal) var(--flow-ease),
+    opacity   var(--flow-normal) var(--flow-ease-soft),
+    background-color var(--flow-fast) var(--flow-ease-soft),
+    border-color     var(--flow-fast) var(--flow-ease-soft),
+    color            var(--flow-fast) var(--flow-ease-soft) !important;
+}
+
+/* Cards lift on the compositor only. `translate3d` keeps them on their own layer. */
+.stat-card:hover, .do-stat-card:hover, .chart-card:hover,
+.analytics-card:hover, .pg-card:hover {
+  transform: translate3d(0, -3px, 0) !important;
+  box-shadow: var(--flow-shadow-lg) !important;
+}
+
+/* will-change is applied only while the pointer is over the parent, so the
+   browser is not asked to hold hundreds of extra layers permanently. */
+.pg-grid:hover .pg-card,
+.dashboard-grid:hover .stat-card { will-change: transform; }
+.pg-grid .pg-card,
+.dashboard-grid .stat-card { will-change: auto; }
+
+/* Slow, editorial page entrance. Opacity + translate only. */
+@keyframes flow-rise {
+  from { opacity: 0; transform: translate3d(0, 14px, 0); }
+  to   { opacity: 1; transform: none; }
+}
+.view.active > * {
+  animation: flow-rise var(--flow-slow) var(--flow-ease) backwards;
+}
+.view.active > *:nth-child(1) { animation-delay: 0ms; }
+.view.active > *:nth-child(2) { animation-delay: 45ms; }
+.view.active > *:nth-child(3) { animation-delay: 90ms; }
+.view.active > *:nth-child(4) { animation-delay: 135ms; }
+.view.active > *:nth-child(n+5) { animation-delay: 180ms; }
+
+/* Backdrop blur is expensive. Keep it for true overlays, drop it elsewhere. */
+.stat-card, .do-stat-card, .chart-card, .do-chart-wrap,
+.analytics-card, .pg-card, .toast {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Long scrolling lists: let the browser skip offscreen row work. */
+#leads-table-body tr,
+#candidates-table-body tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 52px;
+}
+
+/* Wheel input is smoothed by the RAF motion engine. Native CSS smooth scroll
+   restarts on every wheel tick and makes panels feel delayed or jittery. */
+.main-content, #main-scroll-area, .diag-body, .pg-modal-card,
+.smodal-content, .smodal-nav {
+  scroll-behavior: auto !important;
+  overscroll-behavior: contain;
+}
+
+/* ── 6. GENEROUS SPACING ────────────────────────────────── */
+/* The large bottom padding is deliberate: the chat composer is anchored at the
+   bottom of the panel, and content needs to clear it when scrolled to the end. */
+.view { padding: 30px 34px 110px !important; }
+@media (max-width: 900px) { .view { padding: 20px 18px 96px !important; } }
+
+.view-header { margin-bottom: 30px !important; }
+.view-subtitle {
+  font-size: 14px !important;
+  color: var(--gray-400) !important;
+  line-height: 1.6 !important;
+  max-width: 62ch;
+}
+
+/* ── 7. CHAT COMPOSER — calm, editorial ─────────────────── */
+.claude-input-container {
+  border-radius: var(--flow-radius-lg) !important;
+  border: 1px solid var(--flow-border-strong) !important;
+  box-shadow: 2px 2px 0px var(--flow-border-strong) !important;
+  transition:
+    transform var(--flow-normal) var(--flow-ease),
+    border-color var(--flow-normal) var(--flow-ease-soft),
+    box-shadow var(--flow-normal) var(--flow-ease-soft) !important;
+}
+html[data-theme="dark"] .claude-input-container {
+  border: 1px solid var(--foreground) !important;
+  box-shadow: 2px 2px 0px var(--foreground) !important;
+}
+.claude-input-container:focus-within {
+  border-color: var(--flow-border-strong) !important;
+  box-shadow: 4px 4px 0px var(--flow-border-strong) !important;
+}
+html[data-theme="dark"] .claude-input-container:focus-within {
+  box-shadow: 4px 4px 0px var(--foreground) !important;
+}
+
+.chat-message.user .chat-bubble {
+  background: var(--shell-active) !important;
+  color: var(--foreground) !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: var(--flow-radius) var(--flow-radius) 4px var(--flow-radius) !important;
+  box-shadow: none !important;
+}
+html[data-theme="dark"] .chat-message.user .chat-bubble {
+  color: var(--foreground) !important;
+  border: 1px solid var(--shell-hairline) !important;
+}
+.chat-message.assistant .chat-bubble {
+  border-radius: var(--flow-radius) var(--flow-radius) var(--flow-radius) 4px !important;
+}
+
+/* ── 8. TOAST — matches the calm palette ────────────────── */
+.toast {
+  border-radius: var(--flow-radius) !important;
+  box-shadow: var(--flow-shadow-lg) !important;
+  border-color: var(--border) !important;
+}
+.toast-success { border-left: 3px solid var(--flow-green) !important; }
+.toast-error   { border-left: 3px solid var(--flow-pulse) !important; }
+.toast-warning { border-left: 3px solid var(--flow-lumen) !important; }
+
+/* ── 9. TABLES — editorial, airy ────────────────────────── */
+table thead th {
+  font-size: 10.5px !important;
+  font-weight: 700 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.07em !important;
+  color: var(--gray-400) !important;
+  padding: 12px 14px !important;
+}
+table tbody td { padding: 13px 14px !important; }
+table tbody tr:hover { background: var(--flow-green-soft) !important; }
+
+/* ── 10. ACCESSIBILITY / MOTION PREFERENCES ─────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .view.active > * { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
+
+/* The in-app motion setting must win over the theme's animations. */
+:root[data-motion="off"] .view.active > * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+:root[data-motion="off"] .stat-card:hover,
+:root[data-motion="off"] .pg-card:hover { transform: none !important; }
+
+
+/* ============================================================
+   SHELL LAYOUT — ChatGPT-desktop structure, Flow palette
+
+   The idea copied from the reference: the window is a flat neutral CANVAS, and
+   the content sits on it as a single ELEVATED PANEL with soft corners and a
+   real shadow. The sidebar is not a panel — it is part of the canvas, so it has
+   no border and no background of its own.
+
+   Navigation is deliberately dull: no colour, no glow, no gradient. Hover is a
+   barely-there neutral wash; the open tab is a slightly stronger neutral pill.
+   Nothing competes with the content.
+   ============================================================ */
+
+/* ── 1. Canvas vs panel tokens ──────────────────────────── */
+html[data-theme="light"] {
+  --shell-canvas:     #F4F4F4;   /* sleek neutral light gray canvas */
+  --shell-panel:      #FFFFFF;   /* pure white elevated main panel */
+  --shell-hover:      rgba(0, 0, 0, 0.04);
+  --shell-active:     rgba(0, 0, 0, 0.07);
+  --shell-hairline:   rgba(0, 0, 0, 0.08);
+  --shell-panel-shadow: -4px 0 20px rgba(0,0,0,0.05), 0 -4px 16px rgba(0,0,0,0.03);
+}
+
+html[data-theme="dark"] {
+  --shell-canvas:     #171717;
+  --shell-panel:      #212121;
+  --shell-hover:      rgba(255, 255, 255, 0.05);
+  --shell-active:     rgba(255, 255, 255, 0.085);
+  --shell-hairline:   rgba(255, 255, 255, 0.07);
+  --shell-panel-shadow: -4px 0 24px rgba(0, 0, 0, 0.4);
+}
+
+/* ── 2. The canvas ──────────────────────────────────────── */
+html[data-theme="light"] body,
+html[data-theme="light"] .app-shell,
+html[data-theme="light"] #app-shell { background: var(--shell-canvas) !important; }
+
+html[data-theme="dark"] body,
+html[data-theme="dark"] .app-shell,
+html[data-theme="dark"] #app-shell { background: var(--shell-canvas) !important; }
+
+/* ── 3. Sidebar: part of the canvas, not a panel ─────────── */
+#sidebar.sidebar,
+.sidebar {
+  background: var(--shell-canvas) !important;
+  border: none !important;
+  border-right: none !important;
+  border-left: none !important;
+  outline: none !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding-top: 6px !important;
+}
+
+/* Ensure resizer covers the left edge of the main panel */
+.sidebar-resizer {
+  background: transparent !important;
+  border: none !important;
+  opacity: 0 !important;
+  width: 16px !important;
+  margin-left: -8px !important; /* Center it exactly on the left edge of the main panel */
+  z-index: 999 !important;
+  cursor: col-resize !important;
+}
+
+/* ── 4. Navigation: minimal, neutral, quiet ─────────────── */
+.sidebar .nav-item,
+.sidebar .nav-sub-item {
+  position: relative;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  margin: 1px 8px !important;
+  padding: 7px 10px !important;
+  border-radius: 8px !important;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-family: var(--flow-sans) !important;
+  font-size: 13.5px !important;
+  font-weight: 450 !important;
+  letter-spacing: -0.005em !important;
+  color: var(--do-t2) !important;
+  /* Colour + background only: no transform, so hovering a long list costs
+     the browser nothing in layout. */
+  transition:
+    background-color var(--flow-fast) var(--flow-ease-soft),
+    color var(--flow-fast) var(--flow-ease-soft) !important;
+}
+
+.sidebar .nav-item:hover,
+.sidebar .nav-sub-item:hover {
+  background: var(--shell-hover) !important;
+  color: var(--foreground) !important;
+  transform: none !important;
+}
+
+/* The open tab. A neutral pill and slightly heavier text — no accent colour,
+   which is what keeps the reference feeling calm. */
+.sidebar .nav-item.active,
+.sidebar .nav-sub-item.active {
+  background: var(--shell-active) !important;
+  color: var(--foreground) !important;
+  font-weight: 550 !important;
+}
+
+/* Remove the decorative markers and glows the older stylesheets added. */
+.sidebar .nav-item::before,
+.sidebar .nav-item::after,
+.sidebar .nav-sub-item::before,
+.sidebar .nav-sub-item::after,
+#lx-nav-pill {
+  content: none !important;
+  display: none !important;
+  background: none !important;
+  animation: none !important;
+  opacity: 0 !important;
+}
+
+/* Icons: same weight as the label, never coloured. */
+.sidebar .nav-item svg,
+.sidebar .nav-item .icon-sm,
+.sidebar .nav-sub-item svg {
+  width: 17px !important;
+  height: 17px !important;
+  flex-shrink: 0 !important;
+  opacity: 0.62 !important;
+  color: currentColor !important;
+  stroke-width: 1.6 !important;
+  transition: opacity var(--flow-fast) var(--flow-ease-soft) !important;
+}
+.sidebar .nav-item:hover svg,
+.sidebar .nav-item.active svg,
+.sidebar .nav-item.active .icon-sm { opacity: 0.95 !important; }
+
+/* Section labels: tiny and recessive, like "Pinned" / "Recents". */
+.sidebar .nav-section-label {
+  margin: 16px 18px 5px !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.02em !important;
+  text-transform: none !important;
+  color: var(--do-t3) !important;
+  opacity: 0.75 !important;
+}
+
+/* Brand row sits flush with the nav, no card treatment. */
+.sidebar .logo-wrap,
+.sidebar .sidebar-brand {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 8px 14px 4px !important;
+}
+.sidebar .logo-brand,
+.sidebar .sidebar-brand-name {
+  font-family: var(--flow-sans) !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.01em !important;
+}
+.sidebar .logo-sub,
+.sidebar .sidebar-brand-sub {
+  font-size: 10px !important;
+  letter-spacing: 0.07em !important;
+  text-transform: uppercase !important;
+  color: var(--do-t3) !important;
+  opacity: 0.7 !important;
+}
+
+/* Footer credits card: flat, quiet, no glow. */
+.sidebar-footer { border-top: 1px solid var(--shell-hairline) !important; padding: 10px 8px !important; }
+.lx-usage-card {
+  background: transparent !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 10px !important;
+  box-shadow: none !important;
+  transition: background-color var(--flow-fast) var(--flow-ease-soft) !important;
+}
+.lx-usage-card:hover { background: var(--shell-hover) !important; transform: none !important; }
+
+/* ── 5. Seamless shell: sidebar + topbar share one canvas ─ */
+.main-content,
+#main-content {
+  background: transparent !important;
+  border-radius: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+  box-sizing: border-box !important;
+  /* The header now belongs to the same canvas as the sidebar. Only the opened
+     page below it is elevated, so there is no visible sidebar/header partition. */
+  margin: 0 0 0 var(--sidebar-current, var(--sidebar-width, 215px)) !important;
+  padding: 0 !important; /* Removed padding so views-container defines margins */
+  height: 100vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+
+  /* NOTE: margin-left is deliberately NOT transitioned. Animating layout
+     properties causes dropped frames; sidebar movement stays on the compositor. */
+  transition: none !important;
+}
+
+/* The sidebar is position:fixed, so it can be moved with a transform — that runs
+   on the compositor and costs no layout. This is what carries the motion. */
+#sidebar.sidebar {
+  transition:
+    transform var(--flow-normal) var(--flow-ease),
+    opacity var(--flow-fast) var(--flow-ease-soft) !important;
+  will-change: transform;
+}
+
+/* Explicit collapsed rule as a safety net, in case :has() is unavailable or a
+   script changes the width without updating the custom property. */
+:root:has(#sidebar.collapsed) .main-content,
+:root:has(#sidebar.collapsed) #main-content { margin-left: 68px !important; }
+
+#main-content.full-width,
+.main-content.full-width { margin-left: 0 !important; }
+
+/* ── 6. Topbar stays on the shared shell canvas ─────────── */
+.topbar {
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 12px 0 20px !important;
+  min-height: 52px !important;
+}
+.page-breadcrumb {
+  font-family: var(--flow-sans) !important;
+  font-size: 14px !important;
+  font-weight: 550 !important;
+  letter-spacing: -0.01em !important;
+  color: var(--foreground) !important;
+}
+
+/* Topbar buttons: flat, neutral, only a wash on hover. */
+.topbar button,
+.topbar .topbar-user-badge {
+  border-radius: 8px !important;
+  box-shadow: none !important;
+  transition: background-color var(--flow-fast) var(--flow-ease-soft) !important;
+}
+.topbar button:hover,
+.topbar .topbar-user-badge:hover {
+  background: var(--shell-hover) !important;
+  transform: none !important;
+}
+
+/* ── 7. Opened page panel and its single scroll surface ── */
+/* The holder carries the only depth shadow; the shared sidebar/topbar canvas
+   stays flat and continuous. `.view.active` remains the sole scroll surface. */
+.views-container,
+#main-scroll-area {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+  background: var(--shell-panel) !important;
+  border: none !important;
+  border-top: 1px solid rgba(0,0,0,0.04) !important;
+  border-left: 1px solid rgba(0,0,0,0.04) !important;
+  border-radius: 24px 0 0 0 !important;
+  box-shadow: -4px -4px 20px rgba(0,0,0,0.05) !important;
+  margin: 0 !important;
+  isolation: isolate !important;
+}
+html[data-theme="dark"] .views-container,
+html[data-theme="dark"] #main-scroll-area {
+  border: none !important;
+  border-top: 1px solid rgba(255,255,255,0.06) !important;
+  border-left: 1px solid rgba(255,255,255,0.06) !important;
+  box-shadow: -4px -4px 32px rgba(0,0,0,0.4) !important;
+}
+
+.view.active {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+}
+
+/* Views container scrollbar is governed by macOS-Style Overlay Auto-Hiding Scrollbar below */
+
+/* ── 8. Cards inside the panel are flatter ──────────────── */
+/* The panel already carries the elevation, so nesting more shadows inside it
+   looks muddy. Inner cards get a hairline and a very light lift instead. */
+.stat-card, .do-stat-card, .chart-card, .do-chart-wrap, .analytics-card,
+.recent-leads-card, .pg-card, .email-sidebar-card,
+.agent-config-card, .agent-progress-card {
+  background: var(--shell-panel) !important;
+  border: 1px solid var(--shell-hairline) !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
+}
+.stat-card:hover, .do-stat-card:hover, .chart-card:hover,
+.analytics-card:hover, .pg-card:hover {
+  border-color: var(--shell-active) !important;
+  box-shadow: 0 4px 14px -6px rgba(0, 0, 0, .12) !important;
+  transform: translate3d(0, -2px, 0) !important;
+}
+
+/* ── 9. Composer: rounded, quiet, circular send ─────────── */
+.claude-input-container {
+  border-radius: 24px !important;
+  border: 1px solid var(--shell-hairline) !important;
+  background: var(--shell-panel) !important;
+  box-shadow: 0 2px 10px -4px rgba(0, 0, 0, .10) !important;
+}
+.claude-input-container:focus-within {
+  border-color: var(--flow-green) !important;
+  box-shadow: 0 2px 14px -4px rgba(0, 0, 0, .14), 0 0 0 3px var(--flow-green-ring) !important;
+}
+.claude-send-btn {
+  width: 32px !important;
+  height: 32px !important;
+  border-radius: 50% !important;
+  background: var(--flow-border-strong) !important;
+  color: #FEFDF5 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.claude-send-btn:hover:not(:disabled) { background: var(--flow-green-hover) !important; }
+.claude-send-btn:disabled { opacity: .35 !important; }
+
+/* ── 10. Ambient effects off — they fight the flat look ─── */
+#lx-cursor-glow,
+.lx-sidebar-glow,
+.lx-content-glow,
+.lx-card-glow,
+.pfx-card-glow { display: none !important; }
+
+.stat-card::before, .do-stat-card::before, .chart-card::before,
+.do-chart-wrap::before, .analytics-card::before,
+.recent-leads-card::before { content: none !important; }
+
+/* ── 11. Mobile: the opened page goes full-bleed ───────── */
+@media (max-width: 768px) {
+  .main-content, #main-content {
+    margin: 0 !important;
+    padding: 0 !important;
+    height: 100vh !important;
+  }
+  .views-container, #main-scroll-area {
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+  }
+  #sidebar.sidebar { background: var(--shell-canvas) !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stat-card:hover, .pg-card:hover { transform: none !important; }
+}
+
+
+/* ============================================================
+   READING COLUMN + CHAT SURFACE
+
+   Analysis of the reference that drove this section:
+
+   1. Content is NOT full width. It sits in a centred column of roughly 720px
+      with large empty margins either side. That single decision is most of why
+      the reference reads as calm rather than as a dashboard.
+   2. Assistant messages have NO bubble — they are plain text on the panel.
+      Only the USER message gets a soft grey bubble, right-aligned, capped at
+      about 70% width. Bubbling both sides is what makes a chat look dated.
+   3. The scrollbar lives inside the panel and is a thin rounded track that
+      barely registers until you look for it.
+   4. The composer is a fully-rounded pill, centred on the same column as the
+      content, with a small circular send button.
+   ============================================================ */
+
+:root {
+  --read-col: 46rem;      /* ≈736px: the centred reading measure */
+  --read-gutter: 24px;
+}
+
+/* ── 1. Centre both AI reading columns on the same measure ─ */
+.chat-container,
+.claude-greeting-container,
+#chat-messages,
+#candidate-chat-messages,
+.chat-footer-text,
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  width: 100% !important;
+  max-width: var(--read-col) !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Both AI routes use the same column contract only while active. Inactive
+   views remain governed by the base `.view { display: none }` routing rule. */
+#view-chat.active,
+#view-candidate-ai.active {
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 0 !important;
+}
+.chat-container {
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  padding: 26px var(--read-gutter) 0 !important;
+  box-sizing: border-box !important;
+}
+#chat-messages,
+#candidate-chat-messages {
+  width: 100% !important;
+  max-width: var(--read-col) !important;
+  margin-inline: auto !important;
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow-y: auto !important;
+  padding-bottom: 18px !important;
+  /* Keeps the newest message anchored at the bottom as content grows, without
+     a scroll listener doing it in JavaScript. */
+  overflow-anchor: auto;
+}
+
+/* Both composers keep their full natural height instead of flex-shrinking. */
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  flex: 0 0 auto !important;
+  margin-bottom: 10px !important;
+}
+#view-chat .chat-footer-text,
+#view-candidate-ai .chat-footer-text {
+  flex: 0 0 auto !important;
+  padding-bottom: 12px !important;
+  text-align: center !important;
+  font-size: 11.5px !important;
+  color: var(--do-t3) !important;
+}
+
+/* The greeting block is centred on the same measure as the conversation. */
+.claude-greeting-container {
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  flex: 1 1 auto !important;
+  padding-bottom: 8vh !important;
+}
+
+/* ── 2. Messages ────────────────────────────────────────── */
+.chat-message {
+  display: flex !important;
+  margin: 0 0 22px !important;
+  animation: flow-rise 380ms var(--flow-ease) backwards;
+}
+
+/* Assistant: plain text, no container, no avatar column stealing width. */
+.chat-message.assistant { justify-content: flex-start !important; }
+.chat-message.assistant .chat-bubble {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
+  max-width: 100% !important;
+  font-size: 15px !important;
+  line-height: 1.72 !important;
+  color: var(--foreground) !important;
+  letter-spacing: -0.003em !important;
+}
+.chat-message.assistant .chat-avatar {
+  width: 26px !important;
+  height: 26px !important;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+  border: 1px solid var(--shell-hairline) !important;
+  box-shadow: none !important;
+}
+
+/* User: soft neutral bubble, right-aligned, never full width. */
+.chat-message.user { justify-content: flex-end !important; }
+.chat-message.user .chat-avatar { display: none !important; }
+.chat-message.user .chat-bubble {
+  max-width: 72% !important;
+  padding: 11px 16px !important;
+  border-radius: 20px !important;
+  font-size: 15px !important;
+  line-height: 1.6 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme="light"] .chat-message.user .chat-bubble {
+  background: #F0EEEA !important;
+  color: var(--foreground) !important;
+}
+html[data-theme="dark"] .chat-message.user .chat-bubble {
+  background: #262523 !important;
+  color: var(--foreground) !important;
+}
+
+/* Readable rhythm for generated prose. */
+.chat-message.assistant .chat-bubble p { margin: 0 0 1em !important; }
+.chat-message.assistant .chat-bubble p:last-child { margin-bottom: 0 !important; }
+.chat-message.assistant .chat-bubble ul,
+.chat-message.assistant .chat-bubble ol { margin: 0 0 1em !important; padding-left: 1.4em !important; }
+.chat-message.assistant .chat-bubble li { margin-bottom: .4em !important; }
+.chat-message.assistant .chat-bubble pre {
+  background: var(--shell-canvas) !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 12px !important;
+  padding: 14px 16px !important;
+  overflow-x: auto !important;
+  font-size: 13px !important;
+  line-height: 1.6 !important;
+}
+.chat-message.assistant .chat-bubble :not(pre) > code {
+  background: var(--shell-active) !important;
+  padding: 2px 6px !important;
+  border-radius: 5px !important;
+  font-size: .9em !important;
+}
+
+/* ── 3. Composer pill ───────────────────────────────────── */
+#view-chat .claude-input-container,
+.claude-input-container {
+  border-radius: 26px !important;
+  padding: 8px 8px 8px 16px !important;
+  display: flex !important;
+  align-items: flex-end !important;
+  gap: 8px !important;
+}
+.claude-input-container textarea {
+  flex: 1 1 auto !important;
+  border: 0 !important;
+  outline: 0 !important;
+  background: transparent !important;
+  resize: none !important;
+  font-size: 15px !important;
+  line-height: 1.55 !important;
+  padding: 8px 0 !important;
+  min-height: 24px !important;
+  max-height: 200px !important;
+  color: var(--foreground) !important;
+}
+.claude-input-container textarea::placeholder { color: var(--do-t3) !important; }
+
+.claude-icon-btn {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 50% !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: var(--do-t2) !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  flex-shrink: 0 !important;
+  box-shadow: none !important;
+  transition: background-color var(--flow-fast) var(--flow-ease-soft) !important;
+}
+.claude-icon-btn:hover { background: var(--shell-hover) !important; transform: none !important; }
+
+/* ── 4. Thin scrollbars, inside the panel ───────────────── */
+#chat-messages,
+.view.active,
+.views-container,
+#main-scroll-area {
+  scrollbar-width: thin;
+  scrollbar-color: var(--shell-active) transparent;
+}
+/* Hide sidebar scrollbar completely per user request */
+.sidebar-nav-scroll,
+#sidebar-nav-scroll,
+.sidebar,
+.sidebar-nav {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+.sidebar-nav-scroll::-webkit-scrollbar,
+#sidebar-nav-scroll::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar,
+.sidebar-nav::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+#chat-messages::-webkit-scrollbar { width: 12px; height: 12px; }
+#chat-messages::-webkit-scrollbar-track { background: transparent; }
+#chat-messages::-webkit-scrollbar-thumb {
+  background: var(--shell-active);
+  border-radius: 99px;
+  border: 4px solid transparent;   /* inset the thumb so it reads as thin */
+  background-clip: content-box;
+  min-height: 40px;
+}
+#chat-messages::-webkit-scrollbar-thumb:hover {
+  background: var(--do-t3);
+  background-clip: content-box;
+}
+/* No arrow buttons, no corner square. */
+::-webkit-scrollbar-button { display: none !important; }
+::-webkit-scrollbar-corner { background: transparent !important; }
+
+/* ── 5. Tighter sidebar rhythm, matching the reference ───── */
+.sidebar .nav-item,
+.sidebar .nav-sub-item {
+  min-height: 30px !important;
+  padding: 6px 10px !important;
+  font-size: 13px !important;
+}
+.sidebar .nav-item span,
+.sidebar .nav-sub-item span {
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+.sidebar .nav-sub-item { padding-left: 30px !important; }
+
+/* Collapsed rail: icons only, centred. */
+#sidebar.collapsed .nav-item,
+#sidebar.collapsed .nav-sub-item { justify-content: center !important; padding: 6px !important; }
+#sidebar.collapsed .nav-item span,
+#sidebar.collapsed .nav-sub-item span,
+#sidebar.collapsed .nav-section-label { display: none !important; }
+
+/* ── 6. Ambient decorations off in the chat view ─────────── */
+/* The reference has an entirely plain canvas behind the conversation. */
+.ambient-orb,
+#view-chat .ambient-orb,
+.ag-floating-orb { display: none !important; }
+
+/* ── 7. Wide views keep their own layout ────────────────── */
+/* Tables and grids need the full panel, so the reading column applies only to
+   the chat surface — not to Leads, Analytics, Plugins and similar views. */
+#view-leads, #view-analytics, #view-plugins, #view-excel,
+#view-dashboard, #view-candidate-db, #view-email, #view-whatsapp {
+  max-width: none !important;
+}
+
+@media (max-width: 860px) {
+  :root { --read-col: 100%; --read-gutter: 16px; }
+  .chat-message.user .chat-bubble { max-width: 86% !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-message { animation: none !important; }
+}
+
+
+/* ============================================================
+   REFERENCE SHELL POLISH — unified chrome + compact controls
+   ============================================================ */
+/* Give every panel edge breathing room so its depth shadow is not clipped. */
+.main-content,
+#main-content {
+  padding: 0 10px 10px 10px !important;
+}
+
+/* The collapsed rail and content must use the same geometry token. */
+:root:has(#sidebar.collapsed) .main-content,
+:root:has(#sidebar.collapsed) #main-content {
+  margin-left: var(--sidebar-current, var(--sidebar-collapsed, 62px)) !important;
+}
+
+/* Sidebar header, sidebar body and topbar are one uninterrupted canvas. */
+.sidebar .sidebar-header,
+#sidebar .sidebar-header {
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+.topbar {
+  height: 44px !important;
+  min-height: 44px !important;
+  padding: 0 8px 0 12px !important;
+  gap: 8px !important;
+}
+.topbar-right { gap: 4px !important; }
+.page-breadcrumb { font-size: 13px !important; }
+
+/* Small, quiet controls like the reference header. */
+.topbar-user-badge {
+  min-height: 26px !important;
+  padding: 2px 6px 2px 3px !important;
+  gap: 5px !important;
+  margin-right: 0 !important;
+  border-color: var(--shell-hairline) !important;
+  background: transparent !important;
+}
+.topbar-avatar {
+  width: 21px !important;
+  height: 21px !important;
+  font-size: 9px !important;
+  box-shadow: none !important;
+}
+.topbar-user-name { font-size: 10.5px !important; max-width: 105px !important; }
+.topbar-user-company { font-size: 8.5px !important; max-width: 105px !important; }
+.topbar-user-badge > svg { width: 9px !important; height: 9px !important; margin-left: 0 !important; }
+
+.tb-history-btn,
+.tb-shortcuts-btn,
+.topbar .generate-btn {
+  height: 25px !important;
+  min-height: 25px !important;
+  padding: 0 7px !important;
+  gap: 4px !important;
+  border-radius: 7px !important;
+  font-size: 10.5px !important;
+  font-weight: 550 !important;
+  line-height: 1 !important;
+  box-shadow: none !important;
+}
+.tb-history-btn,
+.tb-shortcuts-btn {
+  color: var(--foreground) !important;
+  background: transparent !important;
+  border: 1px solid transparent !important;
+  filter: none !important;
+}
+.tb-shortcuts-btn::after { display: none !important; }
+.tb-history-btn svg,
+.tb-shortcuts-btn svg,
+.topbar .generate-btn svg,
+.topbar .generate-btn .icon-sm {
+  width: 11px !important;
+  height: 11px !important;
+  margin-right: 0 !important;
+  stroke-width: 1.8 !important;
+}
+.tb-shortcuts-btn .tb-cmd-icon {
+  width: 14px !important;
+  height: 14px !important;
+  border-radius: 4px !important;
+  background: var(--shell-active) !important;
+  box-shadow: none !important;
+}
+.tb-shortcuts-btn .tb-cmd-icon svg { width: 9px !important; height: 9px !important; }
+
+/* Preserve the reliable toggle internals; scale only its outer composited layer. */
+.topbar .lx-theme-toggle {
+  transform: translateZ(0) scale(0.78) !important;
+  transform-origin: center !important;
+  margin-inline: -6px !important;
+  box-shadow: none !important;
+}
+
+/* A defined edge and soft exterior shadow belong only to the opened page. */
+.views-container,
+#main-scroll-area {
+  border-radius: 20px !important;
+  box-shadow:
+    0 0 0 1px var(--shell-hairline),
+    0 4px 14px -7px rgba(26, 25, 23, 0.24),
+    0 18px 46px -28px rgba(26, 25, 23, 0.34) !important;
+}
+html[data-theme="dark"] .views-container,
+html[data-theme="dark"] #main-scroll-area {
+  box-shadow:
+    0 0 0 1px rgba(244, 241, 235, 0.055),
+    0 5px 16px -7px rgba(0, 0, 0, 0.64),
+    0 22px 50px -28px rgba(0, 0, 0, 0.88) !important;
+}
+
+/* Dense navigation and stable native wheel/touch scrolling. */
+.sidebar .sidebar-nav,
+#sidebar-nav-scroll {
+  will-change: auto !important;
+  scrollbar-gutter: stable !important;
+  overscroll-behavior: contain !important;
+  touch-action: pan-y !important;
+  scroll-behavior: auto !important;
+}
+.sidebar .nav-item,
+.sidebar .nav-sub-item {
+  min-height: 30px !important;
+  height: 30px !important;
+  max-height: 30px !important;
+}
+
+@media (max-width: 1080px) {
+  .topbar-user-info { display: none !important; }
+  .topbar-user-badge { padding-right: 3px !important; }
+}
+@media (max-width: 820px) {
+  .tb-history-btn,
+  .tb-shortcuts-btn { font-size: 0 !important; width: 26px !important; padding: 0 !important; justify-content: center !important; }
+  .tb-shortcuts-btn .tb-cmd-icon { background: transparent !important; }
+}
+@media (max-width: 768px) {
+  .main-content,
+  #main-content { padding: 0 !important; }
+  .topbar { padding-inline: 10px !important; }
+  .views-container,
+  #main-scroll-area { border-radius: 0 !important; box-shadow: none !important; }
+}
+
+
+/* ============================================================
+   CANDIDATE AI — in-composer source picker.
+   The composer stays on the shared Client AI reading column while portal
+   selection lives in a compact dropdown that opens upward from its toolbar.
+   ============================================================ */
+#view-candidate-ai .candidate-composer {
+  overflow: visible !important;
+  margin-bottom: 8px !important;
+  position: relative;
+  z-index: 12;
+  isolation: auto !important;
+  background: var(--shell-panel) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  box-shadow: var(--flow-shadow) !important;
+}
+/* Candidate search uses the browser's native caret. The global luxury layer
+   measures a separate fake caret and can drift from wrapped textarea text. */
+#view-candidate-ai .candidate-composer::before,
+#view-candidate-ai .candidate-composer::after,
+#view-candidate-ai .candidate-composer .lx-hover-glow,
+#view-candidate-ai .candidate-composer .lx-caret-dust {
+  content: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+#view-candidate-ai #candidate-ai-input {
+  caret-color: var(--foreground) !important;
+  cursor: text !important;
+}
+
+/* Keep the browser's native caret; the old luxury layer's beam/dust obscured it. */
+#view-chat .claude-input-container::before,
+#view-chat .claude-input-container::after,
+#view-candidate-ai .claude-input-container::before,
+#view-candidate-ai .claude-input-container::after,
+#view-chat .claude-input-container .lx-hover-glow,
+#view-chat .claude-input-container .lx-caret-dust,
+#view-candidate-ai .claude-input-container .lx-hover-glow,
+#view-candidate-ai .claude-input-container .lx-caret-dust {
+  content: none !important;
+  display: none !important;
+  opacity: 0 !important;
+  animation: none !important;
+  box-shadow: none !important;
+  background: none !important;
+}
+#view-chat #chat-input,
+#view-candidate-ai #candidate-ai-input {
+  caret-color: currentColor !important;
+  cursor: text !important;
+  text-shadow: none !important;
+}
+
+/* Narrow the composer and lower it slightly while keeping Pip on its top edge. */
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  width: min(100%, 640px) !important;
+  max-width: 640px !important;
+  margin-top: 12px !important;
+  transform: translateY(10px) !important;
+  transition: transform .45s cubic-bezier(.22,1,.36,1),
+              border-color .28s ease, box-shadow .35s ease !important;
+}
+#view-chat .claude-input-container textarea,
+#view-candidate-ai .claude-input-container textarea {
+  transition: border-color .28s ease, box-shadow .35s ease !important;
+}
+#view-chat .claude-input-container:focus-within,
+#view-candidate-ai .claude-input-container:focus-within {
+  transform: translateY(10px) !important;
+}
+.nexus-pet-host {
+  width: min(100%, 640px) !important;
+  max-width: 640px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+}
+
+/* Final composition pass: no shell gutter, compact greeting, and the composer
+   pair sits just below the visual middle instead of touching the bottom edge. */
+.main-content,
+#main-content {
+  padding: 0 !important;
+}
+.views-container,
+#main-scroll-area {
+  margin: 0 !important;
+  border-radius: 24px 0 0 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+}
+.flow-overline { display: none !important; }
+.claude-greeting-container {
+  transform: translateY(-42px) !important;
+  padding-bottom: 0 !important;
+}
+.claude-greeting,
+#welcome-greeting,
+#candidate-welcome-greeting {
+  font-size: clamp(42px, 5.2vw, 62px) !important;
+  line-height: 1.02 !important;
+  margin-bottom: 0 !important;
+}
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  transform: none !important;
+  margin-bottom: 72px !important;
+}
+#view-chat .claude-input-container:focus-within,
+#view-candidate-ai .claude-input-container:focus-within {
+  transform: none !important;
+}
+.nexus-pet-host { transform: none !important; }
+
+/* Unified shell: remove the rail divider and let the topbar/sidebar read as
+   one continuous canvas behind the single top-left panel curve. */
+#sidebar,
+#sidebar.sidebar,
+html aside#sidebar {
+  border-right: 0 !important;
+}
+.topbar {
+  border-left: 0 !important;
+  border-bottom: 0 !important;
+}
+.views-container,
+#main-scroll-area {
+  border-left: 0 !important;
+  border-top: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 24px 0 0 0 !important;
+  box-shadow: 0 10px 24px -20px rgba(0, 0, 0, .24) !important;
+}
+
+/* The sidebar is not resizable in this fixed client layout. Hiding the handle
+   removes the automatic blue hover strip completely. */
+.sidebar-resizer,
+.sidebar-resizer::before,
+.sidebar-resizer::after {
+  display: none !important;
+  width: 0 !important;
+  opacity: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+/* Shared muted off-white shell; the opened page remains a clean white surface. */
+html[data-theme="light"] #sidebar,
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar,
+html[data-theme="light"] #main-content,
+html[data-theme="light"] .main-content {
+  background: #f3f4f2 !important;
+}
+html[data-theme="light"] .views-container,
+html[data-theme="light"] #main-scroll-area {
+  background: #fff !important;
+  box-shadow: -8px -8px 26px -18px rgba(22, 31, 45, .34) !important;
+}
+
+/* Never show a scrollbar in the left rail, even while it is hovered. */
+#sidebar,
+#sidebar-nav-scroll,
+.sidebar-nav,
+.sidebar-nav-scroll {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+#sidebar::-webkit-scrollbar,
+#sidebar-nav-scroll::-webkit-scrollbar,
+.sidebar-nav::-webkit-scrollbar,
+.sidebar-nav-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+/* Typewriter-like inline suggestion reveal: deliberate and readable, not a
+   sudden placeholder swap. */
+.lx-ghost-sugg {
+  display: inline-block !important;
+  animation: flow-suggestion-reveal 1.15s steps(26, end) both !important;
+  transform-origin: left center;
+}
+@keyframes flow-suggestion-reveal {
+  from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateX(2px); }
+  to   { opacity: 1; clip-path: inset(0 0 0 0); transform: translateX(0); }
+}
+#candidate-ai-status:empty { display: none !important; }
+#candidate-ai-status {
+  flex: 0 0 auto;
+  max-width: var(--read-col, 46rem);
+  margin: 0 auto 8px;
+  text-align: center;
+}
+.candidate-source-picker {
+  position: relative;
+  display: inline-flex;
+}
+.candidate-source-trigger {
+  min-height: 32px;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--do-t2, #5f6368);
+  background: transparent;
+  font-family: var(--flow-sans) !important;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: background-color var(--flow-fast) var(--flow-ease-soft),
+              border-color var(--flow-fast) var(--flow-ease-soft),
+              color var(--flow-fast) var(--flow-ease-soft);
+}
+.candidate-source-trigger:hover,
+.candidate-source-picker.is-open .candidate-source-trigger {
+  color: var(--foreground);
+  background: var(--shell-hover);
+  border-color: var(--shell-hairline);
+}
+.candidate-source-count {
+  min-width: 19px;
+  height: 19px;
+  display: inline-grid;
+  place-items: center;
+  padding-inline: 5px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--flow-green, #1a7f5a);
+  font-size: 10px;
+  font-variant-numeric: tabular-nums;
+}
+.candidate-source-chevron {
+  transition: transform var(--flow-fast) var(--flow-ease-soft);
+}
+.candidate-source-picker.is-open .candidate-source-chevron {
+  transform: rotate(180deg);
+}
+.cand-source-menu[hidden] { display: none !important; }
+.cand-source-menu {
+  position: absolute;
+  z-index: 40;
+  left: 0;
+  bottom: calc(100% + 10px);
+  width: min(248px, calc(100vw - 48px));
+  display: grid;
+  gap: 4px;
+  padding: 8px;
+  border: 1px solid var(--shell-hairline);
+  border-radius: 16px;
+  background: var(--shell-panel);
+  box-shadow: var(--flow-shadow-lg), 0 18px 48px rgba(30, 28, 24, 0.14);
+  transform-origin: bottom left;
+  animation: candidate-menu-in 160ms var(--flow-ease) both;
+}
+.cand-source-menu-head {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px 8px;
+  color: var(--foreground);
+  font-family: var(--flow-sans) !important;
+  font-size: 12px;
+  font-weight: 650;
+}
+.cand-source-menu-head small {
+  color: var(--do-t3, #9aa0a6);
+  font-size: 10.5px;
+  font-weight: 450;
+}
+.cand-src-chip {
+  width: 100%;
+  min-height: 36px;
+  display: grid;
+  grid-template-columns: 8px 1fr auto;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 9px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  color: var(--do-t2, #5f6368);
+  background: transparent;
+  font-family: var(--flow-sans) !important;
+  font-size: 12px;
+  font-weight: 550;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color var(--flow-fast) var(--flow-ease-soft),
+              border-color var(--flow-fast) var(--flow-ease-soft),
+              color var(--flow-fast) var(--flow-ease-soft);
+}
+.cand-src-chip:hover { background: var(--shell-hover); }
+.cand-src-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--do-t3, #9aa0a6);
+}
+.cand-src-check {
+  color: transparent;
+  font-size: 12px;
+  font-weight: 700;
+}
+.cand-src-chip.active {
+  color: var(--flow-green, #1a7f5a);
+  background: var(--flow-green-soft, rgba(26, 127, 90, 0.1));
+  border-color: var(--flow-green-ring, rgba(26, 127, 90, 0.2));
+}
+.cand-src-chip.active .cand-src-dot { background: var(--flow-green, #1a7f5a); }
+.cand-src-chip.active .cand-src-check { color: var(--flow-green, #1a7f5a); }
+@keyframes candidate-menu-in {
+  from { opacity: 0; transform: translateY(5px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@media (max-width: 560px) {
+  .candidate-source-trigger > span:not(.candidate-source-count) { display: none; }
+  .cand-source-menu { left: -8px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .candidate-source-trigger,
+  .candidate-source-chevron,
+  .cand-src-chip { transition: none !important; }
+  .cand-source-menu { animation: none !important; }
+}
+
+/* ============================================================
+   EMAIL WORKSPACE — compact Gmail-inspired compose experience
+   ============================================================ */
+#view-email.active {
+  --shell-soft: var(--shell-hover, #f7f7f5);
+  padding: 22px 24px 32px !important;
+  background: var(--shell-panel) !important;
+}
+#view-email > div:first-child {
+  max-width: 1440px;
+  margin-inline: auto;
+}
+#email-compose-panel,
+#email-sent-panel {
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+}
+#view-email .email-layout {
+  grid-template-columns: minmax(0, 1fr) 310px !important;
+  gap: 14px !important;
+  margin-top: 10px !important;
+  align-items: start !important;
+}
+#view-email .gmail-compose-card.gmail-exact {
+  height: auto !important;
+  min-height: 0 !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 14px !important;
+  overflow: visible !important;
+  background: var(--shell-panel) !important;
+  box-shadow: 0 1px 2px rgba(30, 28, 24, 0.06), 0 12px 32px rgba(30, 28, 24, 0.08) !important;
+}
+#view-email .gmail-exact-header {
+  min-height: 42px;
+  padding: 9px 14px !important;
+  border-radius: 14px 14px 0 0 !important;
+  border-bottom: 1px solid var(--shell-hairline) !important;
+  background: var(--shell-soft) !important;
+  color: var(--foreground) !important;
+  font-family: var(--flow-sans) !important;
+  font-size: 13px !important;
+  font-weight: 650 !important;
+}
+#view-email .gmail-exact-body {
+  padding: 0 18px !important;
+  overflow: visible !important;
+  background: var(--shell-panel) !important;
+}
+#view-email .gmail-input-row {
+  min-height: 39px;
+  padding: 7px 0 !important;
+  border-bottom: 1px solid var(--shell-hairline) !important;
+}
+#view-email .gmail-input-bare {
+  min-width: 0;
+  padding: 5px 7px !important;
+  background: transparent !important;
+  color: var(--foreground) !important;
+  font-family: var(--flow-sans) !important;
+}
+#view-email .gmail-input-bare:disabled {
+  color: var(--do-t2) !important;
+  opacity: 1;
+}
+#view-email #email-body-rich {
+  flex: none !important;
+  min-height: 210px !important;
+  max-height: 330px !important;
+  padding: 14px 4px !important;
+  overflow-y: auto !important;
+  border-bottom: 0 !important;
+  color: var(--foreground) !important;
+  background: var(--shell-panel) !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  scrollbar-width: thin;
+}
+#view-email #email-body-rich:focus,
+#view-email #email-signature-rich:focus {
+  outline: none !important;
+}
+#view-email .gmail-signature-section {
+  margin: 4px 0 10px !important;
+  padding: 10px !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 12px !important;
+  background: var(--shell-soft) !important;
+}
+.email-signature-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 7px;
+  color: var(--foreground);
+  font-family: var(--flow-sans);
+  font-size: 12px;
+}
+.email-signature-save-status {
+  margin-left: 7px;
+  color: var(--do-t3);
+  font-size: 10px;
+  font-weight: 500;
+}
+.email-signature-save-status[data-tone="saved"] { color: var(--flow-green); }
+.email-signature-save-status[data-tone="error"] { color: #dc2626; }
+.email-signature-save-btn {
+  padding: 5px 10px;
+  border: 0;
+  border-radius: 8px;
+  color: #fff;
+  background: #0b57d0;
+  font-family: var(--flow-sans);
+  font-size: 10.5px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.email-signature-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 7px;
+  padding: 5px;
+  border: 1px solid var(--shell-hairline);
+  border-radius: 9px;
+  background: var(--shell-panel);
+}
+.email-signature-toolbar button,
+.email-signature-toolbar select,
+.email-signature-toolbar input[type="color"],
+.email-signature-media-btn {
+  min-height: 27px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--do-t2);
+  background: transparent;
+  font-family: var(--flow-sans);
+  font-size: 10px;
+  font-weight: 650;
+  cursor: pointer;
+}
+.email-signature-toolbar button:hover,
+.email-signature-toolbar select:hover,
+.email-signature-media-btn:hover {
+  color: var(--foreground);
+  background: var(--shell-hover);
+  border-color: var(--shell-hairline);
+}
+.email-signature-toolbar input[type="color"] {
+  width: 29px;
+  padding: 3px;
+}
+.email-signature-media-btn {
+  color: #0b57d0;
+  background: rgba(11, 87, 208, 0.08);
+}
+.email-signature-media-btn input { display: none; }
+.email-tool-divider {
+  width: 1px;
+  height: 18px;
+  margin-inline: 2px;
+  background: var(--shell-hairline);
+}
+#view-email #email-signature-rich {
+  min-height: 84px !important;
+  max-height: 210px !important;
+  padding: 10px !important;
+  overflow: auto !important;
+  resize: vertical;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--foreground) !important;
+  background: var(--shell-panel) !important;
+  font-family: Arial, Helvetica, sans-serif !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+#view-email #email-signature-rich:focus {
+  border-color: rgba(11, 87, 208, 0.42);
+  box-shadow: 0 0 0 3px rgba(11, 87, 208, 0.09);
+}
+.email-signature-help {
+  margin-top: 6px;
+  color: var(--do-t3);
+  font-family: var(--flow-sans);
+  font-size: 9.5px;
+  line-height: 1.4;
+}
+#view-email .mail-resizable-media {
+  position: relative !important;
+  min-width: 60px !important;
+  min-height: 0 !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: inline-block !important;
+  margin: 4px 8px 4px 0;
+  padding: 2px !important;
+  overflow: visible !important;
+  resize: none !important;
+  vertical-align: middle;
+  border: 1px solid transparent !important;
+  border-radius: 5px;
+  background: transparent !important;
+  box-sizing: border-box;
+  cursor: default;
+}
+#view-email .mail-resizable-media img {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 3px;
+  object-fit: contain;
+}
+#view-email .mail-resizable-media:hover,
+#view-email .mail-resizable-media.is-selected,
+#view-email .mail-resizable-media.is-resizing {
+  border-color: #0b57d0 !important;
+  box-shadow: 0 0 0 2px rgba(11, 87, 208, 0.12);
+}
+#view-email .mail-resize-handle {
+  position: absolute;
+  right: -7px;
+  bottom: -7px;
+  width: 13px;
+  height: 13px;
+  display: none;
+  border: 2px solid #fff;
+  border-radius: 50%;
+  background: #0b57d0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.28);
+  cursor: nwse-resize;
+  touch-action: none;
+}
+#view-email .mail-resizable-media:hover .mail-resize-handle,
+#view-email .mail-resizable-media.is-selected .mail-resize-handle,
+#view-email .mail-resizable-media.is-resizing .mail-resize-handle { display: block; }
+#view-email .gmail-formatting-bar,
+#view-email .email-composer-pro-toolbar {
+  border-color: var(--shell-hairline) !important;
+  background: var(--shell-panel) !important;
+}
+#view-email .gmail-exact-footer {
+  min-height: 48px;
+  padding: 8px 16px !important;
+  border-top: 1px solid var(--shell-hairline) !important;
+  border-radius: 0 0 14px 14px;
+  background: var(--shell-panel) !important;
+}
+#view-email .email-sidebar-card {
+  position: sticky;
+  top: 10px;
+  gap: 10px !important;
+  padding: 12px !important;
+  border-radius: 14px !important;
+  background: var(--shell-panel) !important;
+  border-color: var(--shell-hairline) !important;
+  box-shadow: 0 1px 2px rgba(30, 28, 24, 0.05), 0 10px 26px rgba(30, 28, 24, 0.06) !important;
+}
+#view-email #email-preview-list {
+  max-height: 92px !important;
+  background: var(--shell-soft) !important;
+  border-color: var(--shell-hairline) !important;
+}
+#view-email #email-send-btn {
+  background: #0b57d0 !important;
+  box-shadow: 0 2px 8px rgba(11, 87, 208, 0.22) !important;
+}
+@media (max-width: 1080px) {
+  #view-email .email-layout { grid-template-columns: 1fr !important; }
+  #view-email .email-sidebar-card { position: static; }
+}
+@media (max-width: 640px) {
+  #view-email.active { padding: 14px 10px 24px !important; }
+  #view-email .gmail-exact-body { padding-inline: 11px !important; }
+  #view-email #email-body-rich { min-height: 190px !important; }
+  .email-signature-toolbar { overflow-x: auto; flex-wrap: nowrap; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #view-email .mail-resizable-media,
+  #view-email .email-signature-toolbar * { transition: none !important; }
+}
+
+#view-email .gmail-formatting-bar {
+  min-height: 39px;
+  padding: 5px 14px !important;
+  overflow-x: auto;
+  border-top: 1px solid var(--shell-hairline) !important;
+  gap: 3px !important;
+}
+#view-email .gmail-formatting-bar select,
+#view-email .gmail-formatting-bar input[type="color"] {
+  height: 28px;
+  border: 1px solid var(--shell-hairline);
+  border-radius: 6px;
+  color: var(--do-t2);
+  background: var(--shell-panel);
+  font-size: 10.5px;
+}
+#view-email .gmail-formatting-bar input[type="color"] { width: 29px; padding: 3px; }
+#view-email .gmail-formatting-bar .gmail-tool-btn {
+  width: auto !important;
+  min-width: 28px;
+  height: 28px;
+  padding-inline: 7px !important;
+  white-space: nowrap;
+  color: var(--do-t2) !important;
+}
+html[data-theme="dark"] #view-email .gmail-compose-card,
+html[data-theme="dark"] #view-email .gmail-input-bare,
+html[data-theme="dark"] #view-email #email-body-rich,
+html[data-theme="dark"] #view-email #email-signature-rich {
+  color: var(--foreground) !important;
+}
+
+
+/* ============================================================
+   CHATGPT-DESKTOP REFERENCE PASS  (v2.0)
+
+   Goal: match the reference screenshot exactly —
+     - macOS traffic-light dots sit flush top-left of the sidebar, small and quiet
+     - Sidebar is a plain light/dark rail: brand row, "New chat"-style primary
+       nav, a muted "Pinned"/section label, then a simple list of rows
+     - Topbar is a thin strip: page title left, compact pills + primary button
+       right
+     - The composer is a fully rounded pill with a soft grey fill (not a card)
+   Everything here targets classes that already exist in index.html — no
+   markup, JS or view logic was touched.
+   ============================================================ */
+
+/* ── 1. Traffic lights: small, flush, exactly like macOS chrome ───── */
+.sidebar .sidebar-header {
+  padding: 12px 12px 10px !important;
+  gap: 10px !important;
+}
+.mac-window-controls {
+  gap: 8px !important;
+  margin: 0 0 4px 2px !important;
+}
+.mac-dot {
+  width: 12px !important;
+  height: 12px !important;
+  box-shadow: none !important;
+}
+/* Traffic lights read as chrome, not buttons — dim until the cluster is hovered. */
+.mac-window-controls .mac-dot { opacity: 0.85; }
+.mac-window-controls:hover .mac-dot { opacity: 1; }
+
+/* ── 2. Sidebar brand row: compact avatar + two-line identity ──────── */
+.sidebar .sidebar-brand-row { padding: 2px 2px 0 !important; }
+.sidebar .logo-mark {
+  width: 26px !important;
+  height: 26px !important;
+  min-width: 26px !important;
+  min-height: 26px !important;
+  border-radius: 7px !important;
+  background: var(--flow-border-strong) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+.sidebar .logo-mark svg { width: 13px !important; height: 13px !important; }
+.sidebar .logo-brand {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: var(--foreground) !important;
+}
+.sidebar .logo-sub {
+  font-size: 9px !important;
+  opacity: 0.55 !important;
+}
+
+/* ── 3. "Pinned"-style section labels + flat rows, ChatGPT spacing ─── */
+.sidebar .nav-section-label {
+  margin: 18px 12px 4px !important;
+  font-size: 10.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.03em !important;
+  opacity: 0.5 !important;
+}
+.sidebar-nav { padding: 4px 6px !important; }
+.sidebar .nav-item,
+.sidebar .nav-sub-item {
+  margin: 0.5px 2px !important;
+  border-radius: 10px !important;
+}
+/* The active row reads as a soft filled pill, same idea as the ChatGPT
+   sidebar's selected conversation row. */
+.sidebar .nav-item.active,
+.sidebar .nav-sub-item.active {
+  background: var(--shell-active) !important;
+  box-shadow: none !important;
+}
+
+/* ── 4. Topbar: thin strip, page title only, tidy right cluster ────── */
+.topbar {
+  min-height: 48px !important;
+  padding: 0 14px 0 18px !important;
+  border-bottom: 1px solid var(--shell-hairline) !important;
+}
+.page-breadcrumb { font-weight: 600 !important; }
+.topbar-right { gap: 6px !important; }
+
+/* Run Agent / primary topbar action reads as a compact solid pill. */
+.topbar .generate-btn {
+  border-radius: 999px !important;
+  padding: 0 14px !important;
+  font-weight: 600 !important;
+}
+
+/* History / Shortcuts read as quiet ghost pills, not bordered buttons. */
+.tb-history-btn,
+.tb-shortcuts-btn {
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 999px !important;
+  background: transparent !important;
+}
+.tb-history-btn:hover,
+.tb-shortcuts-btn:hover { background: var(--shell-hover) !important; }
+
+/* User badge: name + avatar, no card chrome until hovered. */
+.topbar-user-badge {
+  border: 1px solid transparent !important;
+  border-radius: 999px !important;
+}
+.topbar-user-badge:hover { border-color: var(--shell-hairline) !important; }
+.topbar-avatar {
+  border-radius: 50% !important;
+  background: var(--flow-border-strong) !important;
+  color: #FEFDF5 !important;
+  font-weight: 600 !important;
+}
+
+/* ── 5. Composer: soft filled pill, ChatGPT-style (no hard border) ── */
+.claude-input-container {
+  border: 1px solid var(--shell-hairline) !important;
+  background: var(--shell-panel) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 8px 24px -14px rgba(0,0,0,0.12) !important;
+}
+html[data-theme="dark"] .claude-input-container {
+  border: 1px solid var(--shell-hairline) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 24px -14px rgba(0,0,0,0.5) !important;
+}
+.claude-input-container:focus-within {
+  border-color: var(--flow-border-strong) !important;
+  box-shadow: 0 0 0 3px var(--flow-green-ring) !important;
+}
+html[data-theme="dark"] .claude-input-container:focus-within {
+  box-shadow: 0 0 0 3px rgba(192, 163, 229, 0.28) !important;
+}
+.claude-send-btn {
+  background: #8E8E93 !important;
+  color: #ffffff !important;
+  border-radius: 50% !important;
+}
+html[data-theme="dark"] .claude-send-btn { background: #636366 !important; color: #ffffff !important; }
+
+/* ── 6. Model selector pill reads as a quiet chip, not a form select ── */
+.claude-model-wrapper .custom-dropdown-header {
+  border-radius: 999px !important;
+  border: 1px solid var(--shell-hairline) !important;
+  background: transparent !important;
+}
+
+@media (max-width: 768px) {
+  .mac-window-controls { margin-left: 4px !important; }
+}
+
+/* ============================================================
+   DASHBOARD POLISH  (ChatGPT-style clean, flat, spacious)
+   Loads last so it wins over design-overhaul.css and macos.css.
+   Structure: unified sidebar+topbar canvas, single floating panel,
+   flat hairline cards, 8-point spacing, richer empty states.
+   ============================================================ */
+
+/* ── A. Kill any residual seam between sidebar, header and topbar ── */
+/* Older stylesheets add border-right / border-bottom that break the
+   "one continuous surface" look. Force them off so the shell reads as a
+   single canvas, exactly like ChatGPT. */
+#sidebar.sidebar,
+.sidebar,
+.sidebar .sidebar-header,
+#sidebar .sidebar-header,
+.topbar {
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ── B. 8-point spacing for the dashboard grids ────────────── */
+.do-dashboard-grid {
+  gap: 16px !important;
+  margin-bottom: 24px !important;
+}
+.do-charts-grid { gap: 16px !important; margin-bottom: 16px !important; }
+.do-charts-row2 { gap: 16px !important; margin-bottom: 24px !important; }
+.do-quick-actions { gap: 8px !important; margin-bottom: 24px !important; }
+
+/* ── C. Stat cards: flat, near-white, 16px radius, more air ── */
+.do-stat-card {
+  background: var(--shell-panel) !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 16px !important;
+  padding: 20px 22px !important;
+  box-shadow: none !important;
+  transition:
+    background-color var(--flow-fast) var(--flow-ease-soft),
+    border-color var(--flow-fast) var(--flow-ease-soft),
+    transform var(--flow-normal) var(--flow-ease) !important;
+}
+.do-stat-card:hover {
+  background: var(--shell-hover) !important;
+  border-color: var(--shell-active) !important;
+  transform: translate3d(0, -2px, 0) !important;
+  box-shadow: none !important;
+}
+
+/* ── D. Icon badges: bigger, softer, consistent ─────────────── */
+.do-stat-icon-wrap {
+  width: 44px !important;
+  height: 44px !important;
+  border-radius: 12px !important;
+  margin-bottom: 16px !important;
+}
+.do-stat-icon-wrap svg {
+  width: 20px !important;
+  height: 20px !important;
+  stroke-width: 1.75 !important;
+}
+
+/* ── E. Typography hierarchy on the cards ───────────────────── */
+.do-stat-num {
+  font-size: 28px !important;
+  font-weight: 700 !important;
+  letter-spacing: -0.03em !important;
+  color: var(--do-t1) !important;
+}
+.do-stat-label {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--do-t2) !important;
+  margin-top: 6px !important;
+}
+.do-stat-trend { margin-top: 10px !important; }
+
+/* ── F. Chart cards: match the flat card language ───────────── */
+.do-chart-wrap {
+  background: var(--shell-panel) !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+  transition:
+    background-color var(--flow-fast) var(--flow-ease-soft),
+    border-color var(--flow-fast) var(--flow-ease-soft) !important;
+}
+.do-chart-header {
+  padding: 16px 20px 12px !important;
+  border-bottom: 1px solid var(--shell-hairline) !important;
+}
+.do-chart-title {
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  color: var(--do-t1) !important;
+  letter-spacing: -0.01em !important;
+}
+.do-chart-subtitle {
+  font-size: 12px !important;
+  color: var(--do-t3) !important;
+}
+.do-chart-body { padding: 20px !important; }
+
+/* ── G. Richer empty states ─────────────────────────────────── */
+.do-chart-empty {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  padding: 28px 16px !important;
+  gap: 4px !important;
+  min-height: 140px !important;
+}
+.do-chart-empty .do-empty-badge {
+  width: 48px !important;
+  height: 48px !important;
+  border-radius: 50% !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: var(--flow-green-soft) !important;
+  color: var(--foreground) !important;
+  margin-bottom: 12px !important;
+}
+.do-chart-empty .do-empty-badge svg {
+  width: 22px !important;
+  height: 22px !important;
+  stroke-width: 1.75 !important;
+  opacity: 0.8 !important;
+}
+.do-chart-empty .do-empty-title {
+  font-size: 13.5px !important;
+  font-weight: 600 !important;
+  color: var(--do-t1) !important;
+}
+.do-chart-empty .do-empty-sub {
+  font-size: 12px !important;
+  color: var(--do-t3) !important;
+  max-width: 220px !important;
+  line-height: 1.4 !important;
+}
+.do-chart-empty .do-empty-cta {
+  margin-top: 8px !important;
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  color: var(--do-t1) !important;
+  background: var(--shell-hover) !important;
+  border: 1px solid var(--shell-hairline) !important;
+  border-radius: 8px !important;
+  padding: 6px 12px !important;
+  cursor: pointer !important;
+  transition: background-color var(--flow-fast) var(--flow-ease-soft) !important;
+}
+.do-chart-empty .do-empty-cta:hover { background: var(--shell-active) !important; }
+
+/* FINAL SHELL LOCK ---------------------------------------------------------
+   Keep the navigation chrome unified in both direct-file and localhost mode.
+   These rules intentionally come last so legacy theme/resizer rules cannot
+   reintroduce the divider, blue hover strip, or diagonal-looking edge.
+*/
+#sidebar,
+#sidebar.sidebar,
+aside#sidebar,
+.sidebar,
+.topbar,
+#main-content,
+.main-content {
+  background: var(--shell-canvas) !important;
+  border-left: 0 !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+#sidebar,
+#sidebar.sidebar,
+aside#sidebar,
+.sidebar {
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
+}
+
+#sidebar::-webkit-scrollbar,
+#sidebar.sidebar::-webkit-scrollbar,
+aside#sidebar::-webkit-scrollbar,
+.sidebar::-webkit-scrollbar,
+#sidebar-nav-scroll::-webkit-scrollbar,
+.sidebar-nav::-webkit-scrollbar,
+.sidebar-nav-scroll::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
+
+.sidebar-resizer,
+.sidebar-resizer::before,
+.sidebar-resizer::after {
+  display: none !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  opacity: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+.views-container,
+#main-scroll-area {
+  margin: 0 !important;
+  background: var(--shell-panel) !important;
+  border: 0 !important;
+  border-radius: 24px 0 0 0 !important;
+  overflow: visible !important;
+  box-shadow: var(--shell-panel-shadow) !important;
+}
+
+/* EDITORIAL REFERENCE PASS -----------------------------------------------
+   Visual language aligned to client-ai-editorial-v3.html. Only existing
+   application surfaces are styled here; navigation and feature markup stays
+   owned by the app so every route and handler keeps working.
+*/
+html[data-theme="light"] #sidebar,
+html[data-theme="light"] #sidebar.sidebar,
+html[data-theme="light"] aside#sidebar,
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar,
+html[data-theme="light"] #main-content,
+html[data-theme="light"] .main-content {
+  background: #f7f4ec !important;
+  color: #1b1a17 !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] .views-container,
+html[data-theme="light"] #main-scroll-area,
+html[data-theme="light"] .claude-ui-wrapper,
+html[data-theme="light"] #view-chat,
+html[data-theme="light"] #view-candidate-ai {
+  background: #fff !important;
+}
+
+html[data-theme="light"] .views-container,
+html[data-theme="light"] #main-scroll-area {
+  border: 0 !important;
+  border-radius: 24px 0 0 0 !important;
+  box-shadow: var(--shell-panel-shadow) !important;
+}
+
+html[data-theme="light"] #sidebar-nav-scroll,
+html[data-theme="light"] .sidebar-nav,
+html[data-theme="light"] .sidebar-footer {
+  background: #f7f4ec !important;
+  border-color: transparent !important;
+}
+
+html[data-theme="light"] .topbar {
+  min-height: 54px !important;
+  height: 54px !important;
+  padding-inline: 18px !important;
+}
+
+html[data-theme="light"] .page-breadcrumb,
+html[data-theme="light"] .topbar-title {
+  color: #55524a !important;
+  font-weight: 500 !important;
+}
+
+html[data-theme="light"] .sidebar .nav-item {
+  color: #55524a !important;
+  border-radius: 9px !important;
+}
+
+html[data-theme="light"] .sidebar .nav-item:hover {
+  background: rgba(27, 26, 23, 0.06) !important;
+  color: #1b1a17 !important;
+}
+
+html[data-theme="light"] .sidebar .nav-item.active {
+  background: #1b1a17 !important;
+  color: #f7f4ec !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="light"] .sidebar .nav-item.active svg {
+  color: #f7f4ec !important;
+}
+
+html[data-theme="light"] #view-chat .claude-greeting,
+html[data-theme="light"] #view-candidate-ai .claude-greeting,
+html[data-theme="light"] #welcome-greeting,
+html[data-theme="light"] #candidate-welcome-greeting {
+  color: #1b1a17 !important;
+  font-family: "Instrument Serif", Georgia, serif !important;
+  font-size: clamp(44px, 4.25vw, 60px) !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.035em !important;
+  line-height: 1.02 !important;
+}
+
+html[data-theme="light"] #view-chat .claude-greeting-container,
+html[data-theme="light"] #view-candidate-ai .claude-greeting-container {
+  transform: translateY(-32px) !important;
+  padding-bottom: 0 !important;
+}
+
+html[data-theme="light"] #view-chat .claude-input-container,
+html[data-theme="light"] #view-candidate-ai .claude-input-container {
+  width: min(100%, 640px) !important;
+  max-width: 640px !important;
+  min-height: 112px !important;
+  margin-top: 4px !important;
+  margin-bottom: 18px !important;
+  padding: 9px 12px 9px 20px !important;
+  border: 1px solid rgba(27, 26, 23, 0.12) !important;
+  border-radius: 22px !important;
+  background: #fff !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    0 1px 2px rgba(27,26,23,.03),
+    0 12px 30px rgba(27,26,23,.06),
+    0 0 0 4px rgba(27,26,23,.018) !important;
+}
+
+html[data-theme="light"] #view-chat .claude-input-container:focus-within,
+html[data-theme="light"] #view-candidate-ai .claude-input-container:focus-within {
+  border-color: rgba(27, 26, 23, 0.22) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.72),
+    0 4px 12px rgba(27,26,23,.05),
+    0 18px 40px rgba(27,26,23,.08) !important;
+}
+
+html[data-theme="light"] #view-chat .claude-textarea,
+html[data-theme="light"] #view-candidate-ai .claude-textarea {
+  color: #1b1a17 !important;
+  font-family: Figtree, Inter, sans-serif !important;
+  font-size: 14px !important;
+  line-height: 1.55 !important;
+  caret-color: #1b1a17 !important;
+}
+
+html[data-theme="light"] #view-chat .claude-textarea::placeholder,
+html[data-theme="light"] #view-candidate-ai .claude-textarea::placeholder {
+  color: #9b9789 !important;
+}
+
+html[data-theme="light"] .nexus-pet-host {
+  width: min(100%, 640px) !important;
+  max-width: 640px !important;
+  transform: translateY(2px) !important;
+}
+
+@media (max-width: 768px) {
+  html[data-theme="light"] .views-container,
+  html[data-theme="light"] #main-scroll-area {
+    border-radius: 20px 0 0 0 !important;
+  }
+  html[data-theme="light"] #view-chat .claude-input-container,
+  html[data-theme="light"] #view-candidate-ai .claude-input-container {
+    min-height: 100px !important;
+  }
+}
+
+/* Last-mile edge cleanup: a single quarter-round corner, no diagonal seam,
+   and a soft perimeter shadow that does not form a triangular wedge. */
+#main-scroll-area,
+.views-container {
+  border: 0 !important;
+  border-top-left-radius: 26px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  clip-path: none !important;
+  outline: 0 !important;
+  box-shadow:
+    -7px 0 22px -17px rgba(31, 41, 55, .42),
+    0 -7px 22px -17px rgba(31, 41, 55, .34),
+    0 14px 30px -24px rgba(31, 41, 55, .30) !important;
+}
+
+#main-scroll-area::before,
+#main-scroll-area::after,
+.views-container::before,
+.views-container::after {
+  display: none !important;
+  content: none !important;
+  box-shadow: none !important;
+}
+
+html[data-theme="dark"] #main-scroll-area,
+html[data-theme="dark"] .views-container {
+  box-shadow:
+    -7px 0 24px -17px rgba(0, 0, 0, .68),
+    0 -7px 24px -17px rgba(0, 0, 0, .56),
+    0 14px 32px -24px rgba(0, 0, 0, .68) !important;
+}
+
+/* Match the light-theme selector weight used by the legacy panel rules. */
+html[data-theme="light"] #main-scroll-area,
+html[data-theme="light"] .views-container {
+  border: 0 !important;
+  border-radius: 26px 0 0 0 !important;
+  clip-path: none !important;
+  box-shadow:
+    -7px 0 22px -17px rgba(31, 41, 55, .42),
+    0 -7px 22px -17px rgba(31, 41, 55, .34),
+    0 14px 30px -24px rgba(31, 41, 55, .30) !important;
+}
+
+html[data-theme="light"] #view-chat .claude-input-container,
+html[data-theme="light"] #view-candidate-ai .claude-input-container {
+  border-color: rgba(27, 26, 23, .13) !important;
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.82),
+    0 1px 2px rgba(27,26,23,.04),
+    0 14px 32px -12px rgba(27,26,23,.18) !important;
+}
+
+/* The rotating empty-state suggestion is a placeholder, not a second input
+   layer. Keep it quiet while the user is typing. */
+html[data-theme="light"] #view-chat .claude-textarea::placeholder,
+html[data-theme="light"] #view-candidate-ai .claude-textarea::placeholder {
+  color: #9b9789 !important;
+  opacity: 1 !important;
+}
+
+/* Final shell polish: elevation comes from shadow only; no divider seams. */
+#sidebar,
+#sidebar.sidebar,
+aside#sidebar,
+.sidebar,
+.topbar,
+#main-content,
+.main-content,
+#sidebar-nav-scroll,
+.sidebar-nav-scroll,
+.sidebar-nav,
+.sidebar-footer {
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+#sidebar-resizer,
+.sidebar-resizer,
+.sidebar-resizer::before,
+.sidebar-resizer::after {
+  display: none !important;
+  width: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  pointer-events: none !important;
+}
+
+/* Keep the working width transition, but finish it with a restrained settle. */
+#sidebar.sidebar,
+#sidebar.sidebar.collapsed {
+  transition-timing-function: cubic-bezier(.22, 1.12, .36, 1) !important;
+}
+
+html[data-theme="light"] #sidebar,
+html[data-theme="light"] #sidebar.sidebar,
+html[data-theme="light"] aside#sidebar,
+html[data-theme="light"] .sidebar,
+html[data-theme="light"] .topbar,
+html[data-theme="light"] #main-content,
+html[data-theme="light"] .main-content,
+html[data-theme="light"] #sidebar-nav-scroll,
+html[data-theme="light"] .sidebar-nav-scroll,
+html[data-theme="light"] .sidebar-nav,
+html[data-theme="light"] .sidebar-footer {
+  border: 0 !important;
+  outline: 0 !important;
+}
+
+html[data-theme="light"] #main-scroll-area,
+html[data-theme="light"] .views-container {
+  border-top: 1px solid rgba(27, 26, 23, .10) !important;
+  border-left: 1px solid rgba(27, 26, 23, .10) !important;
+  border-right: 0 !important;
+  border-bottom: 0 !important;
+  border-radius: 26px 0 0 0 !important;
+  overflow: hidden !important;
+  background: var(--shell-panel) !important;
+  background-clip: border-box !important;
+  clip-path: none !important;
+  box-shadow: none !important;
+  filter: none !important;
+  /* Low-spread edge shadows keep the hairline readable without filling the
+     transparent quarter-round with a dark wedge. */
+  box-shadow:
+    -10px 0 28px rgba(31, 41, 55, .18),
+    0 -10px 28px rgba(31, 41, 55, .14),
+    0 18px 34px rgba(31, 41, 55, .12) !important;
+}
+
+/* Let the panel's exterior elevation breathe into the shell. The scroll
+   surface remains the panel itself; only its outside shadow is unclipped. */
+html[data-theme="light"] #main-content,
+html[data-theme="light"] .main-content {
+  overflow: visible !important;
+  isolation: isolate !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* The app shell used to clip the panel's outside elevation. Keep the shell
+   full-viewport, but let only the panel shadow breathe past its edge. */
+html[data-theme="light"] .app-shell,
+html[data-theme="light"] #app-shell {
+  overflow: visible !important;
+}
+
+/* Compact credit meter: keep it on the sidebar canvas instead of letting it
+   visually merge into the opened page. */
+html[data-theme="light"] .sidebar-footer {
+  padding: 7px 6px !important;
+  background: var(--shell-canvas) !important;
+}
+html[data-theme="light"] .lx-usage-card {
+  width: 154px !important;
+  min-height: 70px !important;
+  padding: 7px 9px !important;
+  background: var(--shell-canvas) !important;
+  border-color: var(--shell-hairline) !important;
+}
+
+/* Compact floating source menu: it belongs above the composer, not inside its
+   visual box. Right anchoring keeps the pet's perch clear on both AI pages. */
+#view-chat .claude-input-container,
+#view-candidate-ai .claude-input-container {
+  overflow: visible !important;
+}
+#view-chat .client-source-picker,
+#view-candidate-ai .candidate-source-picker {
+  position: relative !important;
+  z-index: 70 !important;
+}
+#view-chat .client-source-picker .cand-source-menu,
+#view-candidate-ai .candidate-source-picker .cand-source-menu {
+  left: auto !important;
+  right: 0 !important;
+  bottom: calc(100% + 12px) !important;
+  width: min(216px, calc(100vw - 40px)) !important;
+  max-height: min(258px, calc(100vh - 150px)) !important;
+  overflow-y: auto !important;
+  gap: 3px !important;
+  padding: 6px !important;
+  border-radius: 13px !important;
+  z-index: 70 !important;
+  transform: none !important;
+  transform-origin: bottom right !important;
+  box-shadow:
+    0 12px 24px rgba(31, 41, 55, .14),
+    0 2px 7px rgba(31, 41, 55, .08) !important;
+}
+#view-chat .client-source-picker.is-open .cand-source-menu,
+#view-candidate-ai .candidate-source-picker.is-open .cand-source-menu {
+  animation: compact-source-menu-in 180ms cubic-bezier(.22, 1, .36, 1) both !important;
+}
+#view-chat .cand-source-menu-head,
+#view-candidate-ai .cand-source-menu-head {
+  gap: 1px !important;
+  padding: 4px 6px 5px !important;
+  font-size: 11.5px !important;
+}
+#view-chat .cand-source-menu-head small,
+#view-candidate-ai .cand-source-menu-head small {
+  font-size: 9.5px !important;
+}
+#view-chat .cand-src-chip,
+#view-candidate-ai .cand-src-chip {
+  min-height: 30px !important;
+  gap: 7px !important;
+  padding: 5px 7px !important;
+  border-radius: 8px !important;
+  font-size: 11.5px !important;
+}
+#view-chat .cand-src-dot,
+#view-candidate-ai .cand-src-dot {
+  width: 6px !important;
+  height: 6px !important;
+}
+#view-chat .nexus-pet-host,
+#view-candidate-ai .nexus-pet-host {
+  z-index: 80 !important;
+}
+@keyframes compact-source-menu-in {
+  from { opacity: 0; transform: translateY(6px) scale(.97) !important; }
+  to { opacity: 1; transform: translateY(0) scale(1) !important; }
+}
+
+/* The client source control replaces the model pill and opens upward without
+   clipping into the composer or the bird's resting area. */
+#view-chat .client-source-picker { z-index: 60 !important; }
+#view-chat .client-source-picker .cand-source-menu {
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  transform-origin: bottom center !important;
+}
+#view-chat .client-source-picker.is-open .cand-source-menu {
+  animation: client-source-menu-in 180ms cubic-bezier(.22, 1, .36, 1) both;
+}
+@keyframes client-source-menu-in {
+  from { opacity: 0; transform: translate(-50%, 5px) scale(.98); }
+  to { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+
+/* Lift the whole composer and its anchored pet together; no independent bird
+   offset is introduced, so Pip stays seated on the top edge. */
+html[data-theme="light"] #view-chat .claude-input-container,
+html[data-theme="light"] #view-candidate-ai .claude-input-container,
+html[data-theme="light"] #view-chat .nexus-pet-host,
+html[data-theme="light"] #view-candidate-ai .nexus-pet-host {
+  transform: translateY(-38px) !important;
+}
+
+/* Compact header: preserve its controls and shared canvas, reduce only the
+   vertical footprint. Removing the top shadow avoids the visible corner wedge. */
+.topbar,
+html[data-theme="light"] .topbar {
+  height: 44px !important;
+  min-height: 44px !important;
+  padding-block: 0 !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Keep collapse composited and calm; width/layout ownership stays with the
+   existing router so the sidebar does not jump or desynchronise the content. */
+#sidebar.sidebar,
+#sidebar.sidebar.collapsed {
+  will-change: transform;
+  transition-property: width, min-width, transform, opacity !important;
+  transition-duration: .52s, .52s, .52s, .22s !important;
+  transition-timing-function: cubic-bezier(.22, 1.12, .36, 1),
+    cubic-bezier(.22, 1.12, .36, 1),
+    cubic-bezier(.22, 1.12, .36, 1), ease !important;
+}
+
+/* Side elevation only: no top shadow means the rounded corner reads as a
+   clean curve instead of a triangular highlight. */
+html[data-theme="light"] #main-scroll-area::before,
+html[data-theme="light"] #main-scroll-area::after,
+html[data-theme="light"] .views-container::before,
+html[data-theme="light"] .views-container::after {
+  display: none !important;
+  content: none !important;
+}
+
+/* Keep readable app content on a crisp raster layer. */
+.app-shell .topbar,
+.app-shell .page-breadcrumb,
+.app-shell .view,
+.app-shell input,
+.app-shell textarea,
+.app-shell button,
+.app-shell label,
+.app-shell h1,
+.app-shell h2,
+.app-shell h3,
+.app-shell h4,
+.app-shell p,
+.app-shell span {
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+/* Final source-menu placement override (must remain last because earlier
+   legacy rules center the menu). */
+#view-chat .client-source-picker .cand-source-menu,
+#view-candidate-ai .candidate-source-picker .cand-source-menu {
+  left: auto !important;
+  right: 0 !important;
+  bottom: calc(100% + 12px) !important;
+  width: min(216px, calc(100vw - 40px)) !important;
+  max-height: min(258px, calc(100vh - 150px)) !important;
+  overflow-y: auto !important;
+  padding: 6px !important;
+  border-radius: 13px !important;
+  z-index: 70 !important;
+  transform: none !important;
+  transform-origin: bottom right !important;
+}
+#view-chat .client-source-picker.is-open .cand-source-menu,
+#view-candidate-ai .candidate-source-picker.is-open .cand-source-menu {
+  animation: compact-source-menu-fade 180ms ease-out both !important;
+}
+@keyframes compact-source-menu-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* One shared corner contract for every routed tab: no straight edge line,
+   only the panel's quarter-round curve and its exterior elevation. */
+#main-scroll-area,
+.views-container {
+  border: 0 !important;
+  border-radius: 26px 0 0 0 !important;
+  overflow: hidden !important;
+  background: var(--shell-panel) !important;
+  background-clip: border-box !important;
+}
+
+/* Sidebar motion pass: the rail and the content geometry share one springy
+   timeline, so the page never jumps while the rail is opening or collapsing. */
+#sidebar.sidebar,
+#sidebar.sidebar.collapsed,
+aside#sidebar {
+  width: var(--sidebar-current, var(--sidebar-width, 215px)) !important;
+  min-width: var(--sidebar-current, var(--sidebar-width, 215px)) !important;
+  max-width: var(--sidebar-current, var(--sidebar-width, 215px)) !important;
+  will-change: width, min-width, max-width;
+  transition-property: width, min-width, max-width, background-color, box-shadow !important;
+  transition-duration: 560ms, 560ms, 560ms, 260ms, 320ms !important;
+  transition-timing-function: cubic-bezier(.22, 1, .36, 1),
+    cubic-bezier(.22, 1, .36, 1), cubic-bezier(.22, 1, .36, 1), ease, ease !important;
+}
+#main-content.main-content,
+#main-content {
+  margin-left: var(--sidebar-current, var(--sidebar-width, 215px)) !important;
+  width: calc(100% - var(--sidebar-current, var(--sidebar-width, 215px))) !important;
+  max-width: calc(100% - var(--sidebar-current, var(--sidebar-width, 215px))) !important;
+  transition-property: margin-left, width, max-width !important;
+  transition-duration: 560ms, 560ms, 560ms !important;
+  transition-timing-function: cubic-bezier(.22, 1, .36, 1),
+    cubic-bezier(.22, 1, .36, 1), cubic-bezier(.22, 1, .36, 1) !important;
+}
+
+/* Labels fade and contract instead of disappearing in one frame. Icons remain
+   stable in the rail, while expanded text returns with a quiet settle. */
+#sidebar .logo-text,
+#sidebar .logo-sub,
+#sidebar .nav-item > span:not(.icon-sm):not(.nav-badge),
+#sidebar .nav-sub-item > span:not(.sub-dot),
+#sidebar .nav-section-label,
+#sidebar .chevron-arrow,
+#sidebar .nav-badge-pill,
+#sidebar .apify-text-col,
+#sidebar .token-meter > div,
+#sidebar .token-label,
+#sidebar .token-count {
+  display: block !important;
+  max-width: 240px;
+  opacity: 1;
+  overflow: hidden;
+  transform: translateX(0);
+  transition-property: opacity, transform !important;
+  transition-duration: 240ms, 360ms !important;
+  transition-timing-function: ease, cubic-bezier(.22, 1, .36, 1) !important;
+}
+#sidebar.collapsed .logo-text,
+#sidebar.collapsed .logo-sub,
+#sidebar.collapsed .nav-item > span:not(.icon-sm):not(.nav-badge),
+#sidebar.collapsed .nav-sub-item > span:not(.sub-dot),
+#sidebar.collapsed .nav-section-label,
+#sidebar.collapsed .chevron-arrow,
+#sidebar.collapsed .nav-badge-pill,
+#sidebar.collapsed .apify-text-col,
+#sidebar.collapsed .token-meter > div,
+#sidebar.collapsed .token-label,
+#sidebar.collapsed .token-count {
+  display: block !important;
+  max-width: 0 !important;
+  opacity: 0 !important;
+  transform: translateX(-5px);
+  pointer-events: none;
+}
+#sidebar.collapsed .nav-section-label {
+  max-height: 0 !important;
+  margin-block: 0 !important;
+}
+
+/* Refined hover states: movement is tiny and composited, so the rail feels
+   responsive without shifting neighbouring rows. */
+#sidebar .nav-item,
+#sidebar .nav-sub-item,
+#sidebar .sidebar-collapse-toggle,
+#sidebar .sidebar-toggle {
+  transition-property: transform, box-shadow, padding !important;
+  transition-duration: 280ms, 260ms, 560ms !important;
+  transition-timing-function: cubic-bezier(.22, 1, .36, 1), ease,
+    cubic-bezier(.22, 1, .36, 1) !important;
+  filter: none !important;
+}
+#sidebar:not(.collapsed) .nav-item:hover,
+#sidebar:not(.collapsed) .nav-sub-item:hover {
+  transform: translateX(3px);
+}
+#sidebar.collapsed .nav-item:hover,
+#sidebar.collapsed .nav-sub-item:hover {
+  transform: translateY(-1px) scale(1.035);
+}
+#sidebar .nav-item:active,
+#sidebar .nav-sub-item:active {
+  transform: translateY(1px) scale(.985);
+}
+
+/* Sidebar scrolling stays on one composited surface with a calm wheel/track
+   response and no accidental nested scrollbars. */
+#sidebar-nav-scroll,
+.sidebar-nav-scroll,
+#sidebar .sidebar-nav {
+  /* Native wheel/touchpad input must not restart a smooth-scroll animation
+     for every tick. The edge/footer bridge owns scripted momentum in one RAF. */
+  scroll-behavior: auto !important;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  transform: translateZ(0);
+  will-change: scroll-position;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #sidebar.sidebar,
+  #sidebar.sidebar.collapsed,
+  aside#sidebar,
+  #main-content.main-content,
+  #main-content,
+  #sidebar .logo-text,
+  #sidebar .logo-sub,
+  #sidebar .nav-item > span,
+  #sidebar .nav-sub-item > span,
+  #sidebar .nav-section-label,
+  #sidebar .nav-item,
+  #sidebar .nav-sub-item {
+    transition: none !important;
+  }
+}
+
+/* Final sidebar visual system: stable macOS traffic lights, quiet spacing and
+   crisp line icons. Active-tab palette is intentionally inherited unchanged. */
+#sidebar .sidebar-header {
+  box-sizing: border-box !important;
+  padding: 12px 13px 10px !important;
+  gap: 10px !important;
+  align-items: stretch !important;
+}
+#sidebar.collapsed .sidebar-header {
+  padding: 12px 0 10px !important;
+  gap: 10px !important;
+  align-items: center !important;
+}
+#sidebar .mac-window-controls,
+#sidebar.collapsed .mac-window-controls {
+  display: flex !important;
+  flex: 0 0 13px !important;
+  flex-flow: row nowrap !important;
+  align-items: center !important;
+  justify-content: flex-start !important;
+  align-content: center !important;
+  width: max-content !important;
+  height: 13px !important;
+  min-height: 13px !important;
+  gap: 7px !important;
+  margin: 0 0 3px 2px !important;
+  padding: 0 !important;
+  transform: none !important;
+  white-space: nowrap !important;
+}
+#sidebar.collapsed .mac-window-controls {
+  justify-content: center !important;
+  width: 100% !important;
+  gap: 6px !important;
+  margin: 0 0 3px !important;
+}
+#sidebar .mac-dot,
+#sidebar.collapsed .mac-dot {
+  box-sizing: border-box !important;
+  display: block !important;
+  flex: 0 0 12px !important;
+  width: 12px !important;
+  min-width: 12px !important;
+  height: 12px !important;
+  min-height: 12px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  transform: none !important;
+  transform-origin: center !important;
+  filter: none !important;
+  transition-property: transform, opacity, filter !important;
+  transition-duration: 180ms, 180ms, 180ms !important;
+  transition-timing-function: cubic-bezier(.22, 1, .36, 1), ease, ease !important;
+}
+#sidebar .mac-dot:hover {
+  transform: scale(1.12) !important;
+}
+#sidebar.collapsed .mac-dot:hover {
+  transform: scale(1.12) !important;
+}
+
+#sidebar .sidebar-brand-row {
+  min-width: 0 !important;
+  min-height: 28px !important;
+  align-items: center !important;
+  overflow: hidden !important;
+  transform: translateZ(0);
+}
+#sidebar.collapsed .sidebar-brand-row {
+  width: 100% !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
+/* Stable row boxes prevent icon drift while the rail width is moving. */
+#sidebar .nav-item,
+#sidebar .nav-sub-item,
+#sidebar .main-cat-header {
+  box-sizing: border-box !important;
+  min-height: 34px !important;
+  height: 34px !important;
+  margin: 2px 8px !important;
+  padding: 0 10px !important;
+  gap: 10px !important;
+  border-radius: 10px !important;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+#sidebar.collapsed .nav-item,
+#sidebar.collapsed .nav-sub-item,
+#sidebar.collapsed .main-cat-header {
+  width: 42px !important;
+  min-width: 42px !important;
+  height: 36px !important;
+  min-height: 36px !important;
+  margin: 2px auto !important;
+  padding: 0 !important;
+  gap: 0 !important;
+  justify-content: center !important;
+}
+#sidebar .nav-item svg,
+#sidebar .nav-sub-item svg,
+#sidebar .nav-item .icon-sm {
+  width: 16px !important;
+  height: 16px !important;
+  min-width: 16px !important;
+  min-height: 16px !important;
+  stroke-width: 1.65 !important;
+  shape-rendering: geometricPrecision;
+  transform: none !important;
+  filter: none !important;
+}
+#sidebar .nav-item:hover > *,
+#sidebar .nav-sub-item:hover > *,
+#sidebar .main-cat-header:hover > * {
+  transform: none !important;
+}
+
+/* The reference-like hover is a soft row wash; only the row itself moves a
+   couple of pixels and never pushes its neighbours. */
+#sidebar:not(.collapsed) .nav-item:hover,
+#sidebar:not(.collapsed) .nav-sub-item:hover,
+#sidebar:not(.collapsed) .main-cat-header:hover {
+  transform: translate3d(2px, 0, 0) !important;
+}
+#sidebar.collapsed .nav-item:hover,
+#sidebar.collapsed .nav-sub-item:hover,
+#sidebar.collapsed .main-cat-header:hover {
+  transform: translate3d(0, -1px, 0) scale(1.025) !important;
+}
+
+#sidebar-nav-scroll::-webkit-scrollbar,
+#sidebar .sidebar-nav::-webkit-scrollbar { width: 6px !important; }
+#sidebar-nav-scroll::-webkit-scrollbar-track,
+#sidebar .sidebar-nav::-webkit-scrollbar-track { background: transparent !important; }
+#sidebar-nav-scroll::-webkit-scrollbar-thumb,
+#sidebar .sidebar-nav::-webkit-scrollbar-thumb {
+  background: transparent !important;
+  border-radius: 99px !important;
+  transition-property: background-color !important;
+  transition-duration: 220ms !important;
+  transition-timing-function: ease !important;
+}
+#sidebar-nav-scroll:hover::-webkit-scrollbar-thumb,
+#sidebar .sidebar-nav:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--foreground) 18%, transparent) !important;
+}
+
+/* Final motion contract: every primary scroll surface uses one short,
+   responsive RAF settle instead of competing CSS smooth-scroll animations. */
+#main-scroll-area,
+.smodal-content,
+.smodal-nav,
+.diag-body,
+.pg-modal-card {
+  scroll-behavior: auto !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: auto !important;
+  scrollbar-gutter: stable;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #main-scroll-area,
+  .smodal-content,
+  .smodal-nav,
+  .diag-body,
+  .pg-modal-card {
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ============================================================
+   SETTINGS WINDOW — compact macOS / neutral glass pass
+   Scoped to the real Settings window so Shortcuts and History keep their
+   own proportions and behavior.
+   ============================================================ */
+#settings-overlay.settings-overlay {
+  background: rgba(24, 24, 26, .34) !important;
+  backdrop-filter: blur(22px) saturate(112%) !important;
+  -webkit-backdrop-filter: blur(22px) saturate(112%) !important;
+}
+
+#settings-overlay #settings-modal {
+  width: min(920px, calc(100vw - 48px)) !important;
+  height: min(590px, calc(100vh - 76px)) !important;
+  min-height: 420px !important;
+  max-width: 920px !important;
+  max-height: 720px !important;
+  border-radius: 14px !important;
+  background: rgba(250, 250, 249, .90) !important;
+  border: 1px solid rgba(24, 24, 26, .14) !important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.48) inset,
+    0 18px 42px rgba(20,20,22,.18),
+    0 34px 88px rgba(20,20,22,.22) !important;
+}
+
+#settings-overlay #settings-modal.minimized {
+  width: min(430px, calc(100vw - 32px)) !important;
+  height: 46px !important;
+  min-height: 46px !important;
+  max-height: 46px !important;
+  border-radius: 12px !important;
+}
+#settings-overlay #settings-modal.minimized .smodal-body {
+  display: none !important;
+}
+#settings-overlay #settings-modal.minimized .smodal-title {
+  display: block !important;
+  font-size: 12px !important;
+  color: rgba(28,28,30,.88) !important;
+}
+#settings-overlay #settings-modal.minimized .smodal-minimized-nav-pill {
+  display: none !important;
+}
+
+/* A minimized window behaves like a small macOS titlebar instead of leaving
+   a blurred, interaction-blocking full-screen sheet behind it. */
+#settings-overlay:has(#settings-modal.minimized) {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  pointer-events: none !important;
+}
+#settings-overlay:has(#settings-modal.minimized) #settings-modal {
+  pointer-events: auto !important;
+  box-shadow:
+    0 0 0 1px rgba(24,24,26,.08) inset,
+    0 12px 28px rgba(20,20,22,.16),
+    0 22px 48px rgba(20,20,22,.14) !important;
+}
+#settings-overlay:has(#settings-modal.minimized) .settings-backdrop {
+  pointer-events: none !important;
+}
+
+#settings-overlay #settings-modal.maximized {
+  width: min(1180px, calc(100vw - 32px)) !important;
+  height: calc(100vh - 40px) !important;
+  max-width: none !important;
+  max-height: none !important;
+  border-radius: 13px !important;
+}
+
+#settings-overlay .smodal-titlebar {
+  height: 42px !important;
+  padding: 0 16px !important;
+  background: rgba(255,255,255,.34) !important;
+  border-bottom: 1px solid rgba(24,24,26,.10) !important;
+}
+#settings-overlay .smodal-traffic-lights {
+  left: 14px !important;
+  gap: 7px !important;
+}
+#settings-overlay .smodal-dot {
+  width: 11px !important;
+  height: 11px !important;
+  box-shadow: inset 0 0 0 .5px rgba(0,0,0,.18) !important;
+}
+#settings-overlay .smodal-title {
+  font-size: 12px !important;
+  font-weight: 600 !important;
+  letter-spacing: -.01em !important;
+  color: rgba(28,28,30,.88) !important;
+}
+#settings-overlay .smodal-status-pill {
+  right: 14px !important;
+  padding: 3px 9px !important;
+  font-size: 10px !important;
+  color: rgba(28,28,30,.58) !important;
+  background: rgba(255,255,255,.44) !important;
+  border-color: rgba(28,28,30,.12) !important;
+}
+
+#settings-overlay .smodal-body {
+  min-height: 0 !important;
+}
+#settings-overlay .smodal-nav {
+  width: 184px !important;
+  min-width: 184px !important;
+  max-width: 184px !important;
+  padding: 12px 9px 18px !important;
+  background: rgba(246,247,248,.48) !important;
+  border-right: 1px solid rgba(24,24,26,.10) !important;
+  box-shadow: inset -1px 0 rgba(255,255,255,.38) !important;
+  backdrop-filter: blur(20px) saturate(120%) !important;
+  -webkit-backdrop-filter: blur(20px) saturate(120%) !important;
+}
+#settings-overlay .smodal-nav-group {
+  margin-bottom: 11px !important;
+}
+#settings-overlay .smodal-nav-group-label {
+  padding: 7px 9px 5px !important;
+  font-size: 9px !important;
+  letter-spacing: .10em !important;
+  color: rgba(28,28,30,.46) !important;
+}
+#settings-overlay .smodal-nav-item {
+  height: 29px !important;
+  min-height: 29px !important;
+  margin-bottom: 1px !important;
+  padding: 0 9px !important;
+  gap: 8px !important;
+  border-radius: 7px !important;
+  color: rgba(28,28,30,.78) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  transition: background-color 140ms ease, color 140ms ease, transform 140ms ease !important;
+}
+#settings-overlay .smodal-nav-item:hover {
+  background: rgba(28,28,30,.055) !important;
+  color: rgba(28,28,30,.92) !important;
+  transform: translateX(1px) !important;
+}
+#settings-overlay .smodal-nav-item.active {
+  background: rgba(28,28,30,.10) !important;
+  color: rgba(20,20,22,.96) !important;
+  font-weight: 650 !important;
+  box-shadow: none !important;
+}
+#settings-overlay .smodal-nav-icon {
+  width: 13px !important;
+  height: 13px !important;
+  opacity: .66 !important;
+  color: currentColor !important;
+}
+#settings-overlay .smodal-nav-item.active .smodal-nav-icon {
+  opacity: .92 !important;
+}
+
+#settings-overlay .smodal-content {
+  padding: 20px 28px 28px !important;
+  background: rgba(255,255,255,.24) !important;
+}
+#settings-overlay .smodal-section-header {
+  margin-bottom: 14px !important;
+  padding-bottom: 10px !important;
+  border-bottom-color: rgba(24,24,26,.10) !important;
+}
+#settings-overlay .smodal-section-title {
+  font-size: 19px !important;
+  font-weight: 650 !important;
+  letter-spacing: -.025em !important;
+  color: rgba(24,24,26,.92) !important;
+}
+#settings-overlay .smodal-section-desc {
+  font-size: 11.5px !important;
+  color: rgba(24,24,26,.54) !important;
+  opacity: 1 !important;
+}
+#settings-overlay .smodal-field {
+  gap: 16px !important;
+  padding: 10px 0 !important;
+  border-bottom-color: rgba(24,24,26,.09) !important;
+}
+#settings-overlay .smodal-label {
+  font-size: 12.5px !important;
+  font-weight: 600 !important;
+  color: rgba(24,24,26,.86) !important;
+}
+#settings-overlay .smodal-hint,
+#settings-overlay .smodal-hint-col {
+  font-size: 11px !important;
+  color: rgba(24,24,26,.52) !important;
+  opacity: 1 !important;
+}
+
+/* Graphite controls: no blue or purple accent in Settings. */
+#settings-overlay .smodal-nav-item:focus-visible,
+#settings-overlay .smodal-btn-primary:focus-visible,
+#settings-overlay .smodal-btn-secondary:focus-visible,
+#settings-overlay .smodal-input:focus,
+#settings-overlay .smodal-select:focus {
+  outline: 2px solid rgba(28,28,30,.28) !important;
+  outline-offset: 2px !important;
+  border-color: rgba(28,28,30,.28) !important;
+  box-shadow: none !important;
+}
+#settings-overlay .smodal-switch input:checked + .smodal-switch-track {
+  background: #343437 !important;
+  box-shadow: 0 1px 3px rgba(20,20,22,.18) !important;
+}
+#settings-overlay .smodal-switch-track {
+  transition: background 160ms ease !important;
+}
+#settings-overlay .smodal-btn-primary,
+#settings-overlay .smodal-btn-secondary {
+  border: 1px solid rgba(24,24,26,.13) !important;
+  border-radius: 7px !important;
+  box-shadow: none !important;
+  transition: background-color 140ms ease, transform 140ms ease !important;
+}
+#settings-overlay .smodal-btn-primary {
+  padding: 7px 17px !important;
+  background: rgba(28,28,30,.88) !important;
+  color: #fff !important;
+}
+#settings-overlay .smodal-btn-secondary {
+  padding: 7px 15px !important;
+  background: rgba(255,255,255,.54) !important;
+  color: rgba(28,28,30,.82) !important;
+}
+#settings-overlay .smodal-btn-primary:hover,
+#settings-overlay .smodal-btn-secondary:hover {
+  background: rgba(28,28,30,.12) !important;
+  color: rgba(28,28,30,.96) !important;
+  transform: translateY(-1px) !important;
+}
+#settings-overlay .smodal-btn-primary:hover {
+  background: rgba(28,28,30,.96) !important;
+  color: #fff !important;
+}
+#settings-overlay .smodal-select,
+#settings-overlay .smodal-input {
+  min-height: 30px !important;
+  background: rgba(255,255,255,.58) !important;
+  border-color: rgba(24,24,26,.14) !important;
+  color: rgba(24,24,26,.90) !important;
+  box-shadow: 0 1px 2px rgba(24,24,26,.04) inset !important;
+}
+#settings-overlay .smodal-range::-webkit-slider-thumb:hover {
+  box-shadow: 0 2px 7px rgba(20,20,22,.24), 0 0 0 2px rgba(28,28,30,.24) !important;
+}
+#settings-overlay .smodal-content::-webkit-scrollbar-thumb,
+#settings-overlay .smodal-nav::-webkit-scrollbar-thumb {
+  background: rgba(28,28,30,.18) !important;
+  background-clip: content-box !important;
+}
+#settings-overlay .smodal-content::-webkit-scrollbar-thumb:hover,
+#settings-overlay .smodal-nav::-webkit-scrollbar-thumb:hover {
+  background: rgba(28,28,30,.32) !important;
+  background-clip: content-box !important;
+}
+
+html[data-theme='dark'] #settings-overlay.settings-overlay {
+  background: rgba(0,0,0,.48) !important;
+}
+html[data-theme='dark'] #settings-overlay #settings-modal {
+  background: rgba(30,30,32,.88) !important;
+  border-color: rgba(255,255,255,.14) !important;
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.06) inset,
+    0 20px 48px rgba(0,0,0,.42),
+    0 38px 96px rgba(0,0,0,.48) !important;
+}
+html[data-theme='dark'] #settings-overlay #settings-modal.minimized .smodal-title {
+  color: rgba(255,255,255,.92) !important;
+}
+html[data-theme='dark'] #settings-overlay:has(#settings-modal.minimized) #settings-modal {
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,.08) inset,
+    0 12px 28px rgba(0,0,0,.34),
+    0 22px 54px rgba(0,0,0,.34) !important;
+}
+
+/* Corner-only cleanup: never cast a top/left shadow into the shared
+   sidebar/topbar canvas. The panel keeps its quarter-round curve while its
+   elevation falls outward on the visible lower/right edges only. */
+#main-scroll-area,
+.views-container {
+  border-top-left-radius: 28px !important;
+  border-top-right-radius: 0 !important;
+  border-bottom-right-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  overflow: hidden !important;
+  clip-path: none !important;
+  box-shadow:
+    8px 0 24px -23px rgba(31,41,55,.22),
+    0 14px 34px -25px rgba(31,41,55,.30) !important;
+}
+html[data-theme='dark'] #main-scroll-area,
+html[data-theme='dark'] .views-container {
+  box-shadow:
+    8px 0 26px -23px rgba(0,0,0,.48),
+    0 16px 38px -25px rgba(0,0,0,.52) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-titlebar {
+  background: rgba(255,255,255,.055) !important;
+  border-bottom-color: rgba(255,255,255,.10) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-title,
+html[data-theme='dark'] #settings-overlay .smodal-label,
+html[data-theme='dark'] #settings-overlay .smodal-section-title {
+  color: rgba(255,255,255,.92) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-status-pill,
+html[data-theme='dark'] #settings-overlay .smodal-section-desc,
+html[data-theme='dark'] #settings-overlay .smodal-hint,
+html[data-theme='dark'] #settings-overlay .smodal-hint-col {
+  color: rgba(255,255,255,.56) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-nav {
+  background: rgba(255,255,255,.055) !important;
+  border-right-color: rgba(255,255,255,.10) !important;
+  box-shadow: inset -1px 0 rgba(255,255,255,.05) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-nav-group-label {
+  color: rgba(255,255,255,.46) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-nav-item {
+  color: rgba(255,255,255,.78) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-nav-item:hover {
+  background: rgba(255,255,255,.07) !important;
+  color: rgba(255,255,255,.94) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-nav-item.active {
+  background: rgba(255,255,255,.14) !important;
+  color: #fff !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-content {
+  background: rgba(0,0,0,.08) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-field,
+html[data-theme='dark'] #settings-overlay .smodal-section-header {
+  border-bottom-color: rgba(255,255,255,.10) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-select,
+html[data-theme='dark'] #settings-overlay .smodal-input,
+html[data-theme='dark'] #settings-overlay .smodal-btn-secondary {
+  background: rgba(255,255,255,.08) !important;
+  border-color: rgba(255,255,255,.14) !important;
+  color: rgba(255,255,255,.90) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-btn-primary {
+  background: rgba(255,255,255,.90) !important;
+  color: rgba(24,24,26,.94) !important;
+}
+html[data-theme='dark'] #settings-overlay .smodal-btn-primary:hover {
+  background: #fff !important;
+  color: #000 !important;
+}
+
+/* Floating page surface — one clipped element owns the white fill, the curve,
+   and the elevation. No filter, border, pseudo-element, or child layer may
+   paint a rectangular edge above its top-left quarter-round. */
+html[data-theme='light'] #main-scroll-area,
+html[data-theme='light'] .views-container {
+  position: relative !important;
+  z-index: 2 !important;
+  background: var(--shell-panel) !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 28px 0 0 0 !important;
+  overflow: hidden !important;
+  clip-path: none !important;
+  filter: none !important;
+  box-shadow:
+    -5px -5px 16px rgba(31,41,55,.10),
+    0 12px 28px rgba(31,41,55,.12) !important;
+  isolation: isolate !important;
+}
+
+html[data-theme='dark'] #main-scroll-area,
+html[data-theme='dark'] .views-container {
+  position: relative !important;
+  z-index: 2 !important;
+  border: 0 !important;
+  outline: 0 !important;
+  border-radius: 28px 0 0 0 !important;
+  overflow: hidden !important;
+  clip-path: none !important;
+  filter: none !important;
+  box-shadow:
+    -5px -5px 16px rgba(0,0,0,.30),
+    0 12px 28px rgba(0,0,0,.30) !important;
+  isolation: isolate !important;
+}
+
+/* The shell chrome casts the quiet overlay; it never draws a hard divider. */
+html[data-theme='light'] #sidebar.sidebar,
+html[data-theme='light'] aside#sidebar {
+  border-right: 0 !important;
+  box-shadow: none !important;
+  z-index: 4 !important;
+}
+
+html[data-theme='light'] .topbar {
+  position: relative !important;
+  z-index: 5 !important;
+  border-bottom: 0 !important;
+  box-shadow: none !important;
+}
+
+/* Final composition: sidebar and topbar are one flat shell canvas. The only
+   elevation belongs to the opened main window, so no chrome seam is visible. */
+html[data-theme='light'] #sidebar.sidebar,
+html[data-theme='light'] aside#sidebar,
+html[data-theme='light'] .topbar {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+
+/* The main surface is the single floating layer. Its radius and background
+   live on the same element, so the shadow follows the curve instead of
+   creating a straight top/left edge. Keep native scrolling but hide its bar. */
+html[data-theme='light'] #main-scroll-area,
+html[data-theme='light'] .views-container {
+  border: 1px solid rgba(27,26,23,.12) !important;
+  outline: 0 !important;
+  border-radius: 28px 0 0 0 !important;
+  overflow: auto !important;
+  box-shadow:
+    0 -8px 20px -12px rgba(31,41,55,.12),
+    -8px 0 20px -12px rgba(31,41,55,.12),
+    -6px -6px 16px -9px rgba(31,41,55,.07),
+    0 14px 28px -22px rgba(31,41,55,.04) !important;
+}
+
+html[data-theme='dark'] #sidebar.sidebar,
+html[data-theme='dark'] aside#sidebar,
+html[data-theme='dark'] .topbar {
+  border: 0 !important;
+  outline: 0 !important;
+  box-shadow: none !important;
+}
+html[data-theme='dark'] #main-scroll-area,
+html[data-theme='dark'] .views-container {
+  overflow: auto !important;
+  border: 1px solid rgba(255,255,255,.11) !important;
+  box-shadow:
+    0 -8px 20px -12px rgba(0,0,0,.21),
+    -8px 0 20px -12px rgba(0,0,0,.21),
+    -6px -6px 16px -9px rgba(0,0,0,.12),
+    0 14px 28px -22px rgba(0,0,0,.10) !important;
+}
+
+/* ── macOS-Style Overlay Auto-Hiding Scrollbar ── */
+#main-scroll-area,
+.views-container,
+.view,
+.view.active {
+  scrollbar-gutter: stable;
+  scrollbar-width: thin !important;
+  scrollbar-color: transparent transparent !important;
+  transition: scrollbar-color 240ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+#main-scroll-area:hover,
+.views-container:hover,
+.view:hover,
+.view.active:hover,
+#main-scroll-area.is-scrolling,
+.views-container.is-scrolling,
+.view.is-scrolling,
+.view.active.is-scrolling {
+  scrollbar-color: rgba(0, 0, 0, 0.28) transparent !important;
+}
+html[data-theme='dark'] #main-scroll-area:hover,
+html[data-theme='dark'] .views-container:hover,
+html[data-theme='dark'] .view:hover,
+html[data-theme='dark'] .view.active:hover,
+html[data-theme='dark'] #main-scroll-area.is-scrolling,
+html[data-theme='dark'] .views-container.is-scrolling,
+html[data-theme='dark'] .view.is-scrolling,
+html[data-theme='dark'] .view.active.is-scrolling {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent !important;
+}
+
+#main-scroll-area::-webkit-scrollbar,
+.views-container::-webkit-scrollbar,
+.view::-webkit-scrollbar,
+.view.active::-webkit-scrollbar {
+  display: block !important;
+  width: 8px !important;
+  height: 8px !important;
+}
+#main-scroll-area::-webkit-scrollbar-track,
+.views-container::-webkit-scrollbar-track,
+.view::-webkit-scrollbar-track,
+.view.active::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+#main-scroll-area::-webkit-scrollbar-thumb,
+.views-container::-webkit-scrollbar-thumb,
+.view::-webkit-scrollbar-thumb,
+.view.active::-webkit-scrollbar-thumb {
+  background-color: transparent !important;
+  border-radius: 999px !important;
+  border: 2px solid transparent !important;
+  background-clip: padding-box !important;
+  transition: background-color 240ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+#main-scroll-area:hover::-webkit-scrollbar-thumb,
+.views-container:hover::-webkit-scrollbar-thumb,
+.view:hover::-webkit-scrollbar-thumb,
+.view.active:hover::-webkit-scrollbar-thumb,
+#main-scroll-area.is-scrolling::-webkit-scrollbar-thumb,
+.views-container.is-scrolling::-webkit-scrollbar-thumb,
+.view.is-scrolling::-webkit-scrollbar-thumb,
+.view.active.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.26) !important;
+}
+html[data-theme='dark'] #main-scroll-area:hover::-webkit-scrollbar-thumb,
+html[data-theme='dark'] .views-container:hover::-webkit-scrollbar-thumb,
+html[data-theme='dark'] .view:hover::-webkit-scrollbar-thumb,
+html[data-theme='dark'] .view.active:hover::-webkit-scrollbar-thumb,
+html[data-theme='dark'] #main-scroll-area.is-scrolling::-webkit-scrollbar-thumb,
+html[data-theme='dark'] .views-container.is-scrolling::-webkit-scrollbar-thumb,
+html[data-theme='dark'] .view.is-scrolling::-webkit-scrollbar-thumb,
+html[data-theme='dark'] .view.active.is-scrolling::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.22) !important;
+}
+
+#main-scroll-area::-webkit-scrollbar-thumb:hover,
+.views-container::-webkit-scrollbar-thumb:hover,
+.view::-webkit-scrollbar-thumb:hover,
+.view.active::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.45) !important;
+}
+html[data-theme='dark'] #main-scroll-area::-webkit-scrollbar-thumb:hover,
+html[data-theme='dark'] .views-container::-webkit-scrollbar-thumb:hover,
+html[data-theme='dark'] .view::-webkit-scrollbar-thumb:hover,
+html[data-theme='dark'] .view.active::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.40) !important;
+}
+
+/* Final shadow-breathing and stacking contract. The parent must not clip the
+   surface shadow at the sidebar seam; the elevated surface is above the flat
+   shell chrome, while its rounded fill remains in its original geometry. */
+html[data-theme='light'] .main-content,
+html[data-theme='light'] #main-content,
+html[data-theme='dark'] .main-content,
+html[data-theme='dark'] #main-content {
+  overflow: visible !important;
+  position: relative !important;
+  z-index: 6 !important;
+  isolation: isolate !important;
+}
+
+html[data-theme='light'] .app-shell,
+html[data-theme='light'] #app-shell,
+html[data-theme='dark'] .app-shell,
+html[data-theme='dark'] #app-shell {
+  overflow: visible !important;
+}
+
+html[data-theme='light'] #sidebar.sidebar,
+html[data-theme='light'] aside#sidebar,
+html[data-theme='dark'] #sidebar.sidebar,
+html[data-theme='dark'] aside#sidebar {
+  z-index: 4 !important;
+}
+
+html[data-theme='light'] .topbar,
+html[data-theme='dark'] .topbar {
+  z-index: 8 !important;
+}
+
+html[data-theme='light'] #main-scroll-area,
+html[data-theme='light'] .views-container,
+html[data-theme='dark'] #main-scroll-area,
+html[data-theme='dark'] .views-container {
+  z-index: 30 !important;
+  border-radius: 28px 0 0 0 !important;
+  border-style: solid !important;
+  clip-path: none !important;
+  filter: none !important;
+}
+
+/* Final mobile geometry contract: the navigation rail overlays the app instead
+   of reserving desktop width when it is visually closed. */
+@media (max-width: 768px) {
+  #sidebar.sidebar,
+  aside#sidebar {
+    position: fixed !important;
+    inset: 0 auto 0 0 !important;
+    width: min(86vw, 215px) !important;
+    min-width: min(86vw, 215px) !important;
+    max-width: min(86vw, 215px) !important;
+    transform: translateX(-105%) !important;
+    z-index: 1000 !important;
+  }
+  #sidebar.sidebar.mobile-open,
+  aside#sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+  #main-content.main-content,
+  #main-content.main-content.full-width,
+  #main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  #main-scroll-area,
+  .views-container,
+  .view,
+  .jarvis-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+  .jarvis-wrapper .jarvis-main { padding-inline: 10px !important; }
+  .jarvis-wrapper .jarvis-split-layout,
+  .jarvis-wrapper .jarvis-hero-stage,
+  .jarvis-wrapper .jarvis-hero-header { min-width: 0 !important; max-width: 100% !important; }
+  .jarvis-wrapper .jarvis-hero-stage { width: 100% !important; flex: 1 1 auto !important; }
+  .jarvis-wrapper .jarvis-hero-actions { min-width: 0 !important; max-width: 100% !important; }
+  .jarvis-wrapper .jarvis-hero-actions { flex-wrap: wrap !important; overflow: visible !important; justify-content: flex-end; }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   CLAVIS MINIMAL SURFACE
+   Keep this final so the Clavis route has one predictable geometry contract.
+   It removes the inset-card treatment, restores the conversation composer,
+   and keeps every secondary surface inside a real scroll container.
+   ═══════════════════════════════════════════════════════════════ */
+
+#main-content:has(#view-jarvis.active),
+#main-content:has(#view-jarvis.active) #main-scroll-area,
+#main-content:has(#view-jarvis.active) .views-container {
+  width: 100% !important;
+  max-width: 100% !important;
+  flex: 1 1 auto !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  min-width: 0 !important;
+}
+
+#view-jarvis.active {
+  width: 100% !important;
+  max-width: none !important;
+  min-height: 100% !important;
+  padding: 0 !important;
+  overflow: auto !important;
+  scrollbar-width: none;
+  background: #f7f8fa !important;
+  color: #1f2933;
+}
+
+#view-jarvis.active::-webkit-scrollbar { display: none; }
+
+#view-jarvis.active .jarvis-split-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr);
+  align-items: stretch;
+  width: 100% !important;
+  min-height: 100%;
+  height: auto !important;
+  gap: 0;
+  padding: 0;
+  box-sizing: border-box;
+  overflow: visible !important;
+  contain: none;
+}
+
+#view-jarvis.active:has(.jarvis-side:not(.closed)) .jarvis-split-layout {
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+
+#view-jarvis.active .jarvis-hero-stage {
+  min-width: 0;
+  min-height: 100% !important;
+  height: 100% !important;
+  background: #ffffff !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  overflow: hidden !important;
+}
+
+#view-jarvis.active .jarvis-hero-header {
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 56px;
+  padding: 10px 14px;
+  gap: 10px;
+  background: #ffffff;
+  border-bottom: 1px solid #eef0f2;
+}
+
+#view-jarvis.active .jarvis-status-pill {
+  flex: 0 0 auto;
+  min-height: 32px;
+  padding: 6px 9px;
+  border: 1px solid #e8ebef !important;
+  border-radius: 8px;
+  background: #fafbfc !important;
+  color: #52606d !important;
+  font-size: 11px;
+  line-height: 1.1;
+}
+
+#view-jarvis.active .jarvis-hero-actions {
+  min-width: 0;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+#view-jarvis.active .jarvis-hero-actions::-webkit-scrollbar { display: none; }
+
+#view-jarvis.active .jarvis-handsfree-pill,
+#view-jarvis.active .jarvis-newchat-pill {
+  flex: 0 0 auto;
+  min-width: 0;
+  height: 33px;
+  min-height: 33px;
+  padding: 0 9px;
+  gap: 5px;
+  border: 1px solid #e0e5e9 !important;
+  border-radius: 8px;
+  background: #ffffff !important;
+  color: #52606d !important;
+  box-shadow: none !important;
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+#view-jarvis.active .jarvis-handsfree-pill:hover,
+#view-jarvis.active .jarvis-newchat-pill:hover {
+  background: #f5f7f8 !important;
+  border-color: #cbd3d9 !important;
+}
+
+#view-jarvis.active .jarvis-handsfree-pill.active {
+  background: #f1f5f9 !important;
+  border-color: rgba(0, 0, 0, 0.16) !important;
+  color: #0f172a !important;
+}
+
+#view-jarvis.active .jarvis-center-orb-wrapper {
+  flex: 1 1 auto;
+  min-height: 270px !important;
+  justify-content: center;
+  gap: 0;
+  padding: 18px 18px 12px;
+  background: #ffffff;
+}
+
+#view-jarvis.active .jarvis-center-orb-wrapper #orb-container {
+  position: relative;
+  flex: 0 0 auto;
+  width: 146px !important;
+  height: 146px !important;
+  min-height: 0 !important;
+  margin: 0 auto 8px;
+  background: transparent;
+}
+
+#view-jarvis.active #orb-container::before {
+  display: none !important;
+  content: none !important;
+}
+
+#view-jarvis.active #orb-container[data-orb-state="SPEAKING"]::before,
+#view-jarvis.active #orb-container[data-orb-state="LISTENING"]::before {
+  animation: clavis-orb-breathe 1.2s ease-in-out infinite;
+}
+
+#view-jarvis.active #orbCanvas {
+  position: relative;
+  z-index: 1;
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+  filter: none !important;
+}
+
+@keyframes clavis-orb-breathe {
+  0%, 100% { opacity: .55; transform: scale(.94); }
+  50% { opacity: .95; transform: scale(1.08); }
+}
+
+#view-jarvis.active .jarvis-greeting-container {
+  min-height: 0 !important;
+  gap: 4px;
+  animation: none !important;
+}
+
+#view-jarvis.active .jarvis-greeting {
+  margin: 0;
+  color: #202a33 !important;
+  font-size: clamp(18px, 2vw, 22px) !important;
+  font-weight: 650;
+  letter-spacing: -.025em;
+}
+
+#view-jarvis.active .jarvis-subgreeting {
+  margin: 0;
+  color: #78838d !important;
+  font-size: 12px;
+}
+
+#view-jarvis.active .clavis-voice-caption {
+  min-height: 18px;
+  margin: 14px 0 10px;
+  color: #7d8993;
+  font-size: 11px;
+}
+
+#view-jarvis.active .jarvis-voice-main-btn {
+  min-height: 38px;
+  padding: 0 16px;
+  gap: 7px;
+  border: 1px solid #263238 !important;
+  border-radius: 9px;
+  background: #263238 !important;
+  color: #ffffff;
+  box-shadow: none !important;
+  font-size: 12px;
+}
+
+#view-jarvis.active .jarvis-voice-main-btn:hover { background: #37474f !important; transform: none; }
+#view-jarvis.active .jarvis-voice-main-btn.recording { background: #0f766e !important; border-color: #0f766e !important; }
+
+#view-jarvis.active .jarvis-chat-container {
+  display: flex !important;
+  flex: 0 1 auto;
+  width: min(800px, calc(100% - 36px));
+  max-height: min(30vh, 260px);
+  min-height: 0;
+  margin: 0 auto;
+  padding: 8px 0 12px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+#view-jarvis.active .jarvis-input-container {
+  display: block !important;
+  flex: 0 0 auto;
+  width: min(800px, calc(100% - 36px));
+  max-width: none;
+  margin: 0 auto 16px;
+  padding: 9px 12px;
+  border: 1px solid #e0e5e9 !important;
+  border-radius: 13px;
+  background: #ffffff !important;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, .055) !important;
+}
+
+#view-jarvis.active .jarvis-input-container > div { gap: 7px !important; }
+#view-jarvis.active .claude-textarea { min-height: 27px !important; height: 27px !important; font-size: 13px; }
+#view-jarvis.active .claude-icon-btn { min-width: 32px; width: 32px; height: 32px; min-height: 32px; padding: 0; border-radius: 8px; }
+
+#view-jarvis.active .jarvis-side {
+  width: auto !important;
+  min-width: 0;
+  max-height: calc(100vh - 40px);
+  padding: 14px;
+  gap: 10px;
+  overflow-y: auto;
+  border: 1px solid #e6e9ed;
+  border-radius: 14px;
+  background: #fbfcfd;
+  scrollbar-width: thin;
+}
+
+#view-jarvis.active .jarvis-side.closed {
+  display: none !important;
+  width: 0 !important;
+  padding: 0 !important;
+  border: 0 !important;
+}
+
+#view-jarvis.active .jarvis-side-card {
+  padding: 12px;
+  border: 1px solid #e7ebee !important;
+  border-radius: 11px !important;
+  background: #ffffff !important;
+  box-shadow: none !important;
+}
+
+#view-jarvis.active .jarvis-side-card h4 { margin-bottom: 8px; font-size: 12px; }
+#view-jarvis.active .jarvis-facts-list,
+#view-jarvis.active .jarvis-scripts-list,
+#view-jarvis.active .jarvis-skills-list { max-height: 130px !important; overflow-y: auto; scrollbar-width: thin; }
+
+#view-jarvis.active .jarvis-voice-panel {
+  top: 68px;
+  right: 22px;
+  width: min(350px, calc(100vw - 32px));
+  max-height: min(74vh, 560px);
+  /* max-height alone did nothing without this — content just overflowed the
+     box uncontained instead of scrolling, which read as "no scrollbar." */
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 13px;
+  border: 1px solid #e0e5e9 !important;
+  border-radius: 13px;
+  background: #ffffff !important;
+  box-shadow: 0 14px 36px rgba(15,23,42,.14) !important;
+}
+#view-jarvis.active .jarvis-voice-panel::-webkit-scrollbar { width: 8px; }
+#view-jarvis.active .jarvis-voice-panel::-webkit-scrollbar-thumb { background: var(--gray-200); border-radius: 8px; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-voice-panel::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.14); }
+
+/* Readability pass: the cloud-voice cards and helper text were set at 9-10px
+   with light-gray-on-white — technically not blurred, but small+low-contrast
+   enough to read as "blurry" at normal viewing distance. */
+#view-jarvis.active .clavis-cloud-voice-option strong { font-size: 12.5px !important; font-weight: 650 !important; }
+#view-jarvis.active .clavis-cloud-voice-option small { font-size: 11px !important; color: var(--gray-500) !important; }
+#view-jarvis.active .clavis-cloud-voice-heading { font-size: 12.5px !important; }
+#view-jarvis.active .clavis-cloud-voice-help { font-size: 11px !important; line-height: 1.5 !important; }
+#view-jarvis.active .jarvis-voice-panel .vo-name { font-size: 12.5px !important; }
+#view-jarvis.active .jarvis-voice-panel .vo-lang { font-size: 10.5px !important; }
+#view-jarvis.active .clavis-recognition-language label { font-size: 11.5px !important; font-weight: 650; }
+#view-jarvis.active .clavis-recognition-language small { font-size: 10.5px !important; line-height: 1.5; }
+
+#view-jarvis.active .jarvis-voice-options { max-height: min(36vh, 230px) !important; overflow-y: auto; }
+#view-jarvis.active .jarvis-voice-panel .voice-option { min-height: 48px; padding: 8px 10px !important; }
+#view-jarvis.active .jarvis-voice-panel > div[style*="margin-top:10px"] { gap: 8px !important; }
+#view-jarvis.active .jarvis-voice-panel > div[style*="margin-top:10px"] input[type="range"] { margin: 7px 0 2px; }
+#view-jarvis.active .jarvis-voice-panel > button { min-height: 36px; }
+
+html[data-theme="dark"] #view-jarvis.active { background: #11161a !important; color: #e7edf1; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-hero-stage,
+html[data-theme="dark"] #view-jarvis.active .jarvis-hero-header,
+html[data-theme="dark"] #view-jarvis.active .jarvis-center-orb-wrapper,
+html[data-theme="dark"] #view-jarvis.active .jarvis-input-container,
+html[data-theme="dark"] #view-jarvis.active .jarvis-voice-panel { background: #171d21 !important; border-color: #293238 !important; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-greeting { color: #edf2f4 !important; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-subgreeting,
+html[data-theme="dark"] #view-jarvis.active .clavis-voice-caption { color: #9aa8b2 !important; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-side { background: #13191d; border-color: #293238; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-side-card { background: #171d21 !important; border-color: #293238 !important; }
+html[data-theme="dark"] #view-jarvis.active .jarvis-handsfree-pill,
+html[data-theme="dark"] #view-jarvis.active .jarvis-newchat-pill { background: #171d21 !important; border-color: #334047 !important; color: #c8d2d8 !important; }
+
+/* Narrow phones: keep the composer and Jarvis controls usable without
+   creating a second horizontal scroll surface. */
+@media (max-width: 390px) {
+  #view-jarvis.active .jarvis-hero-header { padding-inline: 10px !important; }
+  #view-jarvis.active .jarvis-hero-actions { gap: 5px !important; }
+  #view-jarvis.active .jarvis-hero-actions > * { min-width: 0 !important; }
+  #view-jarvis.active .jarvis-input-container { padding-inline: 8px !important; }
+  #view-jarvis.active .claude-input-container { max-width: 100% !important; }
+}
+
+@media (max-width: 760px) {
+  #view-jarvis.active .jarvis-split-layout,
+  #view-jarvis.active .jarvis-hero-stage,
+  #view-jarvis.active .jarvis-hero-header { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  #view-jarvis.active .jarvis-split-layout { grid-template-columns: minmax(0, 1fr) !important; padding: 0; gap: 0; }
+  #view-jarvis.active .jarvis-hero-stage { min-height: 100% !important; }
+  #view-jarvis.active .jarvis-hero-header { align-items: flex-start; flex-direction: column; }
+  #view-jarvis.active .jarvis-hero-actions { width: 100% !important; max-width: 100% !important; min-width: 0 !important; overflow-x: auto !important; }
+  #view-jarvis.active .jarvis-center-orb-wrapper { min-height: 250px !important; }
+  #view-jarvis.active .jarvis-center-orb-wrapper #orb-container { width: 146px !important; height: 146px !important; }
+  #view-jarvis.active .jarvis-voice-panel { top: 78px; right: 12px; width: calc(100vw - 24px); }
+  #view-jarvis.active .jarvis-side { max-height: none; }
+}
+
+/* ============================================================
+   CRYSTAL-CLEAR OVERRIDE  (loaded last so it always wins)
+   User request: "jo bhi blur hai UI me use sharp kro."
+   Kills the frosted-glass backdrop blur that made panels/text
+   look hazy, plus the small foreground content blurs.
+   Large ambient background glows are radial gradients (soft
+   light, not blurred content) and are left intact.
+   ============================================================ */
+*, *::before, *::after {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+#view-jarvis.active .clavis-voice-caption { margin: 11px 0 9px; font-size: 10px; }
+
+#view-jarvis.active .jarvis-voice-main-btn {
+  height: 34px;
+  min-height: 34px;
+  padding: 0 13px;
+  border-radius: 8px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+#view-jarvis.active .jarvis-chat-container {
+  flex: 1 1 auto;
+  width: min(760px, calc(100% - 40px));
+  max-height: 220px;
+  padding: 8px 0 8px;
+  overflow-y: auto;
+}
+
+#view-jarvis.active .jarvis-input-container {
+  width: min(760px, calc(100% - 40px));
+  margin-bottom: 12px;
+  padding: 7px 9px;
+  border-radius: 11px;
+  box-shadow: 0 2px 9px rgba(15, 23, 42, .045) !important;
+}
+
+#view-jarvis.active .claude-textarea {
+  min-height: 30px !important;
+  height: 30px !important;
+  padding: 6px 8px !important;
+  font-size: 12px;
+}
+
+#view-jarvis.active .claude-icon-btn {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  border-radius: 7px;
+}
+
+html[data-theme="dark"] #main-content:has(#view-jarvis.active),
+html[data-theme="dark"] #main-content:has(#view-jarvis.active) .topbar,
+html[data-theme="dark"] #view-jarvis.active,
+html[data-theme="dark"] #view-jarvis.active .jarvis-hero-stage,
+html[data-theme="dark"] #view-jarvis.active .jarvis-hero-header,
+html[data-theme="dark"] #view-jarvis.active .jarvis-center-orb-wrapper { background: #171d21 !important; }
+
+@media (max-width: 760px) {
+  #view-jarvis.active .jarvis-center-orb-wrapper { flex-basis: 320px; min-height: 320px !important; }
+  #view-jarvis.active .jarvis-center-orb-wrapper #orb-container { width: 146px !important; height: 146px !important; }
+  #view-jarvis.active .jarvis-chat-container,
+  #view-jarvis.active .jarvis-input-container { width: calc(100% - 24px); }
+}
+
+/* ============================================================
+   CLAVIS LIQUID ORB — smooth moving-gradient orb (ChatGPT-style)
+   Replaces the particle-canvas visual. Colors drift continuously
+   inside a circular mask; state (idle/listening/thinking/speaking)
+   is read from #orb-container[data-orb-state] and only changes
+   speed/glow — never a hard cut — so it always feels alive.
+   ============================================================ */
+.clavis-liquid-orb {
+  position: absolute; inset: 0; border-radius: 50%;
+  overflow: hidden; isolation: isolate;
+  background: radial-gradient(circle at 32% 28%, #14141c 0%, #0a0a10 62%, #060608 100%);
+  box-shadow:
+    0 0 0 1px rgba(255,255,255,0.06),
+    0 8px 40px -8px rgba(124,58,237,0.35),
+    inset 0 0 32px rgba(0,0,0,0.55);
+  cursor: pointer;
+  transform: translateZ(0) scale(calc(1 + var(--orb-volume, 0) * 0.06));
+  transition: transform 160ms cubic-bezier(.22,1,.36,1), box-shadow 400ms ease;
+}
+.clavis-liquid-orb:hover { box-shadow: 0 0 0 1px rgba(255,255,255,0.1), 0 8px 46px -6px rgba(124,58,237,0.5), inset 0 0 32px rgba(0,0,0,0.55); }
+
+.clavis-orb-blob {
+  position: absolute;
+  width: 72%; height: 72%;
+  border-radius: 48% 52% 55% 45% / 52% 48% 52% 48%;
+  filter: blur(22px);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+  will-change: transform;
+  animation: clavisOrbDrift var(--orb-dur, 13s) ease-in-out infinite;
+  animation-duration: calc(var(--orb-dur, 13s) / var(--orb-speed, 1));
+}
+.clavis-orb-blob.b1 { background: radial-gradient(circle, #ff8a4c 0%, #ff8a4c00 72%); top: -8%; left: -6%; --orb-dur: 14s; animation-delay: 0s; }
+.clavis-orb-blob.b2 { background: radial-gradient(circle, #7c3aed 0%, #7c3aed00 72%); top: 10%; left: 30%; width: 88%; height: 88%; --orb-dur: 17s; animation-delay: -4s; opacity: 0.95; }
+.clavis-orb-blob.b3 { background: radial-gradient(circle, #22d3a6 0%, #22d3a600 72%); bottom: -10%; right: -8%; --orb-dur: 15.5s; animation-delay: -8s; }
+.clavis-orb-blob.b4 { background: radial-gradient(circle, #3b82f6 0%, #3b82f600 72%); bottom: 4%; left: -4%; width: 60%; height: 60%; --orb-dur: 11s; animation-delay: -2s; opacity: 0.7; }
+
+@keyframes clavisOrbDrift {
+  0%   { transform: translate(0%, 0%) scale(1) rotate(0deg); }
+  25%  { transform: translate(10%, -8%) scale(1.08) rotate(20deg); }
+  50%  { transform: translate(-6%, 10%) scale(0.96) rotate(-14deg); }
+  75%  { transform: translate(-12%, -6%) scale(1.05) rotate(10deg); }
+  100% { transform: translate(0%, 0%) scale(1) rotate(0deg); }
+}
+
+.clavis-orb-sheen {
+  position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 34% 24%, rgba(255,255,255,0.35) 0%, rgba(255,255,255,0.06) 22%, rgba(255,255,255,0) 45%);
+  mix-blend-mode: soft-light;
+  pointer-events: none;
+}
+.clavis-orb-ring {
+  position: absolute; inset: 0; border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08);
+  pointer-events: none;
+}
+
+/* State-driven pace + glow — smooth, slightly slow like macOS, never jumpy */
+#orb-container[data-orb-state="IDLE"] .clavis-orb-blob      { --orb-speed: 0.72; }
+#orb-container[data-orb-state="LISTENING"] .clavis-orb-blob { --orb-speed: 1.15; }
+#orb-container[data-orb-state="THINKING"] .clavis-orb-blob  { --orb-speed: 1.35; }
+#orb-container[data-orb-state="SPEAKING"] .clavis-orb-blob  { --orb-speed: 1.7; }
+
+#orb-container[data-orb-state="LISTENING"] .clavis-liquid-orb { box-shadow: 0 0 0 1px rgba(34,211,166,0.18), 0 8px 46px -6px rgba(34,211,166,0.45), inset 0 0 32px rgba(0,0,0,0.5); }
+#orb-container[data-orb-state="THINKING"] .clavis-liquid-orb  { box-shadow: 0 0 0 1px rgba(124,58,237,0.22), 0 8px 46px -6px rgba(124,58,237,0.55), inset 0 0 32px rgba(0,0,0,0.5); }
+#orb-container[data-orb-state="SPEAKING"] .clavis-liquid-orb  { box-shadow: 0 0 0 1px rgba(255,138,76,0.22), 0 8px 50px -4px rgba(255,138,76,0.55), inset 0 0 32px rgba(0,0,0,0.5); }
+
+@media (prefers-reduced-motion: reduce) {
+  .clavis-orb-blob { animation-duration: 40s !important; }
+}
+
+/* ============================================================
+   CLAVIS HEADER DECLUTTER — the old row was 8 full-text pills
+   wide and ate most of the header. Now: 3 icon-only mode toggles
+   + New Chat + a single "More" overflow menu for everything else.
+   ============================================================ */
+.jarvis-hero-actions--compact { display: flex; align-items: center; gap: 6px; flex-wrap: nowrap; }
+
+.jarvis-icon-pill {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 32px; height: 32px; padding: 0; border-radius: 50%;
+  background: var(--gray-100); border: 1px solid var(--border);
+  color: var(--gray-600); cursor: pointer;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease, transform 120ms ease;
+}
+.jarvis-icon-pill:hover { background: var(--gray-150); transform: translateY(-1px); }
+.jarvis-icon-pill:active { transform: translateY(0); }
+.jarvis-icon-pill.active {
+  background: linear-gradient(135deg,#6366f1,#a855f7); color: #fff; border-color: transparent;
+  box-shadow: 0 2px 10px rgba(99,102,241,0.35);
+}
+/* User explicitly asked to remove the "breathing" pulse on active toolbar
+   icons — the solid gradient fill + color already signals "on" clearly
+   enough without a constant scale/opacity animation drawing the eye. */
+.jarvis-icon-pill.active svg { animation: none !important; }
+.jarvis-handsfree-pill.active svg { animation: none !important; }
+
+.jarvis-actions-sep { width: 1px; height: 18px; background: var(--border); margin: 0 2px; flex: none; }
+
+.jarvis-more-menu { position: relative; }
+.jarvis-more-menu .jarvis-icon-pill.open,
+.jarvis-more-menu.open .jarvis-icon-pill { background: var(--gray-150); color: var(--gray-800); }
+.jarvis-more-panel {
+  position: absolute; top: calc(100% + 8px); right: 0; z-index: 40;
+  display: flex; flex-direction: column; gap: 2px;
+  min-width: 190px; padding: 6px;
+  background: var(--white, #fff); border: 1px solid var(--border);
+  border-radius: 12px; box-shadow: 0 12px 32px -8px rgba(0,0,0,0.22);
+  animation: jarvisMorePop 140ms cubic-bezier(.22,1,.36,1);
+}
+@keyframes jarvisMorePop { from { opacity: 0; transform: translateY(-4px) scale(.98); } to { opacity: 1; transform: translateY(0) scale(1); } }
+.jarvis-more-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; border: none; background: transparent;
+  font-size: 13px; font-weight: 600; color: var(--gray-700); text-align: left; cursor: pointer;
+  transition: background-color 120ms ease;
+}
+.jarvis-more-item:hover { background: var(--gray-100); }
+.jarvis-more-item svg { flex: none; opacity: .75; }
+
+html[data-theme="dark"] .jarvis-more-panel { background: #1c2226; border-color: rgba(255,255,255,0.08); }
+html[data-theme="dark"] .jarvis-more-item { color: rgba(255,255,255,0.82); }
+html[data-theme="dark"] .jarvis-more-item:hover { background: rgba(255,255,255,0.06); }
+html[data-theme="dark"] .jarvis-icon-pill { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: rgba(255,255,255,0.75); }
+html[data-theme="dark"] .jarvis-icon-pill:hover { background: rgba(255,255,255,0.1); }
+
+/* The "More" dropdown is position:absolute inside .jarvis-hero-actions — that
+   row has overflow:auto/scroll rules elsewhere (for the old wide pill strip),
+   which clipped the dropdown to invisible. Compact row no longer needs to
+   scroll, so let it overflow visibly. */
+.jarvis-wrapper .jarvis-hero-actions--compact,
+.jarvis-hero-actions--compact { overflow: visible !important; }
+
+/* ============================================================
+   TOAST POLISH — calmer entrance, real icon chips, less "generic
+   alert box." No backdrop-filter (kept fast per the rule above).
+   ============================================================ */
+.toast {
+  display: flex !important; align-items: flex-start !important; gap: 12px !important;
+  padding: 13px 14px 13px 13px !important;
+  border-radius: 14px !important;
+  border: 1px solid var(--border) !important;
+  background: var(--white, #fff) !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.04), 0 16px 40px -12px rgba(0,0,0,0.18) !important;
+  transform: translateY(10px) scale(0.98) !important;
+  transition: opacity 420ms cubic-bezier(.22,1,.36,1), transform 420ms cubic-bezier(.22,1,.36,1) !important;
+}
+.toast.visible { transform: translateY(0) scale(1) !important; }
+.toast:hover { transform: translateY(-1px) scale(1) !important; box-shadow: 0 1px 2px rgba(0,0,0,0.05), 0 20px 48px -12px rgba(0,0,0,0.24) !important; }
+html[data-theme="dark"] .toast { background: #1c2226 !important; border-color: rgba(255,255,255,0.08) !important; box-shadow: 0 1px 0 rgba(255,255,255,0.03), 0 16px 40px -12px rgba(0,0,0,0.55) !important; }
+
+.toast-icon {
+  flex: none; width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--gray-100);
+}
+.toast-icon svg { width: 16px; height: 16px; }
+.toast-success .toast-icon { background: rgba(16,185,129,0.14); color: #10b981; }
+.toast-error   .toast-icon { background: rgba(239,68,68,0.14); color: #ef4444; }
+.toast-warning .toast-icon { background: rgba(245,158,11,0.14); color: #f59e0b; }
+.toast-info    .toast-icon { background: rgba(99,102,241,0.14); color: #6366f1; }
+
+.toast-content { flex: 1; min-width: 0; padding-top: 1px; }
+.toast-title { font-size: 13px !important; font-weight: 650 !important; letter-spacing: -0.005em; }
+.toast-message { font-size: 12.5px !important; line-height: 1.45 !important; margin-top: 2px !important; }
+
+.toast-action {
+  align-self: center; flex: none; min-height: 30px; padding: 0 11px;
+  border: 1px solid var(--border); border-radius: 8px;
+  background: var(--gray-50); color: var(--gray-800);
+  font-size: 12px; font-weight: 650; cursor: pointer;
+  transition: background-color 140ms ease, border-color 140ms ease;
+}
+.toast-action:hover { background: var(--gray-100); }
+html[data-theme="dark"] .toast-action { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.1); color: #fff; }
+html[data-theme="dark"] .toast-action:hover { background: rgba(255,255,255,0.1); }
+
+.toast-close {
+  flex: none; width: 24px; height: 24px; margin: -3px -3px 0 0;
+  border-radius: 50%; font-size: 15px; line-height: 1; color: var(--gray-400);
+  transition: background-color 140ms ease, color 140ms ease;
+}
+.toast-close:hover { background: var(--gray-100); color: var(--gray-700); }
+html[data-theme="dark"] .toast-close:hover { background: rgba(255,255,255,0.08); color: #fff; }
+
+/* Left accent as a soft tint instead of a hard 3px bar — quieter, still legible. */
+.toast-success { border-left: 1px solid var(--border) !important; }
+.toast-error, .toast-warning { border-left: 1px solid var(--border) !important; }
+
+.jarvis-more-sep { height: 1px; background: var(--border); margin: 4px 6px; }
+html[data-theme="dark"] .jarvis-more-sep { background: rgba(255,255,255,0.08); }
+.jarvis-live-dot {
+  width: 6px; height: 6px; border-radius: 50%; margin-left: auto;
+  background: #ef4444; box-shadow: 0 0 0 0 rgba(239,68,68,0.6);
+  animation: jarvisLiveDotPulse 1.4s ease-out infinite;
+}
+@keyframes jarvisLiveDotPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.55); }
+  70%  { box-shadow: 0 0 0 6px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}

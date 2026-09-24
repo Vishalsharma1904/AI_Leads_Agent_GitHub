@@ -1,0 +1,1354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Skylark — AI Lead Generation Agent v2</title>
+  <meta name="description" content="Skylark's intelligent B2B lead generation platform — find companies needing security guards and housekeeping staff. Multi-location, industry-aware, Google Sheets integrated."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Lora:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="styles.css"/>
+  <script>
+    // Initialize theme before render to prevent FOUC
+    const savedTheme = localStorage.getItem('skylark-theme') || 'dark';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+  </script>
+</head>
+<body>
+
+<div id="toast-container" aria-live="polite"></div>
+
+<div class="app-shell" id="app-shell">
+
+  <!-- ═══════════ SIDEBAR ═══════════ -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo-mark">
+        <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+          <path d="M16 2L28 8.5V18C28 23.5 22.5 28.5 16 30C9.5 28.5 4 23.5 4 18V8.5L16 2Z" fill="url(#lg1)"/>
+          <path d="M12 15.5L15 18.5L20.5 13" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+          <defs>
+            <linearGradient id="lg1" x1="16" y1="2" x2="16" y2="30" gradientUnits="userSpaceOnUse">
+              <stop stop-color="#818cf8"/>
+              <stop offset="1" stop-color="#4f46e5"/>
+            </linearGradient>
+          </defs>
+        </svg>
+      </div>
+      <div class="logo-text">
+        <div class="logo-brand">Skylark</div>
+        <div class="logo-tag">LEAD AGENT V2</div>
+      </div>
+      <button class="sidebar-close-btn" id="sidebar-close-btn">
+        <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+    </div>
+
+    <nav class="sidebar-nav">
+        <div class="nav-section-label">MAIN</div>
+        <a href="#" class="nav-item active" data-view="chat">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+          Chat AI
+          <span class="nav-badge green" style="font-size:9px">NEW</span>
+        </a>
+        <a href="#" class="nav-item" data-view="dashboard">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zM3 10a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H4a1 1 0 01-1-1v-6zM14 9a1 1 0 00-1 1v6a1 1 0 001 1h2a1 1 0 001-1v-6a1 1 0 00-1-1h-2z"/></svg>
+        <span>Dashboard</span>
+      </a>
+      <a href="#" class="nav-item" data-view="leads">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg>
+        <span>All Leads</span>
+        <span class="nav-badge" id="leads-count-badge">0</span>
+      </a>
+      <a href="#" class="nav-item" data-view="agent">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+        <span>Run Agent</span>
+      </a>
+      <a href="#" class="nav-item" data-view="excel">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+        <span>Excel Manager</span>
+        <span class="nav-badge green" id="excel-imported-badge" style="display:none">0</span>
+      </a>
+      <a href="#" class="nav-item" data-view="analytics">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z"/></svg>
+        <span>Analytics</span>
+      </a>
+
+      <a href="#" class="nav-item" data-view="email">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"></rect><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"></path></svg>
+        <span>Email Auto</span>
+      </a>
+
+      <a href="#" class="nav-item" data-view="whatsapp">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+        <span>WhatsApp Auto</span>
+      </a>
+
+      <a href="#" class="nav-item" data-view="candidate-ai">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path></svg>
+        <span>Candidate AI</span>
+      </a>
+      <a href="#" class="nav-item" data-view="candidate-db">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+        <span>Candidate Data</span>
+        <span class="nav-badge green" id="candidates-count-badge">0</span>
+      </a>
+      
+      <a href="#" class="nav-item" data-view="accounts">
+        <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+        <span>Accounts</span>
+      </a>
+
+      <div class="nav-section-label" style="margin-top:16px">System</div>
+      <a href="#" class="nav-item" data-view="settings">
+        <svg class="nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clip-rule="evenodd"/></svg>
+        <span>Settings</span>
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <div class="agent-status-pill">
+        <span class="status-dot idle" id="status-dot"></span>
+        <span id="status-label">Agent Idle</span>
+      </div>
+      <button class="token-meter" id="token-meter" onclick="showView('tokens')" title="Click to view API Key Dashboard" style="width:100%;text-align:left;cursor:pointer;background:none;border:none;">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <span class="token-label">Tokens Used</span>
+          <span id="token-warn-icon" style="display:none;color:#ef4444;font-size:12px">⚠</span>
+        </div>
+        <div class="token-bar-track">
+          <div class="token-bar-fill" id="token-bar-fill" style="width:0%"></div>
+        </div>
+        <div class="token-count" id="token-count">0 / 1000</div>
+        <div style="font-size:10px;color:var(--gray-400);margin-top:2px">Click for API Dashboard →</div>
+      </button>
+    </div>
+  </aside>
+
+  <!-- ═══════════ MAIN ═══════════ -->
+  <main class="main-content" id="main-content">
+
+    <header class="topbar">
+      <div class="topbar-left">
+        <button class="sidebar-toggle" id="sidebar-toggle">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+        </button>
+        <span class="page-breadcrumb" id="breadcrumb-text">Dashboard</span>
+      </div>
+      <div class="topbar-right">
+        <div class="theme-toggle-wrapper" title="Toggle Dark/Light Mode">
+          <label class="theme-toggle">
+            <input type="checkbox" id="theme-switch">
+            <span class="theme-slider">
+              <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>
+              <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>
+            </span>
+          </label>
+        </div>
+        <div class="topbar-chip sheets" id="topbar-sheets-status" style="display:none">
+          <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg>
+          Connect Sheets
+        </div>
+        <div class="topbar-chip" id="topbar-leads-total">0 leads</div>
+        <button class="generate-btn" onclick="showView('agent')">
+          <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+          Run Agent
+        </button>
+      </div>
+    </header>
+
+    <!-- VIEWS -->
+    <div class="views-container" id="main-scroll-area">
+
+      <!-- CHAT VIEW (NEW) -->
+      <div id="view-chat" class="view active claude-ui-wrapper">
+        <div class="ambient-orb orb-1"></div>
+        <div class="ambient-orb orb-2"></div>
+        <div class="chat-top-header">
+          <button type="button" id="btn-new-chat-client" class="claude-new-chat-btn" onclick="startNewChat('client')" title="Start a fresh lead search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>New Chat</span>
+          </button>
+        </div>
+        <div class="top-right-badge" style="padding: 6px 12px; background: rgba(255,255,255,0.9); border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 6px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; font-weight: 600; color: #f59e0b;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+          <span id="home-token-counter">0 / 400</span>
+        </div>
+        <div class="chat-container" style="width: 100%; max-width: 768px; display: flex; flex-direction: column; height: 100%; position: relative; z-index: 2;">
+          <!-- Initial Welcome Screen -->
+          <div id="chat-welcome" class="claude-greeting-container">
+            <h1 class="claude-greeting">
+              Welcome back sir
+            </h1>
+          </div>
+
+
+          <!-- Chat Messages Area -->
+          <div id="chat-messages" class="chat-messages"></div>
+
+          <!-- Chat Input Area -->
+          <div class="claude-input-container">
+            <textarea id="chat-input" class="claude-textarea" rows="1" placeholder="How can I help you today?"></textarea>
+            <div class="claude-input-toolbar">
+              <div class="claude-toolbar-left">
+                <button class="claude-icon-btn plus-btn" title="Add context">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <input type="file" id="enrich-file-upload" accept=".csv,.txt" style="display:none;" onchange="handleFileUpload(event)">
+                <button class="claude-icon-btn" onclick="document.getElementById('enrich-file-upload').click()" title="Upload CSV">
+                  <svg viewBox="0 0 24 24" width="16" height="16" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                </button>
+              </div>
+              <div class="claude-toolbar-right">
+                <div class="claude-model-wrapper custom-dropdown" tabindex="0">
+                  <input type="hidden" id="home-ai-model-select" value="llama-3.3-70b-versatile">
+                  <div class="custom-dropdown-header">
+                    <span class="custom-dropdown-text">Llama 3.3 70B</span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                  <ul class="custom-dropdown-list">
+                    <li data-value="llama-3.3-70b-versatile" class="active flagship">Llama 3.3 70B (Groq) <span class="flagship-badge">⭐ TOP</span></li>
+                    <li data-value="deepseek-chat" class="flagship">DeepSeek V3 (DeepSeek API) <span class="flagship-badge">🔥 PRO</span></li>
+                    <li data-value="deepseek-reasoner" class="flagship">DeepSeek R1 (DeepSeek API) <span class="flagship-badge">🔥 PRO</span></li>
+                    <li data-value="moonshot-v1-8k" class="flagship">Kimi (Moonshot API) <span class="flagship-badge">🔥 PRO</span></li>
+                    <li data-value="mixtral-8x7b-32768">Mixtral 8x7B (Groq)</li>
+                  </ul>
+                </div>
+                <button id="voice-btn" class="claude-icon-btn" onclick="startVoiceInput()" title="Voice Input">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" y1="19" x2="12" y2="23"></line><line x1="8" y1="23" x2="16" y2="23"></line></svg>
+                </button>
+                <button id="chat-stop-btn" class="claude-icon-btn" title="Stop generating" style="display:none; color:#ef4444;" onclick="stopChatGeneration()">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"></rect></svg>
+                </button>
+                <button id="chat-send-btn" class="claude-icon-btn claude-send-btn" title="Send message">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+            <!-- Chat Quick Chips (Below Input) -->
+            <div class="chat-quick-chips" id="chat-quick-chips">
+              <button class="chat-chip" onclick="sendQuickChat('Mujhe 25 hotel leads chahiye Gurugram mein security ke liye')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Hotels (Gurugram)</button>
+              <button class="chat-chip" onclick="sendQuickChat('Find 25 hospital leads in Delhi for housekeeping staff')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Hospitals (Delhi)</button>
+              <button class="chat-chip" onclick="sendQuickChat('25 IT park leads in Bangalore for security guards')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> IT Parks (Bangalore)</button>
+              <button class="chat-chip" onclick="sendQuickChat('Export all leads to excel')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Export Excel</button>
+            </div>
+            <div class="chat-footer-text">Skylark AI can make mistakes. Always verify lead data.</div>
+          </div>
+        </div>
+      <!-- ══════════ TOKEN DASHBOARD VIEW ══════════ -->
+      <section class="view" id="view-tokens">
+        <div class="view-header">
+          <div><h1 class="view-title">API Key Dashboard</h1><p class="view-subtitle">Monitor API usage, token consumption, and key health in real-time</p></div>
+          <div class="view-header-actions">
+            <button class="btn-secondary" onclick="resetAllKeyUsage()">🔄 Reset Usage Stats</button>
+          </div>
+        </div>
+        <!-- Overall Stats -->
+        <div class="stats-grid" style="margin-bottom:20px" id="token-stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon purple"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M4 4a2 2 0 00-2 2v1h16V6a2 2 0 00-2-2H4zM18 9H2v5a2 2 0 002 2h12a2 2 0 002-2V9zM4 13a1 1 0 011-1h1a1 1 0 110 2H5a1 1 0 01-1-1zm5-1a1 1 0 100 2h1a1 1 0 100-2H9z"/></svg></div>
+            <div class="stat-body"><div class="stat-value" id="tk-total">0</div><div class="stat-label">Total Tokens Ever Used</div><div class="stat-trend">Across all sessions</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon blue"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clip-rule="evenodd"/></svg></div>
+            <div class="stat-body"><div class="stat-value" id="tk-session">0</div><div class="stat-label">This Session</div><div class="stat-trend">Since last page open</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon green"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>
+            <div class="stat-body"><div class="stat-value" id="tk-apify-active">-</div><div class="stat-label">Active Apify Key</div><div class="stat-trend" id="tk-apify-status">Checking...</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon orange"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/></svg></div>
+            <div class="stat-body"><div class="stat-value" id="tk-groq-active">-</div><div class="stat-label">Active Groq Key</div><div class="stat-trend" id="tk-groq-status">Checking...</div></div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-icon" style="color: #76b900; background: rgba(118, 185, 0, 0.1);"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"></path></svg></div>
+            <div class="stat-body"><div class="stat-value" id="tk-nvidia-active">-</div><div class="stat-label">NVIDIA API Key</div><div class="stat-trend" id="tk-nvidia-status">Tokens Used</div></div>
+          </div>
+        </div>
+        
+        <!-- API Key Overrides -->
+        <div class="chart-card" style="margin-bottom:16px">
+          <div class="chart-card-header"><h3>🔑 Set Custom API Keys</h3><span style="font-size:12px;color:var(--gray-400)">Saves to your browser and overrides config.js</span></div>
+          <div style="display:flex;flex-wrap:wrap;gap:16px; margin-bottom: 16px;">
+            <div class="form-group" style="flex:1;min-width:250px">
+              <label>Apify API Key</label>
+              <div class="input-with-action">
+                <input type="password" id="custom-apify-input" placeholder="apify_api_...">
+              </div>
+            </div>
+            <div class="form-group" style="flex:1;min-width:250px">
+              <label>Groq API Key</label>
+              <div class="input-with-action">
+                <input type="password" id="custom-groq-input" placeholder="gsk_...">
+              </div>
+            </div>
+            <div class="form-group" style="flex:1;min-width:250px">
+              <label>DeepSeek API Key</label>
+              <div class="input-with-action">
+                <input type="password" id="custom-deepseek-input" placeholder="sk-...">
+              </div>
+            </div>
+            <div class="form-group" style="flex:1;min-width:250px">
+              <label>Moonshot API Key</label>
+              <div class="input-with-action">
+                <input type="password" id="custom-moonshot-input" placeholder="sk-...">
+                <button class="btn-primary" onclick="saveCustomKeys()">Save Keys</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Apify Keys Table -->
+        <div class="chart-card" style="margin-bottom:16px">
+          <div class="chart-card-header"><h3>🔑 Apify API Keys Health</h3><span style="font-size:12px;color:var(--gray-400)">Auto-rotates when a key hits 90% usage</span></div>
+          <div id="apify-keys-table"><div class="empty-chart-msg">No Apify keys configured in config.js</div></div>
+        </div>
+        <!-- Groq Keys Table -->
+        <div class="chart-card">
+          <div class="chart-card-header"><h3>🤖 Groq API Keys Health</h3><span style="font-size:12px;color:var(--gray-400)">Auto-rotates on rate limit (429)</span></div>
+          <div id="groq-keys-table"><div class="empty-chart-msg">No Groq keys configured in config.js</div></div>
+        </div>
+        
+        <!-- Candidates Scraper Usage -->
+        <div class="chart-card" style="margin-top:24px;">
+          <div class="chart-card-header"><h3>🔍 Candidates Scraper Usage</h3><span style="font-size:12px;color:var(--gray-400)">Apify Data Extraction</span></div>
+          <div style="padding:16px;">
+            <div style="font-size:14px;color:var(--gray-600);margin-bottom:8px;">Total candidates scraped so far:</div>
+            <div style="font-size:28px;font-weight:700;color:var(--primary);"><span id="candidate-apify-usage">0</span> leads</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- DASHBOARD VIEW -->
+      <section class="view" id="view-dashboard">
+        <div class="view-header">
+          <div><h1 class="view-title">Dashboard</h1><p class="view-subtitle">Buyer lead intelligence for Skylark Security & Housekeeping</p></div>
+        </div>
+        <div class="stats-grid" id="stats-grid">
+          <div class="stat-card"><div class="stat-icon purple"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 6a3 3 0 11-6 0 3 3 0 016 0zM17 6a3 3 0 11-6 0 3 3 0 016 0zM12.93 17c.046-.327.07-.66.07-1a6.97 6.97 0 00-1.5-4.33A5 5 0 0119 16v1h-6.07zM6 11a5 5 0 015 5v1H1v-1a5 5 0 015-5z"/></svg></div><div class="stat-body"><div class="stat-value" id="sv-total">0</div><div class="stat-label">Total Leads</div><div class="stat-trend" id="st-total">All buyer companies</div></div></div>
+          <div class="stat-card"><div class="stat-icon blue"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd"/></svg></div><div class="stat-body"><div class="stat-value" id="sv-new">0</div><div class="stat-label">New (Uncontacted)</div><div class="stat-trend" id="st-new">Ready to call</div></div></div>
+          <div class="stat-card"><div class="stat-icon orange"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M2.166 4.999A11.954 11.954 0 0010 1.944 11.954 11.954 0 0017.834 5c.11.65.166 1.32.166 2.001 0 5.225-3.34 9.67-8 11.317C5.34 16.67 2 12.225 2 7c0-.682.057-1.35.166-2.001zm11.541 3.708a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div><div class="stat-body"><div class="stat-value" id="sv-security">0</div><div class="stat-label">Security Leads</div><div class="stat-trend">Needs guards</div></div></div>
+          <div class="stat-card"><div class="stat-icon green"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/></svg></div><div class="stat-body"><div class="stat-value" id="sv-housekeeping">0</div><div class="stat-label">Housekeeping Leads</div><div class="stat-trend">Needs HK staff</div></div></div>
+        </div>
+        <div class="charts-row">
+          <div class="chart-card wide">
+            <div class="chart-card-header"><h3>Leads by Source</h3><div class="chart-legend" id="source-legend"></div></div>
+            <div class="source-bars" id="source-bars"><div class="empty-chart-msg">Run agent to see data</div></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-header"><h3>Status Breakdown</h3></div>
+            <div class="donut-wrapper"><canvas id="status-donut" width="160" height="160"></canvas><div class="donut-center-label"><span class="donut-num" id="donut-total">0</span><span class="donut-sub">Total</span></div></div>
+            <div class="donut-legend" id="donut-legend"></div>
+          </div>
+        </div>
+        <div class="charts-row" style="margin-top:0">
+          <div class="chart-card wide">
+            <div class="chart-card-header"><h3>Leads by Industry</h3></div>
+            <div class="source-bars" id="industry-bars"><div class="empty-chart-msg">Run agent to see data</div></div>
+          </div>
+          <div class="chart-card">
+            <div class="chart-card-header"><h3>Top Cities</h3></div>
+            <div class="source-bars" id="city-bars"><div class="empty-chart-msg">Run agent to see data</div></div>
+          </div>
+        </div>
+        <div class="recent-leads-card">
+          <div class="section-header"><h3>Recent Leads</h3><button class="text-link" onclick="showView('leads')">View All →</button></div>
+          <div id="recent-leads-container"></div>
+        </div>
+      </section>
+
+      <!-- ══════════ LEADS VIEW ══════════ -->
+      <section class="view" id="view-leads">
+        <div class="view-header">
+          <div><h1 class="view-title">All Leads</h1><p class="view-subtitle">Buyer companies needing security guards or housekeeping staff</p></div>
+          <div class="view-header-actions">
+            <button class="btn-secondary" onclick="pushSelectedToSheets()">
+              <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
+              Sync to Sheets
+            </button>
+            <button class="btn-secondary" onclick="exportExcel()" style="color:#10b981;border-color:#10b981;">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg> Export Excel
+            </button>
+            <button class="btn-secondary" onclick="exportCSV()">
+              <svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg> CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div class="filter-bar">
+          <div class="search-input-wrap">
+            <svg class="search-icon" width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z" clip-rule="evenodd"/></svg>
+            <input type="text" id="search-input" placeholder="Search company, email, phone, city..." oninput="applyFilters()"/>
+          </div>
+          <div class="filter-chips">
+            <select id="filter-type" onchange="applyFilters()" class="filter-select"><option value="">All Types</option><option value="Security">Security</option><option value="Housekeeping">Housekeeping</option><option value="Both">Both</option></select>
+            <select id="filter-industry" onchange="applyFilters()" class="filter-select" id="filter-industry"><option value="">All Industries</option></select>
+            <select id="filter-city" onchange="applyFilters()" class="filter-select"><option value="">All Cities</option></select>
+            <select id="filter-status" onchange="applyFilters()" class="filter-select"><option value="">All Statuses</option><option value="New">New</option><option value="Contacted">Contacted</option><option value="Qualified">Qualified</option><option value="Closed">Closed</option></select>
+            <select id="filter-date" onchange="applyFilters()" class="filter-select"><option value="">All Time</option><option value="24h">Last 24h</option><option value="7d">Last 7 Days</option><option value="30d">Last 30 Days</option></select>
+            <select id="filter-sheets" onchange="applyFilters()" class="filter-select"><option value="">Sheets: All</option><option value="unsynced">Not Synced</option><option value="synced">Synced</option></select>
+            <button class="filter-clear-btn" onclick="clearFilters()">
+              <svg width="13" height="13" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+              Clear
+            </button>
+          </div>
+        </div>
+
+        <div class="results-meta" id="results-meta">0 leads</div>
+
+        <div class="table-container">
+          <table class="leads-table" id="leads-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox" id="select-all-cb" onchange="toggleSelectAll(this)"/></th>
+                <th class="th-sort" data-col="company" onclick="sortTable('company')">Company <span class="sort-arrow">↕</span></th>
+                <th>Industry</th>
+                <th class="th-sort" data-col="city" onclick="sortTable('city')">City <span class="sort-arrow">↕</span></th>
+                <th>Type</th>
+                <th>Phone</th>
+                <th>Email</th>
+                <th>Website</th>
+                <th class="th-sort" data-col="timestamp" onclick="sortTable('timestamp')">Date <span class="sort-arrow">↕</span></th>
+                <th>Status</th>
+                <th>Sheets</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="leads-tbody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- ══════════ RUN AGENT VIEW ══════════ -->
+      <section class="view" id="view-agent">
+        <div class="view-header">
+          <div><h1 class="view-title">Run AI Agent</h1><p class="view-subtitle">Smart lead generation — finds buyer companies needing your services</p></div>
+        </div>
+
+        <div class="agent-layout">
+          <!-- Config Panel -->
+          <div class="agent-config-card">
+            <div class="agent-config-header">
+              <h3>Search Configuration</h3>
+              <div class="phase-badges">
+                <span class="phase-badge p1">Phase 1: Smart Scan</span>
+                <span class="phase-badge p2">Phase 2: Dedup</span>
+                <span class="phase-badge p3">Phase 3: Maps</span>
+                <span class="phase-badge" style="background:#fdf2f8;color:#9d174d">Phase 4: Crawler</span>
+              </div>
+            </div>
+
+            <div class="config-form">
+
+              <!-- Multi-Location Input -->
+              <div class="form-group">
+                <label>Target Locations <span class="label-hint">(add multiple cities)</span></label>
+                <div class="tag-input-wrapper" id="location-tag-wrapper">
+                  <div class="tag-chips" id="location-chips"></div>
+                  <input type="text" id="location-input" class="tag-input"
+                    placeholder="Type city name + press Enter..."
+                    onkeydown="handleLocationKeydown(event)"
+                    list="city-suggestions"/>
+                  <datalist id="city-suggestions">
+                    <option value="Mumbai"/><option value="Delhi"/><option value="Bangalore"/>
+                    <option value="Hyderabad"/><option value="Chennai"/><option value="Pune"/>
+                    <option value="Kolkata"/><option value="Ahmedabad"/><option value="Noida"/>
+                    <option value="Gurgaon"/><option value="Jaipur"/><option value="Lucknow"/>
+                    <option value="Surat"/><option value="Kochi"/><option value="Chandigarh"/>
+                    <option value="Indore"/><option value="Bhopal"/><option value="Nagpur"/>
+                    <option value="Vadodara"/><option value="Coimbatore"/>
+                  </datalist>
+                </div>
+                <p class="field-hint">Press Enter or comma after each city</p>
+              </div>
+
+              <!-- Industry Selector -->
+              <div class="form-group">
+                <label>Target Industries <span class="label-hint">(buyer sectors — who needs your service)</span></label>
+                <div class="industry-grid" id="industry-grid"></div>
+                <div class="industry-quick-actions">
+                  <button class="text-link" onclick="selectAllIndustries()">Select All</button>
+                  <button class="text-link" onclick="clearAllIndustries()">Clear All</button>
+                  <button class="text-link" onclick="selectTopIndustries()">Top 5 (Recommended)</button>
+                </div>
+              </div>
+
+              <!-- Service Type -->
+              <div class="form-group">
+                <label>Service Type Required</label>
+                <div class="service-type-row">
+                  <label class="service-type-card" id="svc-security-card">
+                    <input type="checkbox" id="target-security" checked onchange="updateServiceCard('security')"/>
+                    <div class="svc-card-body">
+                      <div class="svc-card-icon">🛡️</div>
+                      <div class="svc-card-label">Security Guards</div>
+                      <div class="svc-card-desc">Bouncers, Supervisors, Armed Guards</div>
+                    </div>
+                  </label>
+                  <label class="service-type-card" id="svc-hk-card">
+                    <input type="checkbox" id="target-housekeeping" checked onchange="updateServiceCard('housekeeping')"/>
+                    <div class="svc-card-body">
+                      <div class="svc-card-icon">🧹</div>
+                      <div class="svc-card-label">Housekeeping Staff</div>
+                      <div class="svc-card-desc">Facility Mgmt, Cleaning, Soft Services</div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Sources & Count -->
+              <div class="form-row">
+                <div class="form-group">
+                  <label>Job Boards & Sources</label>
+                  <div style="display:flex;flex-direction:column;gap:6px">
+                    <label class="mini-check"><input type="checkbox" id="src-maps" checked/> <span class="src-label google" style="background:#ea4335">M</span> Google Maps (Recommended)</label>
+                    <label class="mini-check"><input type="checkbox" id="src-linkedin" checked/> <span class="src-label linkedin">in</span> LinkedIn Jobs</label>
+                    <label class="mini-check"><input type="checkbox" id="src-indeed" checked/> <span class="src-label indeed">I</span> Indeed</label>
+                    <label class="mini-check"><input type="checkbox" id="src-google" checked/> <span class="src-label google">G</span> Google Jobs</label>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label>Leads per Industry/City</label>
+                  <div class="range-wrap">
+                    <input type="range" id="batch-size" min="1" max="10" value="3" oninput="updateBatchInfo()"/>
+                    <span class="range-val" id="batch-size-val">3</span>
+                  </div>
+                  <div class="batch-estimate" id="batch-estimate">~0 total leads expected</div>
+                  <div class="token-estimate" id="token-estimate">~0 Apify tokens</div>
+                </div>
+              </div>
+
+              <!-- Enrichment -->
+              <div class="form-group">
+                <label>Enrichment Pipeline</label>
+                <div class="pipeline-steps">
+                  <div class="pipeline-step">
+                    <div class="step-toggle"><input type="checkbox" id="enrich-maps" checked/><label for="enrich-maps">Phase 3: Google Maps</label></div>
+                    <p class="step-desc">Fill missing phone, address, website</p>
+                  </div>
+                  <div class="pipeline-step">
+                    <div class="step-toggle"><input type="checkbox" id="enrich-crawler" checked/><label for="enrich-crawler">Phase 4: Web Crawler</label></div>
+                    <p class="step-desc">Extract emails from company websites</p>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Auto-download Excel -->
+              <div class="form-group">
+                <label class="mini-check" style="font-size:14px;font-weight:600;gap:10px">
+                  <input type="checkbox" id="auto-download-excel"/>
+                  Auto-download leads as Excel (.xlsx) after generation
+                </label>
+              </div>
+
+              <button class="generate-leads-btn" id="generate-btn" onclick="startAgentPipeline()">
+                <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
+                <span id="generate-btn-text">Generate Leads</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Pipeline Progress -->
+          <div class="agent-progress-card">
+            <div class="progress-header">
+              <h3>Live Pipeline</h3>
+              <span class="progress-status-badge idle" id="pipeline-badge">Idle</span>
+            </div>
+
+            <div class="pipeline-visualizer" id="pipeline-visualizer">
+              <div class="pipeline-node" id="pnode-1">
+                <div class="pnode-icon"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM14 11a1 1 0 011 1v1h1a1 1 0 110 2h-1v1a1 1 0 11-2 0v-1h-1a1 1 0 110-2h1v-1a1 1 0 011-1z"/></svg></div>
+                <div class="pnode-body"><div class="pnode-title">Phase 1 — Smart Scan</div><div class="pnode-desc" id="pnode-1-desc">Industry × Location targeting</div><div class="pnode-progress-bar"><div class="pnode-progress-fill" id="pnode-1-fill" style="width:0%"></div></div></div>
+                <div class="pnode-check" id="pnode-1-check">✓</div>
+              </div>
+              <div class="pipeline-connector" id="pc-1"></div>
+              <div class="pipeline-node" id="pnode-2">
+                <div class="pnode-icon"><svg viewBox="0 0 20 20" fill="currentColor"><path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/><path fill-rule="evenodd" d="M4 5a2 2 0 012-2 3 3 0 003 3h2a3 3 0 003-3 2 2 0 012 2v11a2 2 0 01-2 2H6a2 2 0 01-2-2V5zm9.707 5.707a1 1 0 00-1.414-1.414L9 12.586l-1.293-1.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/></svg></div>
+                <div class="pnode-body"><div class="pnode-title">Phase 2 — Pre-flight Dedup</div><div class="pnode-desc" id="pnode-2-desc">Token-optimized deduplication</div><div class="pnode-progress-bar"><div class="pnode-progress-fill" id="pnode-2-fill" style="width:0%"></div></div></div>
+                <div class="pnode-check" id="pnode-2-check">✓</div>
+              </div>
+              <div class="pipeline-connector" id="pc-2"></div>
+              <div class="pipeline-node" id="pnode-3">
+                <div class="pnode-icon"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clip-rule="evenodd"/></svg></div>
+                <div class="pnode-body"><div class="pnode-title">Phase 3 — Maps Enrichment</div><div class="pnode-desc" id="pnode-3-desc">Phone, address, website</div><div class="pnode-progress-bar"><div class="pnode-progress-fill" id="pnode-3-fill" style="width:0%"></div></div></div>
+                <div class="pnode-check" id="pnode-3-check">✓</div>
+              </div>
+              <div class="pipeline-connector" id="pc-3"></div>
+              <div class="pipeline-node" id="pnode-4">
+                <div class="pnode-icon"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M12.586 4.586a2 2 0 112.828 2.828l-3 3a2 2 0 01-2.828 0 1 1 0 00-1.414 1.414 4 4 0 005.656 0l3-3a4 4 0 00-5.656-5.656l-1.5 1.5a1 1 0 101.414 1.414l1.5-1.5zm-5 5a2 2 0 012.828 0 1 1 0 101.414-1.414 4 4 0 00-5.656 0l-3 3a4 4 0 105.656 5.656l1.5-1.5a1 1 0 10-1.414-1.414l-1.5 1.5a2 2 0 11-2.828-2.828l3-3z" clip-rule="evenodd"/></svg></div>
+                <div class="pnode-body"><div class="pnode-title">Phase 4 — Web Crawler</div><div class="pnode-desc" id="pnode-4-desc">Email extraction from websites</div><div class="pnode-progress-bar"><div class="pnode-progress-fill" id="pnode-4-fill" style="width:0%"></div></div></div>
+                <div class="pnode-check" id="pnode-4-check">✓</div>
+              </div>
+            </div>
+
+            <div class="live-log-header">
+              <h4>Live Agent Log</h4>
+              <button class="text-link small" onclick="clearLog()">Clear</button>
+            </div>
+            <div class="live-log" id="live-log">
+              <div class="log-entry idle">Configure and click Generate Leads to start.</div>
+            </div>
+
+            <div class="run-summary" id="run-summary" style="display:none">
+              <div class="run-summary-title">Last Run Results</div>
+              <div class="run-summary-grid" id="run-summary-grid"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ GOOGLE SHEETS VIEW ══════════ -->
+       <section class="view" id="view-excel">
+        <div class="view-header" style="margin-bottom: 24px;">
+          <div>
+            <h1 class="view-title">Excel Manager</h1>
+            <p class="view-subtitle">Import lists of companies to find contacts, or export currently scraped leads as formatted Excel files.</p>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 24px; max-width: 1200px; margin: 0 auto; align-items: start;">
+          
+          <!-- Column 1: Import List to Enrich -->
+          <div class="email-sidebar-card" style="padding: 32px 24px; min-height: 420px; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                <div style="background:#e8f5e9; padding:8px; border-radius:8px;">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#107c41" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                </div>
+                <div>
+                  <h3 style="font-size:16px; font-weight:700; color:#202124; margin:0;">Import Company List</h3>
+                  <p style="font-size:12px; color:var(--gray-500); margin:2px 0 0 0;">Upload an Excel (.xlsx/.xls) or CSV list of companies</p>
+                </div>
+              </div>
+
+              <div id="excel-dropzone" style="border: 2px dashed #dadce0; border-radius: 8px; padding: 30px 16px; text-align: center; background: #fafafa; cursor: pointer; transition: all 0.2s;" onclick="document.getElementById('excel-import-file').click()">
+                <input type="file" id="excel-import-file" accept=".xlsx,.xls,.csv" style="display:none;" onchange="handleExcelImport(event)">
+                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#5f6368" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:8px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
+                <p style="font-size:13px; font-weight:600; color:#3c4043; margin-bottom:4px;">Drag & Drop or Click to Upload</p>
+                <p style="font-size:11px; color:#70757a;">Supports Excel (XLSX, XLS) or standard CSV files</p>
+              </div>
+
+              <div id="excel-import-preview" style="display:none; margin-top: 16px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f1f3f4; padding:8px 12px; border-radius:6px; font-size:12px; font-weight:600; color:#3c4043;">
+                  <span id="excel-import-filename" style="overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width: 250px;">list.xlsx</span>
+                  <span id="excel-import-rowcount" style="color:#107c41;">0 Rows</span>
+                </div>
+                
+                <div class="form-group" style="margin-top: 12px;">
+                  <label style="font-size: 11px; font-weight: 600; color: #5f6368;">Select Column with Company Name</label>
+                  <select id="excel-column-select" style="width:100%; padding: 8px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none; margin-top:4px;"></select>
+                </div>
+              </div>
+            </div>
+
+            <button id="excel-import-btn" class="gmail-send-btn gmail-exact-send" style="width: 100%; justify-content: center; font-size: 14px; padding: 12px; border-radius: var(--radius-full); background:#107c41; margin-top: 24px;" disabled onclick="processExcelImport()">
+              ⚡ Push Companies to Extraction Queue
+            </button>
+          </div>
+
+          <!-- Column 2: Export Data -->
+          <div class="email-sidebar-card" style="padding: 32px 24px; min-height: 420px; display:flex; flex-direction:column; justify-content:space-between;">
+            <div>
+              <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px;">
+                <div style="background:#e8f0fe; padding:8px; border-radius:8px;">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0b57d0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                </div>
+                <div>
+                  <h3 style="font-size:16px; font-weight:700; color:#202124; margin:0;">Export Extracted Leads</h3>
+                  <p style="font-size:12px; color:var(--gray-500); margin:2px 0 0 0;">Download current leads to your computer</p>
+                </div>
+              </div>
+
+              <div class="sheets-stats" style="margin-bottom:20px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <div class="mem-stat" style="background:#fafafa; border:1px solid #dadce0; border-radius:8px; padding:12px; text-align:center;">
+                  <span class="mem-val" id="excel-total-leads" style="font-size:24px; font-weight:800; color:#202124; display:block;">0</span>
+                  <span class="mem-lbl" style="font-size:11px; color:#5f6368; font-weight:600;">Total Leads</span>
+                </div>
+                <div class="mem-stat" style="background:#fafafa; border:1px solid #dadce0; border-radius:8px; padding:12px; text-align:center;">
+                  <span class="mem-val" id="excel-unsaved-leads" style="font-size:24px; font-weight:800; color:#0b57d0; display:block;">0</span>
+                  <span class="mem-lbl" style="font-size:11px; color:#5f6368; font-weight:600;">New Leads</span>
+                </div>
+              </div>
+
+              <!-- Export Formatting Options -->
+              <div style="background:#fafafa; border:1px solid #dadce0; border-radius:8px; padding:16px; font-size:13px; color:#3c4043; display:flex; flex-direction:column; gap:12px;">
+                <div style="font-weight:600; color:#202124; border-bottom: 1px solid #dadce0; padding-bottom:6px;">Excel Formatting Options</div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>Auto-Fit Column Widths</span>
+                  <input type="checkbox" id="excel-autofit" checked style="width:16px; height:16px; cursor:pointer;">
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>Style Header Row (Green Theme)</span>
+                  <input type="checkbox" id="excel-style-header" checked style="width:16px; height:16px; cursor:pointer;">
+                </div>
+                
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <span>Sheet Name</span>
+                  <input type="text" id="excel-sheet-name" value="Skylark Leads" style="width:150px; padding:4px 8px; border:1px solid #dadce0; border-radius:4px; font-size:12px;">
+                </div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:24px;">
+              <button class="btn-primary" style="justify-content:center; padding:12px; font-size:14px; background:#107c41; border-radius:var(--radius-full);" onclick="exportToExcel()">
+                💚 Download Excel (.xlsx)
+              </button>
+              <button class="btn-secondary" style="justify-content:center; padding:12px; font-size:14px; border-radius:var(--radius-full);" onclick="exportToCSV()">
+                📄 Download CSV
+              </button>
+            </div>
+          </div>
+          
+        </div>
+      </section>
+
+      <!-- ══════════ ANALYTICS VIEW ══════════ -->
+      <section class="view" id="view-analytics">
+        <div class="view-header"><h1 class="view-title">Analytics</h1><p class="view-subtitle">Lead generation performance insights</p></div>
+        <div class="analytics-grid" id="analytics-grid">
+          <div class="analytics-card"><h3>Leads by Source</h3><div id="analytics-source-chart" class="analytics-bar-chart"></div></div>
+          <div class="analytics-card"><h3>Leads by Type</h3><div id="analytics-type-chart" class="analytics-bar-chart"></div></div>
+          <div class="analytics-card wide"><h3>Lead Timeline (Last 14 Days)</h3><div id="analytics-timeline" class="analytics-timeline"></div></div>
+          <div class="analytics-card"><h3>Conversion Funnel</h3><div id="analytics-funnel" class="analytics-funnel"></div></div>
+          <div class="analytics-card"><h3>Top Industries</h3><div id="analytics-industries" class="analytics-bar-chart"></div></div>
+        </div>
+      </section>
+
+      <!-- ══════════ SETTINGS VIEW ══════════ -->
+      <section class="view" id="view-settings">
+        <div class="view-header"><h1 class="view-title">Settings</h1><p class="view-subtitle">Configure API credentials and preferences</p></div>
+        <div class="settings-layout">
+          <div class="settings-card">
+            <div class="settings-card-header">
+              <div class="settings-icon purple"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 8a6 6 0 01-7.743 5.743L10 14l-1 1-1 1H6v2H2v-4l4.257-4.257A6 6 0 1118 8zm-6-4a1 1 0 100 2 2 2 0 012 2 1 1 0 102 0 4 4 0 00-4-4z" clip-rule="evenodd"/></svg></div>
+              <div><h3>Apify API Key</h3><p>For live scraping actors on LinkedIn, Indeed & Google</p></div>
+            </div>
+            <div class="form-group">
+              <label>API Key</label>
+              <div class="input-with-action"><input type="password" id="apify-key" placeholder="apify_api_xxxxxxxxx"/><button class="icon-btn" onclick="toggleApiKey()"><svg id="eye-icon" width="17" height="17" viewBox="0 0 20 20" fill="currentColor"><path d="M10 12a2 2 0 100-4 2 2 0 000 4z"/><path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd"/></svg></button></div>
+              <p class="field-hint">Stored locally only — never transmitted</p>
+            </div>
+            <div class="form-group">
+              <label for="token-budget">Apify Token Budget (per run)</label>
+              <div class="range-wrap"><input type="range" id="token-budget" min="100" max="5000" step="100" value="1000" oninput="document.getElementById('token-budget-val').textContent = this.value"/><span class="range-val" id="token-budget-val">1000</span></div>
+            </div>
+            <div class="form-group">
+              <label>Deduplication Strategy</label>
+              <select id="dedup-field" class="filter-select full-width">
+                <option value="company+type">Company + Type + City (Recommended)</option>
+                <option value="email">Email Address</option>
+                <option value="company">Company Name Only</option>
+                <option value="phone">Phone Number</option>
+              </select>
+            </div>
+            <div class="settings-actions">
+              <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+              <button class="btn-secondary" onclick="clearAllData()">Clear All Data</button>
+            </div>
+            </div>
+            
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-icon blue">🤖</div>
+                <div>
+                  <h3 style="margin:0">Groq AI Chat Setup</h3>
+                  <p style="font-size:12px;color:var(--gray-500);margin-top:2px">Configure AI models for Chat interface</p>
+                </div>
+              </div>
+              <div class="form-group">
+                <label>Groq API Key (Optional)</label>
+                <div class="input-with-action">
+                  <input type="password" id="groq-key" placeholder="gsk_... (Leave empty to use local fallback)">
+                  <button class="btn-secondary" onclick="toggleGroqKey()">Show</button>
+                </div>
+                <div class="field-hint">Get a free key at <a href="https://console.groq.com/keys" target="_blank">console.groq.com</a>. If omitted, Chat AI uses a smart local Hinglish parser.</div>
+              </div>
+            </div>
+
+            <div class="settings-card">
+              <div class="settings-card-header">
+                <div class="settings-icon purple">🧠</div>
+                <svg viewBox="0 0 20 20" fill="currentColor"><path d="M3 12v3c0 1.657 3.134 3 7 3s7-1.343 7-3v-3c0 1.657-3.134 3-7 3s-7-1.343-7-3z"/><path d="M3 7v3c0 1.657 3.134 3 7 3s7-1.343 7-3V7c0 1.657-3.134 3-7 3S3 8.657 3 7z"/><path d="M17 5c0 1.657-3.134 3-7 3S3 6.657 3 5s3.134-3 7-3 7 1.343 7 3z"/></svg></div>
+              <div><h3>Agent Memory</h3><p>Persistent lead database stats</p></div>
+            </div>
+            <div class="memory-stats">
+              <div class="mem-stat"><span class="mem-val" id="mem-total">0</span><span class="mem-lbl">Total Leads</span></div>
+              <div class="mem-stat"><span class="mem-val" id="mem-dupes">0</span><span class="mem-lbl">Dupes Blocked</span></div>
+              <div class="mem-stat"><span class="mem-val" id="mem-sessions">0</span><span class="mem-lbl">Sessions Run</span></div>
+              <div class="mem-stat"><span class="mem-val" id="mem-pushed">0</span><span class="mem-lbl">Sheets Pushed</span></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ══════════ EMAIL AUTOMATION VIEW ══════════ -->
+      <section class="view" id="view-email">
+        <div class="view-header" style="margin-bottom: 12px;">
+          <h1 class="view-title">Email Automation</h1>
+          <p class="view-subtitle">Send automated bulk emails to your uncontacted leads.</p>
+        </div>
+
+        <div class="email-layout">
+          <div class="gmail-compose-card gmail-exact">
+            <div class="gmail-header gmail-exact-header">
+              <span>New Message</span>
+              <div class="gmail-header-actions">
+                <span>_</span><span>↙</span><span>✕</span>
+              </div>
+            </div>
+            
+            <div class="gmail-body-container gmail-exact-body">
+              <div class="gmail-input-row">
+                <span class="gmail-input-label">To</span>
+                <input type="text" id="email-to-recipients" class="gmail-input-bare" placeholder="Recipients (Selected in Target & Send)" disabled style="background:transparent; cursor:not-allowed;">
+                <span class="gmail-input-right" onclick="toggleCcBccFields()" style="cursor:pointer; color: #5f6368; font-weight: 500;">Cc Bcc</span>
+              </div>
+              
+              <div class="gmail-input-row" id="gmail-cc-row" style="display:none;">
+                <span class="gmail-input-label">Cc</span>
+                <input type="text" id="email-cc" class="gmail-input-bare" placeholder="Cc recipient emails">
+              </div>
+              
+              <div class="gmail-input-row" id="gmail-bcc-row" style="display:none;">
+                <span class="gmail-input-label">Bcc</span>
+                <input type="text" id="email-bcc" class="gmail-input-bare" placeholder="Bcc recipient emails">
+              </div>
+              
+              <div class="gmail-input-row" style="border-bottom: 1px solid #f1f3f4;">
+                <input type="text" id="email-subject" class="gmail-input-bare" placeholder="Subject">
+              </div>
+
+              <div id="email-body-rich" class="gmail-editor gmail-exact-editor" contenteditable="true" style="min-height: 200px; max-height: 250px; overflow-y: auto; outline: none; border-bottom: 1px solid #f1f3f4;">
+                <p>Hi {Company} team,</p><p><br></p><p>We provide excellent {JobTitle} services...</p><p><br></p>
+              </div>
+              
+              <div class="gmail-signature-section" style="border-top: 1px dashed #dadce0; padding: 12px 16px; background: #fdfdfd;">
+                <div class="gmail-sig-label" style="font-size: 10px; color: #70757a; font-weight: bold; margin-bottom: 4px; letter-spacing: 0.5px;">SIGNATURE:</div>
+                <div id="email-signature-rich" class="gmail-editor-sig" contenteditable="true" style="min-height: 80px; outline: none; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.5;">
+                  Best regards,<br><b>Skylark Security</b>
+                </div>
+              </div>
+
+              <!-- Attachments Preview -->
+              <div id="gmail-attachments-preview" class="gmail-attachments-area"></div>
+            </div>
+            
+            <!-- Hidden Formatting Toolbar -->
+            <div class="gmail-formatting-bar" id="gmail-formatting-bar" style="display:none;">
+              <button class="gmail-tool-btn" onclick="formatEmailText('bold')" title="Bold"><b>B</b></button>
+              <button class="gmail-tool-btn" onclick="formatEmailText('italic')" title="Italic"><i>I</i></button>
+              <button class="gmail-tool-btn" onclick="formatEmailText('underline')" title="Underline"><u>U</u></button>
+              <div class="gmail-divider"></div>
+              <button class="gmail-tool-btn" onclick="formatEmailText('justifyLeft')" title="Align Left">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
+              </button>
+              <button class="gmail-tool-btn" onclick="formatEmailText('justifyCenter')" title="Align Center">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="10" x2="6" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="18" y1="18" x2="6" y2="18"></line></svg>
+              </button>
+              <button class="gmail-tool-btn" onclick="formatEmailText('justifyRight')" title="Align Right">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="21" y1="10" x2="7" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="21" y1="18" x2="7" y2="18"></line></svg>
+              </button>
+              <div class="gmail-divider"></div>
+              <button class="gmail-tool-btn" onclick="formatEmailText('insertUnorderedList')" title="Bullet List">•</button>
+              <button class="gmail-tool-btn" onclick="formatEmailText('insertOrderedList')" title="Number List">1.</button>
+            </div>
+
+            <div class="gmail-footer gmail-exact-footer">
+              <div style="display:flex; align-items:center; gap: 8px;">
+                <div class="gmail-send-group">
+                  <button class="gmail-send-btn gmail-exact-send" onclick="saveEmailTemplate()">Save Template</button>
+                  <button class="gmail-send-dropdown">▼</button>
+                </div>
+                
+                <button class="gmail-tool-btn" onclick="toggleFormattingBar()" title="Formatting options" style="margin-left: 8px; font-weight: 700; font-family: serif; font-size: 16px;">
+                  <u>A</u>
+                </button>
+                
+                <input type="file" id="email-attachment-input" multiple style="display:none;" onchange="handleEmailAttachments(event)">
+                <button class="gmail-tool-btn" onclick="document.getElementById('email-attachment-input').click()" title="Attach files">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444746" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"></path></svg>
+                </button>
+                
+                <button class="gmail-tool-btn" onclick="formatEmailLink()" title="Insert link">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444746" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                </button>
+
+                <!-- Body Image Upload -->
+                <input type="file" id="email-body-image-input" accept="image/*" style="display:none;" onchange="handleBodyImage(event)">
+                <button class="gmail-tool-btn" onclick="document.getElementById('email-body-image-input').click()" title="Insert photo">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444746" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                </button>
+                
+                <!-- Signature Image Upload -->
+                <input type="file" id="email-signature-image-input" accept="image/*" style="display:none;" onchange="handleSignatureImage(event)">
+                <button class="gmail-tool-btn" onclick="document.getElementById('email-signature-image-input').click()" title="Insert signature">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444746" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                </button>
+              </div>
+              
+              <div>
+                <button class="gmail-tool-btn" title="Discard draft">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#444746" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div class="email-sidebar-card">
+            <h3>Target & Send</h3>
+            
+            <div class="form-group" style="margin-top: 16px;">
+              <label>Target Leads</label>
+              <select id="email-target" onchange="updateEmailPreview()">
+                <option value="uncontacted">All Uncontacted Leads</option>
+                <option value="all">All Leads (Including Contacted)</option>
+              </select>
+            </div>
+            
+            <div class="form-group" style="margin-top: 16px;">
+              <label>Batch Size (Max emails to send)</label>
+              <input type="number" id="email-batch-size" value="10" min="1" max="100" oninput="updateEmailPreview()">
+            </div>
+
+            <div class="form-group" style="margin-top: 16px;">
+              <label>Recipient Preview</label>
+              <div id="email-preview-list" style="max-height: 250px; overflow-y: auto; background: var(--gray-50); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 8px; font-size: 12px; color: var(--gray-600);">
+                Loading preview...
+              </div>
+            </div>
+
+            <button class="btn-primary" style="width: 100%; margin-top: 24px; justify-content: center; font-size: 14px; background: #0b57d0; border-radius: 20px; box-shadow: none;" onclick="startEmailAutomation()">
+              ▶ Start Sending Emails
+            </button>
+            
+            <div style="font-size: 11px; color: var(--gray-500); text-align: center; margin-top: 8px;">
+              Requires connected Account.<br>Go to <b>Accounts</b> tab to connect.
+            </div>
+
+            <div id="email-progress-container" style="display: none; margin-top: 24px;">
+              <h4>Progress</h4>
+              <div class="token-bar-track">
+                <div class="token-bar-fill" id="email-progress-bar" style="width: 0%; background: var(--accent-green);"></div>
+              </div>
+              <p id="email-progress-text" style="font-size: 12px; margin-top: 4px; color: var(--gray-500);">0 / 10 Sent</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 📱 WHATSAPP AUTOMATION VIEW 📱 -->
+      <section class="view" id="view-whatsapp">
+        <div class="view-header" style="margin-bottom: 12px;">
+          <h1 class="view-title">WhatsApp Automation</h1>
+          <p class="view-subtitle">Send WhatsApp messages directly using a safe click-to-chat queue system.</p>
+        </div>
+
+        <div class="email-layout whatsapp-layout">
+          <!-- Composer Section -->
+          <div class="gmail-compose-card gmail-exact" style="height: auto; min-height: 400px;">
+            <div class="gmail-header gmail-exact-header" style="background:#25D366; color:white;">
+              <span>WhatsApp Message Template</span>
+            </div>
+            
+            <div class="gmail-body-container gmail-exact-body" style="padding: 16px;">
+              <div style="font-size:12px; color:var(--gray-500); margin-bottom:12px; line-height: 1.5;">
+                <strong>Supported Variables:</strong> {Company}, {City}, {Phone}, {Industry}, {JobTitle}<br>
+                <strong>Text Formatting:</strong> Use *bold*, _italics_, or ~strikethrough~.
+              </div>
+
+              <textarea id="whatsapp-body" class="gmail-input-bare" style="width: 100%; min-height: 200px; padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: 14px; resize: vertical;" placeholder="Hi {Company},&#10;&#10;We provide excellent {JobTitle} services..."></textarea>
+            </div>
+            
+            <div class="gmail-exact-footer">
+              <button class="btn-secondary" onclick="saveWhatsappTemplate()" style="border-color:#25D366; color:#128c7e;">Save Template</button>
+            </div>
+          </div>
+
+          <!-- Queue Control Panel -->
+          <div class="email-sidebar-card" style="padding: 24px;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #202124; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+              Batch & Send
+            </h3>
+
+            <!-- Sender Number -->
+            <div class="form-group" style="margin-bottom: 20px;">
+              <label style="font-size: 12px; font-weight: 600; color: #5f6368; display:flex; justify-content:space-between;">
+                <span>Sender Number (Optional)</span>
+                <span style="font-size:10px; color:#128c7e; cursor:pointer;" onclick="openWhatsappWeb()">Open WhatsApp Web ↗</span>
+              </label>
+              <input type="text" id="whatsapp-sender-num" placeholder="e.g. +919876543210 (For reference)" style="width:100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none;">
+              <div style="font-size:11px; color:var(--gray-500); margin-top:4px;">Messages will be sent from the account logged into WhatsApp Web.</div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 20px;">
+              <label style="font-size: 12px; font-weight: 600; color: #5f6368;">Target Audience</label>
+              <div style="font-size: 14px; font-weight: 600; color: var(--gray-800); background: var(--gray-50); padding: 10px; border-radius: 6px; border: 1px solid var(--border);">
+                New Leads with Phone: <span id="wa-eligible-count" style="color: #25D366;">0</span>
+              </div>
+            </div>
+
+            <div class="form-group" style="margin-bottom: 24px;">
+              <label style="font-size: 12px; font-weight: 600; color: #5f6368;">Batch Size</label>
+              <div class="range-wrap">
+                <input type="range" id="wa-batch-size" min="1" max="50" value="10" oninput="document.getElementById('wa-batch-val').textContent = this.value">
+                <span class="range-val" id="wa-batch-val">10</span>
+              </div>
+            </div>
+
+            <!-- Queue UI (hidden by default) -->
+            <div id="wa-queue-ui" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 8px; margin-bottom: 20px; text-align: center;">
+              <div style="font-weight: 600; color: #166534; margin-bottom: 8px;" id="wa-queue-status">Ready to Send: 0 / 10</div>
+              <p style="font-size: 12px; color: #15803d; margin-bottom: 16px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="wa-queue-current-lead">Next: ...</p>
+              <button id="wa-send-next-btn" class="btn-primary" onclick="processWhatsappQueueNext()" style="width: 100%; background: #25D366; box-shadow: 0 4px 12px rgba(37,211,102,0.3); border:none; justify-content:center; padding:12px; font-size:16px;">
+                Send Next Message ↗
+              </button>
+              <button class="text-link" onclick="stopWhatsappQueue()" style="color:#dc2626; margin-top:12px; width:100%;">Stop Batch</button>
+            </div>
+
+            <button id="wa-start-batch-btn" class="gmail-send-btn gmail-exact-send" style="width: 100%; justify-content: center; font-size: 14px; padding: 12px; border-radius: var(--radius-full); background: #25D366; border: none; display: flex;" onclick="startWhatsappBatch()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
+              Start WhatsApp Batch
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- 👤 ACCOUNTS VIEW 👤 -->
+      <section class="view" id="view-accounts">
+        <div class="view-header" style="margin-bottom: 24px;">
+          <h1 class="view-title">Connected Accounts</h1>
+          <p class="view-subtitle">Connect your Gmail account to send automated emails directly.</p>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 24px; max-width: 1200px; margin: 0 auto; align-items: start;">
+          
+          <!-- Column 1: Connection Card -->
+          <div class="email-sidebar-card" style="padding: 32px 24px;">
+            <div style="text-align: center; margin-bottom: 20px;">
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#0b57d0" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom: 12px;"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+              <h2 style="font-size: 18px; font-weight: 700; color: #202124; margin-bottom: 8px;">Google Workspace Integration</h2>
+              <p style="color: var(--gray-500); font-size: 13px; line-height: 1.5;">
+                Providing the Webhook URL bypasses local file security restrictions and uses your official Google Account to send personalized emails.
+              </p>
+            </div>
+
+            <!-- Active email display -->
+            <div id="active-email-banner" style="display:none; background:#e8f0fe; border:1px solid #c5d5f5; border-radius:8px; padding:10px 14px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;">
+              <div style="display:flex; align-items:center; gap:8px;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="#0b57d0"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+                <span id="active-email-label" style="font-size:13px; font-weight:600; color:#0b57d0;"></span>
+              </div>
+              <span style="font-size:11px; color:#0b57d0; background:#c5d5f5; padding:2px 8px; border-radius:99px; font-weight:600;">Active</span>
+            </div>
+
+            <!-- Saved Emails Dropdown (shows when 2+ emails saved) -->
+            <div id="saved-emails-section" style="display:none; margin-bottom:16px;">
+              <label style="font-size: 12px; font-weight: 600; color: #5f6368; display:block; margin-bottom:6px;">Switch Account</label>
+              <div style="display:flex; gap:8px;">
+                <select id="saved-emails-dropdown" onchange="switchSavedEmail(this.value)" style="flex:1; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none; font-size:13px; background:#fff;">
+                </select>
+                <button onclick="removeSavedEmail()" title="Remove selected email" style="padding:8px 12px; border:1px solid #fce8e6; background:#fce8e6; color:#c0392b; border-radius:var(--radius-sm); cursor:pointer; font-size:13px;">✕</button>
+              </div>
+            </div>
+
+            <div class="form-group" style="text-align: left; margin-bottom: 16px;">
+              <label style="font-size: 12px; font-weight: 600; color: #5f6368;">Add / Change Email</label>
+              <input type="text" id="account-email" placeholder="e.g., yourname@gmail.com" style="width:100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none;">
+            </div>
+
+            <div class="form-group" style="text-align: left; margin-bottom: 24px;">
+              <label style="font-size: 12px; font-weight: 600; color: #5f6368;">Google Apps Script URL (Webhook)</label>
+              <input type="text" id="email-webhook-url" placeholder="https://script.google.com/macros/s/.../exec" style="width:100%; padding: 10px; border: 1px solid var(--border); border-radius: var(--radius-sm); outline: none;">
+            </div>
+
+            <button class="gmail-send-btn gmail-exact-send" style="width: 100%; justify-content: center; font-size: 14px; padding: 12px; border-radius: var(--radius-full);" onclick="saveEmailWebhook()">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
+              Save & Connect Account
+            </button>
+          </div>
+
+          <!-- Column 2: Step-by-Step Setup Guide -->
+          <div class="email-sidebar-card" style="padding: 32px 24px; border-left: 4px solid #0b57d0; background: #f8fafd;">
+            <h3 style="font-size: 16px; font-weight: 700; color: #041e49; margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+              💡 Google Script Setup Guide
+            </h3>
+            
+            <div style="font-size: 13px; line-height: 1.6; color: #3c4043; display: flex; flex-direction: column; gap: 12px;">
+              
+              <div>
+                <span style="background: #0b57d0; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; margin-right: 6px;">1</span>
+                <strong>Naya Project Banayein:</strong><br>
+                Google Apps Script (<a href="https://script.google.com/" target="_blank" style="color: #0b57d0; text-decoration: underline; font-weight: 600;">script.google.com</a>) par jayein. "New Project" banayein aur usme <code>email_script_gas.js</code> ka code paste karein.
+              </div>
+
+              <div>
+                <span style="background: #0b57d0; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; margin-right: 6px;">2</span>
+                <strong>Web App Deploy Karein:</strong><br>
+                Top-right me <strong>Deploy > New Deployment</strong> click karein. Settings (Gear icon) me <strong>Web App</strong> chunein. (Execute as: <strong>"Me"</strong>, Access: <strong>"Anyone"</strong>).
+              </div>
+
+              <div style="background: #fce8e6; border: 1px solid #f2b8b5; padding: 10px; border-radius: 8px; color: #601410; font-size: 12px;">
+                <strong>⚠️ Warning Bypass:</strong> Deploy par click karne par <em>"Authorize Access"</em> dabayein, account select karein, fir <strong>Advanced > Go to project (unsafe)</strong> chunein aur <strong>Allow</strong> kar dein.
+              </div>
+
+              <div>
+                <span style="background: #0b57d0; color: #fff; border-radius: 50%; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; margin-right: 6px;">3</span>
+                <strong>URL Paste Karein:</strong><br>
+                Milne wale Web App URL ko copy karein aur left box me daal kar **Connect** dabayein (ya <code>config.js</code> file me update kar dein).
+              </div>
+
+              <div style="border-top: 1px solid #dadce0; padding-top: 12px; font-size: 12px; color: #5f6368; font-style: italic;">
+                *Note: Ye steps sirf pehli baar (first deployment) par karne hote hain. Iske baad app automatic backend me secure email sending perform karegi.
+              </div>
+
+            </div>
+          </div>
+          
+        </div>
+      </section>
+
+    <!-- CANDIDATES VIEW -->
+      <!-- CANDIDATE AI CHAT (Claude Style) -->
+      <section class="view claude-ui-wrapper" id="view-candidate-ai">
+        <div class="ambient-orb orb-3"></div>
+        <div class="ambient-orb orb-4"></div>
+        <div class="chat-top-header">
+          <button type="button" id="btn-new-chat-candidate" class="claude-new-chat-btn" onclick="startNewChat('candidate')" title="Start a fresh candidate search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>New Chat</span>
+          </button>
+        </div>
+        <div class="top-right-badge" style="padding: 6px 12px; background: rgba(255,255,255,0.9); border: 1px solid #e2e8f0; border-radius: 20px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05); display: flex; align-items: center; gap: 6px; font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 13px; font-weight: 600; color: #f59e0b;">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="7"></circle><polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"></polyline></svg>
+          <span id="candidate-token-counter">0 / 400</span>
+        </div>
+        <div class="chat-container" style="width: 100%; max-width: 768px; display: flex; flex-direction: column; height: 100%; position: relative; z-index: 2;">
+          <div class="claude-greeting-container" id="candidate-chat-welcome">
+            <h1 class="claude-greeting">
+              Candidate AI Ready
+            </h1>
+          </div>
+          
+          <div id="candidate-chat-messages" class="chat-messages-container" style="flex:1; overflow-y:auto; margin-bottom:20px; display:none;"></div>
+          
+          <div class="claude-input-container">
+            <textarea id="candidate-ai-input" class="claude-textarea" rows="1" placeholder="Ask AI... (e.g., 'Mujhe Mumbai me HR Admin chahiye 10 candidates ki list')"></textarea>
+            <div class="claude-input-toolbar">
+              <div class="claude-toolbar-left">
+                <button class="claude-icon-btn plus-btn" title="Add context">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+              </div>
+              <div class="claude-toolbar-right">
+                <div class="claude-model-wrapper custom-dropdown" tabindex="0">
+                  <input type="hidden" id="candidate-ai-model-select" value="llama-3.3-70b-versatile">
+                  <div class="custom-dropdown-header">
+                    <span class="custom-dropdown-text">Llama 3.3 70B</span>
+                    <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                  <ul class="custom-dropdown-list">
+                    <li data-value="llama-3.3-70b-versatile" class="active flagship">Llama 3.3 70B (Groq) <span class="flagship-badge">⭐ TOP</span></li>
+                    <li data-value="deepseek-chat" class="flagship">DeepSeek V3 (DeepSeek API) <span class="flagship-badge">🔥 PRO</span></li>
+                    <li data-value="deepseek-reasoner" class="flagship">DeepSeek R1 (DeepSeek API) <span class="flagship-badge">🔥 PRO</span></li>
+                    <li data-value="moonshot-v1-8k" class="flagship">Kimi (Moonshot API) <span class="flagship-badge">🔥 PRO</span></li>
+                    <li data-value="mixtral-8x7b-32768">Mixtral 8x7B (Groq)</li>
+                  </ul>
+                </div>
+                <button id="btn-candidate-ai-send" class="claude-icon-btn claude-send-btn" onclick="handleCandidateChatSend()" title="Send message">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+          <div id="candidate-ai-status" class="claude-status-text" style="margin-top:-20px; text-align:center;"></div>
+        </div>
+      </section>
+
+      <!-- CANDIDATE DATABASE -->
+      <section class="view" id="view-candidate-db">
+        <div class="view-header">
+          <div>
+            <h1 class="view-title">Candidate Database</h1>
+            <p class="view-subtitle">Scraped authentic LinkedIn candidates directly via Apify</p>
+          </div>
+          <div class="view-header-actions">
+            <button class="btn-secondary" onclick="exportCandidatesCSV()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              Export CSV
+            </button>
+            <button class="btn-secondary" onclick="exportCandidatesExcel()" style="color: #10b981; border-color: #10b981;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="13"></line><line x1="8" y1="17" x2="16" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              Export Excel
+            </button>
+            <button class="btn-secondary" onclick="clearAllCandidates()" style="color: #ef4444; border-color: #ef4444;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+              Clear All
+            </button>
+            <button class="btn-primary" onclick="window.SKYLARK.showView('whatsapp')">
+              WhatsApp Auto
+            </button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="leads-table">
+            <thead>
+              <tr>
+                <th><input type="checkbox"></th>
+                <th>Candidate Name</th>
+                <th>Phone (Mocked)</th>
+                <th>Job Interest & Snippet</th>
+                <th>Profile Link</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody id="candidates-tbody">
+              <!-- JS Injected -->
+            </tbody>
+          </table>
+          <div id="candidates-empty-state" class="empty-chart-msg" style="padding:40px 20px;">
+            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray-300); margin-bottom:12px;"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg><br>
+            No candidates searched yet.<br>Enter a role and city above to start scraping.
+          </div>
+        </div>
+      </section>
+
+    </div><!-- views-container -->
+  </main>
+</div><!-- app-shell -->
+
+<!-- Floating Image Resizer Overlay -->
+<div id="gmail-image-resizer" class="gmail-image-resizer-popup" style="display:none; position: absolute; z-index: 10000; background: #fff; border: 1px solid #ccc; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 4px 8px; border-radius: 4px; display: flex; gap: 8px; font-family: Roboto, Arial, sans-serif; font-size: 12px; align-items: center;">
+  <span style="color: #666; font-weight: 500;">Size:</span>
+  <button class="resizer-btn" onclick="resizeSelectedImage('100px')">Small</button>
+  <button class="resizer-btn" onclick="resizeSelectedImage('250px')">Best fit</button>
+  <button class="resizer-btn" onclick="resizeSelectedImage('100%')">Original</button>
+  <div style="width: 1px; height: 16px; background: #e0e0e0;"></div>
+  <button class="resizer-btn remove" onclick="removeSelectedImage()" style="color: #d93025; font-weight: 500;">Remove</button>
+</div>
+
+<!-- Lead Detail Modal -->
+<div class="modal-overlay" id="lead-modal" onclick="closeModal(event)">
+  <div class="modal-card" id="lead-modal-card">
+    <div class="modal-header">
+      <div class="modal-company-badge" id="modal-company-badge"></div>
+      <div class="modal-header-info"><h2 id="modal-company-name">Company</h2><div class="modal-meta" id="modal-meta"></div></div>
+      <button class="modal-close" onclick="closeLeadModal()"><svg viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg></button>
+    </div>
+    <div class="modal-body" id="modal-body"></div>
+    <div class="modal-footer" id="modal-footer"></div>
+  </div>
+</div>
+
+  <!-- Scripts -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="config.js"></script>
+  <script src="memory.js"></script>
+  <script src="agent.js"></script>
+  <script src="chat.js"></script>
+  <script src="app.js"></script>
+  <script>
+    // Audio Context Setup for Ambient Sounds
+    let audioCtx = null;
+    function playThemeSound(isDark) {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      const filter = audioCtx.createBiquadFilter();
+
+      osc.connect(filter);
+      filter.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+
+      const now = audioCtx.currentTime;
+
+      if (isDark) {
+        // Deep, soothing warm pad for dark mode
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(110, now); // A2
+        
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = 'sine';
+        osc2.frequency.setValueAtTime(164.81, now); // E3
+        osc2.connect(filter);
+        
+        const osc3 = audioCtx.createOscillator();
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(220, now); // A3
+        osc3.connect(filter);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(400, now);
+        
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(0.15, now + 1.0); // very slow attack
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 3.0); // very slow release
+        
+        osc.start(now);
+        osc2.start(now);
+        osc3.start(now);
+        osc.stop(now + 3.0);
+        osc2.stop(now + 3.0);
+        osc3.stop(now + 3.0);
+      } else {
+        // Soft, bright morning chord for light mode
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(440, now); // A4
+        
+        const osc2 = audioCtx.createOscillator();
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(554.37, now + 0.1); // C#5
+        osc2.connect(filter);
+        
+        const osc3 = audioCtx.createOscillator();
+        osc3.type = 'sine';
+        osc3.frequency.setValueAtTime(659.25, now + 0.2); // E5
+        osc3.connect(filter);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1200, now);
+        
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(0.1, now + 0.1);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, now + 2.0);
+        
+        osc.start(now);
+        osc2.start(now + 0.1);
+        osc3.start(now + 0.2);
+        osc.stop(now + 2.0);
+        osc2.stop(now + 2.0);
+        osc3.stop(now + 2.0);
+      }
+    }
+
+    // Theme Toggle Logic
+    document.addEventListener('DOMContentLoaded', () => {
+      const themeSwitch = document.getElementById('theme-switch');
+      if (themeSwitch) {
+        const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+        themeSwitch.checked = currentTheme === 'dark';
+        
+        themeSwitch.addEventListener('change', function(e) {
+          const newTheme = e.target.checked ? 'dark' : 'light';
+          document.documentElement.setAttribute('data-theme', newTheme);
+          localStorage.setItem('skylark-theme', newTheme);
+          playThemeSound(e.target.checked);
+        });
+      }
+    });
+  </script>
+</body>
+</html>

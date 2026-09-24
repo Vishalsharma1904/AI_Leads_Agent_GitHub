@@ -1,0 +1,141 @@
+/* ============================================================
+   clavis-suggestions.css
+   Centered, elegant empty-state suggestion chips for Clavis AI
+   Positioned directly above the centered composer box.
+   ============================================================ */
+
+.clavis-suggestions-wrap {
+  position: relative;
+  width: min(500px, calc(100% - 32px)) !important;
+  max-width: 500px !important;
+  margin: 0 auto 12px auto !important;
+  padding: 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  gap: 8px;
+  box-sizing: border-box !important;
+  pointer-events: none;
+  opacity: 0;
+  max-height: 0;
+  overflow: hidden;
+  transform: translateY(6px);
+  transition:
+    opacity 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 340ms cubic-bezier(0.16, 1, 0.3, 1),
+    margin 280ms ease;
+  z-index: 10;
+}
+
+.clavis-suggestions-wrap.is-visible {
+  pointer-events: auto;
+  opacity: 1;
+  max-height: 140px;
+  overflow: visible;
+  transform: none;
+}
+
+.clavis-suggestions-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--au-mute, #827E76);
+  user-select: none;
+  opacity: 0.8;
+  margin-bottom: 2px;
+}
+.clavis-suggestions-label svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.75;
+}
+
+html[data-theme="dark"] .clavis-suggestions-label {
+  color: var(--au-mute, #A6A199);
+}
+
+.clavis-suggestion-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 7px;
+  width: 100%;
+}
+
+.clavis-suggestion-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  color: var(--csb-text, #1A1917);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+  transition:
+    background-color 160ms var(--csb-out, ease),
+    border-color 160ms var(--csb-out, ease),
+    transform 200ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 160ms ease,
+    color 140ms ease;
+  animation: clavis-chip-in 340ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.clavis-suggestion-chip:hover {
+  background: rgba(255, 255, 255, 1);
+  border-color: rgba(0, 122, 255, 0.40);
+  color: #007AFF;
+  transform: translateY(-1.5px);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+}
+
+.clavis-suggestion-chip:active {
+  transform: scale(0.97);
+  transition-duration: 80ms;
+}
+
+html[data-theme="dark"] .clavis-suggestion-chip {
+  border: 0.5px solid rgba(255, 255, 255, 0.10);
+  background: rgba(30, 30, 34, 0.85);
+  color: var(--csb-text, #ECEAE4);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+}
+
+html[data-theme="dark"] .clavis-suggestion-chip:hover {
+  background: rgba(40, 42, 48, 0.95);
+  border-color: rgba(10, 132, 255, 0.50);
+  color: #0A84FF;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.40);
+}
+
+.clavis-suggestion-chip-icon {
+  font-size: 13px;
+  line-height: 1;
+}
+
+@keyframes clavis-chip-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}

@@ -1,0 +1,45 @@
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+alembic
+redis
+celery
+# chromadb
+# sentence-transformers
+# faster-whisper
+# numpy
+pydantic
+pydantic-settings
+python-dotenv
+python-multipart
+websockets
+PyJWT
+bcrypt
+passlib
+httpx
+supabase
+google-auth
+requests
+pywin32; platform_system == "Windows"
+
+# Public business-site enrichment. Install browser binaries separately with
+# `python -m playwright install chromium` on the deployment host.
+crawlee>=1.10,<2
+playwright>=1.50,<2
+
+# Keyless Google Maps discovery (replaces Apify's Maps actor). Install
+# browser binaries separately with `scrapling install` on the deployment host.
+scrapling[fetchers]>=0.2,<1
+
+# Clavis strict-local speech runtime (Python 3.12 production bundle).
+# Kokoro is the only TTS path; faster-whisper and Silero remain lazy-loaded
+# so text-only startup still works when models are unavailable.
+numpy>=1.26,<3
+scipy>=1.13,<2
+soundfile>=0.12,<1
+torch>=2.5,<3
+kokoro>=0.9.4
+faster-whisper>=1.1,<2
+silero-vad>=6,<7
+onnxruntime>=1.17,<2

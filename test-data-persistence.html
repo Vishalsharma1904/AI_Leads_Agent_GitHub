@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Data Persistence Test</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        .container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+        }
+        h1 {
+            font-size: 28px;
+            font-weight: 800;
+            color: #1a202c;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            font-size: 14px;
+            color: #718096;
+            margin-bottom: 30px;
+        }
+        .test-section {
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .test-section h2 {
+            font-size: 18px;
+            font-weight: 700;
+            color: #2d3748;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .status {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: auto;
+        }
+        .status.pass { background: #c6f6d5; color: #22543d; }
+        .status.fail { background: #fed7d7; color: #742a2a; }
+        .status.info { background: #bee3f8; color: #2c5282; }
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px;
+            border-bottom: 1px solid #e2e8f0;
+            font-size: 14px;
+        }
+        .info-row:last-child { border-bottom: none; }
+        .info-row .label {
+            font-weight: 600;
+            color: #4a5568;
+        }
+        .info-row .value {
+            color: #2d3748;
+            font-family: 'Monaco', 'Courier New', monospace;
+            background: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 13px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            margin: 5px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:active {
+            transform: translateY(0);
+        }
+        .actions {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 20px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .alert.success { background: #c6f6d5; border-left: 4px solid #38a169; color: #22543d; }
+        .alert.error { background: #fed7d7; border-left: 4px solid #e53e3e; color: #742a2a; }
+        .alert.warning { background: #fefcbf; border-left: 4px solid #d69e2e; color: #744210; }
+        pre {
+            background: #2d3748;
+            color: #f7fafc;
+            padding: 15px;
+            border-radius: 8px;
+            font-size: 13px;
+            overflow-x: auto;
+            line-height: 1.5;
+        }
+        .emoji { font-size: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Data Persistence Test Suite</h1>
+        <p class="subtitle">Verify that your data stays safe across app reloads & code changes</p>
+
+        <div id="results"></div>
+
+        <div class="actions">
+            <button onclick="runAllTests()">🧪 Run All Tests</button>
+            <button onclick="simulateLogin()">👤 Simulate Login</button>
+            <button onclick="addTestLeads()">📊 Add Test Leads</button>
+            <button onclick="reloadPage()">🔄 Reload Page</button>
+            <button onclick="clearAll()" style="background: linear-gradient(135deg, #fc5c7d 0%, #6a82fb 100%);">🗑️ Clear All</button>
+        </div>
+    </div>
+
+    <script>
+        function getElement(id) {
+            return document.getElementById(id);
+        }
+
+        function showResults(html) {
+            getElement('results').innerHTML = html;
+        }
+
+        function runAllTests() {
+            let html = '<h2 style="margin-bottom: 20px; font-size: 20px;">📋 Test Results</h2>';
+
+            // Test 1: Auth State
+            const isLoggedIn = localStorage.getItem('skylark_logged_in') === 'true';
+            const activeEmail = localStorage.getItem('skylark_active_email') || 'NOT SET';
+            const hasValidSession = isLoggedIn && activeEmail.includes('@');
+            
+            html += `
+                <div class="test-section">
+                    <h2>
+                        <span class="emoji">🔐</span> Authentication State
+                        <span class="status ${hasValidSession ? 'pass' : 'fail'}">${hasValidSession ? 'PASS' : 'FAIL'}</span>
+                    </h2>
+                    <div class="info-row">
+                        <span class="label">Login Status:</span>
+                        <span class="value">${isLoggedIn ? '✅ Logged In' : '❌ Not Logged In'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Active Email:</span>
+                        <span class="value">${activeEmail}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Valid Session:</span>
+                        <span class="value">${hasValidSession ? '✅ YES' : '❌ NO'}</span>
+                    </div>
+                </div>
+            `;
+
+            // Test 2: User Profile
+            let profile = { name: 'NOT SET', company: 'NOT SET', email: 'NOT SET' };
+            try {
+                const raw = localStorage.getItem('skylark_user_profile') || localStorage.getItem('skylark_user');
+                if (raw) profile = JSON.parse(raw);
+            } catch (e) {}
+
+            html += `
+                <div class="test-section">
+                    <h2>
+                        <span class="emoji">👤</span> User Profile Data
+                        <span class="status ${profile.name !== 'NOT SET' ? 'pass' : 'fail'}">${profile.name !== 'NOT SET' ? 'PASS' : 'FAIL'}</span>
+                    </h2>
+                    <div class="info-row">
+                        <span class="label">Name:</span>
+                        <span class="value">${profile.name || 'Not Set'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Company:</span>
+                        <span class="value">${profile.company || 'Not Set'}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Email:</span>
+                        <span class="value">${profile.email || 'Not Set'}</span>
+                    </div>
+                </div>
+            `;
+
+            // Test 3: Leads Data
+            let leadsCount = 0;
+            let leadsSource = 'None';
+            try {
+                // Try UserStorage scoped
+                const userId = `usr_${activeEmail.replace(/[^a-z0-9]/g, '_')}`;
+                const scopedKey = `skylark_${userId}_allLeads`;
+                let raw = localStorage.getItem(scopedKey);
+                if (raw) {
+                    const leads = JSON.parse(raw);
+                    if (Array.isArray(leads)) {
+                        leadsCount = leads.length;
+                        leadsSource = 'UserStorage (Scoped)';
+                    }
+                }
+                
+                // Fallback to global
+                if (leadsCount === 0) {
+                    raw = localStorage.getItem('allLeads');
+                    if (raw) {
+                        const leads = JSON.parse(raw);
+                        if (Array.isArray(leads)) {
+                            leadsCount = leads.length;
+                            leadsSource = 'Global localStorage';
+                        }
+                    }
+                }
+            } catch (e) {}
+
+            html += `
+                <div class="test-section">
+                    <h2>
+                        <span class="emoji">📊</span> Leads Database
+                        <span class="status ${leadsCount > 0 ? 'pass' : 'info'}">${leadsCount > 0 ? 'PASS' : 'EMPTY'}</span>
+                    </h2>
+                    <div class="info-row">
+                        <span class="label">Total Leads:</span>
+                        <span class="value">${leadsCount}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Data Source:</span>
+                        <span class="value">${leadsSource}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Storage Key:</span>
+                        <span class="value">${activeEmail.includes('@') ? `skylark_usr_${activeEmail.replace(/[^a-z0-9]/g, '_')}_allLeads` : 'allLeads'}</span>
+                    </div>
+                </div>
+            `;
+
+            // Test 4: Cloud Sync
+            const lastSync = localStorage.getItem('skylark_last_cloud_sync') || 'Never';
+            const syncStatus = localStorage.getItem('skylark_sync_status') || 'Unknown';
+            const lastSyncTime = lastSync !== 'Never' ? new Date(parseInt(lastSync)).toLocaleString('en-IN') : 'Never';
+
+            html += `
+                <div class="test-section">
+                    <h2>
+                        <span class="emoji">☁️</span> Cloud Sync Status
+                        <span class="status info">INFO</span>
+                    </h2>
+                    <div class="info-row">
+                        <span class="label">Sync Status:</span>
+                        <span class="value">${syncStatus}</span>
+                    </div>
+                    <div class="info-row">
+                        <span class="label">Last Sync:</span>
+                        <span class="value">${lastSyncTime}</span>
+                    </div>
+                </div>
+            `;
+
+            // Overall Summary
+            const allPass = hasValidSession && profile.name !== 'NOT SET';
+            html += `
+                <div class="alert ${allPass ? 'success' : 'warning'}">
+                    ${allPass 
+                        ? '<strong>✅ All Core Tests Passed!</strong><br>Your data persistence is working correctly. Try reloading the page to verify leads stay saved.' 
+                        : '<strong>⚠️ Some Tests Failed</strong><br>Your session or data may not persist correctly. Use the buttons below to set up a test session.'}
+                </div>
+            `;
+
+            showResults(html);
+        }
+
+        function simulateLogin() {
+            const testEmail = prompt('Enter test email:', 'khushi.test@gmail.com');
+            if (!testEmail || !testEmail.includes('@')) {
+                alert('❌ Invalid email');
+                return;
+            }
+
+            const testName = prompt('Enter your name:', 'Khushi Sharma');
+            const testCompany = prompt('Enter company:', 'AI Leads Agency');
+
+            localStorage.setItem('skylark_logged_in', 'true');
+            localStorage.setItem('skylark_active_email', testEmail);
+            
+            const profile = {
+                id: `usr_${testEmail.replace(/[^a-z0-9]/g, '_')}`,
+                email: testEmail,
+                name: testName || 'Test User',
+                company: testCompany || 'Enterprise',
+                phone: '+91 98765 43210',
+                role: 'Owner'
+            };
+            
+            localStorage.setItem('skylark_user_profile', JSON.stringify(profile));
+            localStorage.setItem('skylark_user', JSON.stringify(profile));
+
+            showResults(`
+                <div class="alert success">
+                    <strong>✅ Login Simulated Successfully!</strong><br>
+                    Email: ${testEmail}<br>
+                    Name: ${profile.name}<br>
+                    Company: ${profile.company}<br><br>
+                    <strong>Next:</strong> Click "Add Test Leads" to create sample data, then reload the page to test persistence.
+                </div>
+            `);
+        }
+
+        function addTestLeads() {
+            const activeEmail = localStorage.getItem('skylark_active_email');
+            if (!activeEmail || !activeEmail.includes('@')) {
+                alert('❌ Please simulate login first');
+                return;
+            }
+
+            const testLeads = [
+                { id: 'test_1', company: 'Acme Corp', city: 'Mumbai', phone: '+91 98765 11111', email: 'contact@acme.com', score: 85, timestamp: Date.now() },
+                { id: 'test_2', company: 'TechVista Solutions', city: 'Delhi', phone: '+91 98765 22222', email: 'hr@techvista.com', score: 78, timestamp: Date.now() },
+                { id: 'test_3', company: 'Global Industries', city: 'Bangalore', phone: '+91 98765 33333', email: 'admin@global.com', score: 92, timestamp: Date.now() },
+                { id: 'test_4', company: 'Star Enterprises', city: 'Pune', phone: '+91 98765 44444', email: 'info@star.com', score: 71, timestamp: Date.now() },
+                { id: 'test_5', company: 'Alpha Security Services', city: 'Hyderabad', phone: '+91 98765 55555', email: 'ops@alpha.com', score: 88, timestamp: Date.now() }
+            ];
+
+            // Save to user-scoped storage
+            const userId = `usr_${activeEmail.replace(/[^a-z0-9]/g, '_')}`;
+            const scopedKey = `skylark_${userId}_allLeads`;
+            localStorage.setItem(scopedKey, JSON.stringify(testLeads));
+            
+            // Also save to global (for compatibility)
+            localStorage.setItem('allLeads', JSON.stringify(testLeads));
+
+            showResults(`
+                <div class="alert success">
+                    <strong>✅ ${testLeads.length} Test Leads Added!</strong><br><br>
+                    <strong>Storage Location:</strong><br>
+                    <pre>${scopedKey}</pre>
+                    <strong>Next Step:</strong> Click "🔄 Reload Page" to verify data persists after page reload.
+                </div>
+            `);
+        }
+
+        function reloadPage() {
+            if (confirm('🔄 Reload page to test data persistence?\n\nYour leads should still be here after reload.')) {
+                window.location.reload();
+            }
+        }
+
+        function clearAll() {
+            if (confirm('⚠️ This will clear all test data. Are you sure?')) {
+                // Clear auth
+                localStorage.removeItem('skylark_logged_in');
+                localStorage.removeItem('skylark_active_email');
+                localStorage.removeItem('skylark_user_profile');
+                localStorage.removeItem('skylark_user');
+                
+                // Clear leads
+                localStorage.removeItem('allLeads');
+                
+                // Clear scoped data
+                Object.keys(localStorage).forEach(key => {
+                    if (key.startsWith('skylark_usr_')) {
+                        localStorage.removeItem(key);
+                    }
+                });
+
+                showResults(`
+                    <div class="alert error">
+                        <strong>🗑️ All Data Cleared</strong><br>
+                        Test data has been removed. Click "Simulate Login" to start fresh.
+                    </div>
+                `);
+            }
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('DOMContentLoaded', () => {
+            setTimeout(runAllTests, 300);
+        });
+    </script>
+</body>
+</html>

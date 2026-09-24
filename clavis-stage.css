@@ -1,0 +1,547 @@
+/* ============================================================
+ * CLAVIS STAGE v2 (clavis-stage.css)
+ * ------------------------------------------------------------
+ * Turns the Clavis AI page from a chat window into a voice-first
+ * ambient surface: the orb becomes the centre of the page, the
+ * transcript is off by default (More -> Transcript brings it back),
+ * every control collapses into a quiet top-right cluster, and the
+ * composer becomes a floating secondary input rather than the star.
+ *
+ * SCOPE: every rule is prefixed .clavis-stage-v2 #view-jarvis, so
+ * nothing here can touch Dashboard, Data Hub, Excel Manager or
+ * Analytics. The class is set on <html> by clavis-task-hud.js.
+ *
+ * KILL SWITCH: run  localStorage.clavis_stage_v2 = 'off'  in the
+ * console and reload -- the class is never added and the page falls
+ * back to exactly what it was before.
+ *
+ * Token convention matches styles.css: dark values are the base,
+ * [data-theme="light"] overrides them.
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis {
+  /* motion */
+  --cs-spring: cubic-bezier(0.22, 1, 0.36, 1);
+  --cs-glide: cubic-bezier(0.32, 0.72, 0, 1);
+  --cs-t1: 200ms;
+  --cs-t2: 380ms;
+  --cs-t3: 560ms;
+
+  /* surface + ink (dark first, per styles.css) */
+  --cs-ink: rgba(255, 255, 255, 0.95);
+  --cs-ink-2: rgba(255, 255, 255, 0.58);
+  --cs-ink-3: rgba(255, 255, 255, 0.36);
+  --cs-line: rgba(255, 255, 255, 0.09);
+  --cs-line-2: rgba(255, 255, 255, 0.14);
+  --cs-veil: rgba(20, 20, 28, 0.62);
+  --cs-veil-2: rgba(255, 255, 255, 0.05);
+  --cs-veil-3: rgba(255, 255, 255, 0.09);
+  --cs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.28), 0 6px 20px -6px rgba(0, 0, 0, 0.45);
+  --cs-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.32), 0 22px 56px -18px rgba(0, 0, 0, 0.65);
+  --cs-accent: #6C5CE7;
+  --cs-accent-soft: rgba(108, 92, 231, 0.18);
+  --cs-accent-ring: rgba(108, 92, 231, 0.28);
+}
+
+[data-theme="light"] #view-jarvis {
+  --cs-ink: #1d1d1f;
+  --cs-ink-2: #6e6e73;
+  --cs-ink-3: #9a9aa0;
+  --cs-line: rgba(0, 0, 0, 0.07);
+  --cs-line-2: rgba(0, 0, 0, 0.12);
+  --cs-veil: rgba(255, 255, 255, 0.74);
+  --cs-veil-2: rgba(255, 255, 255, 0.62);
+  --cs-veil-3: rgba(0, 0, 0, 0.04);
+  --cs-shadow-1: 0 1px 2px rgba(0, 0, 0, 0.04), 0 6px 18px -6px rgba(0, 0, 0, 0.10);
+  --cs-shadow-2: 0 2px 8px rgba(0, 0, 0, 0.05), 0 22px 54px -18px rgba(0, 0, 0, 0.22);
+}
+
+/* ============================================================
+ * 1. STAGE SHELL
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis .jarvis-hero-stage {
+  background: var(--cs-veil) !important;
+  border: 1px solid var(--cs-line) !important;
+  border-radius: 26px !important;
+  box-shadow: var(--cs-shadow-1) !important;
+  backdrop-filter: blur(28px) saturate(170%);
+  -webkit-backdrop-filter: blur(28px) saturate(170%);
+}
+
+/* ============================================================
+ * 2. HEADER -> floating, quiet, right-aligned control cluster
+ *    The strip itself is click-through so it never steals a click
+ *    from the orb behind it; only the actual controls take events.
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis .jarvis-hero-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 6;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 14px 16px !important;
+  border-bottom: 0 !important;
+  background: none !important;
+  pointer-events: none;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-hero-header > * {
+  pointer-events: auto;
+}
+
+/* State reads as a dot + label, not a chip. */
+.clavis-stage-v2 #view-jarvis .jarvis-status-pill {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 7px;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  padding: 4px 2px !important;
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.005em;
+  white-space: nowrap;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-status-pill::before {
+  content: '';
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 9px currentColor;
+  transition: transform var(--cs-t2) var(--cs-spring);
+}
+.clavis-stage-v2[data-clavis-state="listening"] #view-jarvis .jarvis-status-pill::before,
+.clavis-stage-v2[data-clavis-state="thinking"] #view-jarvis .jarvis-status-pill::before {
+  animation: csDotPulse 1.7s ease-in-out infinite;
+}
+@keyframes csDotPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.45); opacity: 0.65; }
+}
+
+.clavis-stage-v2 #view-jarvis .clavis-live-mic-status {
+  margin-right: auto;
+  font-size: 11.5px !important;
+  color: var(--cs-ink-3) !important;
+  letter-spacing: 0.005em;
+  max-width: 30%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.clavis-stage-v2 #view-jarvis .jarvis-hero-actions {
+  gap: 6px !important;
+}
+
+/* Squircle icon buttons with a real press response. */
+.clavis-stage-v2 #view-jarvis .jarvis-icon-pill,
+.clavis-stage-v2 #view-jarvis .jarvis-newchat-pill {
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+  padding: 0 !important;
+  border-radius: 11px !important;
+  border: 1px solid var(--cs-line) !important;
+  background: var(--cs-veil-2) !important;
+  color: var(--cs-ink-2) !important;
+  box-shadow: none !important;
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  transition:
+    transform 300ms var(--cs-spring),
+    background-color 300ms var(--cs-glide),
+    border-color 300ms var(--cs-glide),
+    color 220ms ease,
+    box-shadow 300ms var(--cs-glide) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-icon-pill:hover,
+.clavis-stage-v2 #view-jarvis .jarvis-newchat-pill:hover {
+  transform: translateY(-1.5px);
+  color: var(--cs-ink) !important;
+  background: var(--cs-veil-3) !important;
+  border-color: var(--cs-line-2) !important;
+  box-shadow: var(--cs-shadow-1) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-icon-pill:active,
+.clavis-stage-v2 #view-jarvis .jarvis-newchat-pill:active {
+  transform: translateY(0) scale(0.93);
+  transition-duration: 90ms !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-icon-pill[aria-pressed="true"] {
+  background: var(--cs-accent-soft) !important;
+  border-color: var(--cs-accent-ring) !important;
+  color: var(--cs-accent) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-actions-sep {
+  width: 1px;
+  height: 18px;
+  margin: 0 3px;
+  background: var(--cs-line-2);
+  border-radius: 1px;
+}
+
+/* One consistent, visible focus ring everywhere on this page. */
+.clavis-stage-v2 #view-jarvis button:focus-visible,
+.clavis-stage-v2 #view-jarvis textarea:focus-visible,
+.clavis-stage-v2 #view-jarvis select:focus-visible,
+.clavis-stage-v2 #view-jarvis [tabindex]:focus-visible {
+  outline: 2px solid var(--cs-accent) !important;
+  outline-offset: 2px !important;
+}
+
+/* The More panel picks up the same material as the HUD. */
+.clavis-stage-v2 #view-jarvis .jarvis-more-panel {
+  border-radius: 16px !important;
+  border: 1px solid var(--cs-line) !important;
+  background: var(--cs-veil) !important;
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: var(--cs-shadow-2) !important;
+  padding: 6px !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-more-item {
+  border-radius: 10px !important;
+  font-size: 13px !important;
+  gap: 10px !important;
+  padding: 9px 10px !important;
+  color: var(--cs-ink-2) !important;
+  transition: background-color 180ms var(--cs-glide), color 180ms ease !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-more-item:hover {
+  background: var(--cs-veil-3) !important;
+  color: var(--cs-ink) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-more-item[aria-pressed="true"] {
+  color: var(--cs-accent) !important;
+}
+
+/* ============================================================
+ * 3. THE ORB — the page's centre of gravity
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis .jarvis-center-orb-wrapper {
+  flex: 1 1 auto;
+  justify-content: center;
+  padding: 84px 24px 8px !important;
+  gap: 0;
+}
+
+.clavis-stage-v2 #view-jarvis #orb-container {
+  width: 172px !important;
+  height: 172px !important;
+  animation: csOrbBreathe 7.5s ease-in-out infinite;
+  transition: transform var(--cs-t3) var(--cs-spring);
+}
+.clavis-stage-v2 #view-jarvis #orb-container:hover {
+  transform: scale(1.035);
+}
+
+/* Ambient halo whose colour tracks the assistant's state. */
+.clavis-stage-v2 #view-jarvis #orb-container::before {
+  content: '';
+  position: absolute;
+  inset: -38%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(circle, var(--cs-halo, rgba(108, 92, 231, 0.34)) 0%, transparent 68%);
+  filter: blur(20px);
+  opacity: 0.5;
+  transition: opacity var(--cs-t3) ease, background var(--cs-t3) ease;
+  animation: csHalo 7.5s ease-in-out infinite;
+}
+.clavis-stage-v2[data-clavis-state="listening"] #view-jarvis #orb-container::before {
+  --cs-halo: rgba(0, 210, 255, 0.40);
+  opacity: 0.9;
+}
+.clavis-stage-v2[data-clavis-state="thinking"] #view-jarvis #orb-container::before {
+  --cs-halo: rgba(108, 92, 231, 0.46);
+  opacity: 0.95;
+}
+.clavis-stage-v2[data-clavis-state="speaking"] #view-jarvis #orb-container::before {
+  --cs-halo: rgba(34, 211, 166, 0.38);
+  opacity: 0.9;
+}
+.clavis-stage-v2[data-clavis-state="error"] #view-jarvis #orb-container::before {
+  --cs-halo: rgba(255, 82, 82, 0.40);
+  opacity: 0.9;
+}
+
+@keyframes csOrbBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.028); }
+}
+@keyframes csHalo {
+  0%, 100% { opacity: 0.46; }
+  50% { opacity: 0.76; }
+}
+
+/* ============================================================
+ * 4. TYPOGRAPHY — a real scale instead of default sizes
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis .jarvis-greeting {
+  font-size: clamp(30px, 3.1vw, 42px) !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.034em !important;
+  line-height: 1.06 !important;
+  color: var(--cs-ink) !important;
+  margin: 30px 0 12px !important;
+}
+
+.clavis-stage-v2 #view-jarvis .clavis-feature-tip-pill {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px !important;
+  color: var(--cs-ink-3) !important;
+  background: none !important;
+  border: 1px solid var(--cs-line) !important;
+  border-radius: 999px !important;
+  padding: 6px 13px !important;
+  box-shadow: none !important;
+  cursor: pointer;
+  transition: color 220ms ease, border-color 260ms var(--cs-glide), transform 260ms var(--cs-spring);
+}
+.clavis-stage-v2 #view-jarvis .clavis-feature-tip-pill:hover {
+  color: var(--cs-ink-2) !important;
+  border-color: var(--cs-line-2) !important;
+  transform: translateY(-1px);
+}
+
+/* ============================================================
+ * 5. PRIMARY VOICE ACTION
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis .jarvis-hero-controls {
+  margin-top: 22px;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-voice-main-btn {
+  height: 46px !important;
+  padding: 0 22px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  font-size: 14.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: -0.008em !important;
+  color: #fff !important;
+  background: linear-gradient(135deg, #6C5CE7 0%, #8B7CF0 100%) !important;
+  box-shadow: 0 1px 2px rgba(70, 56, 175, 0.30), 0 12px 28px -10px rgba(108, 92, 231, 0.62) !important;
+  display: inline-flex !important;
+  align-items: center;
+  gap: 9px;
+  position: relative;
+  transition:
+    transform 320ms var(--cs-spring),
+    box-shadow 320ms var(--cs-glide),
+    filter 200ms ease !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-voice-main-btn:hover {
+  transform: translateY(-1.5px);
+  filter: brightness(1.05);
+  box-shadow: 0 2px 4px rgba(70, 56, 175, 0.32), 0 18px 38px -12px rgba(108, 92, 231, 0.72) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-voice-main-btn:active {
+  transform: translateY(0) scale(0.97);
+  transition-duration: 100ms !important;
+}
+/* A slow ring breathing out of the button while Clavis is listening. */
+.clavis-stage-v2[data-clavis-state="listening"] #view-jarvis .jarvis-voice-main-btn::after {
+  content: '';
+  position: absolute;
+  inset: -3px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(108, 92, 231, 0.55);
+  animation: csListenRing 2.4s var(--cs-glide) infinite;
+  pointer-events: none;
+}
+@keyframes csListenRing {
+  0% { transform: scale(1); opacity: 0.75; }
+  100% { transform: scale(1.22); opacity: 0; }
+}
+
+/* ============================================================
+ * 6. CLAVIS TAB CHAT REMOVAL — Voice/Neural Stage Only
+ * All interaction & output happens via the Floating Window
+ * (#clavis-task-surface). The Orb stays prominent and full-sized.
+ * ============================================================ */
+
+#view-jarvis #jarvis-chat-scroll,
+.clavis-stage-v2 #view-jarvis #jarvis-chat-scroll {
+  display: none !important;
+}
+
+#view-jarvis .jarvis-center-orb-wrapper,
+.clavis-stage-v2 #view-jarvis .jarvis-center-orb-wrapper {
+  flex: 1 1 auto !important;
+  justify-content: center !important;
+  padding: 64px 24px 12px !important;
+}
+
+#view-jarvis #orb-container,
+.clavis-stage-v2 #view-jarvis #orb-container {
+  width: 172px !important;
+  height: 172px !important;
+}
+
+#view-jarvis .jarvis-greeting,
+.clavis-stage-v2 #view-jarvis .jarvis-greeting {
+  font-size: clamp(28px, 3vw, 40px) !important;
+  margin: 24px 0 10px !important;
+}
+
+/* ============================================================
+ * 7. COMPOSER — secondary, floating, calm
+ * ============================================================ */
+
+.clavis-stage-v2 #view-jarvis .jarvis-input-container {
+  width: calc(100% - 44px) !important;
+  max-width: 720px !important;
+  margin: 0 auto 20px !important;
+  border-radius: 24px !important;
+  border: 1px solid var(--cs-line) !important;
+  background: var(--cs-veil) !important;
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
+  box-shadow: var(--cs-shadow-1) !important;
+  transition:
+    box-shadow var(--cs-t2) var(--cs-glide),
+    border-color var(--cs-t2) var(--cs-glide),
+    transform var(--cs-t2) var(--cs-spring) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-input-container:focus-within {
+  border-color: var(--cs-accent-ring) !important;
+  box-shadow: var(--cs-shadow-2), 0 0 0 4px rgba(108, 92, 231, 0.10) !important;
+  transform: translateY(-1px);
+}
+.clavis-stage-v2 #view-jarvis #jarvis-input {
+  font-size: 15px !important;
+  line-height: 1.5 !important;
+  letter-spacing: -0.006em !important;
+  color: var(--cs-ink) !important;
+}
+.clavis-stage-v2 #view-jarvis #jarvis-input::placeholder {
+  color: var(--cs-ink-3) !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-btn {
+  border-radius: 10px !important;
+  color: var(--cs-ink-2) !important;
+  transition:
+    transform 260ms var(--cs-spring),
+    background-color 220ms var(--cs-glide),
+    color 200ms ease !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-btn:hover {
+  color: var(--cs-ink) !important;
+  background: var(--cs-veil-3) !important;
+  transform: translateY(-1px);
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-btn:active {
+  transform: scale(0.92);
+  transition-duration: 90ms !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-up-btn {
+  border-radius: 50% !important;
+  transition: transform 280ms var(--cs-spring), filter 200ms ease !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-up-btn:hover {
+  transform: translateY(-1.5px) scale(1.04);
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-up-btn:active {
+  transform: scale(0.94);
+  transition-duration: 90ms !important;
+}
+.clavis-stage-v2 #view-jarvis .jarvis-composer-dropdown {
+  border-radius: 16px !important;
+  border: 1px solid var(--cs-line) !important;
+  background: var(--cs-veil) !important;
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  box-shadow: var(--cs-shadow-2) !important;
+}
+
+/* ============================================================
+ * 8. ENTRANCE — the stage settles in when you open the tab
+ * ============================================================ */
+
+/* The orb fades in rather than rising: csRise also animates transform,
+   and its `both` fill would hold transform:none forever, permanently
+   freezing the breathing animation underneath it. */
+.clavis-stage-v2 #view-jarvis.active .jarvis-center-orb-wrapper > #orb-container {
+  animation: csOrbBreathe 7.5s ease-in-out infinite, csFade 780ms var(--cs-glide) both;
+}
+.clavis-stage-v2 #view-jarvis.active #jarvis-welcome {
+  animation: csRise 720ms var(--cs-spring) both;
+  animation-delay: 90ms;
+}
+.clavis-stage-v2 #view-jarvis.active .jarvis-hero-controls {
+  animation: csRise 720ms var(--cs-spring) both;
+  animation-delay: 160ms;
+}
+.clavis-stage-v2 #view-jarvis.active .jarvis-input-container {
+  animation: csRise 760ms var(--cs-spring) both;
+  animation-delay: 220ms;
+}
+.clavis-stage-v2 #view-jarvis.active .jarvis-hero-header {
+  animation: csFade 700ms var(--cs-glide) both;
+  animation-delay: 280ms;
+}
+@keyframes csRise {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes csFade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ============================================================
+ * 9. NARROW WINDOWS
+ * ============================================================ */
+
+@media (max-width: 900px) {
+  .clavis-stage-v2 #view-jarvis #orb-container {
+    width: 132px !important;
+    height: 132px !important;
+  }
+  .clavis-stage-v2 #view-jarvis .jarvis-center-orb-wrapper {
+    padding: 74px 16px 8px !important;
+  }
+  .clavis-stage-v2 #view-jarvis .clavis-live-mic-status {
+    display: none !important;
+  }
+  .clavis-stage-v2 #view-jarvis .jarvis-status-pill {
+    margin-right: auto;
+  }
+  .clavis-stage-v2 #view-jarvis .jarvis-input-container {
+    width: calc(100% - 24px) !important;
+  }
+}
+
+/* ============================================================
+ * 10. REDUCED MOTION — keep the design, drop the movement
+ * ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  .clavis-stage-v2 #view-jarvis #orb-container,
+  .clavis-stage-v2 #view-jarvis #orb-container::before,
+  .clavis-stage-v2 #view-jarvis .jarvis-status-pill::before,
+  .clavis-stage-v2 #view-jarvis .jarvis-voice-main-btn::after,
+  .clavis-stage-v2 #view-jarvis.active .jarvis-center-orb-wrapper > #orb-container,
+  .clavis-stage-v2 #view-jarvis.active #jarvis-welcome,
+  .clavis-stage-v2 #view-jarvis.active .jarvis-hero-controls,
+  .clavis-stage-v2 #view-jarvis.active .jarvis-input-container,
+  .clavis-stage-v2 #view-jarvis.active .jarvis-hero-header {
+    animation: none !important;
+  }
+  .clavis-stage-v2 #view-jarvis * {
+    transition-duration: 1ms !important;
+  }
+}

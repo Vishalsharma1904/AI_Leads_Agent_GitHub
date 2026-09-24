@@ -1,0 +1,295 @@
+/* ============================================================
+   clavis-composer-iq.css
+   ------------------------------------------------------------
+   Styling for clavis-composer-iq.js (Ghost completion + the
+   attachment tray). This file was never wired up, which is why
+   the mirror element, the "Tab · accept" hint and the tray header
+   were rendering unstyled and stacking on top of the real text —
+   the "overlap" in the composer. Loaded last, after
+   composer-overhaul.css, so it always wins.
+   ============================================================ */
+
+/* ── A · Ghost completion mirror ─────────────────────────────
+   The mirror sits exactly on top of the textarea. Until the JS
+   syncs real metrics onto it, it is 0×0 and clipped, so it can
+   never show a stray duplicate line. The typed text is painted
+   fully transparent — it only reserves space so the ghost text
+   lands after the real caret, never on top of it. */
+.ciq-mirror {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 0;
+  height: 0;
+  margin: 0;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  z-index: 6;
+  --ciq-ink: currentColor;
+}
+
+.ciq-mirror .ciq-typed {
+  color: transparent;
+}
+
+.ciq-mirror .ciq-ghost {
+  color: rgba(17, 17, 17, 0.38);
+  opacity: 0;
+  transition: color 380ms ease, opacity 160ms ease;
+}
+
+.ciq-mirror.is-live .ciq-ghost {
+  opacity: 1;
+}
+
+/* Tab: the grey catches up to the real ink colour while the real
+   textarea's own glyphs are muted underneath, so the switch reads
+   as one piece of text changing colour, not two stacked copies. */
+.ciq-mirror.is-accepting .ciq-ghost {
+  color: var(--ciq-ink, rgba(17, 17, 17, 0.92));
+  opacity: 1;
+}
+
+html[data-theme="dark"] .ciq-mirror .ciq-ghost {
+  color: rgba(236, 234, 228, 0.42);
+}
+
+html[data-theme="dark"] .ciq-mirror.is-accepting .ciq-ghost {
+  color: var(--ciq-ink, rgba(236, 234, 228, 0.95));
+}
+
+/* The textarea itself, for the ~430ms the mirror is repainting the
+   accepted text. Without this the real caret + real glyphs paint
+   right through the mirror at the same spot — the double-print. */
+.ciq-input-muted {
+  color: transparent !important;
+  caret-color: transparent !important;
+}
+
+/* ── Tab-to-accept hint ───────────────────────────────────── */
+.ciq-tab-hint {
+  position: absolute;
+  /* Sit just INSIDE the composer's top-right corner. It used to be at
+     top:-9px — poking outside the shell — where any scroll/overflow
+     ancestor above the composer clipped it, so it read as "hidden behind
+     the composer". Inside the box it is always fully visible, including
+     when the composer sits at the very bottom of the viewport. */
+  top: 8px;
+  right: 12px;
+  display: none;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 9px 3px 6px;
+  border-radius: 999px;
+  pointer-events: none;
+  user-select: none;
+  z-index: 40;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Figtree", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--au-mute, #6b6b6b);
+  background: rgba(255, 255, 255, 0.92);
+  border: 0.5px solid rgba(0, 0, 0, 0.08);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  opacity: 0;
+  transform: translateY(3px);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.ciq-tab-hint.is-live {
+  display: inline-flex;
+  opacity: 1;
+  transform: none;
+}
+
+.ciq-tab-hint kbd {
+  font-family: inherit;
+  font-size: 9.5px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: rgba(0, 0, 0, 0.08);
+  color: inherit;
+}
+
+html[data-theme="dark"] .ciq-tab-hint {
+  color: var(--au-mute, #b9b6ae);
+  background: rgba(30, 30, 34, 0.92);
+  border-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
+
+html[data-theme="dark"] .ciq-tab-hint kbd {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ── B · Attachment tray ─────────────────────────────────────
+   Wraps the existing attachment dock in a small labelled panel
+   instead of it just floating above the text. */
+.ciq-tray {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 8px 0;
+}
+
+.ciq-tray.has-items {
+  display: flex;
+}
+
+.ciq-tray-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 2px;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Figtree", sans-serif;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--au-mute, #827E76);
+}
+
+.ciq-tray-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+
+.ciq-tray-count {
+  flex: 1 1 auto;
+}
+
+.ciq-tray-clear {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: none;
+  letter-spacing: 0;
+  color: inherit;
+  opacity: 0.65;
+  padding: 2px 8px;
+  border-radius: 999px;
+  transition: opacity 140ms ease, background-color 140ms ease, color 140ms ease;
+}
+
+.ciq-tray-clear:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+  color: #007AFF;
+}
+
+html[data-theme="dark"] .ciq-tray-head {
+  color: var(--au-mute, #A6A199);
+}
+
+html[data-theme="dark"] .ciq-tray-clear:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #0A84FF;
+}
+
+#clavis-composer-attachment-dock.is-dense {
+  gap: 4px;
+}
+
+#clavis-composer-attachment-dock .clavis-att-card {
+  animation: ciq-card-in 220ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation-delay: calc(var(--ciq-i, 0) * 35ms);
+}
+
+@keyframes ciq-card-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/* A pasted screenshot should feel caught, not just appended. */
+.jarvis-luxury-composer.ciq-caught,
+.jarvis-input-container.ciq-caught,
+.cts-composer.ciq-caught {
+  animation: ciq-caught-pulse 700ms ease;
+}
+
+@keyframes ciq-caught-pulse {
+  0%   { box-shadow: 0 0 0 0 rgba(0, 122, 255, 0.35); }
+  30%  { box-shadow: 0 0 0 4px rgba(0, 122, 255, 0.18); }
+  100% { box-shadow: 0 0 0 0 rgba(0, 122, 255, 0); }
+}
+
+html[data-theme="dark"] .jarvis-luxury-composer.ciq-caught,
+html[data-theme="dark"] .jarvis-input-container.ciq-caught,
+html[data-theme="dark"] .cts-composer.ciq-caught {
+  animation-name: ciq-caught-pulse-dark;
+}
+
+@keyframes ciq-caught-pulse-dark {
+  0%   { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0.40); }
+  30%  { box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.22); }
+  100% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0); }
+}
+/* ── Clavis smoothness pass (2026-09-23) ─────────────────────
+   Keep the character of the orb, but remove the layout/paint churn that was
+   making an already-hidden task surface and notification rail participate in
+   every frame. These rules are last in the Clavis cascade on purpose. */
+html body #clavis-task-surface:not(.is-open) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+html body #desktop-notification-container:empty {
+  display: none !important;
+}
+
+html body #desktop-notification-container {
+  contain: layout paint style;
+}
+
+/* The current orb is 120px with a 1.08 scale transform. A restrained 0.94
+   scale brings it back to roughly 113px without removing its presence. */
+html body #view-jarvis #orb-container {
+  transform: scale(0.94) !important;
+  transform-origin: center center !important;
+}
+
+/* Readable rail controls: 17px source icons were visually disappearing at
+   the 64px collapsed width. */
+html body #sidebar .nav-item svg,
+html body #sidebar .nav-item .icon-sm {
+  width: 20px !important;
+  height: 20px !important;
+}
+
+html body #sidebar .nav-item {
+  min-height: 38px !important;
+}
+
+/* Keep cursor/sidebar atmosphere quiet while preserving state animations. */
+html body #lx-cursor-glow,
+html body #pfx-cursor-glow {
+  display: none !important;
+}
+html {
+  --lx-glow: 0.55 !important;
+}
+
+/* Retry is a calm recovery action, not a destructive red alert. */
+html body .cts .cts-act[data-action-id="retry"] {
+  background: #c6aa68 !important;
+  border-color: #b39553 !important;
+  color: #2e2618 !important;
+  box-shadow: 0 4px 12px rgba(135, 104, 35, 0.18) !important;
+}
+html body .cts .cts-act[data-action-id="retry"]:hover {
+  background: #b99a55 !important;
+  border-color: #a68745 !important;
+}

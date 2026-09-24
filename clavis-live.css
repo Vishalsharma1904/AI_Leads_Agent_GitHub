@@ -1,0 +1,153 @@
+/* clavis-live.css — the floating voice bar for Clavis Live.
+   Quiet by design: one glass pill, one breathing orb, one caption line.
+   Motion is slow and eased (no bounce), and honours reduced-motion. */
+
+:root {
+  --clh-bg: rgba(22, 22, 20, 0.78);
+  --clh-border: rgba(255, 255, 255, 0.08);
+  --clh-text: #f3f1ea;
+  --clh-muted: rgba(243, 241, 234, 0.56);
+  --clh-olive: #4f583b;
+  --clh-olive-hi: #8e9a6a;
+  --clh-shadow: 0 18px 48px -18px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.18);
+  --clh-ease: cubic-bezier(0.16, 1, 0.3, 1);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --clh-bg: rgba(250, 249, 245, 0.82);
+    --clh-border: rgba(20, 20, 18, 0.08);
+    --clh-text: #1f1e1b;
+    --clh-muted: rgba(31, 30, 27, 0.55);
+    --clh-shadow: 0 18px 48px -20px rgba(40, 38, 30, 0.35), 0 1px 3px rgba(40, 38, 30, 0.1);
+  }
+}
+:root[data-theme="dark"] {
+  --clh-bg: rgba(22, 22, 20, 0.78);
+  --clh-border: rgba(255, 255, 255, 0.08);
+  --clh-text: #f3f1ea;
+  --clh-muted: rgba(243, 241, 234, 0.56);
+}
+
+.clh {
+  --lvl: 0;
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 2147483000;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(560px, calc(100vw - 32px));
+  padding: 8px 8px 8px 12px;
+  border-radius: 999px;
+  background: var(--clh-bg);
+  border: 1px solid var(--clh-border);
+  box-shadow: var(--clh-shadow);
+  color: var(--clh-text);
+  font: 500 13px/1.35 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, system-ui, sans-serif;
+  -webkit-backdrop-filter: blur(22px) saturate(1.4);
+  backdrop-filter: blur(22px) saturate(1.4);
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 18px) scale(0.98);
+  transition: opacity 0.6s var(--clh-ease), transform 0.7s var(--clh-ease);
+}
+.clh.is-in {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(-50%, 0) scale(1);
+}
+
+/* the orb: breathes when idle, follows the real voice level when talking */
+.clh-orb {
+  position: relative;
+  flex: 0 0 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+}
+.clh-orb span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #d8e0bd 0%, var(--clh-olive-hi) 38%, var(--clh-olive) 100%);
+  box-shadow: 0 0 0 calc(2px + var(--lvl) * 9px) rgba(142, 154, 106, calc(0.12 + var(--lvl) * 0.18));
+  transform: scale(calc(1 + var(--lvl) * 0.32));
+  transition: transform 0.12s linear, box-shadow 0.12s linear, filter 0.6s var(--clh-ease);
+}
+.clh[data-state="connecting"] .clh-orb span,
+.clh[data-state="reconnecting"] .clh-orb span,
+.clh[data-state="thinking"] .clh-orb span {
+  animation: clh-breathe 2.4s var(--clh-ease) infinite;
+}
+.clh[data-state="speaking"] .clh-orb span { filter: saturate(1.25) brightness(1.08); }
+@keyframes clh-breathe {
+  0%, 100% { transform: scale(0.86); opacity: 0.75; }
+  50% { transform: scale(1.08); opacity: 1; }
+}
+
+.clh-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+.clh-state {
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--clh-muted);
+  transition: color 0.5s var(--clh-ease);
+}
+.clh[data-state="speaking"] .clh-state { color: var(--clh-olive-hi); }
+.clh-caption {
+  min-height: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--clh-text);
+  opacity: 0.92;
+  transition: opacity 0.45s var(--clh-ease);
+}
+.clh-caption:empty { opacity: 0; }
+.clh-caption[data-who="user"] { color: var(--clh-muted); font-style: italic; }
+
+.clh-btn {
+  flex: 0 0 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--clh-muted);
+  cursor: pointer;
+  transition: background 0.35s var(--clh-ease), color 0.35s var(--clh-ease), transform 0.35s var(--clh-ease);
+}
+.clh-btn svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.clh-btn:hover { background: rgba(127, 127, 120, 0.14); color: var(--clh-text); }
+.clh-btn:active { transform: scale(0.94); }
+.clh-btn:focus-visible { outline: 2px solid var(--clh-olive-hi); outline-offset: 2px; }
+.clh-btn.is-on { background: var(--clh-olive); color: #f3f1ea; }
+.clh-btn[data-act="mute"].is-on { background: rgba(190, 70, 60, 0.9); }
+.clh-end:hover { background: rgba(190, 70, 60, 0.16); color: #d9695c; }
+
+.clh-cut { opacity: 0.5; font-size: 0.9em; }
+
+@media (max-width: 480px) {
+  .clh { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); gap: 6px; }
+  .clh-btn { flex-basis: 32px; height: 32px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .clh, .clh-orb span, .clh-caption, .clh-btn { transition: none; }
+  .clh[data-state] .clh-orb span { animation: none; }
+}

@@ -1,0 +1,631 @@
+/*
+  ================================================================
+  NEXUS AI — macOS Sequoia 15 Authentic Design System
+  ================================================================
+  Philosophy:
+  - Sidebar: NO backdrop-filter (always visible = FPS killer on i3)
+    Instead: rich opaque dark surface with inner glow border
+  - Modals/Settings: backdrop-filter blur IS used (only when shown)
+    This is how Apple does it too — panels only blur when open
+  - Light Physics: Real CSS radial gradient that follows cursor
+  - Sounds: Web Audio synthesized, 3 distinct profiles
+  ================================================================
+*/
+
+/* ══════════════════════════════════════════════════════════════
+   1. BASE — GPU COMPOSITE LAYER
+══════════════════════════════════════════════════════════════ */
+html, body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  font-feature-settings: "kern" 1, "liga" 1, "calt" 1;
+}
+
+.app-shell, .sidebar, .main-content, .views-container {
+  transform: translateZ(0);
+  backface-visibility: hidden;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   2. COLOUR TOKENS — macOS Sequoia palette
+══════════════════════════════════════════════════════════════ */
+:root {
+  /* Sequoia Blue */
+  --macos-blue: #007AFF;
+  --macos-blue-hover: #0063CF;
+  --macos-blue-active: rgba(0,122,255,0.18);
+  --macos-blue-glow: rgba(0,122,255,0.35);
+
+  /* macOS easing curves — critically damped (Apple HIG standard, 0% cartoon overshoot) */
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-inout: cubic-bezier(0.65, 0, 0.35, 1);
+}
+
+html[data-theme="dark"] {
+  /* Sidebar — NOT glass, pure dark Obsidian like macOS Sonoma sidebar */
+  --sb-bg: #1c1c1e;
+  --sb-border: rgba(255,255,255,0.08);
+  --sb-nav-hover: rgba(255,255,255,0.07);
+  --sb-nav-active-bg: rgba(0,122,255,0.18);
+  --sb-nav-active-fg: #409CFF;
+  --sb-text: rgba(255,255,255,0.55);
+  --sb-text-active: rgba(255,255,255,0.92);
+  --sb-label: rgba(255,255,255,0.28);
+
+  /* Glass — for settings panel & modals ONLY (shown temporarily) */
+  --glass-bg: rgba(28, 28, 30, 0.75);
+  --glass-border: rgba(255,255,255,0.12);
+  --glass-blur: blur(16px) saturate(180%);
+  --glass-shadow:
+    0 0 0 0.5px rgba(255,255,255,0.06) inset,
+    0 24px 80px rgba(0,0,0,0.55),
+    0 8px 24px rgba(0,0,0,0.3);
+
+  /* Main content */
+  --main-bg: #0f0f11;
+  --card-bg: rgba(28,28,30,0.85);
+  --card-border: rgba(255,255,255,0.08);
+
+  /* Text */
+  --t1: rgba(255,255,255,0.92);
+  --t2: rgba(255,255,255,0.60);
+  --t3: rgba(255,255,255,0.32);
+  --sep: rgba(255,255,255,0.07);
+
+  /* Input */
+  --input-bg: rgba(44,44,46,0.9);
+  --input-border: rgba(255,255,255,0.12);
+}
+
+html[data-theme="light"] {
+  --sb-bg: #f6f7fb;
+  --sb-border: rgba(0,0,0,0.08);
+  --sb-nav-hover: rgba(0,0,0,0.05);
+  --sb-nav-active-bg: rgba(99,102,241,0.12);
+  --sb-nav-active-fg: #4338ca;
+  --sb-text: #334155;
+  --sb-text-active: #0f172a;
+  --sb-label: #64748b;
+
+  --glass-bg: rgba(242,242,247,0.72);
+  --glass-border: rgba(0,0,0,0.10);
+  --glass-blur: blur(16px) saturate(200%);
+  --glass-shadow:
+    0 0 0 0.5px rgba(0,0,0,0.06) inset,
+    0 24px 80px rgba(0,0,0,0.14),
+    0 8px 24px rgba(0,0,0,0.08);
+
+  --main-bg: #f5f5f7;
+  --card-bg: rgba(255,255,255,0.9);
+  --card-border: rgba(0,0,0,0.08);
+
+  --t1: rgba(0,0,0,0.88);
+  --t2: rgba(0,0,0,0.55);
+  --t3: rgba(0,0,0,0.32);
+  --sep: rgba(0,0,0,0.07);
+
+  --input-bg: rgba(255,255,255,0.85);
+  --input-border: rgba(0,0,0,0.12);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   3. SIDEBAR — macOS Finder-style opaque surface
+══════════════════════════════════════════════════════════════ */
+#sidebar.sidebar, .sidebar {
+  background: var(--sb-bg) !important;
+  border-right: 0.5px solid var(--sb-border) !important;
+  box-shadow: 1px 0 0 var(--sep), inset -1px 0 0 rgba(255,255,255,0.03) !important;
+  border-radius: 0 !important;
+  overflow: hidden !important;
+  position: fixed !important;
+  left: 0 !important;
+  top: 0 !important;
+  height: 100vh !important;
+  z-index: 999 !important;
+  display: flex !important;
+  flex-direction: column !important;
+  /* GPU composited — NO backdrop-filter (too expensive always-on) */
+  transform: translateZ(0) !important;
+  /* Paint containment — sidebar changes don't trigger full-page repaints */
+  contain: layout style !important;
+}
+
+/* Sidebar nav container scroll */
+.sidebar .sidebar-nav, #sidebar-nav-scroll {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 6px 8px !important;
+  scroll-behavior: auto !important;
+  scrollbar-width: none !important;
+}
+.sidebar .sidebar-nav::-webkit-scrollbar { display: none !important; }
+
+/* ── Nav section labels */
+.sidebar .nav-section-label, .nav-section-label {
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  color: var(--sb-label) !important;
+  letter-spacing: 0.1em !important;
+  text-transform: uppercase !important;
+  padding: 14px 8px 4px !important;
+  margin: 0 !important;
+  overflow: hidden !important;
+  white-space: nowrap !important;
+  text-overflow: ellipsis !important;
+}
+
+/* ── Nav items */
+.sidebar .nav-item {
+  display: flex !important;
+  align-items: center !important;
+  gap: 9px !important;
+  height: 32px !important;
+  padding: 0 9px !important;
+  border-radius: 8px !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  color: var(--sb-text) !important;
+  letter-spacing: -0.1px !important;
+  white-space: nowrap !important;
+  overflow: hidden !important;
+  text-decoration: none !important;
+  margin-bottom: 1px !important;
+  border: 1px solid transparent !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  position: relative !important;
+  /* Only transition color/bg — GPU safe */
+  transition: background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease !important;
+  transform: none !important;
+}
+
+.sidebar .nav-item span {
+  flex: 1 !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+  /* Fade out text when collapsed */
+  transition: opacity 0.15s ease, max-width 0.2s ease !important;
+}
+
+.sidebar .nav-item svg,
+.sidebar .nav-item i,
+.sidebar .nav-icon {
+  flex-shrink: 0 !important;
+  width: 16px !important;
+  height: 16px !important;
+  opacity: 0.65 !important;
+  transition: opacity 0.12s ease !important;
+}
+
+.sidebar .nav-item:hover {
+  background: var(--sb-nav-hover) !important;
+  color: var(--sb-text-active) !important;
+  border-color: var(--sep) !important;
+  transform: none !important;
+  box-shadow: none !important;
+}
+
+.sidebar .nav-item:hover svg,
+.sidebar .nav-item:hover i {
+  opacity: 0.9 !important;
+}
+
+.sidebar .nav-item.active {
+  background: var(--sb-nav-active-bg) !important;
+  color: var(--sb-nav-active-fg) !important;
+  font-weight: 600 !important;
+  border-color: rgba(0,122,255,0.2) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.sidebar .nav-item.active svg,
+.sidebar .nav-item.active i {
+  opacity: 1 !important;
+}
+
+/* ── Sidebar COLLAPSED state — icon only, centered */
+#sidebar.sidebar.collapsed, .sidebar.collapsed {
+  width: 60px !important;
+  min-width: 60px !important;
+}
+
+.sidebar.collapsed .nav-item {
+  width: 40px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  margin: 1px auto !important;
+  border-radius: 10px !important;
+  gap: 0 !important;
+}
+
+/* Hide text labels, section titles, badges in collapsed mode */
+.sidebar.collapsed .nav-item span,
+.sidebar.collapsed .nav-item .nav-label,
+.sidebar.collapsed .logo-text,
+.sidebar.collapsed .nav-badge-pill,
+.sidebar.collapsed .chevron-arrow,
+.sidebar.collapsed .nav-sub-items {
+  display: none !important;
+}
+
+/* Keep nav section labels as spacers only */
+.sidebar.collapsed .nav-section-label {
+  height: 8px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  font-size: 0 !important;
+  min-height: 0 !important;
+}
+
+.sidebar.collapsed .nav-item svg,
+.sidebar.collapsed .nav-item i {
+  margin: 0 auto !important;
+  flex-shrink: 0 !important;
+}
+
+/* In collapsed mode, show traffic lights stacked vertically at top-center */
+.sidebar.collapsed .sidebar-header {
+  padding: 10px 0 8px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 6px !important;
+}
+
+/* Traffic lights remain visible in collapsed state — just centered */
+.sidebar.collapsed .mac-window-controls {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  gap: 5px !important;
+  margin: 0 !important;
+}
+
+.sidebar.collapsed .sidebar-brand-row {
+  display: flex !important;
+  justify-content: center !important;
+}
+
+.sidebar.collapsed .logo-mark {
+  margin: 0 auto !important;
+}
+
+/* Sidebar header */
+.sidebar-header, .sidebar .sidebar-header {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 8px !important;
+  padding: 14px 12px 10px !important;
+  border-bottom: 0.5px solid var(--sep) !important;
+  flex-shrink: 0 !important;
+  background: transparent !important;
+}
+
+/* ── Window traffic lights (macOS Sequoia physical spec) */
+.mac-dot, .mac-traffic-light {
+  width: 12px !important;
+  height: 12px !important;
+  border-radius: 50% !important;
+  box-shadow: inset 0 0 0 0.5px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.08) !important;
+  transition: transform 0.12s cubic-bezier(0.16, 1, 0.3, 1), filter 0.12s ease !important;
+  cursor: pointer !important;
+  flex-shrink: 0 !important;
+}
+.mac-dot:hover, .mac-traffic-light:hover { filter: brightness(1.08) !important; transform: scale(1.06) !important; }
+.mac-dot:active, .mac-traffic-light:active { transform: scale(0.92) !important; filter: brightness(0.96) !important; }
+.mac-close, .mac-traffic-light.close { background: #ff5f57 !important; }
+.mac-minimize, .mac-traffic-light.minimize { background: #ffbd2e !important; }
+.mac-maximize, .mac-traffic-light.maximize { background: #28c840 !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   4. SETTINGS PANEL — macOS Sequoia Frosted Glass
+   (backdrop-filter is OK here — it only composites when open)
+══════════════════════════════════════════════════════════════ */
+.mac-settings-overlay {
+  background: rgba(0,0,0,0.3) !important;
+  backdrop-filter: blur(4px) !important;
+  -webkit-backdrop-filter: blur(4px) !important;
+}
+
+.mac-settings-window {
+  background: var(--glass-bg) !important;
+  border: 0.5px solid var(--glass-border) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--glass-shadow) !important;
+  overflow: hidden !important;
+  position: relative !important;
+  z-index: 100 !important;
+}
+
+.mac-settings-window::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* macOS Sequoia window open animation — scale + translateY spring */
+@keyframes mac-panel-open {
+  0%   { opacity: 0; transform: scale(0.92) translateY(12px); }
+  65%  { opacity: 1; transform: scale(1.018) translateY(-3px); }
+  100% { opacity: 1; transform: scale(1) translateY(0); }
+}
+@keyframes mac-panel-close {
+  0%   { opacity: 1; transform: scale(1) translateY(0); }
+  100% { opacity: 0; transform: scale(0.94) translateY(8px); }
+}
+
+.mac-settings-overlay.active .mac-settings-window {
+  animation: mac-panel-open 0.36s var(--ease-spring) both !important;
+  transform: none !important;
+}
+.mac-settings-overlay.closing .mac-settings-window {
+  animation: mac-panel-close 0.2s ease-in both !important;
+}
+
+/* Settings rows */
+.mac-group {
+  background: rgba(255,255,255,0.04) !important;
+  border: 0.5px solid var(--sep) !important;
+  border-radius: 12px !important;
+  overflow: hidden !important;
+}
+html[data-theme="light"] .mac-group {
+  background: rgba(0,0,0,0.025) !important;
+}
+
+.mac-row {
+  border-bottom: 0.5px solid var(--sep) !important;
+  color: var(--t1) !important;
+}
+
+.mac-row.clickable {
+  transition: background-color 0.1s ease !important;
+}
+.mac-row.clickable:hover {
+  background: rgba(0,122,255,0.06) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. MAIN CONTENT
+══════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] .main-content { background: var(--main-bg) !important; }
+html[data-theme="light"] .main-content { background: var(--main-bg) !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   6. VIEW TRANSITIONS — macOS app switch
+══════════════════════════════════════════════════════════════ */
+@keyframes mac-view-in {
+  0%   { opacity: 0; transform: translateY(8px) translateZ(0); }
+  100% { opacity: 1; transform: translateY(0) translateZ(0); }
+}
+.view.active {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7. CARDS & SURFACES
+══════════════════════════════════════════════════════════════ */
+.stat-card, .glass-card {
+  background: var(--card-bg) !important;
+  border: 0.5px solid var(--card-border) !important;
+  border-radius: 14px !important;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.12), 0 1px 0 rgba(255,255,255,0.04) inset !important;
+  transform: translateZ(0) !important;
+  transition: box-shadow 0.18s ease, transform 0.18s ease !important;
+}
+.stat-card:hover, .glass-card:hover {
+  box-shadow: 0 8px 28px rgba(0,0,0,0.2), 0 1px 0 rgba(255,255,255,0.06) inset !important;
+  transform: translateY(-1px) translateZ(0) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   8. BUTTONS — macOS Sequoia system buttons
+══════════════════════════════════════════════════════════════ */
+.btn-primary {
+  background: var(--macos-blue) !important;
+  color: #fff !important;
+  border: none !important;
+  border-radius: 8px !important;
+  font-weight: 590 !important;
+  font-size: 13px !important;
+  padding: 6px 16px !important;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.2), inset 0 1px 0 rgba(255,255,255,0.22) !important;
+  transition: background 0.1s ease, transform 0.08s ease !important;
+  letter-spacing: -0.1px !important;
+}
+.btn-primary:hover {
+  background: var(--macos-blue-hover) !important;
+  transform: translateY(-0.5px) !important;
+}
+.btn-primary:active { transform: scale(0.96) !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   9. INPUTS
+══════════════════════════════════════════════════════════════ */
+input[type="text"], input[type="email"], input[type="tel"],
+input[type="password"], input[type="number"], textarea, select {
+  background: var(--input-bg) !important;
+  border: 0.5px solid var(--input-border) !important;
+  border-radius: 8px !important;
+  color: var(--t1) !important;
+  font-size: 13px !important;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.10) !important;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease !important;
+}
+input:focus, textarea:focus, select:focus {
+  border-color: var(--macos-blue) !important;
+  box-shadow: 0 0 0 3px rgba(0,122,255,0.20), inset 0 1px 2px rgba(0,0,0,0.06) !important;
+  outline: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   10. SCROLLBARS — macOS overlay style (appear on hover only)
+══════════════════════════════════════════════════════════════ */
+* {
+  scrollbar-width: thin !important;
+  scrollbar-color: transparent transparent !important;
+}
+*::-webkit-scrollbar { width: 5px !important; background: transparent !important; }
+*::-webkit-scrollbar-thumb {
+  background: rgba(128,128,128,0) !important;
+  border-radius: 100px !important;
+  /* OPTIMIZED: Removed transition that causes scroll jitter */
+  /* transition: background 0.25s ease !important; */
+}
+*::-webkit-scrollbar-track { background: transparent !important; }
+*:hover::-webkit-scrollbar-thumb { background: rgba(128,128,128,0.26) !important; }
+
+/* ══════════════════════════════════════════════════════════════
+   11. STAGGERED NAV ENTRY ANIMATION - DISABLED for Performance
+   ══════════════════════════════════════════════════════════════ */
+/* DISABLED: Staggered animations cause scroll lag/jitter
+@keyframes nav-in {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+.nav-item { animation: nav-in 0.28s var(--ease-out-expo) both !important; }
+.nav-item:nth-child(1) { animation-delay: 0.02s !important; }
+.nav-item:nth-child(2) { animation-delay: 0.05s !important; }
+.nav-item:nth-child(3) { animation-delay: 0.08s !important; }
+.nav-item:nth-child(4) { animation-delay: 0.11s !important; }
+.nav-item:nth-child(5) { animation-delay: 0.14s !important; }
+.nav-item:nth-child(6) { animation-delay: 0.17s !important; }
+.nav-item:nth-child(7) { animation-delay: 0.20s !important; }
+.nav-item:nth-child(8) { animation-delay: 0.23s !important; }
+.nav-item:nth-child(9) { animation-delay: 0.26s !important; }
+.nav-item:nth-child(10) { animation-delay: 0.29s !important; }
+*/
+
+/* ══════════════════════════════════════════════════════════════
+   12. CURSOR GLOW — DISABLED for Performance
+   These radial gradient effects cause severe GPU drain during scroll.
+   Re-enabled via JS if needed by removing the display:none override.
+   ══════════════════════════════════════════════════════════════ */
+.main-content::before,
+.stat-card::after,
+.glass-card::after,
+.sidebar .nav-item::before {
+  /* DISABLED: Cursor glow effects cause scroll lag/jitter */
+  display: none !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   13. TOAST
+══════════════════════════════════════════════════════════════ */
+.toast {
+  border-radius: 14px !important;
+  background: var(--glass-bg) !important;
+  backdrop-filter: var(--glass-blur) !important;
+  -webkit-backdrop-filter: var(--glass-blur) !important;
+  border: 0.5px solid var(--glass-border) !important;
+  box-shadow: var(--glass-shadow) !important;
+  font-size: 13px !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   14. TEXT SELECTION & FOCUS RING
+══════════════════════════════════════════════════════════════ */
+::selection { background: rgba(0,122,255,0.28) !important; }
+*:focus-visible {
+  outline: 2px solid var(--macos-blue) !important;
+  outline-offset: 2px !important;
+  border-radius: 6px !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   15. NAV BADGE
+══════════════════════════════════════════════════════════════ */
+.nav-badge-pill {
+  background: rgba(255,255,255,0.12) !important;
+  color: var(--sb-text-active) !important;
+  border-radius: 999px !important;
+  font-size: 10px !important;
+  font-weight: 700 !important;
+  padding: 1px 6px !important;
+  margin-left: auto !important;
+  flex-shrink: 0 !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   16. TOPBAR
+══════════════════════════════════════════════════════════════ */
+html[data-theme="dark"] .topbar {
+  background: rgba(15,15,17,0.85) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 0.5px solid var(--sep) !important;
+}
+html[data-theme="light"] .topbar {
+  background: rgba(246,246,248,0.88) !important;
+  backdrop-filter: blur(12px) !important;
+  -webkit-backdrop-filter: blur(12px) !important;
+  border-bottom: 0.5px solid rgba(0,0,0,0.08) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   17. DRAG RESIZE HANDLE
+══════════════════════════════════════════════════════════════ */
+.sidebar-resizer {
+  position: absolute !important;
+  right: -2px !important;
+  top: 0 !important;
+  width: 4px !important;
+  height: 100% !important;
+  cursor: col-resize !important;
+  z-index: 100 !important;
+  opacity: 0 !important;
+  transition: opacity 0.2s ease, background 0.2s ease !important;
+}
+.sidebar:hover .sidebar-resizer {
+  opacity: 1 !important;
+  background: rgba(0,122,255,0.3) !important;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   18. PERFORMANCE — Reduced Motion & Low-End Device Safety
+══════════════════════════════════════════════════════════════ */
+
+/* Smooth sidebar nav scroll without layout thrashing */
+.sidebar .sidebar-nav, #sidebar-nav-scroll {
+  -webkit-overflow-scrolling: touch !important;
+  scroll-behavior: auto !important;
+}
+
+/* Disable ALL decorative animations on reduced-motion / low-end preferences */
+@media (prefers-reduced-motion: reduce) {
+  .nav-item {
+    animation: none !important;
+  }
+  .view.active {
+    animation: none !important;
+  }
+  .mac-settings-overlay,
+  .mac-settings-window {
+    transition: opacity 100ms linear !important;
+  }
+  .stat-card, .glass-card {
+    transition: none !important;
+  }
+  .sidebar .nav-item {
+    transition: background-color 0.08s ease, color 0.08s ease !important;
+  }
+  .mac-dot, .mac-traffic-light {
+    transition: none !important;
+  }
+  /* Disable cursor glow effects */
+  .main-content::before,
+  .stat-card::after,
+  .glass-card::after,
+  .sidebar .nav-item::before {
+    display: none !important;
+  }
+}

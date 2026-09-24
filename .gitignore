@@ -1,0 +1,16 @@
+
+# Local credentials - never commit
+secrets.local.js
+backend/.env
+backend/.env.*
+!backend/.env.example
+*.db
+*.sqlite
+.superdesign
+
+# Local Python/runtime and installer output
+backend/.venv/
+backend/.venv312/
+dist/
+build/
+*.spec

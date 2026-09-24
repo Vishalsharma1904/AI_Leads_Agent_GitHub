@@ -1,0 +1,220 @@
+/* ============================================================
+   clavis-polish-fixes.css
+   Global polish: scrollbars, atomic theme, smooth animations
+   Loaded after all other CSS sheets.
+   ============================================================ */
+
+/* ── 1. ATOMIC THEME TRANSITION ──────────────────────────────
+   During lx-theme-busy ALL elements have transition:none so
+   the whole page switches simultaneously. After the wave
+   completes, transitions are re-enabled naturally. */
+html.lx-theme-busy * {
+  transition: none !important;
+  /* (animation-duration was forced to 0.01ms here too — that restarted
+     every running animation, the orb included, in the middle of the
+     theme reveal. clavis-luxe.css owns the busy rule now.) */
+}
+/* But the wave overlay itself must still animate */
+html.lx-theme-busy .lx-theme-wave {
+  transition: unset !important;
+  animation-duration: unset !important;
+}
+
+/* ── 2. GLOBAL SCROLLBARS — hover-reveal pattern ─────────────
+   Thin, auto-hidden. Parent :hover reveals. Floating window
+   reveals on its own hover. Uses a class approach for
+   performance (no :has() which restyles everything). */
+
+/* Scrollbars stay visible where content scrolls (the owner asked for
+   them); clavis-luxe.css sets the thin warm colours. */
+* {
+  scrollbar-width: thin;
+}
+
+/* Chromium: thin track, hidden thumb until parent hovered */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 200ms ease;
+}
+
+/* (Universal *:hover scrollbar rules removed: Chrome ignores
+   ::-webkit-scrollbar once scrollbar-color is set, and a *:hover selector
+   restyles the hovered chain on every pointer move.) */
+
+/* Floating task surface: scrollbar only on hover */
+.cts .cts-body {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 200ms ease;
+}
+.cts:hover .cts-body,
+.cts .cts-body:hover {
+  scrollbar-color: rgba(120, 120, 128, 0.35) transparent;
+}
+html[data-theme="dark"] .cts:hover .cts-body,
+html[data-theme="dark"] .cts .cts-body:hover {
+  scrollbar-color: rgba(255, 255, 255, 0.22) transparent;
+}
+.cts .cts-body::-webkit-scrollbar {
+  width: 4px;
+}
+.cts .cts-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.cts .cts-body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+  transition: background 200ms ease;
+}
+.cts:hover .cts-body::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.35);
+}
+html[data-theme="dark"] .cts:hover .cts-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.20);
+}
+
+/* Sidebar nav scroll: keep hidden */
+#sidebar .sidebar-nav::-webkit-scrollbar {
+  width: 0 !important;
+}
+
+/* Deep dive panel body scrollbar */
+.lx-surface .lx-body,
+#clavis-task-surface .cts-body {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+.lx-surface:hover .lx-body::-webkit-scrollbar-thumb,
+#clavis-task-surface:hover .cts-body::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.28);
+}
+
+/* ── 3. GLOBAL SMOOTH SCROLL ──────────────────────────────── */
+.cts-body,
+.lx-body,
+.mac-settings-body,
+.jarvis-messages,
+#jarvis-messages,
+.sidebar-nav,
+.page-content,
+.leads-table-wrapper {
+  scroll-behavior: smooth;
+}
+
+/* ── 4. ALL POPUPS/MODALS UNIFORM ENTRANCE ──────────────────
+   Any element that should spring in uses .au-spring-in class.
+   JS can add this class; CSS handles the animation. */
+.au-spring-in {
+  animation: au-spring-enter 300ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes au-spring-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* ── 5. SIDEBAR PILL — consolidate transition ─────────────── */
+/* Override any competing transition on the ghost highlight */
+#au-nav-ghost {
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    width 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    height 160ms cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 180ms ease !important;
+  /* Remove will-change — it was causing jitter by promoting to compositor too early */
+  will-change: auto;
+}
+
+/* The nav item icon hover spring — override conflicting rules */
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-item svg,
+html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .nav-sub-item svg {
+  transition:
+    color 140ms ease,
+    stroke 140ms ease,
+    transform 200ms cubic-bezier(0.34, 1.56, 0.64, 1) !important;
+}
+
+/* Suppress jitter from sidebar-animating class being added/removed */
+html.sidebar-animating * {
+  /* Do NOT suppress all transitions — only the layout-affecting ones */
+  will-change: auto !important;
+}
+
+/* ── 6. SETTINGS PANEL SCROLLBAR ────────────────────────────*/
+.mac-settings-body {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+  transition: scrollbar-color 200ms ease;
+}
+.mac-settings-window:hover .mac-settings-body {
+  scrollbar-color: rgba(120, 120, 128, 0.30) transparent;
+}
+html[data-theme="dark"] .mac-settings-window:hover .mac-settings-body {
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+.mac-settings-body::-webkit-scrollbar {
+  width: 5px;
+}
+.mac-settings-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.mac-settings-body::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 999px;
+}
+.mac-settings-window:hover .mac-settings-body::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.30);
+}
+html[data-theme="dark"] .mac-settings-window:hover .mac-settings-body::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── 7. LEADS TABLE / PAGE CONTENT SCROLLBARS ───────────────*/
+.leads-table-wrapper:hover::-webkit-scrollbar-thumb,
+.page-content:hover::-webkit-scrollbar-thumb {
+  background: rgba(120, 120, 128, 0.28);
+}
+html[data-theme="dark"] .leads-table-wrapper:hover::-webkit-scrollbar-thumb,
+html[data-theme="dark"] .page-content:hover::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+/* ── 8. TOOLTIP MINIMUM DISPLAY TIME ────────────────────────
+   Keep tooltip visible for at least 2.5 seconds after show.
+   CSS transition-delay on opacity removal. */
+.ap-tip {
+  /* Keep visible 2.5 seconds minimum before allowing hide */
+  transition-delay: 0ms, 0ms;
+}
+.ap-tip.ap-tip-in {
+  transition-delay: 0ms;
+}
+/* When tip is REMOVING (ap-tip-in removed), add delay before opacity goes to 0 */
+.ap-tip:not(.ap-tip-in) {
+  transition-delay: 2500ms !important;
+}
+
+/* ── 9. FLOATING WINDOW BODY NICE PADDING ───────────────────*/
+.cts.is-open .cts-body {
+  overflow-y: auto;
+}
+
+/* ── 10. THEME TOGGLE — ensure all elements switch at once ───
+    The sidebar background uses --csb-bg and --au-* which
+    are set on html[data-theme]. During lx-theme-busy, they
+    all switch at once (rule 1 above kills transitions).
+    After lx-theme-busy is removed, transitions restart
+    naturally from the new color. This is the correct flow. */

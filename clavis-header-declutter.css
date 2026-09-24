@@ -1,0 +1,62 @@
+/* ============================================================
+ * CLAVIS HEADER DECLUTTER (clavis-header-declutter.css)
+ * ------------------------------------------------------------
+ * Scoped to #view-jarvis .jarvis-hero-header only. Loaded LAST (see
+ * index.html <link> order) so it wins the cascade over the five
+ * earlier "polish" stylesheets without editing any of them blind.
+ *
+ * What changed and why:
+ *  - "New Chat" collapses to icon-only on desktop too (the font-size:0
+ *    trick was already proven for mobile in clavis-voice-polish.css;
+ *    the text label was the single widest thing in this row).
+ *  - Icon-only controls sit a little tighter together (6px -> 4px).
+ *  - The mic-status label truncates with an ellipsis instead of
+ *    forcing the row to wrap at moderate window widths.
+ *  - Hover/press easing slows from the ~120-160ms snap used elsewhere
+ *    to 220ms on Apple's own spring curve (already used for the
+ *    dropdown menus in apple-polish.css) -- smoother, not snappier.
+ * ============================================================ */
+
+html body #view-jarvis.active .jarvis-newchat-pill {
+  font-size: 0 !important;
+  width: 32px !important;
+  padding: 0 !important;
+  justify-content: center !important;
+  gap: 0 !important;
+}
+html body #view-jarvis.active .jarvis-newchat-pill svg {
+  flex-shrink: 0;
+}
+
+html body #view-jarvis.active .jarvis-hero-actions,
+html body #view-jarvis.active .jarvis-hero-actions--compact {
+  gap: 4px !important;
+}
+
+html body #view-jarvis.active .clavis-live-mic-status {
+  max-width: 32vw;
+}
+html body #view-jarvis.active #clavis-mic-live-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  max-width: 100%;
+  vertical-align: bottom;
+}
+
+html body #view-jarvis.active .jarvis-icon-pill,
+html body #view-jarvis.active .jarvis-newchat-pill {
+  transition:
+    transform 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 220ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 220ms cubic-bezier(0.16, 1, 0.3, 1) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html body #view-jarvis.active .jarvis-icon-pill,
+  html body #view-jarvis.active .jarvis-newchat-pill {
+    transition: none !important;
+  }
+}
