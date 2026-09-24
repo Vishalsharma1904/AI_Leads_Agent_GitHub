@@ -39,6 +39,14 @@
   /* Where a person actually goes to get or top up a key. This is the
      whole "refuel in a few clicks" promise — the right page, not a
      search result. */
+  // PROVIDER_INFO[*].test is a RegExp. It used to be called like a function
+  // (info.test(key)) — a TypeError that made every vault save fail.
+  function keyShapeOk(info, key) {
+    var t = info && info.test;
+    if (!t) return true;
+    return typeof t === 'function' ? !!t(key) : t.test(String(key || ''));
+  }
+
   var PROVIDER_INFO = {
     groq: {
       label: 'Groq',
@@ -233,7 +241,7 @@
       var v = String(value || '').trim();
       if (!v) return;
       var info = PROVIDER_INFO[provider];
-      if (info && info.test && !info.test(v)) return;
+      if (info && !keyShapeOk(info, v)) return;
       found.push({ provider: provider, key: v });
     }
 
@@ -370,7 +378,7 @@
     opts = opts || {};
     var info = PROVIDER_INFO[provider];
     if (!info) return Promise.reject(new Error('Unknown provider: ' + provider));
-    if (info.test && !info.test(key)) {
+    if (!keyShapeOk(info, key)) {
       return Promise.reject(new Error('That does not look like a ' + info.label + ' key (expected it to start with "' + info.prefix + '").'));
     }
 

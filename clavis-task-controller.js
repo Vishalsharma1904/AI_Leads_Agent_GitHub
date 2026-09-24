@@ -109,6 +109,9 @@
    * a bad correction never overwrites a good title with a worse one. */
   function refineTitle(id, rawText) {
     if (!global.ClavisIQ || typeof global.ClavisIQ.callModel !== 'function') return;
+    // Opt-in: an extra AI call per request only for a prettier heading used up
+    // the free daily quota that answers need (clavis_title_ai = 'true' to enable).
+    try { if (localStorage.getItem('clavis_title_ai') !== 'true') return; } catch (_) { return; }
     var text = String(rawText || '').trim();
     if (!text || text.length > 200) return;
     global.ClavisIQ.callModel([

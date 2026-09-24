@@ -1588,10 +1588,56 @@
     return '<div class="cts-preview-wrap"><table class="cts-preview-table"><thead>' + thead + '</thead><tbody>' + tbody + '</tbody></table></div>';
   }
 
+  // Out of AI quota / no key: the fix is one paste away, right here — not a
+  // raw provider dump ("Rate limit reached for model … org_…").
+  var KEY_TROUBLE = /AI_ALL_PROVIDERS_EXHAUSTED|AI_CREDENTIAL_MISSING/;
+  var KEY_WORDS = /rate limit|free limit|quota|tokens per day|no ai key|ai studio|exhausted|billing/i;
+  function friendlyError(e) {
+    var msg = String(e.message || '');
+    if (/rate limit reached for model|tokens per day|org_[a-z0-9]{10,}/i.test(msg)) {
+      return 'Groq ki aaj ki free limit khatam ho gayi hai, sir. Google AI Studio ki free key jod dijiye — Clavis turant usi par chalega.';
+    }
+    return msg;
+  }
   register('error', function (task) {
     var e = task.error || {};
-    return '<h2 class="cts-title">' + esc(e.cancelled ? 'Stopped' : 'Could not finish') + '</h2>' +
-           (e.message && !e.cancelled ? '<p class="cts-note">' + esc(e.message) + '</p>' : '');
+    var needKey = !e.cancelled && (KEY_TROUBLE.test(e.code || '') || KEY_WORDS.test(e.message || ''));
+    var html = '<h2 class="cts-title">' + esc(e.cancelled ? 'Stopped' : needKey ? 'AI limit khatam' : 'Could not finish') + '</h2>' +
+           (e.message && !e.cancelled ? '<p class="cts-note">' + esc(friendlyError(e)) + '</p>' : '');
+    if (needKey) {
+      html += '<div class="cts-keybox" data-task="' + esc(task.id) + '">' +
+        '<label class="cts-keybox-label" for="cts-key-' + esc(task.id) + '">Google AI Studio key ' +
+        '<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">free key yahan se lein ↗</a></label>' +
+        '<div class="cts-keybox-row"><input id="cts-key-' + esc(task.id) + '" type="password" autocomplete="off" spellcheck="false" placeholder="AIza…" data-cts-key>' +
+        '<button type="button" data-cts-keysave>Save &amp; continue</button></div>' +
+        '<p class="cts-keybox-msg" data-cts-keymsg>Key sirf aapke is PC par encrypted rehti hai (backend chalu ho to wahan bhi safe).</p></div>';
+    }
+    return html;
+  });
+  // One delegated handler: save the key, make AI Studio the brain, retry.
+  document.addEventListener('click', function (ev) {
+    var btn = ev.target && ev.target.closest && ev.target.closest('[data-cts-keysave]');
+    if (!btn) return;
+    var box = btn.closest('.cts-keybox');
+    var input = box && box.querySelector('[data-cts-key]');
+    var note = box && box.querySelector('[data-cts-keymsg]');
+    var key = String(input && input.value || '').trim();
+    var m = key.match(/AIza[0-9A-Za-z_\-]{30,}/);
+    if (!m) { if (note) note.textContent = 'Ye AI Studio key jaisi nahi lag rahi — "AIza…" se shuru hoti hai.'; return; }
+    btn.disabled = true;
+    if (note) note.textContent = 'Check kar rahi hoon…';
+    var vault = global.ClavisKeyVault;
+    var save = vault && vault.add ? vault.add('gemini', m[0]) : Promise.resolve(global.ClavisDirect && global.ClavisDirect.setKey && global.ClavisDirect.setKey('gemini', m[0]));
+    Promise.resolve(save).then(function () {
+      try { localStorage.setItem('clavis_ai_provider', 'gemini'); } catch (_) {}
+      if (note) note.textContent = 'Jud gayi! Ab wahi kaam dobara kar rahi hoon…';
+      try { global.renderClavisBrainState && global.renderClavisBrainState(); } catch (_) {}
+      var id = box.getAttribute('data-task');
+      setTimeout(function () { try { Task.retry(id); } catch (_) {} }, 400);
+    }).catch(function (err) {
+      btn.disabled = false;
+      if (note) note.textContent = (err && err.message) || 'Key save nahi hui — dobara try kijiye.';
+    });
   });
 
   function completionHeadline(task) {
