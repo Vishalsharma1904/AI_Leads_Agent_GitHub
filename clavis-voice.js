@@ -1,28 +1,35 @@
 /* ============================================================
  * clavis-voice.js · how Clavis sounds when it speaks a reply
  * ------------------------------------------------------------
- * Why it sounded "like an angrez reading Hindi": the saved browser
- * voice was "Google UK English Male", and every reply — Hindi,
- * Hinglish or English — was read by that one English voice.
+ * Sir's rule: a FEMALE voice first, speaking Hindi AND English, with
+ * feeling. Only when her quota runs out (or she can't say it
+ * properly) does the MALE voice step in — and he must speak Hindi too.
  *
- * Now, in order:
- *  1. Google AI Studio TTS (gemini-3.1-flash-tts-preview, then
- *     gemini-2.5-flash-preview-tts) whenever an AI Studio key is
- *     connected: one natural voice (default "Charon") that speaks
- *     Hindi, Hinglish and English properly. The first sentence is
+ * In order:
+ *  1. Google AI Studio TTS, female voice (default "Kore"), every
+ *     connected AI Studio key × both TTS models (each model has its
+ *     own free quota, so a 429 on one is not the end). One natural
+ *     voice for Hindi, Hinglish and English. The first sentence is
  *     synthesised on its own so speech starts in about a second, and
- *     the next part is fetched while the first one plays.
- *  2. No key (or quota spent): the browser voices, chosen PER
- *     SENTENCE — Devanagari or Hinglish goes to the Hindi voice
- *     ("Google हिन्दी"), after Hinglish in Roman letters is
- *     transliterated to Devanagari (Google Input Tools), so it is
- *     pronounced like Hindi instead of spelled out in English; pure
- *     English goes to the English voice.
+ *     the next part is fetched while the first one plays. The style
+ *     line follows the moment: warm when he's happy, calm and steady
+ *     when he's stressed, gentle when he's low (ClavisEmotionalEngine).
+ *  2. Same TTS, male voice ("Charon") — when she failed on the text
+ *     itself (no audio back, a server error), not on quota.
+ *  3. The local backend voice (its own key and quota) in the male voice.
+ *  4. Browser voices, male first, chosen PER SENTENCE: a Hindi male
+ *     voice (Madhur / Hemant) for Hindi and Hinglish (transliterated to
+ *     Devanagari so it's pronounced as Hindi), an Indian-English male
+ *     voice for English. If the PC has no Hindi male voice, Hindi goes
+ *     to the Hindi voice it does have — correct Hindi beats the gender.
  *
  * API: ClavisVoice.speak(text, {signal}) -> Promise<boolean>
- *      ClavisVoice.stop(), .setVoice(name), .status()
- * localStorage: clavis_gemini_voice (voice name), clavis_voice_engine
- * ('auto' | 'browser'), clavis_voice_rate (browser rate, default 1).
+ *      ClavisVoice.stop(), .setVoice(name), .status(), .isSpeaking(),
+ *      .outputLevel() (RMS of what is playing — barge-in uses it),
+ *      .primaryVoice(), .fallbackVoice(), .genderOf(name)
+ * localStorage: clavis_gemini_voice (primary voice), clavis_voice_male
+ * (fallback voice), clavis_voice_engine ('auto' | 'browser'),
+ * clavis_voice_rate (browser rate, default 1).
  * ============================================================ */
 (function () {
   'use strict';
@@ -30,8 +37,10 @@
 
   const API = 'https://generativelanguage.googleapis.com/v1beta/models/';
   const TTS_MODELS = ['gemini-3.1-flash-tts-preview', 'gemini-2.5-flash-preview-tts'];
-  const VOICES = ['Charon', 'Iapetus', 'Orus', 'Sadaltager', 'Algieba', 'Schedar', 'Achird', 'Rasalgethi', 'Kore', 'Sulafat', 'Gacrux', 'Alnilam', 'Puck', 'Fenrir', 'Zephyr', 'Aoede', 'Leda', 'Despina', 'Erinome', 'Vindemiatrix', 'Umbriel', 'Callirrhoe', 'Autonoe', 'Enceladus', 'Algenib', 'Achernar', 'Laomedeia', 'Zubenelgenubi', 'Sadachbia', 'Pulcherrima'];
-  const STYLE = 'Say this in a calm, warm, confident, natural voice, like a trusted personal assistant — unhurried, clear, never robotic';
+  const FEMALE = ['Kore', 'Sulafat', 'Aoede', 'Leda', 'Zephyr', 'Despina', 'Achernar', 'Callirrhoe', 'Autonoe', 'Erinome', 'Laomedeia', 'Gacrux', 'Pulcherrima', 'Vindemiatrix'];
+  const MALE = ['Charon', 'Orus', 'Iapetus', 'Puck', 'Fenrir', 'Algieba', 'Schedar', 'Achird', 'Rasalgethi', 'Sadaltager', 'Alnilam', 'Enceladus', 'Umbriel', 'Algenib', 'Zubenelgenubi', 'Sadachbia'];
+  const VOICES = [...FEMALE, ...MALE];
+  const DEFAULT_FEMALE = 'Kore', DEFAULT_MALE = 'Charon';
   const DEVANAGARI = /[ऀ-ॿ]/;
   // Distinctly Hindi words only (no "to", "me", "the", "par" that English shares).
   const HI = new Set(('hai hain hoon hun tha thi kya kyu kyun kyon kaise kaisa kaisi kab kahan kaha kitna kitne kitni kuch koi aap aapka aapki aapke ' +
@@ -42,20 +51,47 @@
     'maine ki ka ke ko se di rakh rakha rakhi kar ho jo jab tab agar kyunki isliye unka uska iska inka wahi yahi kaun kis kisi kuchh bahut bohot ' +
     'sabse pehle baad saath tak hua hui hue karenge karunga dunga lunga raha gaye jaayega jayega chahte chahta dikha dikhao dikhaiye').split(/\s+/));
 
-  const S = { gen: 0, ctx: null, player: null, drained: null, aborter: null, ttsModel: '', coolUntil: 0, lastError: '', translitCache: new Map() };
-
-  /* ── keys / prefs ─────────────────────────────────────────── */
-  function key() {
-    try {
-      const k = window.ClavisDirect?.keyFor?.('gemini') || (window.ClavisKeyVault?.all?.('gemini') || [])[0] || '';
-      return /^AIza\S{10,}$/.test(k) ? k : '';
-    } catch (_) { return ''; }
-  }
-  const voiceName = () => {
-    const v = localStorage.getItem('clavis_gemini_voice') || 'Charon';
-    return VOICES.includes(v) ? v : 'Charon';
+  const S = {
+    gen: 0, ctx: null, player: null, analyser: null, lvlBuf: null, drained: null, aborter: null,
+    ttsModel: '', rest: new Map(), lastError: '', lastVoice: '', lastEngine: '', translitCache: new Map(), speaking: false,
   };
+
+  /* ── voices / prefs ───────────────────────────────────────── */
+  // One-time move to the female-first voice sir asked for. The old
+  // default "Charon" becomes the male fallback, not the first voice.
+  (function migrate() {
+    try {
+      if (localStorage.getItem('clavis_voice_v2') === '1') return;
+      const saved = localStorage.getItem('clavis_gemini_voice');
+      if (saved && MALE.includes(saved)) localStorage.setItem('clavis_voice_male', saved);
+      if (!saved || MALE.includes(saved)) localStorage.setItem('clavis_gemini_voice', DEFAULT_FEMALE);
+      localStorage.setItem('clavis_voice_v2', '1');
+    } catch (_) {}
+  })();
+  const genderOf = (v) => (FEMALE.includes(v) ? 'female' : MALE.includes(v) ? 'male' : '');
+  function primaryVoice() {
+    const v = localStorage.getItem('clavis_gemini_voice') || DEFAULT_FEMALE;
+    return VOICES.includes(v) ? v : DEFAULT_FEMALE;
+  }
+  function fallbackVoice() {
+    const p = primaryVoice();
+    const m = localStorage.getItem('clavis_voice_male');
+    if (genderOf(p) === 'male') return p;
+    return MALE.includes(m) ? m : DEFAULT_MALE;
+  }
   const engine = () => localStorage.getItem('clavis_voice_engine') || 'auto';
+
+  /* ── keys (every connected AI Studio key, rested ones skipped) ── */
+  function keys() {
+    const out = [];
+    try { const k = window.ClavisDirect?.keyFor?.('gemini'); if (k) out.push(k); } catch (_) {}
+    try { (window.ClavisKeyVault?.all?.('gemini') || []).forEach((k) => out.push(k)); } catch (_) {}
+    return [...new Set(out.filter((k) => /^AIza\S{10,}$/.test(String(k || ''))))];
+  }
+  const restKey = (k, m) => `${String(k).slice(-6)}|${m || '*'}`;
+  const resting = (k, m) => (S.rest.get(restKey(k, m)) || 0) > Date.now() || (S.rest.get(restKey(k)) || 0) > Date.now();
+  const rest = (k, m, ms) => S.rest.set(restKey(k, m), Date.now() + ms);
+  function anyGemini() { return keys().some((k) => !resting(k) && TTS_MODELS.some((m) => !resting(k, m))); }
 
   /* ── text shaping ─────────────────────────────────────────── */
   function sentences(text) {
@@ -81,6 +117,55 @@
     return hits / words.length >= 0.18 || hits >= 3 ? 'hinglish' : 'en';
   }
 
+  /* ── first-person Hindi follows the voice's gender ────────── */
+  // App lines were written for a male assistant ("khol raha hoon", "bata
+  // dunga"). Said by her voice that sounds wrong, and the reverse when he
+  // takes over — so only first-person forms (…a/…i hoon, …unga/…ungi) are
+  // flipped, right before speaking. Nothing about other people changes.
+  function genderize(text, gender) {
+    const f = gender === 'female';
+    let t = String(text || '');
+    t = t.replace(/\b(rah|gay|chuk|aay|sakt|chaht|[a-z]{2,}t)(a|i)(\s+(?:hoon|hun|hu|hoo)\b)/gi, (m, stem, v, tail) => stem + (f ? 'i' : 'a') + tail);
+    t = t.replace(/\b([a-z]{1,12}?(?:u|oo))ng(a|i)\b/gi, (m, stem) => stem + 'ng' + (f ? 'i' : 'a'));
+    t = t.replace(/(^|[\s,(])(गया|गई|गयी)(\s+हू[ँं])/g, (m, pre, w, tail) => pre + (f ? 'गई' : 'गया') + tail);
+    t = t.replace(/(रह|चुक|सकत|चाहत|[ऀ-ॿ]{1,6}त)(ा|ी)(\s+हू[ँं])/g, (m, stem, v, tail) => stem + (f ? 'ी' : 'ा') + tail);
+    t = t.replace(/(ू[ँं]|ऊ[ँं])(गा|गी)/g, (m, nas) => nas + (f ? 'गी' : 'गा'));
+    return t;
+  }
+
+  /* ── feeling → speaking style ─────────────────────────────── */
+  // The TTS model takes a short natural-language direction before the
+  // text ("Say warmly: …"). It follows sir's mood first, then the reply's.
+  function styleFor(text) {
+    const E = window.ClavisEmotionalEngine;
+    let user = 'neutral', reply = 'composed';
+    try { user = E?.inferUserEmotion?.(window.__clavisLastUserText || '')?.name || 'neutral'; } catch (_) {}
+    try { reply = E?.speechProsody?.(text)?.name || 'composed'; } catch (_) {}
+    const byUser = {
+      frustrated: 'calm, steady and genuinely empathetic, like someone quietly taking the problem off his hands',
+      anxious: 'calm, reassuring and grounded, unhurried',
+      sad: 'soft, gentle and caring, a little slower',
+      excited: 'bright and warm, sharing his excitement with a smile in the voice',
+      happy: 'warm and cheerful, with a smile in the voice',
+      grateful: 'warm and gracious',
+      curious: 'warm and engaged, lightly curious',
+    };
+    const byReply = {
+      bright: 'warm and upbeat, with a smile in the voice',
+      reassuring: 'gentle and reassuring',
+      alert: 'calm but clearly serious and attentive',
+      curious: 'warm and inquisitive',
+      thoughtful: 'thoughtful and unhurried',
+      composed: 'calm, warm and confident',
+    };
+    const mood = byUser[user] || byReply[reply] || byReply.composed;
+    const lang = langOf(text);
+    const accent = lang === 'en'
+      ? 'natural Indian English'
+      : 'natural conversational Hindi the way an educated Delhi professional speaks it — Hindi words with a native Hindi accent, English words (leads, email, website) in natural English';
+    return `Speak as a trusted personal assistant, ${mood}; ${accent}; human rhythm with natural pauses, never robotic. Say`;
+  }
+
   /* ── audio out (24 kHz PCM, same worklet as the live voice) ── */
   // Chrome keeps an AudioContext suspended until the first click/key, and
   // resume() then just waits — so give up after a moment and let the
@@ -94,9 +179,20 @@
     S.ctx = new AudioContext({ sampleRate: 24000, latencyHint: 'interactive' });
     await S.ctx.audioWorklet.addModule('clavis-pcm-player-worklet.js?v=3');
     S.player = new AudioWorkletNode(S.ctx, 'clavis-pcm-player', { outputChannelCount: [1] });
-    S.player.connect(S.ctx.destination);
+    // Metered output: barge-in compares the mic with what is playing NOW.
+    S.analyser = S.ctx.createAnalyser();
+    S.analyser.fftSize = 512;
+    S.lvlBuf = new Float32Array(S.analyser.fftSize);
+    S.player.connect(S.analyser).connect(S.ctx.destination);
     S.player.port.onmessage = (e) => { if (e.data?.type === 'drained' && S.drained) { const r = S.drained; S.drained = null; r(); } };
     return wake();
+  }
+  function outputLevel() {
+    if (!S.speaking || !S.analyser || S.lastEngine !== 'google-tts') return null;
+    S.analyser.getFloatTimeDomainData(S.lvlBuf);
+    let s = 0;
+    for (let i = 0; i < S.lvlBuf.length; i++) s += S.lvlBuf[i] * S.lvlBuf[i];
+    return Math.sqrt(s / S.lvlBuf.length);
   }
   function b64ToBuffer(b64) {
     const bin = atob(b64);
@@ -116,63 +212,103 @@
   }
 
   /* ── Google AI Studio TTS ─────────────────────────────────── */
-  async function synth(text, k, signal) {
-    const models = S.ttsModel ? [S.ttsModel, ...TTS_MODELS.filter((m) => m !== S.ttsModel)] : (localStorage.getItem('clavis_tts_model') ? [localStorage.getItem('clavis_tts_model'), ...TTS_MODELS] : TTS_MODELS);
-    let lastErr;
-    for (const model of [...new Set(models)]) {
-      const res = await fetch(`${API}${model}:generateContent?key=${encodeURIComponent(k)}`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: `${STYLE}: ${text}` }] }],
-          generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voiceName() } } } },
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const part = (data.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData?.data);
-        if (!part) { lastErr = new Error('No audio in the reply'); continue; }
-        S.ttsModel = model;
-        try { localStorage.setItem('clavis_tts_model', model); } catch (_) {}
-        return b64ToBuffer(part.inlineData.data);
-      }
-      const body = await res.json().catch(() => ({}));
-      lastErr = Object.assign(new Error(body?.error?.message || `TTS ${res.status}`), { status: res.status });
-      if (res.status === 429 || res.status === 401 || res.status === 403) break;   // quota / bad key: no point trying other models
+  async function synthOnce(text, k, model, voice, signal) {
+    const res = await fetch(`${API}${model}:generateContent?key=${encodeURIComponent(k)}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, signal,
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: `${styleFor(text)}: ${genderize(text, genderOf(voice) || 'female')}` }] }],
+        generationConfig: { responseModalities: ['AUDIO'], speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: voice } } } },
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const part = (data.candidates?.[0]?.content?.parts || []).find((p) => p.inlineData?.data);
+      if (!part) throw Object.assign(new Error('No audio in the reply'), { status: 0, kind: 'content' });
+      return b64ToBuffer(part.inlineData.data);
     }
-    throw lastErr || new Error('TTS failed');
+    const body = await res.json().catch(() => ({}));
+    const kind = res.status === 429 ? 'quota' : (res.status === 401 || res.status === 403) ? 'key' : res.status === 404 ? 'model' : res.status >= 500 ? 'server' : 'content';
+    throw Object.assign(new Error(body?.error?.message || `TTS ${res.status}`), { status: res.status, kind });
+  }
+  // Every key × model for one voice. Quota/auth failures rest that key
+  // (or key+model) so the next sentence doesn't hit the same wall.
+  async function synth(text, voice, signal) {
+    const order = S.ttsModel ? [S.ttsModel, ...TTS_MODELS.filter((m) => m !== S.ttsModel)] : TTS_MODELS;
+    let lastErr, contentErr = false;
+    for (const k of keys()) {
+      if (resting(k)) continue;
+      for (const model of order) {
+        if (resting(k, model)) continue;
+        try {
+          const pcm = await synthOnce(text, k, model, voice, signal);
+          S.ttsModel = model;
+          return pcm;
+        } catch (e) {
+          if (e?.name === 'AbortError') throw e;
+          lastErr = e;
+          if (e.kind === 'quota') rest(k, model, 60000);
+          else if (e.kind === 'key') { rest(k, null, 10 * 60000); break; }
+          else if (e.kind === 'model') rest(k, model, 30 * 60000);
+          else contentErr = true;
+        }
+      }
+    }
+    throw Object.assign(lastErr || new Error('TTS failed'), { contentErr });
   }
 
-  async function speakGemini(parts, id, signal, progress) {
-    const k = key();
+  async function speakGemini(parts, id, signal, progress, voice) {
     await ensureAudio();
-    let pending = synth(parts[0], k, signal);
-    for (let i = 0; i < parts.length; i++) {
+    let pending = synth(parts[progress.i], voice, signal);
+    for (let i = progress.i; i < parts.length; i++) {
       progress.i = i;
       const pcm = await pending;
       if (id !== S.gen) return false;
-      if (i + 1 < parts.length) { pending = synth(parts[i + 1], k, signal); pending.catch(() => {}); }   // fetch ahead while this plays
+      if (i + 1 < parts.length) { pending = synth(parts[i + 1], voice, signal); pending.catch(() => {}); }   // fetch ahead while this plays
+      S.lastEngine = 'google-tts';
+      S.lastVoice = voice;
       await play(pcm);
       if (id !== S.gen) return false;
     }
     return true;
   }
 
-  /* ── browser voices, chosen per sentence ──────────────────── */
-  function pickVoice(lang) {
+  /* ── backend voice (own key + quota), male ────────────────── */
+  async function speakBackend(text, id, signal) {
+    const L = window.LocalSpeechEngine;
+    if (!L?.speak || L.isBackendUnavailable?.()) return false;
+    try {
+      S.lastEngine = 'backend';
+      S.lastVoice = fallbackVoice();
+      await L.speak(genderize(text, genderOf(fallbackVoice()) || 'male'), { signal, voice: fallbackVoice() });
+      return id === S.gen;
+    } catch (_) { return false; }
+  }
+
+  /* ── browser voices, male first, chosen per sentence ──────── */
+  const MALE_NAME = /\b(male|madhur|hemant|prabhat|ravi|rishi|david|mark|guy|ryan|christopher|eric|andrew|brian|george|daniel|james|thomas)\b/i;
+  const FEMALE_NAME = /\b(female|swara|kalpana|heera|neerja|zira|aria|jenny|sonia|libby|hazel|susan|samantha|victoria|karen|moira|tessa|veena|lekha)\b/i;
+  function pickVoice(lang, gender = 'male') {
     const voices = window.speechSynthesis?.getVoices?.() || [];
+    const isHi = (v) => /^hi/i.test(v.lang);
+    const want = (v) => (gender === 'male' ? MALE_NAME.test(v.name) && !FEMALE_NAME.test(v.name) : !MALE_NAME.test(v.name));
     if (lang === 'hi') {
-      return voices.find((v) => /hi[-_]IN/i.test(v.lang) && /google/i.test(v.name))
-        || voices.find((v) => /hi[-_]IN/i.test(v.lang) && /natural|online|madhur|swara/i.test(v.name))
-        || voices.find((v) => /^hi/i.test(v.lang)) || null;
+      return voices.find((v) => isHi(v) && want(v) && /natural|online/i.test(v.name))
+        || voices.find((v) => isHi(v) && want(v))
+        || voices.find((v) => isHi(v) && /google/i.test(v.name))
+        || voices.find((v) => isHi(v) && /natural|online|madhur|swara/i.test(v.name))
+        || voices.find(isHi) || null;
     }
     const saved = localStorage.getItem('jarvis_voice_name');
-    const savedVoice = saved && voices.find((v) => v.name === saved && /^en/i.test(v.lang));
+    const savedVoice = saved && voices.find((v) => v.name === saved && /^en/i.test(v.lang) && (gender !== 'male' || !FEMALE_NAME.test(v.name)));
     return savedVoice
-      || voices.find((v) => /en[-_]IN/i.test(v.lang) && /natural|online|google|prabhat|ravi/i.test(v.name))
-      || voices.find((v) => /Google UK English Male/i.test(v.name))
-      || voices.find((v) => /^en/i.test(v.lang) && /natural|online/i.test(v.name))
+      || voices.find((v) => /en[-_]IN/i.test(v.lang) && want(v) && /natural|online/i.test(v.name))
+      || voices.find((v) => /en[-_]IN/i.test(v.lang) && want(v))
+      || (gender === 'male' ? voices.find((v) => /Google UK English Male/i.test(v.name)) : null)
+      || voices.find((v) => /^en/i.test(v.lang) && want(v) && /natural|online/i.test(v.name))
+      || voices.find((v) => /^en/i.test(v.lang) && want(v))
       || voices.find((v) => /^en/i.test(v.lang)) || null;
   }
+  const hasHindiMale = () => (window.speechSynthesis?.getVoices?.() || []).some((v) => /^hi/i.test(v.lang) && MALE_NAME.test(v.name) && !FEMALE_NAME.test(v.name));
   async function toDevanagari(sentence) {
     const cached = S.translitCache.get(sentence);
     if (cached) return cached;
@@ -191,8 +327,11 @@
       const u = new SpeechSynthesisUtterance(text);
       if (voice) u.voice = voice;
       u.lang = voice?.lang || (lang === 'hi' ? 'hi-IN' : 'en-IN');
-      u.rate = Math.max(0.8, Math.min(1.2, Number(localStorage.getItem('clavis_voice_rate')) || (lang === 'hi' ? 0.98 : 1)));
-      u.pitch = lang === 'hi' ? 1 : 0.96;
+      let prosody = null;
+      try { prosody = window.ClavisEmotionalEngine?.speechProsody?.(text); } catch (_) {}
+      const base = Number(localStorage.getItem('clavis_voice_rate')) || (lang === 'hi' ? 0.98 : 1);
+      u.rate = Math.max(0.8, Math.min(1.2, base * (prosody?.rateMultiplier || 1)));
+      u.pitch = Math.max(0.8, Math.min(1.2, (lang === 'hi' ? 1 : 0.96) * (prosody?.pitchMultiplier || 1)));
       u.onend = () => resolve(true);
       u.onerror = () => resolve(false);
       try { window.speechSynthesis.resume?.(); window.speechSynthesis.speak(u); } catch (_) { resolve(false); }
@@ -204,13 +343,25 @@
       await new Promise((r) => { window.speechSynthesis.onvoiceschanged = r; setTimeout(r, 900); });
     }
     try { window.speechSynthesis.cancel(); } catch (_) {}
-    const list = sentences(text).map((s) => ({ s, lang: langOf(s) }));
-    // Transliterate all Hinglish sentences in parallel before the first word is spoken.
-    const ready = list.map((x) => (x.lang === 'hinglish' ? toDevanagari(x.s).then((d) => ({ s: d, lang: 'hi' })) : Promise.resolve({ s: x.s, lang: x.lang })));
+    S.lastEngine = 'browser';
+    const gender = genderOf(fallbackVoice()) || 'male';
+    const hindiMale = hasHindiMale();
+    const list = sentences(genderize(text, gender)).map((s) => ({ s, lang: langOf(s) }));
+    // Hinglish in Roman letters: with a Hindi male voice, transliterate so
+    // it's pronounced as Hindi; without one, the Indian-English male voice
+    // reads Roman Hinglish far better than a female Hindi voice switching in
+    // mid-reply would sound.
+    const ready = list.map((x) => {
+      if (x.lang === 'hinglish' && hindiMale) return toDevanagari(x.s).then((d) => ({ s: d, lang: 'hi' }));
+      if (x.lang === 'hinglish') return Promise.resolve({ s: x.s, lang: 'en' });
+      return Promise.resolve({ s: x.s, lang: x.lang });
+    });
     for (const p of ready) {
       const { s, lang } = await p;
       if (id !== S.gen) return false;
-      await utter(s, pickVoice(lang), lang);
+      const v = pickVoice(lang, gender);
+      S.lastVoice = v?.name || '';
+      await utter(s, v, lang);
       if (id !== S.gen) return false;
     }
     return true;
@@ -223,29 +374,43 @@
     stop();
     const id = ++S.gen;
     S.aborter = new AbortController();
+    S.speaking = true;
     opts.signal?.addEventListener?.('abort', () => { if (id === S.gen) stop(); }, { once: true });
-    let rest = clean;
-    if (key() && engine() !== 'browser' && Date.now() > S.coolUntil) {
+    try {
       const parts = chunks(clean);
       const progress = { i: 0 };
-      try {
-        const done = await speakGemini(parts, id, S.aborter.signal, progress);
-        S.lastError = '';
-        return done && id === S.gen;
-      } catch (e) {
-        if (id !== S.gen) return false;   // stopped on purpose (every stop bumps gen)
-        S.lastError = e?.message || String(e);
-        console.warn('[ClavisVoice] Google TTS unavailable, using browser voice:', S.lastError);
-        if (e?.status === 429) S.coolUntil = Date.now() + 60000;   // quota: rest a minute
-        if (e?.status === 401 || e?.status === 403 || e?.status === 400) S.coolUntil = Date.now() + 10 * 60000;
-        rest = parts.slice(progress.i).join(' ');   // never repeat what was already said
+      const remaining = () => parts.slice(progress.i).join(' ');   // never repeat what was already said
+      if (engine() !== 'browser' && anyGemini()) {
+        const first = primaryVoice();
+        try {
+          const done = await speakGemini(parts, id, S.aborter.signal, progress, first);
+          S.lastError = '';
+          return done && id === S.gen;
+        } catch (e) {
+          if (id !== S.gen) return false;   // stopped on purpose (every stop bumps gen)
+          S.lastError = e?.message || String(e);
+          console.warn(`[ClavisVoice] ${first} unavailable (${S.lastError}) — handing over to the male voice.`);
+          // She failed on the text itself (not quota): he tries the same TTS.
+          const male = fallbackVoice();
+          if (e?.contentErr && male !== first && anyGemini()) {
+            try {
+              const done = await speakGemini(parts, id, S.aborter.signal, progress, male);
+              return done && id === S.gen;
+            } catch (e2) { if (id !== S.gen) return false; S.lastError = e2?.message || String(e2); }
+          }
+        }
       }
+      if (engine() !== 'browser' && await speakBackend(remaining(), id, S.aborter.signal)) return true;
+      if (id !== S.gen) return false;
+      return await speakBrowser(remaining(), id);
+    } finally {
+      if (id === S.gen) S.speaking = false;
     }
-    return speakBrowser(rest, id);
   }
 
   function stop() {
     S.gen++;
+    S.speaking = false;
     try { S.aborter?.abort(); } catch (_) {}
     try { S.player?.port.postMessage({ type: 'stop' }); } catch (_) {}
     if (S.drained) { const r = S.drained; S.drained = null; r(); }
@@ -253,10 +418,23 @@
   }
 
   window.ClavisVoice = {
-    speak, stop,
-    setVoice(name) { if (VOICES.includes(name)) { localStorage.setItem('clavis_gemini_voice', name); return true; } return false; },
+    speak, stop, outputLevel, primaryVoice, fallbackVoice, genderOf, genderize,
+    isSpeaking: () => S.speaking,
+    setVoice(name) {
+      if (!VOICES.includes(name)) return false;
+      localStorage.setItem('clavis_gemini_voice', name);
+      if (genderOf(name) === 'male') localStorage.setItem('clavis_voice_male', name);
+      return true;
+    },
+    setFallbackVoice(name) { if (MALE.includes(name)) { localStorage.setItem('clavis_voice_male', name); return true; } return false; },
     voices: () => VOICES.slice(),
-    status: () => ({ engine: key() && engine() !== 'browser' ? 'google-tts' : 'browser', model: S.ttsModel || null, voice: voiceName(), coolingFor: Math.max(0, S.coolUntil - Date.now()), lastError: S.lastError }),
+    femaleVoices: () => FEMALE.slice(),
+    maleVoices: () => MALE.slice(),
+    status: () => ({
+      engine: S.lastEngine || (anyGemini() && engine() !== 'browser' ? 'google-tts' : 'browser'),
+      model: S.ttsModel || null, voice: primaryVoice(), fallback: fallbackVoice(), lastVoice: S.lastVoice,
+      keys: keys().length, resting: [...S.rest.entries()].filter(([, t]) => t > Date.now()).length, lastError: S.lastError,
+    }),
     _selfTest() {
       const ok = [
         langOf('Aap kaise hain sir, sab theek hai?') === 'hinglish',
@@ -265,6 +443,13 @@
         langOf('Maine leads ki list screen par rakh di hai.') === 'hinglish',
         chunks('One. Two is here. Three.').length === 2 && chunks('One. Two is here. Three.')[0] === 'One.',
         sentences('Hello sir. आप कैसे हैं? Fine!').length === 3,
+        genderOf('Kore') === 'female' && genderOf('Charon') === 'male',
+        /Hindi/.test(styleFor('Aap kaise hain sir?')),
+        genderize('Dashboard khol raha hoon, main bata dunga.', 'female') === 'Dashboard khol rahi hoon, main bata dungi.',
+        genderize('Main kar sakti hoon, dikhaungi.', 'male') === 'Main kar sakta hoon, dikhaunga.',
+        genderize('मैं देख रहा हूँ, बता दूँगा', 'female') === 'मैं देख रही हूँ, बता दूँगी',
+        genderize('Main ek AI hoon, woh aa rahi hai.', 'male') === 'Main ek AI hoon, woh aa rahi hai.',
+        genderize('मैं समझ गया हूँ', 'female') === 'मैं समझ गई हूँ' && genderize('मैं समझ गई हूँ', 'male') === 'मैं समझ गया हूँ',
       ];
       const passed = ok.filter(Boolean).length;
       console[passed === ok.length ? 'log' : 'error'](`ClavisVoice self-test: ${passed}/${ok.length}`);

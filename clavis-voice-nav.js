@@ -26,8 +26,8 @@
     {
       name: 'dashboard',
       patterns: [
-        /\b(dashboard|home|ghar|mukhya|main page|home page|overview|mukhy|shuru)\b/i,
-        /\b(dashboard (pe|par|me|ko|kholo|jao|dikhao|dikha)|go to dashboard|open dashboard|show dashboard)\b/i
+        /^(?:(?:go to|open|show)\s+)?(dashboard|home|home page|main page|overview)(?:\s+(?:pe|par|kholo|jao|dikhao|chalo|page))?$/i,
+        /\b(dashboard (pe|par|me|ko|kholo|jao|dikhao|dikha)|go to dashboard|open dashboard|show dashboard|home page (pe|par) (jao|chalo))\b/i
       ],
       speak: 'Dashboard khol raha hoon.',
       action: () => switchToView('dashboard')
@@ -59,8 +59,8 @@
     {
       name: 'analytics',
       patterns: [
-        /\b(analytics|statistics|stats|report|analysis|graph|chart)\b/i,
-        /\b(analytics (pe|par|dikhao|kholo|jao)|go to analytics|open analytics|show analytics)\b/i
+        /^(?:(?:go to|open|show)\s+)?(analytics|statistics)(?:\s+(?:pe|par|kholo|jao|dikhao|page))?$/i,
+        /\b(analytics (pe|par|dikhao|kholo|jao|page)|go to analytics|open analytics|show analytics|analytics page)\b/i
       ],
       speak: 'Analytics page par ja raha hoon.',
       action: () => switchToView('analytics')
@@ -101,8 +101,8 @@
     {
       name: 'settings',
       patterns: [
-        /\b(settings? (kholo|open|pe|par|me|jao|dikhao)|open settings?|go to settings?|settings? page)\b/i,
-        /\b(settings|configuration|preferences?|setup kholo)\b/i
+        /\b(settings? (kholo|open|pe|par|jao|dikhao)|open settings?|go to settings?|settings? page)\b/i,
+        /^(settings|configuration|preferences?|setup kholo)$/i
       ],
       speak: 'Settings khol raha hoon.',
       action: () => openSettings()
@@ -113,7 +113,7 @@
       name: 'close_modal',
       patterns: [
         /\b(settings? (band|close) karo|modal (band|close) karo|close settings?)\b/i,
-        /\b(popup band karo|close popup|window band karo)\b/i
+        /\b(popup band karo|close popup)\b/i
       ],
       speak: 'Window band kar di.',
       action: () => closeOverlays()
@@ -217,10 +217,18 @@
         // Clean prefixes & suffixes
         topic = topic.replace(/^(mujhe|humein|please|can you|zara)\s+/i, '').replace(/\s+(ki|ka|ke)$/i, '').trim();
 
+        // Say what was actually understood ("lord" → Hindu deities,
+        // "shiv ji" → Lord Shiva), not the raw word he typed.
+        let said = topic;
+        try {
+          const q = window.ClavisLuxe?.understandImageQuery?.(raw);
+          if (q && (q.name || q.subject)) said = q.name || q.subject;
+        } catch (e) {}
+
         // Forward to Clavis Luxe research or composer
         if (window.ClavisLuxe && typeof window.ClavisLuxe.researchImages === 'function') {
           window.ClavisLuxe.researchImages(topic);
-          return { handled: true, spoken: `${topic} ki images fetch kar raha hoon.` };
+          return { handled: true, spoken: `${said} ki photos dikha raha hoon.` };
         }
 
         // Send into chat input

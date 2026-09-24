@@ -943,12 +943,36 @@ async function handleJarvisSend(options) {
     text = 'Please inspect the attached screenshot(s) and provide a detailed analysis, key data points, and recommended actions.';
   }
 
-  // Clear composer state immediately
-  if (input) {
+  // Clear composer state immediately — unless this turn came by voice and
+  // the composer holds a separate draft he is still typing.
+  if (input && (requestSource !== 'voice' || !input.value.trim() || input.value.trim() === text)) {
     input.value = '';
     autoGrowJarvisInput();
   }
   clearClavisScreenshots();
+
+  window.__clavisLastUserText = text;   // the voice's mood follows his (ClavisVoice)
+  try { window.ClavisIntent?.learn?.(text); } catch (_) {}
+
+  // ── The few words he says most: "map band karo", "close everything",
+  //    "band karo", "zoom in", "ladke ki awaaz me bolo" — instant and local,
+  //    before the STOP rule (which used to swallow "map band karo") and the AI.
+  if (!attachments.length && !images.length) {
+    try {
+      const quick = await window.ClavisIntent?.route?.(text, { source: requestSource });
+      if (quick && quick.handled) {
+        if (quick.spoken) {
+          window.ClavisMind?.noteClavisTurn?.(quick.spoken);
+          if (jarvisSpeechEnabled && !quick.silent) speakJarvisText(quick.spoken);
+          else setJarvisStatus('online', 'Clavis Online');
+        } else {
+          setJarvisStatus('online', 'Clavis Online');
+        }
+        if (jarvisHandsFree) scheduleHandsFreeRelisten();
+        return;
+      }
+    } catch (e) { console.warn('Clavis intent route failed:', e); }
+  }
 
   // ── "Shut up" / "chup" — silence Clavis instantly, don't echo or call AI. ──
   if (window.ClavisCommands?.isStop?.(text) && text.trim().split(/\s+/).length <= 4) {
@@ -958,7 +982,7 @@ async function handleJarvisSend(options) {
     isJarvisSpeaking = false;
     if (currentPlayingAudio) { try { currentPlayingAudio.pause(); } catch (_) {} currentPlayingAudio = null; }
     window.ClavisBargeIn?.disarm?.();
-    window.ClavisMind?.noteSpeakingStopped?.();
+    window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     window.ClavisProactive?.snooze?.(30);
     window.ClavisMind?.social?.suppress?.(30 * 60000);
     setJarvisStatus('online', 'Chup — bolo jab chahiye');
@@ -992,13 +1016,15 @@ async function handleJarvisSend(options) {
   try {
     const cmd = await window.ClavisCommands?.route(text);
     if (cmd && cmd.handled) {
-      const replyContent = cmd.spoken || cmd.bubbleHtml?.replace(/<[^>]+>/g, '') || 'Command completed successfully.';
-      if (/<img|<table/i.test(cmd.bubbleHtml || '') || !cmd.spoken) clavisSetDisplay(taskId, 'window');
+      // `text` (screen) and `spoken` (voice) may differ on purpose — e.g. a
+      // website brief shows a tidy summary and SAYS a deeper take on it.
+      const replyContent = cmd.text || cmd.spoken || cmd.bubbleHtml?.replace(/<[^>]+>/g, '') || 'Command completed successfully.';
+      if (cmd.display === 'window' || cmd.text || /<img|<table/i.test(cmd.bubbleHtml || '') || !cmd.spoken) clavisSetDisplay(taskId, 'window');
       if (taskId && window.ClavisTask) {
         window.ClavisTask.complete(taskId, {
           type: 'answer',
           text: replyContent,
-          summary: cmd.spoken || 'Command executed'
+          summary: (cmd.summary || cmd.spoken || 'Command executed').slice(0, 160)
         });
       }
       clavisReveal(taskId);
@@ -1149,7 +1175,7 @@ async function handleJarvisSend(options) {
       if (jarvisSpeechEnabled && voiceStream && !voiceStreamFailed) {
         await window.LocalSpeechEngine.finishSpeech();
         isJarvisSpeaking = false;
-        window.ClavisMind?.noteSpeakingStopped?.();
+        window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
         window.ClavisBargeIn?.disarm?.();
         setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
       } else if (jarvisSpeechEnabled) {
@@ -1285,6 +1311,9 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
     });
     groqAudioChunks = [];
     isGroqRecording = true;
+    const groqStartedAt = Date.now();
+    window.ClavisEar?.tap?.start?.('groq');
+    window.ClavisEar?.caption?.listening(true);
 
     let mimeType = 'audio/webm;codecs=opus';
     if (!MediaRecorder.isTypeSupported(mimeType)) {
@@ -1301,6 +1330,8 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
 
     groqMediaRecorder.onstop = async () => {
       isGroqRecording = false;
+      window.ClavisEar?.tap?.stop?.('groq');
+      window.ClavisEar?.caption?.listening(false);
       btn?.classList.remove('recording');
       stream.getTracks().forEach(track => track.stop());
 
@@ -1322,7 +1353,10 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
         const text = await window.ClavisDirect.transcribeWithGroq(audioBlob);
         if (composerStatus) composerStatus.textContent = '';
         if (text && text.trim()) {
-          commitJarvisVoiceInput(text.trim());
+          commitJarvisVoiceInput(text.trim(), {
+            since: groqStartedAt, source: 'groq',
+            requireWake: Boolean(options.handsFreeCapture && !options.awakeCapture && !options.soundTrigger && !jarvisAwake),
+          });
         } else {
           setJarvisStatus('online', 'Kuch boliyega...');
         }
@@ -1442,11 +1476,18 @@ function legacyStartNativeSpeechRecognition(options = {}) {
   jarvisRecognition = recognition;
   const initialText = String(options.initialText || '').trim();
   let hasFinalSpeech = false;
+  let utterStartAt = 0;
+  const commitMeta = () => ({
+    since: utterStartAt || Date.now() - 6000, source: 'native', openMic: Boolean(options.followUp),
+    requireWake: Boolean(options.handsFreeCapture && !options.awakeCapture && !options.soundTrigger && !jarvisAwake),
+  });
   jarvisVoiceFinalTranscript = initialText;
   jarvisVoiceStopRequested = false;
 
   btn?.classList.add('recording');
   setJarvisStatus(options.handsFreeCapture ? 'awake' : 'listening', options.handsFreeCapture ? 'Haan sir, boliye...' : 'Sun raha hoon...');
+  if (window.ClavisEar?.voiceId?.enabled?.()) window.ClavisEar.tap.start('native');
+  window.ClavisEar?.caption?.listening(true);
   recognition.onresult = (e) => {
     if (session !== jarvisVoiceSession) return;
     let finalText = jarvisVoiceFinalTranscript;
@@ -1462,17 +1503,16 @@ function legacyStartNativeSpeechRecognition(options = {}) {
     }
     if (finalText.trim()) jarvisVoiceFinalTranscript = finalText.trim();
     const transcript = `${jarvisVoiceFinalTranscript} ${interimText}`.trim();
-    const input = document.getElementById('jarvis-input');
-    if (input) {
-      input.value = transcript;
-      input.dispatchEvent(new Event('input'));
-    }
+    if (!utterStartAt && transcript) utterStartAt = Date.now() - 700;
+    // His words preview in the Siri-style caption (top right), never in the
+    // composer: the composer stays his, and Clavis's own voice can't land there.
+    clavisShowVoicePreview(transcript);
     clearTimeout(jarvisVoiceCommitTimer);
     if (/\b(go for it|that's it|thats it|backseat|done|over)\.?\s*$/i.test(transcript)) {
-      commitJarvisVoiceInput(transcript);
+      commitJarvisVoiceInput(transcript, commitMeta());
     } else if (hasFinalSpeech) {
       const pauseMs = options.handsFreeCapture ? 1500 : 1300;
-      jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript), pauseMs);
+      jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript, commitMeta()), pauseMs);
     }
   };
   recognition.onerror = (event) => {
@@ -1505,12 +1545,12 @@ function legacyStartNativeSpeechRecognition(options = {}) {
     if (session !== jarvisVoiceSession) return;
     if (jarvisRecognition === recognition) jarvisRecognition = null;
     btn?.classList.remove('recording');
-    if (jarvisVoiceStopRequested) return;
+    if (jarvisVoiceStopRequested) { window.ClavisEar?.tap?.stop?.('native'); window.ClavisEar?.caption?.listening(false); return; }
     if (hasFinalSpeech && jarvisVoiceFinalTranscript.trim()) {
       clearTimeout(jarvisVoiceCommitTimer);
       // Chrome may end its service during a perfectly valid pause. Give the
       // user the same pause window instead of submitting half a sentence.
-      jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript), options.handsFreeCapture ? 1500 : 1300);
+      jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript, commitMeta()), options.handsFreeCapture ? 1500 : 1300);
     } else {
       window.setTimeout(() => {
         if (session !== jarvisVoiceSession || jarvisVoiceStopRequested || jarvisRecognition) return;
@@ -1526,11 +1566,60 @@ function legacyStartNativeSpeechRecognition(options = {}) {
   }
 }
 
-function commitJarvisVoiceInput(transcript) {
+// Live preview of what sir is saying. The caption owns it; the composer is
+// only a fallback for a build without clavis-ear.js.
+function clavisShowVoicePreview(text) {
+  if (!text) return;
+  if (window.ClavisEar?.caption) { window.ClavisEar.caption.live(text); return; }
   const input = document.getElementById('jarvis-input');
-  const finalText = clavisCommitCommand(String(transcript || '').trim());
+  if (input) { input.value = text; input.dispatchEvent(new Event('input')); }
+}
+
+// Stop Clavis mid-sentence because sir spoke over it. Capture is NOT
+// restarted here — callers that already hold his words just use them.
+function interruptClavisSpeech() {
+  if (!isJarvisSpeaking && !window.ClavisEar?.isSpeaking?.()) return false;
+  try { jarvisController?.abort('barge-in'); } catch (_) {}
+  jarvisController = null;
+  stopJarvisSpeech();
+  isJarvisSpeaking = false;
+  window.ClavisBargeIn?.disarm?.();
+  window.ClavisMind?.noteInterrupted?.();
+  window.ClavisEar?.noteSpeakingDone?.();
+  setJarvisStatus('interrupted', 'Aap boliye...');
+  return true;
+}
+window.interruptClavisSpeech = interruptClavisSpeech;
+
+function commitJarvisVoiceInput(transcript, meta = {}) {
+  const input = document.getElementById('jarvis-input');
+  let finalText = clavisCommitCommand(String(transcript || '').trim());
   clearTimeout(jarvisVoiceCommitTimer);
-  if (!finalText || !input) return;
+  if (!finalText) return;
+  if (meta && meta.requireWake) {
+    const wake = clavisWakeMatch(finalText);
+    if (!wake) { window.ClavisEar?.caption?.final(finalText, false); jarvisVoiceFinalTranscript = ''; return; }
+    finalText = wake.remainder;
+    if (!finalText) {
+      jarvisAwake = true;
+      playWakeChime();
+      setJarvisStatus('awake', 'Haan sir, boliye...');
+      window.ClavisEar?.caption?.listening(true);
+      return;
+    }
+  }
+  // One gate for every recognizer: Clavis's own voice (echo), background
+  // chatter in open-mic moments, and — once enrolled — voices that aren't his.
+  const verdict = window.ClavisEar?.judge?.(finalText, meta || {}) || { accept: true };
+  if (!verdict.accept) {
+    console.info('[ClavisEar] ignored (' + verdict.reason + '):', finalText);
+    window.ClavisEar?.caption?.final(finalText, false);
+    jarvisVoiceFinalTranscript = '';
+    return;
+  }
+  if (verdict.barge) interruptClavisSpeech();
+  window.ClavisEar?.tap?.stop?.('native');
+  window.ClavisEar?.caption?.final(finalText, true);
   // "Clavis, get me leads..." in one breath: hand the command straight to Live.
   if (window.ClavisLive?.isAvailable?.() && !window.ClavisLive.isActive()) {
     jarvisVoiceFinalTranscript = '';
@@ -1541,8 +1630,10 @@ function commitJarvisVoiceInput(transcript) {
     window.ClavisLive.start({ trigger: 'wake word', initialText: finalText });
     return;
   }
-  input.value = finalText;
-  input.dispatchEvent(new Event('input'));
+  if (!window.ClavisEar && input) {
+    input.value = finalText;
+    input.dispatchEvent(new Event('input'));
+  }
   jarvisVoiceFinalTranscript = '';
   jarvisVoiceStopRequested = true;
   jarvisVoiceSession++;
@@ -1550,7 +1641,7 @@ function commitJarvisVoiceInput(transcript) {
   try { jarvisRecognition?.stop(); } catch {}
   jarvisRecognition = null;
   document.getElementById('jarvis-voice-btn')?.classList.remove('recording');
-  handleJarvisSend({ source: 'voice' });
+  handleJarvisSend({ source: 'voice', text: finalText });
 }
 
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
@@ -1561,6 +1652,9 @@ function commitJarvisVoiceInput(transcript) {
 // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 let wakeResultIndex = -1;
 let clavisFinalTranscript = '';
+let clavisCaptureStartAt = 0;     // when the current spoken command began (voice ID scores from here)
+let clavisFollowUpUntil = 0;      // open-mic window after a reply: no wake word needed
+let clavisFollowUpTimer = null;
 
 function getClavisWakeWords() {
   try {
@@ -1779,7 +1873,10 @@ function startWakeListener() {
   // "Clavis" (the old path treated every overheard sentence as a command).
   // Only the wake opens a Live session, so idle listening costs no quota.
   const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  if (!(SR && window.ClavisLive?.isAvailable?.())) {
+  // The free browser recognizer is the wake-word detector whenever it exists
+  // (with or without Live). Before, without a Gemini key the fallback tiers
+  // treated EVERY overheard sentence as a command.
+  if (!SR) {
     if (!window.LocalSpeechEngine) {
       setJarvisStatus('unavailable', 'Local speech service unavailable');
       return;
@@ -1789,8 +1886,10 @@ function startWakeListener() {
     }
     return;
   }
-  if (window.ClavisLive.isActive() || wakeRecognition) return;
+  if (window.ClavisLive?.isActive?.() || wakeRecognition) return;
   wakeStopRequested = false;
+  // Voice ID scores the follow-up window from this tap (only once enrolled).
+  if (window.ClavisEar?.voiceId?.enabled?.()) window.ClavisEar.tap.start('wake');
 
   wakeRecognition = new SR();
   // en-IN writes "Clavis" (and Hinglish) in Latin script; hi-IN tends to
@@ -1800,8 +1899,27 @@ function startWakeListener() {
   wakeRecognition.interimResults = true;
 
   wakeRecognition.onresult = (e) => {
-    if (typeof isJarvisSpeaking !== 'undefined' && isJarvisSpeaking) {
+    const latest = e.results[e.results.length - 1];
+    const latestText = String(latest?.[0]?.transcript || '').trim();
+
+    // Clavis is talking. The recognizer hears its voice too, so nothing here
+    // is a command — unless it is sir talking OVER it (a stop word, his own
+    // new words, or its name), which is a real barge-in.
+    if (isJarvisSpeaking || window.ClavisEar?.isSpeaking?.()) {
       clearTimeout(relistenTimer);
+      const v = latestText ? window.ClavisEar?.judge?.(latestText) : null;
+      if (v?.accept && v.barge) {
+        interruptClavisSpeech();
+        jarvisAwake = true;
+        clavisFollowUpUntil = 0;
+        clavisCaptureStartAt = Date.now() - 800;
+        // Keep what he said as the start of the command, minus the wake name.
+        const wake = clavisWakeMatch(latestText);
+        clavisFinalTranscript = (!latest.isFinal || window.ClavisCommands?.isStop?.(latestText)) ? '' : (wake ? wake.remainder : latestText);
+        wakeResultIndex = e.results.length - 1;
+        clavisShowVoicePreview(clavisFinalTranscript || latestText);
+        setJarvisStatus('awake', 'Haan sir, boliye...');
+      }
       return;
     }
 
@@ -1810,12 +1928,16 @@ function startWakeListener() {
       for (let i = e.resultIndex; i < e.results.length; i++) {
         const t = e.results[i][0].transcript;
         const wake = clavisWakeMatch(t);
+        // Clavis saying its own name ("Main Clavis hoon") must not wake it.
+        if (wake && window.ClavisEar && window.ClavisEar.msSinceSpoke() < 4000 && !window.ClavisEar.judge(t).accept) continue;
         if (wake) {
           jarvisAwake = true;
           wakeResultIndex = i;
           clavisFinalTranscript = wake.remainder;
-          
-    window.LocalSpeechEngine?.stopInput?.();
+          clavisFollowUpUntil = 0;
+          clavisCaptureStartAt = Date.now() - 800;
+
+          window.LocalSpeechEngine?.stopInput?.();
           if (currentPlayingAudio) {
             currentPlayingAudio.pause();
             currentPlayingAudio = null;
@@ -1834,47 +1956,52 @@ function startWakeListener() {
         }
       }
     } else if (!jarvisRecognition) {
-      // Capturing command
+      // Capturing command (after a barge-in, or in the follow-up window)
       let captured = clavisFinalTranscript;
       let interim = '';
-      const input = document.getElementById('jarvis-input');
-      
+
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (!e.results[i]) continue;
         const t = e.results[i][0].transcript;
         if (e.results[i].isFinal) {
+          // A late final of Clavis's own last sentence is not part of his command.
+          const v = window.ClavisEar?.judge?.(t);
+          if (v && !v.accept && /echo/.test(v.reason)) continue;
           captured += t + ' ';
         } else {
           interim += t;
         }
       }
-      
+
       const fullText = (captured + interim).trim();
       clavisFinalTranscript = captured.trim();
-      if (input && fullText) {
-        input.value = fullText;
-        autoGrowJarvisInput();
+      if (fullText && !clavisCaptureStartAt) clavisCaptureStartAt = Date.now() - 800;
+      if (fullText) {
+        clavisShowVoicePreview(fullText);
+        clearTimeout(clavisFollowUpTimer);
       }
       const subText = document.getElementById('jarvis-subtitle-text');
       if (subText && fullText) {
         subText.textContent = fullText;
       }
 
+      const openMic = Date.now() < clavisFollowUpUntil;
+      const commit = (value) => {
+        const finalText = clavisCommitCommand(value);
+        clavisFinalTranscript = '';
+        jarvisAwake = false;
+        clavisFollowUpUntil = 0;
+        const since = clavisCaptureStartAt;
+        clavisCaptureStartAt = 0;
+        if (!finalText) return;
+        document.getElementById('jarvis-voice-btn')?.classList.remove('recording');
+        commitJarvisVoiceInput(finalText, { openMic, since, source: 'wake' });
+      };
       clearTimeout(relistenTimer);
-      relistenTimer = setTimeout(() => {
-        const finalText = clavisCommitCommand(input ? input.value.trim() : '');
-        if (finalText) {
-          jarvisAwake = false;
-          const btn = document.getElementById('jarvis-voice-btn');
-          btn?.classList.remove('recording');
-          if (input) input.value = finalText;
-          handleJarvisSend({ source: 'voice' });
-        }
-      }, 1600); // natural pause, without 3 s of dead air before every reply
+      relistenTimer = setTimeout(() => commit(fullText), 1600); // natural pause, without 3 s of dead air before every reply
       if (/\b(go for it|that's it|thats it|backseat|done|over)\.?\s*$/i.test(fullText)) {
         clearTimeout(relistenTimer);
-        const finalText = clavisCommitCommand(fullText);
-        if (input && finalText) { input.value = finalText; jarvisAwake = false; handleJarvisSend({ source: 'voice' }); }
+        commit(fullText);
       }
     }
   };
@@ -1910,6 +2037,7 @@ function startWakeListener() {
 }
 
 function stopWakeListener(keepAwake = false) {
+  window.ClavisEar?.tap?.stop?.('wake');
   if (window.LocalSpeechEngine) window.LocalSpeechEngine.stopInput?.();
   if (wakeRecognition) {
     wakeStopRequested = true;
@@ -1928,12 +2056,33 @@ function scheduleHandsFreeRelisten() {
     if (jarvisHandsFree && isJarvisSpeaking) {
       scheduleHandsFreeRelisten();
     } else if (jarvisHandsFree) {
-      jarvisAwake = false;
+      // Like a person in a conversation: for a few seconds after a reply he
+      // can just answer, no "Clavis" needed. Words in this window still pass
+      // ClavisEar (not echo, sounds like a request, his voice if enrolled);
+      // silence or chatter drops back to wake-word listening.
+      const followUp = localStorage.getItem('clavis_followup_window') !== 'false'
+        && !window.ClavisLive?.isActive?.() && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+      jarvisAwake = followUp;
+      clavisFinalTranscript = '';
+      clavisCaptureStartAt = 0;
+      clavisFollowUpUntil = followUp ? Date.now() + 7000 : 0;
+      clearTimeout(clavisFollowUpTimer);
+      if (followUp) {
+        clavisFollowUpTimer = setTimeout(() => {
+          if (jarvisAwake && !clavisFinalTranscript && Date.now() >= clavisFollowUpUntil) {
+            jarvisAwake = false;
+            clavisFollowUpUntil = 0;
+            window.ClavisEar?.caption?.listening(false);
+            setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
+          }
+        }, 7100);
+        window.ClavisEar?.caption?.listening(true);
+      }
       startWakeListener();
       if (localStorage.getItem('clavis_sound_trigger_enabled') !== 'false') startClavisSoundTriggers();
-      setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
+      setJarvisStatus(followUp ? 'awake' : 'listening', followUp ? 'Boliye, sir…' : 'Sun raha hoon — bolo "Clavis"');
     }
-  }, 1000);
+  }, 700);
 }
 
 // Soft two-tone chime so the user knows Jarvis is now listening.
@@ -2172,6 +2321,7 @@ async function legacySpeakJarvisTextV1(text) {
   stopClavisSoundTriggers();
   setJarvisStatus('speaking', clean.slice(0, 48) + (clean.length > 48 ? '...' : ''));
   window.ClavisMind?.noteSpeakingStarted?.(clean);
+  window.ClavisEar?.noteSpeaking?.(clean);
   const subText = document.getElementById('jarvis-subtitle-text');
   if (subText) subText.textContent = clean;
 
@@ -2179,7 +2329,7 @@ async function legacySpeakJarvisTextV1(text) {
     isJarvisSpeaking = false;
     clearTimeout(speechSafetyTimer);
     currentPlayingAudio = null;
-    window.ClavisMind?.noteSpeakingStopped?.();
+    window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     if (window.ClavisBargeIn) window.ClavisBargeIn.disarm();
     if (jarvisAwake) setJarvisStatus('awake', 'Haan sir, boliye...');
     else setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
@@ -2387,7 +2537,7 @@ function stopJarvisSpeech() {
 }
 
 function initClavisLocalVoiceControls() {
-  const voice = localStorage.getItem('clavis_gemini_voice') || 'Charon';
+  const voice = window.ClavisVoice?.primaryVoice?.() || localStorage.getItem('clavis_gemini_voice') || 'Kore';
   ['clavis-gemini-voice', 'sm-gemini-voice'].forEach((id) => { const el = document.getElementById(id); if (el) el.value = voice; });
 }
 
@@ -2395,18 +2545,24 @@ function initClavisLocalVoiceControls() {
 // itself disarms before invoking this callback; restart capture only in
 // hands-free mode so a normal tap-to-talk session stays predictable.
 function handleClavisBargeIn() {
-  if (!isJarvisSpeaking) return;
-  try { jarvisController?.abort('barge-in'); } catch (_) {}
-  jarvisController = null;
-  stopJarvisSpeech();
-  isJarvisSpeaking = false;
-  window.ClavisMind?.noteInterrupted?.();
-  setJarvisStatus('interrupted', 'Aap boliye...');
-  if (jarvisHandsFree) {
-    setTimeout(() => {
-      if (!isJarvisSpeaking && jarvisHandsFree) startJarvisVoiceInput({ handsFreeCapture: true, persistent: true });
-    }, 90);
+  if (!interruptClavisSpeech()) return;
+  // He is talking right now, so listen — in every mode, not just hands-free
+  // (before, a tap-to-talk user who interrupted was simply not heard).
+  // In hands-free the running wake recognizer is already hearing him.
+  if (wakeRecognition && jarvisHandsFree) {
+    jarvisAwake = true;
+    clavisFinalTranscript = '';
+    clavisFollowUpUntil = 0;
+    clavisCaptureStartAt = Date.now() - 600;
+    window.ClavisEar?.caption?.listening(true);
+    setJarvisStatus('awake', 'Haan sir, boliye...');
+    return;
   }
+  setTimeout(() => {
+    if (!isJarvisSpeaking && !jarvisRecognition && !isGroqRecording) {
+      startJarvisVoiceInput({ handsFreeCapture: true, awakeCapture: true, persistent: false });
+    }
+  }, 60);
 }
 window.handleClavisBargeIn = handleClavisBargeIn;
 
@@ -2439,7 +2595,7 @@ async function legacySpeakJarvisTextV2(text) {
     jarvisSpeechAbortController = null;
     currentPlayingAudio = null;
     isJarvisSpeaking = false;
-    window.ClavisMind?.noteSpeakingStopped?.();
+    window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     window.ClavisBargeIn?.disarm?.();
     if (jarvisAwake) setJarvisStatus('awake', 'Haan sir, boliye...');
     else setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
@@ -2449,6 +2605,7 @@ async function legacySpeakJarvisTextV2(text) {
   stopClavisSoundTriggers();
   setJarvisStatus('speaking', clean.slice(0, 48) + (clean.length > 48 ? '...' : ''));
   window.ClavisMind?.noteSpeakingStarted?.(clean);
+  window.ClavisEar?.noteSpeaking?.(clean);
   const subText = document.getElementById('jarvis-subtitle-text');
   if (subText) subText.textContent = clean;
   jarvisSpeechSafetyTimer = setTimeout(doneSpeaking, Math.max(25000, Math.min(90000, clean.length * 180)));
@@ -2587,6 +2744,7 @@ async function speakJarvisText(text) {
   isJarvisSpeaking = true;
   setJarvisStatus('speaking', clean.slice(0, 48) + (clean.length > 48 ? '...' : ''));
   window.ClavisMind?.noteSpeakingStarted?.(clean);
+  window.ClavisEar?.noteSpeaking?.(clean);
   window.ClavisBargeIn?.arm?.(handleClavisBargeIn).catch?.(() => {});
   const subtitle = document.getElementById('jarvis-subtitle-text');
   if (subtitle) subtitle.textContent = clean;
@@ -2595,7 +2753,7 @@ async function speakJarvisText(text) {
     if (!active()) return;
     isJarvisSpeaking = false;
     jarvisSpeechAbortController = null;
-    window.ClavisMind?.noteSpeakingStopped?.();
+    window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     window.ClavisBargeIn?.disarm?.();
     if (jarvisAwake) setJarvisStatus('awake', 'Haan sir, boliye...');
     else setJarvisStatus('online', 'Clavis Ready');

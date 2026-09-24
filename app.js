@@ -5004,8 +5004,9 @@ function saveVoiceSettings() {
   const tts = document.getElementById('sm-tts-model');
   safeLocalStorageSet('skylark-tts-model', 'gemini');
   safeLocalStorageSet('skylark-tts-engine', 'gemini');
-  const geminiVoice = document.getElementById('sm-gemini-voice')?.value || document.getElementById('clavis-gemini-voice')?.value || 'Charon';
-  safeLocalStorageSet('clavis_gemini_voice', geminiVoice);
+  const geminiVoice = document.getElementById('sm-gemini-voice')?.value || document.getElementById('clavis-gemini-voice')?.value || 'Kore';
+  // setVoice also remembers a male pick as the fallback voice.
+  if (!window.ClavisVoice?.setVoice?.(geminiVoice)) safeLocalStorageSet('clavis_gemini_voice', geminiVoice);
   const speed = document.getElementById('sm-speech-speed');
   if (speed) safeLocalStorageSet('skylark-speech-speed', speed.value);
   const wakeEl = document.getElementById('clavis-wake-words');

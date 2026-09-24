@@ -1414,7 +1414,7 @@
                   </div>
                 </div>
                 <div class="clavis-voice-grid">
-                  <label>Voice<select id="clavis-gemini-voice"><option value="Charon" selected>Charon · composed narration</option><option value="Orus">Orus · narration</option><option value="Kore">Kore · clear, neutral</option><option value="Fenrir">Fenrir · dramatic</option><option value="Puck">Puck · dramatic</option></select></label>
+                  <label>Voice<select id="clavis-gemini-voice"><optgroup label="Female · Hindi + English (first choice)"><option value="Kore" selected>Kore · clear, warm</option><option value="Sulafat">Sulafat · warm</option><option value="Aoede">Aoede · breezy</option><option value="Leda">Leda · youthful</option><option value="Despina">Despina · smooth</option><option value="Achernar">Achernar · soft</option></optgroup><optgroup label="Male · Hindi + English (auto fallback)"><option value="Charon">Charon · composed, Jarvis-like</option><option value="Orus">Orus · firm</option><option value="Iapetus">Iapetus · clear</option><option value="Fenrir">Fenrir · excitable</option><option value="Puck">Puck · upbeat</option></optgroup></select></label>
                 </div>
                 <div class="clavis-mic-health" data-clavis-mic-status data-status="info">Microphone: tap the mic once to grant access · Hands-Free restores after grant</div>
                 <div class="clavis-voice-actions">
@@ -4927,7 +4927,26 @@
 
               <div class="smodal-field">
                 <div class="smodal-field-left"><label class="smodal-label" for="sm-gemini-voice">Voice</label></div>
-                <select id="sm-gemini-voice" class="smodal-select"><option value="Charon" selected>Charon · composed narration</option><option value="Orus">Orus · narration</option><option value="Kore">Kore · clear, neutral</option><option value="Fenrir">Fenrir · dramatic</option><option value="Puck">Puck · dramatic</option></select>
+                <select id="sm-gemini-voice" class="smodal-select"><optgroup label="Female · Hindi + English (first choice)"><option value="Kore" selected>Kore · clear, warm</option><option value="Sulafat">Sulafat · warm</option><option value="Aoede">Aoede · breezy</option><option value="Leda">Leda · youthful</option><option value="Despina">Despina · smooth</option><option value="Achernar">Achernar · soft</option></optgroup><optgroup label="Male · Hindi + English (auto fallback)"><option value="Charon">Charon · composed, Jarvis-like</option><option value="Orus">Orus · firm</option><option value="Iapetus">Iapetus · clear</option><option value="Fenrir">Fenrir · excitable</option><option value="Puck">Puck · upbeat</option></optgroup></select>
+              </div>
+
+              <div class="smodal-field">
+                <div class="smodal-field-left">
+                  <label class="smodal-label">Voice ID <span class="smodal-hint">(beta)</span></label>
+                  <span class="smodal-hint" id="sm-voiceid-hint">Register your voice once — background voices are ignored unless they say “Clavis”.</span>
+                </div>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <button type="button" class="smodal-btn-primary" id="sm-voiceid-btn" onclick="window.ClavisEar?.voiceId?.openEnroll?.().then(function(){ if (typeof window.clavisSyncVoiceIdUi==='function') window.clavisSyncVoiceIdUi(); })">Register my voice</button>
+                  <label class="smodal-switch" title="Use Voice ID"><input type="checkbox" id="sm-voiceid-toggle" onchange="window.ClavisEar?.voiceId?.setEnabled?.(this.checked)"><span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span></label>
+                </div>
+              </div>
+
+              <div class="smodal-field">
+                <div class="smodal-field-left">
+                  <label class="smodal-label">Live caption</label>
+                  <span class="smodal-hint">Show what you say under the top-right buttons while you talk</span>
+                </div>
+                <label class="smodal-switch"><input type="checkbox" id="sm-live-caption-toggle" checked onchange="window.ClavisEar?.caption?.setEnabled?.(this.checked)"><span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span></label>
               </div>
 
             <div class="smodal-field smodal-field-range">
@@ -5474,5 +5493,15 @@
   <script src="clavis-intelligence.js?v=1.1" defer></script>
   <script src="clavis-composer-iq.js?v=1.0" defer></script>
   <script src="clavis-peek-iq.js?v=1.1" defer></script>
+  <!-- CLAVIS EAR / INTENT / AUTOMATION (2026-09-24): hears only sir (self-echo
+       guard, voice ID, smarter barge-in), a Siri-style live caption instead of
+       typing speech into the composer, a fast local intent layer (close map /
+       close everything / short commands) and PC + website automation.
+       clavis-olive.css: rich olive-green buttons. Loaded last to win the cascade. -->
+  <link rel="stylesheet" href="clavis-ear.css?v=1.0">
+  <link rel="stylesheet" href="clavis-olive.css?v=1.0">
+  <script src="clavis-ear.js?v=1.0" defer></script>
+  <script src="clavis-intent.js?v=1.0" defer></script>
+  <script src="clavis-automation.js?v=1.0" defer></script>
 </body>
 </html>
