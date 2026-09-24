@@ -531,7 +531,8 @@
         .then(function (res) {
           if (!id) return res;
           if (res && res.handled) {
-            complete(id, { type: 'text', text: res.spoken || 'Done' }, []);
+            // `text` is what belongs on screen (e.g. a website brief); `spoken` is the voice line.
+            complete(id, { type: 'text', text: res.text || res.spoken || 'Done' }, []);
           } else {
             Store.clear(id);   // not a device command after all — engine takes over
           }

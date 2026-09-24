@@ -264,8 +264,9 @@
         // rather than `start` popping a "Windows cannot find…" dialog. Bare
         // executables / protocols ("mspaint.exe", "ms-settings:") still go
         // through /open below.
+        // (Returned, not thrown: some callers fire-and-forget open().)
         if (r?.notInstalled && !/^[\w.-]+\.(exe|msc|cpl)$|^[\w-]+:$/i.test(String(target).trim())) {
-          throw new Error(`${r.name || target} is PC pe install nahi mila.`);
+          return { ok: false, native: true, notInstalled: true, error: `${r.name || target} is PC pe install nahi mila.` };
         }
       }
       await bridge('/open', 'POST', { target: web || appFor(target)?.exe || target });

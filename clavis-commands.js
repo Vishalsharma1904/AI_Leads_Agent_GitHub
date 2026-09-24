@@ -172,6 +172,7 @@
       if (target) {
         try {
           const r = await window.ClavisPC.open(target);
+          if (r && r.ok === false) return { handled: true, spoken: r.error || `${target} nahi khul paya.` };
           return { handled: true, spoken: r.native ? `${target} khol diya.` : `${target} browser me khol diya.` };
         } catch (err) { return { handled: true, spoken: err.message }; }
       }

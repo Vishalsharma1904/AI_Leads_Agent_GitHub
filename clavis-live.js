@@ -617,6 +617,8 @@ ${memoryLines()}`;
       if (!target) return { error: 'Nothing to open.' };
       if (!window.ClavisPC?.open) return { error: 'PC control is not loaded.' };
       const r = await window.ClavisPC.open(target);
+      // open() reports an app that isn't installed instead of pretending.
+      if (r && r.ok === false) return { ok: false, error: r.error || `Could not open ${target}.` };
       return { ok: true, opened: target, via: r?.native ? 'PC bridge' : 'browser tab' };
     }
     if (name === 'read_website') return readWebsite(args);

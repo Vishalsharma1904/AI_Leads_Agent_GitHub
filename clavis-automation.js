@@ -427,7 +427,8 @@
     const t = norm(raw);
     if (!t || t.length > 400 || NEVER_RE.test(t)) return false;
     if (/\b(leads?|candidates?|contacts?|companies|clients?|prospects?)\b/.test(t)) return false;
-    const thing = (PC()?.matchApps(t).length) || /\b(pc|computer|laptop|desktop|browser|tab|window|chrome)\b/.test(t);
+    // Not "window"/"tab": those are usually Clavis's own floating window.
+    const thing = (PC()?.matchApps(t).length) || /\b(pc|computer|laptop|desktop|browser)\b/.test(t);
     const act = OPEN_VERB.test(t) || TYPE_AT.test(t) || KEY_VERB.test(t) || SCROLL_WORD.test(t) || /\b(new\s+tab|naya\s+tab|save\s+karo|minimi[sz]e|maximi[sz]e)\b/.test(t);
     return Boolean(thing && act);
   }
@@ -658,14 +659,15 @@
       let r;
       try { r = await withTimeout(runStep(step, ctx, steps.slice(i + 1)), stepBudget(step), stepLabel(step)); }
       catch (err) { r = { ok: false, say: `${stepNoun(step)} nahi ho paya (${err?.message || err})` }; }
-      ctx.results.push({ step, ...r });
-      if (r && r.stop) break;
-      if (r && r.ok === false && r.fatal !== false && step.type !== 'wait') {
+      const entry = { step, ...(r || { ok: false, say: `${stepNoun(step)} nahi ho paya` }) };
+      ctx.results.push(entry);
+      if (entry.stop) break;
+      if (entry.ok === false && entry.fatal !== false && step.type !== 'wait') {
         // Stopped before typing? Don't lose his text — it goes to the clipboard.
         const pending = steps.slice(i + 1).find((x) => x.type === 'type' && !x.compose);
         if (pending) {
           const copied = await P.copyText(pending.text).catch(() => false);
-          if (copied) r.say += ' — text clipboard me copy kar diya, Ctrl+V dabaiye';
+          if (copied) entry.say += ' — text clipboard me copy kar diya, Ctrl+V dabaiye';
         }
         break;
       }
