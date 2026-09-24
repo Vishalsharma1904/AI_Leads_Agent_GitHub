@@ -78,3 +78,10 @@
     animation: none !important;
   }
 }
+
+/* The orb is always a circle — even if a graphics tier or an older cached
+   script skips its glass lens pass, the strands can never show as a square. */
+#orb-container canvas {
+  border-radius: 50% !important;
+  clip-path: circle(49.5% at 50% 50%);
+}

@@ -199,3 +199,8 @@ html[data-theme="dark"] #clavis-voiceid-sheet .cv-card {
 #clavis-voiceid-sheet.is-recording .cv-mic { animation: ceBreathDot 1.2s ease-in-out infinite; }
 #clavis-voiceid-sheet.is-done .cv-fill { stroke-dashoffset: 0; }
 @keyframes ceBreathDot { 50% { transform: scale(1.35); opacity: 0.6; } }
+
+/* Never write over an open dialog (Settings, credential sheet, etc.). */
+body:has(#settings-overlay.open) #clavis-ear-caption,
+body:has(.clavis-credential-dialog[aria-hidden="false"]) #clavis-ear-caption,
+body:has(#clavis-voiceid-sheet) #clavis-ear-caption { opacity: 0 !important; }

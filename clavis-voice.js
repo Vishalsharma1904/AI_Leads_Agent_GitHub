@@ -434,6 +434,7 @@
       sel.addEventListener('change', () => window.ClavisVoice.setVoice(sel.value));
       if (id !== 'sm-gemini-voice') return;
       const row = sel.closest('.smodal-field');
+      mountKeyRow(row);
       if (!row || document.getElementById('sm-gemini-voice-male')) return;
       const male = document.createElement('div');
       male.className = 'smodal-field';
@@ -450,6 +451,45 @@
       });
     });
   }
+  // A plain, visible place to paste the Google AI Studio key — the only
+  // other way in was a dialog that appeared when something else failed.
+  function mountKeyRow(voiceRow) {
+    if (!voiceRow || document.getElementById('sm-gemini-key')) return;
+    const box = document.createElement('div');
+    box.className = 'smodal-field';
+    const has = keys().length > 0;
+    box.innerHTML = `<div class="smodal-field-left"><label class="smodal-label" for="sm-gemini-key">Google AI Studio key</label>
+      <span class="smodal-hint" id="sm-gemini-key-hint">${has ? 'Connected — Clavis speaks with Google voices.' : 'Free key → natural Hindi + English voices and live talk. <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener">Get a key ↗</a>'}</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><input id="sm-gemini-key" type="password" autocomplete="off" spellcheck="false" placeholder="${has ? '•••••• connected — paste to add another' : 'AIza…'}" style="width:220px;padding:8px 10px;border-radius:10px;border:1px solid rgba(127,127,127,.3);background:transparent;color:inherit;font:inherit">
+      <button type="button" class="smodal-btn-primary" id="sm-gemini-key-save">Save &amp; test</button></div>`;
+    voiceRow.before(box);
+    const input = box.querySelector('#sm-gemini-key');
+    const hint = box.querySelector('#sm-gemini-key-hint');
+    box.querySelector('#sm-gemini-key-save').addEventListener('click', async (ev) => {
+      const btn = ev.currentTarget;
+      const k = String(input.value || '').trim();
+      if (!/^AIza\S{20,}$/.test(k)) { hint.textContent = 'Yeh Google AI Studio key nahi lagti — "AIza…" se shuru hoti hai.'; return; }
+      btn.disabled = true; hint.textContent = 'Check kar raha hoon…';
+      const prevBrain = localStorage.getItem('clavis_ai_provider');
+      try {
+        if (window.ClavisKeyVault?.add) await window.ClavisKeyVault.add('gemini', k);
+        else window.ClavisDirect?.setKey?.('gemini', k);
+        // A voice key must not quietly replace the chat brain he chose.
+        if (prevBrain && prevBrain !== 'gemini') localStorage.setItem('clavis_ai_provider', prevBrain);
+        S.rest.clear();
+        input.value = '';
+        hint.textContent = 'Key saved — test awaaz chal rahi hai…';
+        const ok = await speak('Namaste sir, main Clavis hoon. Ab main Google ki awaaz me Hindi aur English dono bolti hoon.');
+        const st = window.ClavisVoice.status();
+        hint.textContent = st.engine === 'google-tts' && ok
+          ? `Connected ✓ — ${st.lastVoice} bol rahi hai (${st.model}).`
+          : `Key saved, lekin Google voice abhi nahi chali: ${st.lastError || 'quota/limit'} — browser voice chal rahi hai.`;
+      } catch (err) {
+        hint.textContent = 'Key save nahi hui: ' + (err?.message || err);
+      } finally { btn.disabled = false; }
+    });
+  }
+
   document.addEventListener('click', () => setTimeout(mountPickers, 80), { passive: true });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPickers, { once: true }); else setTimeout(mountPickers, 0);
 

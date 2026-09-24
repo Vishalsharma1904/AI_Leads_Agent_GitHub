@@ -853,12 +853,13 @@ function showView(viewName) {
     breadcrumb.textContent = labels[viewName] || viewName;
   }
 
-  // Settings opens as a macOS overlay — never as a blank page view (requires login)
+  // Settings opens as a macOS overlay — never as a blank page view.
+  // openSettingsModal() owns the access check (localhost / signed-in /
+  // app shell visible). Gating on the skylark_logged_in flag here too
+  // meant that whenever that flag was 'false' — it is reset on every page
+  // load — the sidebar's Settings (and #settings) silently did nothing.
   if (viewName === 'settings') {
-    const isLoggedIn = localStorage.getItem('skylark_logged_in') === 'true';
-    if (isLoggedIn && typeof window.openSettingsModal === 'function') {
-      window.openSettingsModal();
-    }
+    if (typeof window.openSettingsModal === 'function') window.openSettingsModal();
     return;
   }
 

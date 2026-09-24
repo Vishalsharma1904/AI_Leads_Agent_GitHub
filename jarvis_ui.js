@@ -1053,7 +1053,9 @@ async function handleJarvisSend(options) {
   try {
     const plan = window.LeadCandidateDomain?.parseRequest?.(text);
     if (plan?.isSearch && !images.length && !attachments.length && window.ChatEngine?.sendMessage
-        && !/\b(export|download|sync|show|list|stats?)\b/i.test(text)) {
+        // About leads he already HAS (report / summary / count / analysis)
+        // is a question for the brain's lead tools, not a new scrape.
+        && !/\b(export|download|sync|show|list|stats?|report|summary|summari\w*|analy\w*|kitni|kitne|count|total|breakdown|status|saved|purani|existing)\b/i.test(text)) {
       clavisSetDisplay(taskId, 'window');
       clavisReveal(taskId);
       setJarvisStatus('thinking', 'Starting the lead search...');
@@ -1572,14 +1574,35 @@ function legacyStartNativeSpeechRecognition(options = {}) {
   }
 }
 
-// How long to wait for more words: a sentence that ends on "ki / ke / aur /
-// and / to…" isn't finished, so give him time instead of acting on half a
-// command; a complete one still goes quickly.
+// How long to wait for more words. Hindi speakers pause mid-thought
+// ("okay to tum mujhe … aur jo hai …"); committing on every pause sent
+// fragments to the AI, which then asked "what exactly do you want?".
+//   finished command (…karo / dikhao / batao / chahiye / ?)  → quick
+//   dangling thought (…mujhe / tum / jo / aur / matlab / okay) → wait
+//   anything else (ends on a noun: "Gurgaon ki leads")         → a beat
+const CLAVIS_DONE_END = /(\b(karo|kardo|kar do|kariye|kijiye|karein|karna hai|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|samjhao|kholo|khol do|band karo|band kar do|hatao|hata do|nikalo|nikal do|bhejo|bhej do|likho|likh do|chahiye|chalao|chala do|dhundho|dhoondho|lao|le aao|sunao|bolo|ruko|bas|chup|stop|please|thanks|thank you|shukriya|done|ho gaya|theek hai|hai na|kya hai|kaun hai|kahan hai|kaise ho)|[?!.।])\s*$/i;
+const CLAVIS_DANGLING_END = /\b(ki|ke|ka|ko|se|me|mein|par|pe|aur|ya|ki jo|jo|jaise|matlab|yaani|mtlb|like|um+|uh+|hmm+|toh|to|phir|fir|abhi|bhi|ek|koi|kuch|mujhe|mujhko|muje|tum|tumhe|tumko|aap|aapko|hum|hame|humko|main|mai|mera|meri|mere|apna|apni|and|or|the|a|an|for|of|in|with|my|your|this|that|okay|ok|so|well|actually|basically|clavis|sir)$/i;
 function clavisPauseFor(text, base) {
   const t = String(text || '').trim().toLowerCase();
-  if (/\b(ki|ke|ka|ko|se|me|mein|par|pe|aur|ya|and|or|the|to|for|of|in|with|a|an|my|mera|meri|mere|is|us|jo|ki\s+jo|jaise|wala|wali)$/.test(t)) return base + 1300;
-  if (t.split(/\s+/).length <= 1) return base + 500;
-  return base;
+  if (!t) return base;
+  if (CLAVIS_DONE_END.test(t)) return base;
+  if (CLAVIS_DANGLING_END.test(t)) return base + 2200;
+  if (t.split(/\s+/).length <= 1) return base + 900;
+  return base + 600;
+}
+// A voice fragment that is obviously unfinished (all filler / ends on a
+// dangling word, no verb) is not a request — keep listening instead of
+// sending it to the AI.
+function clavisIsFragment(text) {
+  const t = String(text || '').trim().toLowerCase().replace(/[.,!?।]+$/g, '');
+  const words = t.split(/\s+/).filter(Boolean);
+  if (!words.length) return true;
+  if (words.length > 6) return false;
+  if (CLAVIS_DONE_END.test(t)) return false;
+  // Any action verb anywhere = a real request ("ek report likho sales ki").
+  if (/\b(karo|kar|kijiye|dikhao|dikha|batao|bata|kholo|khol|band|hatao|nikalo|nikal|bhejo|likho|likh|chahiye|chalao|dhundho|lao|search|open|close|show|find|send|write|play|call|leads?|map|photo|photos)\b/.test(t)) return false;
+  if (words.length <= 3 && /^(aur|to|toh|phir|fir|matlab|and|so|or|ya)\b/.test(t)) return true;
+  return CLAVIS_DANGLING_END.test(t);
 }
 
 // Live preview of what sir is saying. The caption owns it; the composer is
@@ -1634,6 +1657,14 @@ function commitJarvisVoiceInput(transcript, meta = {}) {
     return;
   }
   if (verdict.barge) interruptClavisSpeech();
+  // "okay to tum mujhe…" — he hasn't said it yet. Nudge, keep listening.
+  if (clavisIsFragment(finalText)) {
+    window.ClavisEar?.caption?.final(finalText, false);
+    jarvisVoiceFinalTranscript = '';
+    jarvisAwake = true;
+    setJarvisStatus('awake', 'Haan sir, boliye…');
+    return;
+  }
   window.ClavisEar?.tap?.stop?.('native');
   window.ClavisEar?.caption?.final(finalText, true);
   // "Clavis, get me leads..." in one breath: hand the command straight to Live.
