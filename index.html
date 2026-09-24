@@ -39,6 +39,10 @@
       document.documentElement.setAttribute('data-theme', savedTheme);
     })();
   </script>
+  <!-- Appearance (colours, fonts, minimal) — applied before first paint. -->
+  <script src="clavis-appearance.js?v=1.1"></script>
+  <!-- Graphics tier (Auto / Smooth / Max) — must run before the orb draws. -->
+  <script src="clavis-perf.js?v=1.1"></script>
   <script>
     (function() {
       if (window.location.protocol === 'file:') {
@@ -3300,14 +3304,14 @@
   <script src="clavis-local-speech.js?v=2.3" defer></script>
   <script src="clavis-audio-trigger.js?v=2.2" defer></script>
   <script src="clavis-canvas.js?v=1.3" defer></script>
-  <script src="clavis-live.js?v=3.4" defer></script>
+  <script src="clavis-live.js?v=3.5" defer></script>
   <script src="clavis-cognition.js?v=1.0" defer></script>
   <script src="clavis-confirm-hud.js?v=1.0" defer></script>
   <script src="clavis-task-hud.js?v=1.0" defer></script>
   <script src="clavis-mind.js?v=1.1" defer></script>
   <script src="clavis-pc.js?v=1.1" defer></script>
   <script src="clavis-prompt-master.js?v=1.1" defer></script>
-  <script src="clavis-voice-nav.js?v=1.1" defer></script>
+  <script src="clavis-voice-nav.js?v=1.2" defer></script>
   <script src="clavis-commands.js?v=1.1" defer></script>
   <script src="clavis-suggestions.js?v=1.1" defer></script>
   <script src="clavis-proactive.js?v=1.1" defer></script>
@@ -3315,7 +3319,7 @@
   <script src="clavis-boot-greet.js?v=1.1" defer></script>
   <script src="clavis-voice.js?v=1.1" defer></script>
   <script src="jarvis_ui.js?v=1.10" defer></script>
-  <script src="strands-orb.js?v=3.1" defer></script>
+  <script src="strands-orb.js?v=3.2" defer></script>
   <script src="app-shortcuts.js?v=1.0" defer></script>
   <script src="voice_ai.js?v=1.0" defer></script>
   <script src="nexus-enhancements.js?v=2.1" defer></script>
@@ -5491,7 +5495,7 @@
   <script src="clavis-pencil.js?v=1.0" defer></script>
   <script src="clavis-luxe.js?v=2.4" defer></script>
   <script src="clavis-intelligence.js?v=1.2" defer></script>
-  <script src="clavis-composer-iq.js?v=1.1" defer></script>
+  <script src="clavis-composer-iq.js?v=1.2" defer></script>
   <script src="clavis-peek-iq.js?v=1.2" defer></script>
   <!-- CLAVIS EAR / INTENT / AUTOMATION (2026-09-24): hears only sir (self-echo
        guard, voice ID, smarter barge-in), a Siri-style live caption instead of
@@ -5502,7 +5506,7 @@
   <link rel="stylesheet" href="clavis-olive.css?v=1.1">
   <link rel="stylesheet" href="clavis-silk.css?v=1.1">
   <script src="clavis-ear.js?v=1.2" defer></script>
-  <script src="clavis-intent.js?v=1.2" defer></script>
+  <script src="clavis-intent.js?v=1.3" defer></script>
   <script src="clavis-automation.js?v=1.1" defer></script>
   <script src="clavis-business.js?v=1.1" defer></script>
 </body>

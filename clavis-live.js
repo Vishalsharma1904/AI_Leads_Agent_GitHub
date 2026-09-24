@@ -650,6 +650,12 @@ ${memoryLines()}`;
     if (live.length) send({ toolResponse: { functionResponses: live } });
   }
 
+  // First wake shouldn't wait on downloading the audio worklets.
+  try {
+    const warm = () => ['clavis-mic-capture-worklet.js?v=2', 'clavis-pcm-player-worklet.js?v=3'].forEach((u) => fetch(u).catch(() => {}));
+    (window.requestIdleCallback || ((f) => setTimeout(f, 3000)))(warm);
+  } catch (_) {}
+
   /* ── setup ─────────────────────────────────────────────────── */
   function buildSetup(model) {
     // 3.8 Live: proactive audio is built in and affective dialog isn't offered;
@@ -1209,9 +1215,11 @@ ${memoryLines()}`;
     pauseLegacy();
     showHud();
     setState('connecting');
+    // The socket + setup handshake (0.5-1.5 s) runs WHILE the speaker and
+    // mic warm up — it needs neither. Words said meanwhile are prerolled.
+    connect();
     try {
-      await ensureOutput();
-      await startMic();
+      await Promise.all([ensureOutput(), startMic()]);
     } catch (e) {
       console.warn('[ClavisLive] audio start failed', e);
       const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError';
@@ -1226,6 +1234,8 @@ ${memoryLines()}`;
       resumeLegacy();
       return false;
     }
+    // connect() may already have ended the session (no usable key).
+    if (S.phase === 'off') return false;
     // A normal browser tab may hold audio until the first click (Chrome's
     // autoplay rule). Keep listening, and let the first click unlock the voice.
     if (S.outCtx.state !== 'running') {
@@ -1238,7 +1248,6 @@ ${memoryLines()}`;
     S.lastActivity = Date.now();
     S.rafId = requestAnimationFrame(levelLoop);
     S.idleTimer = setInterval(idleCheck, 5000);
-    connect();
     return true;
   }
 

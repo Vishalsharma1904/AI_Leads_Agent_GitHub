@@ -133,6 +133,41 @@
     return null;
   }
 
+  /* ── places: instant, no AI round trip ─────────────────────── */
+  // "India Gate map pe dikhao", "show Cyber Hub on map", "map pe Noida",
+  // "hospitals near Cyber Hub", "Sector 44 ke paas ATM". Before, these
+  // waited for the AI to decide to call its map tool — or never did.
+  const NEAR_CATS = { hospital: 'hospital', hospitals: 'hospital', aspatal: 'hospital', clinic: 'clinic', clinics: 'clinic', police: 'police', thana: 'police', school: 'school', schools: 'school', college: 'college', bank: 'bank', banks: 'bank', atm: 'atm', atms: 'atm', hotel: 'hotel', hotels: 'hotel', restaurant: 'restaurant', restaurants: 'restaurant', cafe: 'cafe', cafes: 'cafe', mall: 'mall', malls: 'mall', metro: 'metro', petrol: 'fuel', 'petrol pump': 'fuel', pharmacy: 'pharmacy', chemist: 'pharmacy', gym: 'gym', park: 'park', parking: 'parking', office: 'office', offices: 'office', factory: 'factory', factories: 'factory', warehouse: 'warehouse', mandir: 'worship', temple: 'worship' };
+  function placeIntent(raw) {
+    const C = window.ClavisCanvas;
+    if (!C?.showMap) return null;
+    const r = String(raw || '').replace(/[?!.।]+$/g, '').replace(/\s+/g, ' ').trim();
+    if (r.split(' ').length > 12) return null;
+    const clean = (x) => String(x || '').replace(/^(clavis|please|zara|jara|mujhe|mujhko|hume|sir)\s+/i, '').replace(/\s+(ko|ka|ki|ke|wala|wali)$/i, '').trim();
+    // nearby first: "<category> near <place>" / "<place> ke paas <category>"
+    let mm = r.match(/^(.*?)\b(hospitals?|aspatal|clinics?|police|thana|schools?|college|banks?|atms?|hotels?|restaurants?|cafes?|malls?|metro|petrol pump|petrol|pharmacy|chemist|gym|park|parking|offices?|factor(?:y|ies)|warehouse|mandir|temple)\b\s+(?:near|nearby|around|close to)\s+(.+)$/i)
+      || r.match(/^(.+?)\s+(?:ke|k)\s+(?:paas|pass|aas\s*paas|around)\s+(?:ke\s+|wale\s+|kaun\s+se\s+)?(hospitals?|aspatal|clinics?|police|thana|schools?|college|banks?|atms?|hotels?|restaurants?|cafes?|malls?|metro|petrol pump|petrol|pharmacy|chemist|gym|park|parking|offices?|factor(?:y|ies)|warehouse|mandir|temple)\b/i);
+    if (mm) {
+      const forward = /near|nearby|around|close to/i.test(r.slice(0, r.length)) && mm.length === 4 && NEAR_CATS[String(mm[2]).toLowerCase()];
+      const cat = NEAR_CATS[String(forward ? mm[2] : mm[2]).toLowerCase()] || NEAR_CATS[String(mm[3] || '').toLowerCase()];
+      const where = clean(forward ? mm[3] : mm[1]);
+      if (cat && where) {
+        Promise.resolve(C.showNearby({ category: cat, place: where })).catch(() => {});
+        return { handled: true, spoken: pick([`${where} ke aas-paas ke ${String(forward ? mm[2] : mm[2])} dhoondh raha hoon.`, `${where} ke around scan kar raha hoon, sir.`], 'near') };
+      }
+    }
+    mm = r.match(/^(?:show\s+(?:me\s+)?|open\s+)?(.+?)\s+(?:ko\s+)?(?:on\s+(?:the\s+)?)?(?:map|maps|naksha|google\s*maps?)\s*(?:pe|par|me|mein|main)?\s*(?:dikhao|dikha\s*do|dikhaiye|dikha|kholo|khol\s*do|show|open|pe\s+dikhao)?$/i)
+      || r.match(/^(?:map|maps|naksha)\s+(?:pe|par|me|mein)?\s*(.+?)\s*(?:dikhao|dikha\s*do|kholo|show)?$/i)
+      || r.match(/^(?:show|open)\s+(.+?)\s+on\s+(?:the\s+)?maps?$/i);
+    if (mm) {
+      const where = clean(mm[1]).replace(/\b(ka|ki|ke)\s*$/i, '').trim();
+      if (!where || /^(the|a|my|mera|meri|ye|yeh|is|isko|band|close)$/i.test(where) || CLOSE.test(where)) return null;
+      Promise.resolve(C.showMap({ place: where })).catch(() => {});
+      return { handled: true, spoken: pick([`${where} map par dikha raha hoon.`, `Yeh raha ${where}, sir.`, `${where} — map par le chalta hoon.`], 'map') };
+    }
+    return null;
+  }
+
   /* ── the router ────────────────────────────────────────────── */
   async function route(text, opts = {}) {
     const raw = String(text || '').trim();
@@ -142,6 +177,12 @@
 
     const v = voiceIntent(t);
     if (v) return v;
+
+    // "accent blue karo", "claude wala theme", "minimal mode on"
+    try {
+      const said = window.ClavisAppearance?.command?.(t);
+      if (said) return { handled: true, spoken: said };
+    } catch (_) {}
 
     // "Hum solar lagate hain" / "mera business IT services hai" → leads,
     // competitor filtering and advice follow what he sells.
@@ -196,6 +237,9 @@
 
     const m = mapIntent(t);
     if (m) return m;
+
+    const place = placeIntent(raw);
+    if (place) return place;
 
     return { handled: false };
   }
