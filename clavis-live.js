@@ -329,7 +329,7 @@ ${memoryLines()}`;
         description: 'Search the web for pictures and show them as a grid in the Clavis display (sir can click one to enlarge).',
         parameters: { type: 'OBJECT', properties: {
           query: { type: 'STRING', description: 'What to find pictures of.' },
-          count: { type: 'NUMBER', description: 'How many (3-12, default 9).' },
+          count: { type: 'NUMBER', description: 'How many (2-6, default 6).' },
         }, required: ['query'] },
       },
       {
@@ -577,6 +577,14 @@ ${memoryLines()}`;
         return { ok: false, note: 'Sir did not ask to close the display, so it stays open. Close it only when he clearly says so.' };
       }
       S.lastShow = null;
+    }
+    // Pictures and maps only when HE asked for them — never because a video
+    // or a conversation in the room mentioned something.
+    if (name === 'show_images' && !/\b(photo|photos|foto|image|images|picture|pictures|pic|pics|tasveer\w*|dikha\w*|show|dekh\w*|look)\b|फोटो|तस्वीर|दिखा/i.test(recentUserWords())) {
+      return { ok: false, note: 'He did not ask for pictures. Do not show any; answer in voice only if he spoke to you.' };
+    }
+    if ((name === 'show_map' || name === 'show_nearby') && !/\b(map|maps|naksha|kahan|kaha|kidhar|where|location|near|nearby|paas|dikha\w*|show|route|rasta)\b|मैप|नक्शा|कहाँ|दिखा/i.test(recentUserWords())) {
+      return { ok: false, note: 'He did not ask for a map. Do not open one.' };
     }
     if (name === 'pc_close_window') {
       const heard = recentUserWords().toLowerCase();

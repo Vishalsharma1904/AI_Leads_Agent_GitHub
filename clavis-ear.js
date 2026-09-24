@@ -190,21 +190,22 @@
       // New words over Clavis's voice interrupt it only when they are for
       // Clavis — a request/question, or (once enrolled) sir's own voice.
       // A conversation in the room shouldn't cut Clavis off.
+      // Other new words interrupt only when they are HIS voice (Voice ID) —
+      // a video or people in the room must never cut Clavis off.
       const his = voiceId.enabled() && voiceId.verdict(ctx.since || now() - 4000).verdict === 'owner';
-      if (e.fresh >= 3 && (his || looksLikeRequest(t))) return { accept: true, barge: true, reason: 'fresh-words', text: t };
+      if (e.fresh >= 2 && his) return { accept: true, barge: true, reason: 'his-voice', text: t };
       return { accept: false, reason: 'unsure-while-speaking', text: t, echo: e };
     }
     // A recognizer can also deliver Clavis's words many seconds late.
     const late = echo(t, 9000);
     if (late.n >= 3 && late.score >= 0.8) return { accept: false, reason: 'late-echo', text: t, echo: late };
 
+    // Open mic (no "Clavis" said): only his registered voice counts. "Sounds
+    // like a request" was not enough — "I'm going to go to the next video"
+    // from a video in the room passed that test and opened photos.
     if (ctx.openMic && !byName) {
-      if (voiceId.enabled()) {
-        const v = voiceId.verdict(ctx.since || now() - 6000);
-        if (v.verdict === 'other') return { accept: false, reason: 'not-owner', text: t, voice: v };
-      }
-      const shortReply = t.split(/\s+/).length <= 3 && /\b(haan|han|ha|yes|yeah|no|nahi|nahin|ok|okay|theek|thik|sure|bilkul|done|chalo)\b/i.test(t);
-      if (!(looksLikeRequest(t) || (shortReply && clavisJustAsked()))) return { accept: false, reason: 'not-addressed', text: t };
+      const v = voiceId.enabled() ? voiceId.verdict(ctx.since || now() - 6000) : { verdict: 'unknown' };
+      if (v.verdict !== 'owner') return { accept: false, reason: voiceId.enabled() ? 'not-owner' : 'not-addressed', text: t, voice: v };
     }
     return { accept: true, barge: false, reason: 'ok', text: t };
   }
@@ -521,7 +522,7 @@
       cap.el.classList.remove('is-listening', 'is-dropped');
       cap.el.classList.add('is-in', 'is-settled');
       clearTimeout(cap.hideTimer);
-      cap.hideTimer = setTimeout(() => this.clear(), 2600);
+      cap.hideTimer = setTimeout(() => this.clear(), 4200);   // long enough to read
     },
     listening(on) {
       if (!capEnabled()) return;
@@ -616,7 +617,8 @@
     checks.push(
       judge('mummy ne khana bana liya', { openMic: true }).accept === false,
       judge('Clavis mummy ko call karo', { openMic: true }).accept === true,
-      judge('map band karo', { openMic: true }).accept === true,
+      judge('map band karo', { openMic: true }).accept === false,
+      judge("I'm going to go to the next video", { openMic: true }).accept === false,
       judge('photos dikhao').accept === true,
     );
     said.items = saved;

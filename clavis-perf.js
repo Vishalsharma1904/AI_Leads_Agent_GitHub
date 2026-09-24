@@ -5,11 +5,9 @@
  * and tells the heavy parts how hard to work, so the GPU does the
  * compositing and the CPU isn't asked to repaint what nobody sees:
  *
- *   full   the orb renders at up to 2x DPR with its glass pass;
- *          idles at 40 fps, 60 fps while listening/speaking
- *   lite   (auto on <= 4 GB RAM or <= 4 cores) 1x DPR, no glass pass,
- *          24 fps idle / 45 active, no backdrop blur (the most
- *          expensive effect on weak GPUs), shorter shadows
+ *   full   the orb renders at up to 2x DPR
+ *   lite   (auto on <= 4 GB RAM or <= 4 cores) the orb renders at 1x DPR;
+ *          only an explicit "Smooth" pick also drops backdrop blur
  *
  * Settings → Performance: Auto / Smooth (lite) / Max quality.
  * localStorage: clavis_perf_mode ('auto' | 'lite' | 'full').
@@ -29,13 +27,18 @@
   function apply() {
     const t = tier();
     const lite = t === 'lite';
+    // The orb's glass pass IS its round lens — never drop it (dropping it
+    // turned the orb into a square). No frame caps either: a capped orb
+    // looks choppy. Low-end PCs only render it at 1x pixel density.
     window.__clavisMaxDpr = lite ? 1 : 2;
-    window.__clavisOrbFps = lite ? { idle: 24, active: 45 } : { idle: 40, active: 60 };
-    window.__clavisOrbNoGlass = lite;
+    window.__clavisOrbFps = null;
+    window.__clavisOrbNoGlass = false;
     document.documentElement.setAttribute('data-perf', t);
     let st = document.getElementById('cx-perf-style');
     if (!st) { st = document.createElement('style'); st.id = 'cx-perf-style'; document.head.appendChild(st); }
-    st.textContent = lite ? `
+    // Blur is only removed when he explicitly picks "Smooth" — Auto never
+    // changes how the app looks.
+    st.textContent = lite && mode() === 'lite' ? `
       html[data-perf="lite"] *, html[data-perf="lite"] *::before, html[data-perf="lite"] *::after {
         backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
       }

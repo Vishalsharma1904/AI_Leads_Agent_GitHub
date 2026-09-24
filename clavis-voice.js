@@ -299,7 +299,7 @@
         || voices.find(isHi) || null;
     }
     const saved = localStorage.getItem('jarvis_voice_name');
-    const savedVoice = saved && voices.find((v) => v.name === saved && /^en/i.test(v.lang) && (gender !== 'male' || !FEMALE_NAME.test(v.name)));
+    const savedVoice = saved && voices.find((v) => v.name === saved && /^en/i.test(v.lang) && (gender === 'male' ? !FEMALE_NAME.test(v.name) : !MALE_NAME.test(v.name)));
     return savedVoice
       || voices.find((v) => /en[-_]IN/i.test(v.lang) && want(v) && /natural|online/i.test(v.name))
       || voices.find((v) => /en[-_]IN/i.test(v.lang) && want(v))
@@ -337,6 +337,12 @@
       try { window.speechSynthesis.resume?.(); window.speechSynthesis.speak(u); } catch (_) { resolve(false); }
     });
   }
+  // ONE voice for the whole reply. Picking per sentence gave a male
+  // English voice for English lines and the female Hindi voice for Hindi
+  // lines — two people talking in turn, and Hinglish read with an English
+  // accent. Now: any Hindi in the reply → a real Hindi voice for all of it
+  // (Chrome's is female, so the browser fallback stays female); pure
+  // English → one English voice.
   async function speakBrowser(text, id) {
     if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
     if (!(window.speechSynthesis.getVoices() || []).length) {
@@ -344,24 +350,19 @@
     }
     try { window.speechSynthesis.cancel(); } catch (_) {}
     S.lastEngine = 'browser';
-    const gender = genderOf(fallbackVoice()) || 'male';
-    const hindiMale = hasHindiMale();
-    const list = sentences(genderize(text, gender)).map((s) => ({ s, lang: langOf(s) }));
-    // Hinglish in Roman letters: with a Hindi male voice, transliterate so
-    // it's pronounced as Hindi; without one, the Indian-English male voice
-    // reads Roman Hinglish far better than a female Hindi voice switching in
-    // mid-reply would sound.
-    const ready = list.map((x) => {
-      if (x.lang === 'hinglish' && hindiMale) return toDevanagari(x.s).then((d) => ({ s: d, lang: 'hi' }));
-      if (x.lang === 'hinglish') return Promise.resolve({ s: x.s, lang: 'en' });
-      return Promise.resolve({ s: x.s, lang: x.lang });
-    });
+    const hindiReply = sentences(text).some((x) => langOf(x) !== 'en');
+    const want = genderOf(primaryVoice()) || 'female';
+    // A male Hindi voice only if this PC really has one (Edge: Madhur).
+    const gender = hindiReply && want === 'male' && !hasHindiMale() ? 'female' : want;
+    const lang = hindiReply ? 'hi' : 'en';
+    const voice = pickVoice(lang, gender);
+    S.lastVoice = voice?.name || '';
+    const list = sentences(genderize(text, gender));
+    const ready = list.map((x) => (lang === 'hi' && langOf(x) === 'hinglish' ? toDevanagari(x) : Promise.resolve(x)));
     for (const p of ready) {
-      const { s, lang } = await p;
+      const line = await p;
       if (id !== S.gen) return false;
-      const v = pickVoice(lang, gender);
-      S.lastVoice = v?.name || '';
-      await utter(s, v, lang);
+      await utter(line, voice, lang);
       if (id !== S.gen) return false;
     }
     return true;
@@ -381,7 +382,7 @@
       const progress = { i: 0 };
       const remaining = () => parts.slice(progress.i).join(' ');   // never repeat what was already said
       if (engine() !== 'browser' && anyGemini()) {
-        const first = primaryVoice();
+        const first = VOICES.includes(opts.voice) ? opts.voice : primaryVoice();
         try {
           const done = await speakGemini(parts, id, S.aborter.signal, progress, first);
           S.lastError = '';
@@ -390,9 +391,10 @@
           if (id !== S.gen) return false;   // stopped on purpose (every stop bumps gen)
           S.lastError = e?.message || String(e);
           console.warn(`[ClavisVoice] ${first} unavailable (${S.lastError}) — handing over to the male voice.`);
-          // She failed on the text itself (not quota): he tries the same TTS.
+          // She failed on the text itself (not quota): he tries the same TTS —
+          // but only before a word was said, never swapping voices mid-reply.
           const male = fallbackVoice();
-          if (e?.contentErr && male !== first && anyGemini()) {
+          if (e?.contentErr && progress.i === 0 && male !== first && anyGemini()) {
             try {
               const done = await speakGemini(parts, id, S.aborter.signal, progress, male);
               return done && id === S.gen;
@@ -400,7 +402,9 @@
           }
         }
       }
-      if (engine() !== 'browser' && await speakBackend(remaining(), id, S.aborter.signal)) return true;
+      // The male backend voice takes a reply from its start only; a reply
+      // that already began in her voice is finished by the browser voice.
+      if (progress.i === 0 && engine() !== 'browser' && await speakBackend(remaining(), id, S.aborter.signal)) return true;
       if (id !== S.gen) return false;
       return await speakBrowser(remaining(), id);
     } finally {
@@ -416,6 +420,38 @@
     if (S.drained) { const r = S.drained; S.drained = null; r(); }
     try { window.speechSynthesis?.cancel(); } catch (_) {}
   }
+
+  /* ── Settings: every AI Studio voice, female + male, with preview ── */
+  const TRAITS = { Zephyr: 'bright', Puck: 'upbeat', Charon: 'informative, Jarvis-like', Kore: 'firm, clear', Fenrir: 'excitable', Leda: 'youthful', Orus: 'firm', Aoede: 'breezy', Callirrhoe: 'easy-going', Autonoe: 'bright', Enceladus: 'breathy', Iapetus: 'clear', Umbriel: 'easy-going', Algieba: 'smooth', Despina: 'smooth', Erinome: 'clear', Algenib: 'gravelly', Rasalgethi: 'informative', Laomedeia: 'upbeat', Achernar: 'soft', Alnilam: 'firm', Schedar: 'even', Gacrux: 'mature', Pulcherrima: 'forward', Achird: 'friendly', Zubenelgenubi: 'casual', Vindemiatrix: 'gentle', Sadachbia: 'lively', Sadaltager: 'knowledgeable', Sulafat: 'warm' };
+  const opt = (v) => `<option value="${v}">${v} · ${TRAITS[v] || ''}</option>`;
+  function mountPickers() {
+    ['sm-gemini-voice', 'clavis-gemini-voice'].forEach((id) => {
+      const sel = document.getElementById(id);
+      if (!sel || sel.dataset.full) return;
+      sel.dataset.full = '1';
+      sel.innerHTML = `<optgroup label="Female · Hindi + English (speaks first)">${FEMALE.map(opt).join('')}</optgroup><optgroup label="Male · Hindi + English">${MALE.map(opt).join('')}</optgroup>`;
+      sel.value = primaryVoice();
+      sel.addEventListener('change', () => window.ClavisVoice.setVoice(sel.value));
+      if (id !== 'sm-gemini-voice') return;
+      const row = sel.closest('.smodal-field');
+      if (!row || document.getElementById('sm-gemini-voice-male')) return;
+      const male = document.createElement('div');
+      male.className = 'smodal-field';
+      male.innerHTML = `<div class="smodal-field-left"><label class="smodal-label" for="sm-gemini-voice-male">Male voice</label><span class="smodal-hint">Takes over only when her quota runs out — same Hindi + English.</span></div>
+        <div style="display:flex;gap:8px;align-items:center"><select id="sm-gemini-voice-male" class="smodal-select">${MALE.map(opt).join('')}</select><button type="button" class="smodal-btn-primary" id="sm-voice-preview" title="Hear the selected voices">▶ Preview</button></div>`;
+      row.after(male);
+      const ms = male.querySelector('select');
+      ms.value = fallbackVoice();
+      ms.addEventListener('change', () => window.ClavisVoice.setFallbackVoice(ms.value));
+      male.querySelector('#sm-voice-preview').addEventListener('click', async () => {
+        const f = sel.value, m = ms.value;
+        await speak('Namaste sir, main Clavis hoon. Aapki leads, map aur PC — sab sambhal loongi.', { voice: f });
+        if (genderOf(f) !== 'male') await speak('Aur main male voice hoon — jab zaroorat ho, main sambhal lunga.', { voice: m });
+      });
+    });
+  }
+  document.addEventListener('click', () => setTimeout(mountPickers, 80), { passive: true });
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPickers, { once: true }); else setTimeout(mountPickers, 0);
 
   window.ClavisVoice = {
     speak, stop, outputLevel, primaryVoice, fallbackVoice, genderOf, genderize,

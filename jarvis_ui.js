@@ -1517,7 +1517,7 @@ function legacyStartNativeSpeechRecognition(options = {}) {
     if (/\b(go for it|that's it|thats it|backseat|done|over)\.?\s*$/i.test(transcript)) {
       commitJarvisVoiceInput(transcript, commitMeta());
     } else if (hasFinalSpeech) {
-      const pauseMs = options.handsFreeCapture ? 1500 : 1300;
+      const pauseMs = clavisPauseFor(transcript, options.handsFreeCapture ? 1500 : 1300);
       jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript, commitMeta()), pauseMs);
     }
   };
@@ -1570,6 +1570,16 @@ function legacyStartNativeSpeechRecognition(options = {}) {
     if (composerStatus) composerStatus.textContent = 'Microphone could not start — try again.';
     showToast('error', 'Voice input error', 'Microphone could not start. Please try again.');
   }
+}
+
+// How long to wait for more words: a sentence that ends on "ki / ke / aur /
+// and / to…" isn't finished, so give him time instead of acting on half a
+// command; a complete one still goes quickly.
+function clavisPauseFor(text, base) {
+  const t = String(text || '').trim().toLowerCase();
+  if (/\b(ki|ke|ka|ko|se|me|mein|par|pe|aur|ya|and|or|the|to|for|of|in|with|a|an|my|mera|meri|mere|is|us|jo|ki\s+jo|jaise|wala|wali)$/.test(t)) return base + 1300;
+  if (t.split(/\s+/).length <= 1) return base + 500;
+  return base;
 }
 
 // Live preview of what sir is saying. The caption owns it; the composer is
@@ -2004,7 +2014,7 @@ function startWakeListener() {
         commitJarvisVoiceInput(finalText, { openMic, since, source: 'wake' });
       };
       clearTimeout(relistenTimer);
-      relistenTimer = setTimeout(() => commit(fullText), 1600); // natural pause, without 3 s of dead air before every reply
+      relistenTimer = setTimeout(() => commit(fullText), clavisPauseFor(fullText, 1500)); // natural pause; longer if he's mid-sentence
       if (/\b(go for it|that's it|thats it|backseat|done|over)\.?\s*$/i.test(fullText)) {
         clearTimeout(relistenTimer);
         commit(fullText);
@@ -2066,7 +2076,9 @@ function scheduleHandsFreeRelisten() {
       // can just answer, no "Clavis" needed. Words in this window still pass
       // ClavisEar (not echo, sounds like a request, his voice if enrolled);
       // silence or chatter drops back to wake-word listening.
+      // Only with Voice ID: otherwise any voice in the room could answer.
       const followUp = localStorage.getItem('clavis_followup_window') !== 'false'
+        && Boolean(window.ClavisEar?.voiceId?.enabled?.())
         && !window.ClavisLive?.isActive?.() && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
       jarvisAwake = followUp;
       clavisFinalTranscript = '';
