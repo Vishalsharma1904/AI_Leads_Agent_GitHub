@@ -32,9 +32,9 @@
 
   const POLL_MS       = 2000;    // how often we sample the foreground window
   const HISTORY_MAX   = 80;
-  const DEFAULT_GAP   = 600000;  // 10 min between proactive lines
+  const DEFAULT_GAP   = 1200000; // 20 min between proactive lines — helpful, never nagging
   const MIN_GAP       = 300000;  // never closer than 5 min, whatever is saved
-  const DEFAULT_HOUR  = 3;       // max proactive lines per hour
+  const DEFAULT_HOUR  = 2;       // max proactive lines per hour
   const AWAY_MS       = 180000;  // 3 min idle = away from desk
   const DEEP_FOCUS_MS = 300000;  // 5 min on one thing = protect it
   const STUCK_MS      = 150000;  // 2.5 min on one thing = maybe stuck

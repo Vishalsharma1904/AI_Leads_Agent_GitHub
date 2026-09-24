@@ -12,8 +12,10 @@
   --ce-ink: #1f2a17;
   --ce-glow: 0 0 14px rgba(255, 253, 244, 0.95), 0 0 2px rgba(255, 253, 244, 0.9);
   --ce-dot: var(--olive-600, #5a6b2f);
+  --ce-fresh: var(--olive-600, #4a6b35);
+  --ce-veil: rgba(250, 248, 241, 0.82);
   position: fixed;
-  top: 50px;
+  top: 96px;
   right: 16px;
   z-index: 2147482000;
   display: flex;
@@ -32,12 +34,16 @@
   will-change: opacity, transform, filter;
 }
 html[data-theme="dark"] #clavis-ear-caption {
+  --ce-fresh: #c9dba0;
+  --ce-veil: rgba(16, 18, 14, 0.72);
   --ce-ink: #f4efdf;
   --ce-glow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.55);
   --ce-dot: var(--olive-400, #9aae5b);
 }
 @media (prefers-color-scheme: dark) {
   html:not([data-theme]) #clavis-ear-caption {
+    --ce-fresh: #c9dba0;
+    --ce-veil: rgba(16, 18, 14, 0.72);
     --ce-ink: #f4efdf;
     --ce-glow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.55);
     --ce-dot: var(--olive-400, #9aae5b);
@@ -45,6 +51,26 @@ html[data-theme="dark"] #clavis-ear-caption {
 }
 
 #clavis-ear-caption.is-in { opacity: 1; transform: none; filter: none; }
+
+/* A feathered frosted veil — no card edge, just enough calm behind the
+   words that they stay readable over the page, the orb or a map. */
+#clavis-ear-caption::before {
+  content: "";
+  position: absolute;
+  inset: -16px -22px -16px -26px;
+  z-index: -1;
+  border-radius: 28px;
+  background: radial-gradient(closest-side, var(--ce-veil), transparent);
+  -webkit-backdrop-filter: blur(14px) saturate(1.2);
+          backdrop-filter: blur(14px) saturate(1.2);
+  -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent);
+          mask-image: radial-gradient(closest-side, #000 62%, transparent);
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.22, 0.9, 0.24, 1);
+  pointer-events: none;
+}
+#clavis-ear-caption.is-in::before { opacity: 1; }
+#clavis-ear-caption.is-idle::before { opacity: 0; }
 #clavis-ear-caption.is-out {
   opacity: 0;
   transform: translateY(-8px);
@@ -57,11 +83,14 @@ html[data-theme="dark"] #clavis-ear-caption {
 #clavis-ear-caption .ce-clip {
   display: flex;
   flex-direction: column-reverse;
-  max-height: calc(1.42em * 3);
+  max-height: calc(1.45em * 2 + 0.35em);
+  padding-top: 0.35em;
   overflow: hidden;
-  font: 500 15.5px/1.42 Inter, "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
-          mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
+  font: 500 16px/1.45 Inter, "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "ss01", "cv11";
+  /* Only words scrolling out through the top fade — the two visible lines stay crisp. */
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.35em);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 0.35em);
 }
 #clavis-ear-caption .ce-line {
   margin: 0;
@@ -77,10 +106,18 @@ html[data-theme="dark"] #clavis-ear-caption {
 
 #clavis-ear-caption .ce-w {
   display: inline-block;
-  animation: ceWordIn 0.46s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+  animation:
+    ceWordIn 0.62s cubic-bezier(0.22, 1, 0.36, 1) both,
+    ceFresh 1.3s ease-out both;
+}
+/* Each new word lands in olive and settles to ink — you can see which
+   words just arrived without anything flashing. */
+@keyframes ceFresh {
+  from { color: var(--ce-fresh); }
+  to   { color: var(--ce-ink); }
 }
 @keyframes ceWordIn {
-  from { opacity: 0; filter: blur(7px); transform: translateY(6px) scale(0.985); }
+  from { opacity: 0; filter: blur(8px); transform: translateY(7px) scale(0.98); letter-spacing: 0.02em; }
   to   { opacity: 1; filter: blur(0);   transform: none; }
 }
 
@@ -199,3 +236,8 @@ html[data-theme="dark"] #clavis-voiceid-sheet .cv-card {
 #clavis-voiceid-sheet.is-recording .cv-mic { animation: ceBreathDot 1.2s ease-in-out infinite; }
 #clavis-voiceid-sheet.is-done .cv-fill { stroke-dashoffset: 0; }
 @keyframes ceBreathDot { 50% { transform: scale(1.35); opacity: 0.6; } }
+
+/* Never write over an open dialog (Settings, credential sheet, etc.). */
+body:has(#settings-overlay.open) #clavis-ear-caption,
+body:has(.clavis-credential-dialog[aria-hidden="false"]) #clavis-ear-caption,
+body:has(#clavis-voiceid-sheet) #clavis-ear-caption { opacity: 0 !important; }

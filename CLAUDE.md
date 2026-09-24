@@ -34,6 +34,10 @@ This repo now contains **two products**:
 ├── clavis-voice.js      # TTS: female-first (Gemini TTS, key+model rotation, emotion styles) → male fallback that speaks Hindi
 ├── clavis-automation.js # PC + website automation (open apps, type into them, multi-step tasks, website brief)
 ├── clavis-olive.css     # Rich olive-green primary buttons + send button (tokens: --olive-*, --cream)
+├── clavis-business.js   # Business profile (what the owner sells): lead search list, competitor filter, fit score, prompts
+├── clavis-appearance.js # Settings → Appearance: themes, accent, surface/text colours, fonts, minimal (loaded in <head>)
+├── clavis-perf.js       # Graphics tiers Auto/Smooth/Max (orb DPR/fps/glass, blur) — loaded in <head> before the orb
+├── clavis-silk.css      # Slow expo-out motion for menus, dialogs, chat bubbles, buttons
 ├── AndroidApp/          # Android WebView wrapper
 └── backend/             # Separate FastAPI voice-calling server (Exotel + OpenRouter)
     ├── main.py                              # API entrypoint incl. /ws/audio, /api/calls/outbound
@@ -66,6 +70,9 @@ All API keys and settings are in `config.js` via `window.SKYLARK_CONFIG`:
 - Spoken words are NEVER typed into the composer — they preview in the live caption (`ClavisEar.caption`).
 - Every recognizer transcript goes through `ClavisEar.judge()` (via `commitJarvisVoiceInput`) so Clavis never answers its own voice.
 - "Close / close everything" clears Clavis's own screen (display + floating window) — never the user's PC apps.
+- Clavis Live is patient (END_SENSITIVITY_LOW, `clavis_live_patience_ms`, default 1100 ms) and keeps the mic open: after ~2.5 s of silence it sends `audioStreamEnd` and holds ~0.4 s of audio until the next voice, so sessions stay open ~10 min cheaply.
+- Sleep: "thodi der chup ho jao" → `go_to_sleep` / `ClavisIntent.sleep()`; `clavis_slept_at` makes the next wake (name / snap / clap) a one-time sleepy "meri aankh lag gayi thi" greeting.
+- Risky actions (delete, send, overwrite, bulk, closing PC apps, spending) are confirmed once in his language; harmless ones (show, open, search, on/off switches) just happen.
 
 ## Important Notes
 - Primary language in codebase is **Hinglish** (Hindi + English mix)

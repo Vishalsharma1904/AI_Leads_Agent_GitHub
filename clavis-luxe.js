@@ -2255,7 +2255,11 @@
         picked.era = picked.decade || (ERA_OLD.test(t) ? 'old' : (ERA_NEW.test(t) ? 'recent' : ''));
         return picked;
       }
-      /* Follow-up or era-driven request without explicit "photo" keyword (e.g., "sunjay dutt 90s") */
+      /* Follow-up or era-driven request without explicit "photo" keyword (e.g., "sunjay dutt 90s").
+         With a photo task on screen, only a short NAME counts ("Krishna", "aur Ganesh ji", "90s
+         wali") — a whole sentence ("I'm going to go to the next video" from a video playing in
+         the room) used to become a photo search for "Next Video". */
+      if (inPhoto && !hasEra && (t.split(' ').length > 4 || /\b(i|i'm|im|you|we|they|he|she|it|is|are|was|were|will|would|can|could|going|go|gonna|let's|lets|next|video|videos|song|music|play|watch|this|that|what|why|how|kya|kyun|kaise|hai|hain|tha|thi|karo|karna|kar|mera|meri|mujhe|tum|aap)\b/i.test(t))) return null;
       if (inPhoto || hasEra) {
         var directPicked = tidy(body);
         var dirWords = directPicked.subject.split(' ').filter(Boolean);
@@ -2769,7 +2773,7 @@
        image: the most trusted picture there is), and "More photos" walks
        through each one's article pictures in turn. */
     function findGroup(subject, grp, signal) {
-      var members = (grp.members || []).slice(0, 9);
+      var members = (grp.members || []).slice(0, 6);
       var state = { next: 0 };
       function labelled(m, it) {
         it.title = m.name;
@@ -3655,13 +3659,15 @@
       if (id && disp) setTaskTitle(id, who.group ? (who.title || disp + ' — Photos') : String(disp).replace(/\s*\([^)]*\)\s*$/, '') + ' — Photos');
     };
     return Pictures.find(det.subject, { era: det.era, raw: text, onName: onName }).then(function (b) {
+      // Sir's rule: 2 to 6 pictures, never a wall of 23.
+      b.items = (b.items || []).slice(0, 6);
       var n = b.items.length;
       if (!n && !b.group && (det.subject.indexOf(' ') > 0 || det.era)) {
         /* ERA_DECADE lives inside Pictures — referencing it bare here threw,
            turning every empty era search into a failed task */
         var cleanSub = det.subject.replace(Pictures.eraRe, '').trim();
         return Pictures.find(cleanSub, {}).then(function (b2) {
-          if (b2.items.length) { b = b2; n = b.items.length; }
+          if (b2.items.length) { b = b2; b.items = b.items.slice(0, 6); n = b.items.length; }
           if (id) { PicTasks.set(id, { state: 'ready', subject: det.subject, bundle: b, sense: sense }); setTaskTitle(id, b.title); }
           var spoken = n ? spokenFor(b, n) : ('Maine ' + b.name + ' ke baare me jankari fetch kar li hai.');
           if (id) T.complete(id, { type: 'images', text: n ? (b.extract || spoken) : spoken, summary: spoken }, []);
