@@ -65,7 +65,16 @@
 
   // ── settings ────────────────────────────────────────────
   const num = (k, d) => { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v > 0 ? v : d; };
-  const isEnabled   = () => localStorage.getItem(LS.enabled) !== 'false';   // default ON
+  // Sir asked for quiet: Clavis speaks only when spoken to. Proactive tips and
+  // screen watching start OFF (once, for everyone) — "tips on" brings them back.
+  try {
+    if (!localStorage.getItem('clavis_quiet_v1')) {
+      localStorage.setItem('clavis_proactive_enabled', 'false');
+      localStorage.setItem('clavis_vision_enabled', 'false');
+      localStorage.setItem('clavis_quiet_v1', '1');
+    }
+  } catch (_) {}
+  const isEnabled   = () => localStorage.getItem(LS.enabled) === 'true';   // default OFF — only when he turns it on
   const shareTitles = () => localStorage.getItem(LS.privacy) !== 'false';   // default ON
   const gapMs       = () => Math.max(MIN_GAP, num(LS.gapMs, DEFAULT_GAP));
   const perHour     = () => Math.min(4, num(LS.perHour, DEFAULT_HOUR));

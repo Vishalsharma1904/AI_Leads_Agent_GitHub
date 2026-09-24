@@ -643,34 +643,77 @@ function hideJarvisTyping() {
 // ── Clavis "brain" (AI key) onboarding ────────────────────────────────────
 // Without an LLM key Clavis literally cannot reply — this makes that state
 // obvious and fixable in one paste, instead of a silent/cryptic failure.
+function clavisHasGeminiKey() {
+  try { return Boolean((window.ClavisKeyVault?.all?.('gemini') || []).length || window.ClavisDirect?.keyFor?.('gemini')); } catch (_) { return false; }
+}
 function renderClavisBrainState() {
   const welcome = document.getElementById('jarvis-welcome');
   const has = window.JarvisEngine?.hasBrain?.() ?? true;
   const existing = document.getElementById('clavis-brain-card');
-  if (has) { existing?.remove(); return; }
+  // With a brain but no AI Studio key, Clavis still lacks its live voice and
+  // a fallback when Groq's daily limit runs out — offer that one paste too.
+  let dismissed = false;
+  try { dismissed = sessionStorage.getItem('clavis_gemini_card_hidden') === '1'; } catch (_) {}
+  const wantGemini = has && !clavisHasGeminiKey() && !dismissed;
+  if (has && !wantGemini) { existing?.remove(); return; }
   if (existing || !welcome) return;
   const card = document.createElement('div');
   card.id = 'clavis-brain-card';
-  card.style.cssText = 'margin:14px auto 0;max-width:440px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.28);border-radius:14px;padding:14px 16px;text-align:left;';
+  card.className = 'clavis-brain-card';
   card.innerHTML = `
-    <div style="font-weight:700;font-size:14px;color:var(--gray-800,#1f2430);margin-bottom:4px;">⚡ Connect Clavis's brain to start talking</div>
-    <div style="font-size:12.5px;color:var(--gray-600,#5b616e);line-height:1.5;margin-bottom:10px;">
-      Clavis needs a <b>Groq</b> AI key to think (free tier, no OpenAI account required):
-      open <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color:#6366f1;font-weight:600;">console.groq.com/keys</a> → Create key → paste it below.
+    ${wantGemini ? '<button type="button" class="cbc-x" aria-label="Hide for now" onclick="hideClavisBrainCard()">×</button>' : ''}
+    <div class="cbc-title">${wantGemini ? 'Clavis ki live voice jodiye — Google AI Studio key' : 'Clavis ka dimaag jodiye — ek free AI key'}</div>
+    <div class="cbc-sub">
+      <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> → <b>Create API key</b> → yahan paste karein.
+      Isse Clavis aapki poori baat sunta hai, insaan jaisi awaaz me bolta hai, aur Groq ki limit khatam hone par bhi chalta rehta hai.
+      ${wantGemini ? '' : 'Groq key (gsk_…) bhi chalegi.'}
     </div>
-    <div style="display:flex;gap:8px;">
-      <input id="clavis-brain-key" type="password" placeholder="Paste Groq key (gsk_...)" autocomplete="off"
-        style="flex:1;padding:9px 11px;border:1px solid rgba(0,0,0,.15);border-radius:9px;font-size:12.5px;background:#fff;color:#1f2430;">
-      <button id="clavis-brain-save" onclick="saveClavisBrainKey()"
-        style="padding:9px 16px;border:none;border-radius:9px;background:#6366f1;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap;">Connect</button>
+    <div class="cbc-row">
+      <input id="clavis-brain-key" type="password" placeholder="${wantGemini ? 'AIza…' : 'AIza… ya gsk_…'}" autocomplete="off" spellcheck="false">
+      <button id="clavis-brain-save" type="button" onclick="saveClavisBrainKey()">Connect</button>
     </div>
-    <div id="clavis-brain-msg" style="font-size:11.5px;margin-top:6px;min-height:14px;"></div>`;
+    <div id="clavis-brain-msg" class="cbc-msg">Key encrypted rehti hai, sirf aapke PC par (backend chalu ho to wahan bhi).</div>`;
   welcome.appendChild(card);
   document.getElementById('clavis-brain-key')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveClavisBrainKey(); });
 }
+function hideClavisBrainCard() {
+  try { sessionStorage.setItem('clavis_gemini_card_hidden', '1'); } catch (_) {}
+  document.getElementById('clavis-brain-card')?.remove();
+}
+window.hideClavisBrainCard = hideClavisBrainCard;
+// The vault decrypts after boot: re-check the card whenever keys change.
+window.addEventListener('clavis:vault-changed', () => { try { renderClavisBrainState(); } catch (_) {} });
 
-function saveClavisBrainKey() {
-  openClavisCredentialDialog();
+async function saveClavisBrainKey() {
+  const input = document.getElementById('clavis-brain-key');
+  const msg = document.getElementById('clavis-brain-msg');
+  const btn = document.getElementById('clavis-brain-save');
+  const raw = String(input?.value || '').trim();
+  const gem = raw.match(/AIza[0-9A-Za-z_\-]{30,}/);
+  const groq = raw.match(/gsk_[0-9A-Za-z]{20,}/);
+  if (!gem && !groq) {
+    if (raw && msg) { msg.textContent = 'Ye key pehchani nahi — AI Studio key "AIza…" se, Groq key "gsk_…" se shuru hoti hai.'; return; }
+    openClavisCredentialDialog();
+    return;
+  }
+  const provider = gem ? 'gemini' : 'groq';
+  if (btn) btn.disabled = true;
+  if (msg) msg.textContent = 'Check kar rahi hoon…';
+  try {
+    if (window.ClavisKeyVault?.add) await window.ClavisKeyVault.add(provider, (gem || groq)[0]);
+    else window.ClavisDirect?.setKey?.(provider, (gem || groq)[0]);
+    // AI Studio becomes the brain; Groq stays as the fallback.
+    if (gem) { try { localStorage.setItem('clavis_ai_provider', 'gemini'); } catch (_) {} }
+    document.getElementById('clavis-brain-card')?.remove();
+    showToast('success', gem ? 'Google AI Studio connected' : 'Groq connected', gem ? 'Clavis ab apni live voice me baat karega.' : 'Clavis ab soch sakta hai.');
+    renderClavisBrainState();
+    if (gem && window.ClavisLive?.isAvailable?.() && !window.ClavisLive.isActive()) {
+      window.ClavisLive.start({ trigger: 'button', initialText: '[SYSTEM EVENT] Sir just connected a Google AI Studio key, so this is the first time he hears your real voice. Greet him warmly in one or two short lines and say he can simply talk to you now.' });
+    }
+  } catch (e) {
+    if (btn) btn.disabled = false;
+    if (msg) msg.textContent = e?.message || 'Key save nahi hui — dobara try kijiye.';
+  }
 }
 window.saveClavisBrainKey = saveClavisBrainKey;
 window.renderClavisBrainState = renderClavisBrainState;
@@ -1060,7 +1103,10 @@ async function handleJarvisSend(options) {
     if (plan?.isSearch && !images.length && !attachments.length && window.ChatEngine?.sendMessage
         // About leads he already HAS (report / summary / count / analysis)
         // is a question for the brain's lead tools, not a new scrape.
-        && !/\b(export|download|sync|show|list|stats?|report|summary|summari\w*|analy\w*|kitni|kitne|count|total|breakdown|status|saved|purani|existing)\b/i.test(text)) {
+        && !/\b(export|download|sync|show|list|stats?|report|summary|summari\w*|analy\w*|kitni|kitne|count|total|breakdown|status|saved|purani|existing)\b/i.test(text)
+        // "Noida ke top 5 hospitals ke naam batao" is a QUESTION, not a scrape:
+        // only start one when he asks for leads / contacts / data.
+        && !(CLAVIS_ASKING_RE.test(text) && !CLAVIS_LEADISH_RE.test(text))) {
       clavisSetDisplay(taskId, 'window');
       clavisReveal(taskId);
       setJarvisStatus('thinking', 'Starting the lead search...');
@@ -1585,6 +1631,8 @@ function legacyStartNativeSpeechRecognition(options = {}) {
 //   finished command (…karo / dikhao / batao / chahiye / ?)  → quick
 //   dangling thought (…mujhe / tum / jo / aur / matlab / okay) → wait
 //   anything else (ends on a noun: "Gurgaon ki leads")         → a beat
+const CLAVIS_ASKING_RE = /\b(batao|bataiye|bata\s*do|naam|names?|kaun|kaunse|which|what|who|tell me|explain|samjhao|kya\s+hai|kaisa|kaisi|kaise|kitna|kitni\s+door|best|top\s*\d*)\b|\?\s*$/i;
+const CLAVIS_LEADISH_RE = /\b(leads?|clients?|customers?|prospects?|contacts?|numbers?|phone|mobile|emails?|data|database|scrape|nikal\w*|dhund\w*|dhoond\w*|khoj\w*|find|search|list\s*banao|sheet|excel)\b/i;
 const CLAVIS_DONE_END = /(\b(karo|kardo|kar do|kariye|kijiye|karein|karna hai|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|samjhao|kholo|khol do|band karo|band kar do|hatao|hata do|nikalo|nikal do|bhejo|bhej do|likho|likh do|chahiye|chalao|chala do|dhundho|dhoondho|lao|le aao|sunao|bolo|ruko|bas|chup|stop|please|thanks|thank you|shukriya|done|ho gaya|theek hai|hai na|kya hai|kaun hai|kahan hai|kaise ho)|[?!.।])\s*$/i;
 const CLAVIS_DANGLING_END = /\b(ki|ke|ka|ko|se|me|mein|par|pe|aur|ya|ki jo|jo|jaise|matlab|yaani|mtlb|like|um+|uh+|hmm+|toh|to|phir|fir|abhi|bhi|ek|koi|kuch|mujhe|mujhko|muje|tum|tumhe|tumko|aap|aapko|hum|hame|humko|main|mai|mera|meri|mere|apna|apni|and|or|the|a|an|for|of|in|with|my|your|this|that|okay|ok|so|well|actually|basically|clavis|sir)$/i;
 function clavisPauseFor(text, base) {

@@ -3151,6 +3151,9 @@
     var polished = new Map();
     function polish(text, signal) {
       var t = String(text || '').replace(/\s+/g, ' ').trim();
+      // A whole AI call just to proofread a heading ate the free daily quota
+      // his real questions need — opt-in only (localStorage clavis_title_ai).
+      if (localStorage.getItem('clavis_title_ai') !== 'true') return Promise.resolve(null);
       if (!t || t.length < 6 || t.length > 140 || !Research.hasBrain()) return Promise.resolve(null);
       if (polished.has(t)) return polished.get(t);
       var p = Research.within(Research.llm([

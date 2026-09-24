@@ -313,3 +313,21 @@ html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) .cts .cts-act.is-prima
     transform: none !important;
   }
 }
+
+/* Clavis page: "connect a key" card (AI Studio first). */
+.clavis-brain-card { position: relative; margin: 14px auto 0; max-width: 460px; padding: 14px 16px; text-align: left; border-radius: 16px;
+  background: color-mix(in srgb, var(--olive-700, #2F5233) 6%, var(--surface, #fff)); border: 1px solid color-mix(in srgb, var(--olive-700, #2F5233) 22%, transparent);
+  animation: silkRise 520ms var(--silk, cubic-bezier(.22,1,.36,1)) both; }
+.clavis-brain-card .cbc-title { font: 650 14px/1.35 Inter, system-ui, sans-serif; color: var(--gray-800, #1f2430); margin: 0 18px 4px 0; }
+.clavis-brain-card .cbc-sub { font: 12.5px/1.5 Inter, system-ui, sans-serif; color: var(--gray-600, #5b616e); margin-bottom: 10px; }
+.clavis-brain-card .cbc-sub a { color: var(--olive-700, #2F5233); font-weight: 600; }
+.clavis-brain-card .cbc-row { display: flex; gap: 8px; }
+.clavis-brain-card input { flex: 1; min-width: 0; padding: 9px 11px; border: 1px solid rgba(0,0,0,.15); border-radius: 10px; font: 12.5px Inter, system-ui, sans-serif; background: #fff; color: #1f2430; }
+.clavis-brain-card button#clavis-brain-save { padding: 9px 16px; border: 0; border-radius: 10px; background: var(--olive-700, #2F5233); color: var(--cream, #F4ECD8); font: 600 12.5px Inter, system-ui, sans-serif; cursor: pointer; white-space: nowrap; }
+.clavis-brain-card button#clavis-brain-save:disabled { opacity: .6; }
+.clavis-brain-card .cbc-msg { font: 11.5px/1.4 Inter, system-ui, sans-serif; margin-top: 7px; opacity: .72; min-height: 14px; }
+.clavis-brain-card .cbc-x { position: absolute; top: 8px; right: 10px; border: 0; background: none; font-size: 18px; line-height: 1; opacity: .5; cursor: pointer; color: inherit; }
+.clavis-brain-card .cbc-x:hover { opacity: .9; }
+html[data-theme="dark"] .clavis-brain-card .cbc-title { color: #f1ede2; }
+html[data-theme="dark"] .clavis-brain-card .cbc-sub { color: #bdb8ab; }
+html[data-theme="dark"] .clavis-brain-card input { background: rgba(255,255,255,.05); color: #f1ede2; border-color: rgba(255,255,255,.16); }

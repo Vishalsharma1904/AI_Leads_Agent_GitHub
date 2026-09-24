@@ -52,7 +52,7 @@
       // production models are listed; discoverModels() self-heals any rename.
       // Each Groq model has its OWN per-minute token bucket (8K TPM on the
       // free tier), so these double as rate-limit overflow, not only renames.
-      textModelFallbacks: ['openai/gpt-oss-20b', 'qwen/qwen3.8-27b'],
+      textModelFallbacks: ['openai/gpt-oss-20b', 'llama-3.3-70b-versatile', 'qwen/qwen3.8-27b', 'llama-3.1-8b-instant'],
       // Groq renames/retires vision models often. These are candidates, not
       // guarantees — discoverModels() below asks the account what is actually
       // live and rewrites this list at runtime, so a rename never dead-ends.
@@ -88,7 +88,7 @@
       schema: 'gemini',
       test: (k) => /^AIza\S{10,}$/.test(k),
       textModel: 'gemini-3.8-flash',
-      textModelFallbacks: ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash'],
+      textModelFallbacks: ['gemini-3.5-flash', 'gemini-3.5-flash-lite', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
       visionModel: 'gemini-3.8-flash',
       visionModelFallbacks: ['gemini-3.5-flash', 'gemini-2.5-flash'],
       vision: true,
@@ -257,7 +257,14 @@
     const ms = (Number(m[1] || 0) * 60 + Number(m[2])) * (m[3].toLowerCase() === 'ms' ? 1 : 1000);
     return Math.min(90000, Math.max(500, ms));
   }
+  // "try again in 19m52.32s" / "1h2m3s" → ms, for a model's daily bucket.
+  function dayRetryMs(err) {
+    const m = /try again in\s*(?:(\d+)h)?\s*(?:(\d+)m)?\s*(?:([\d.]+)s)?/i.exec(String(err?.message || ''));
+    const ms = m ? ((Number(m[1] || 0) * 60 + Number(m[2] || 0)) * 60 + Number(m[3] || 0)) * 1000 : 0;
+    return Math.min(24 * 3600e3, Math.max(60e3, ms || 3600e3));
+  }
   const coolKey = (provider, model) => provider + ':' + model;
+  const dailySpent = new Set();   // cooling keys parked for a DAILY limit (not a minute one)
   const isCooling = (provider, model) => (cooling.get(coolKey(provider, model)) || 0) > Date.now();
   function soonestCooldown(provider, models) {
     const until = models.map((m) => cooling.get(coolKey(provider, m)) || 0).filter((t) => t > Date.now());
@@ -399,6 +406,9 @@
     // "tokens per minute" / "try again in 12s" / request too big for this
     // model's TPM: this MODEL is busy for a few seconds, the key is fine.
     if ((status === 429 || status === 413) && /per minute|\(tpm\)|\(rpm\)|try again in|request too large|tokens per/.test(msg) && !/per day|\(tpd\)|\(rpd\)/.test(msg)) return 'ratelimit';
+    // Groq's DAILY limits are per model ("Rate limit reached for model `x` …
+    // tokens per day"): the key's other models still have their own quota.
+    if (status === 429 && /for model/.test(msg) && /per day|\(tpd\)|\(rpd\)/.test(msg)) return 'modelday';
     if (status === 429 || /quota|rate limit|exceeded|insufficient|out of credit|billing/.test(msg)) return 'exhausted';
     if (status === 401 || status === 403) return 'rejected';
     if (status === 402) return 'exhausted';
@@ -459,7 +469,11 @@
     let lastErr, discovered = false;
     for (const key of keys) {
       for (let i = 0; i < models.length; i++) {
-        if (isCooling(provider, models[i])) { lastErr = lastErr || Object.assign(new Error(`${models[i]} is cooling down`), { status: 429, ratelimited: true }); continue; }
+        if (isCooling(provider, models[i])) {
+          const daily = dailySpent.has(coolKey(provider, models[i]));
+          lastErr = lastErr || Object.assign(new Error(`${models[i]} is cooling down`), { status: 429, ratelimited: !daily, dailySpent: daily });
+          continue;
+        }
         try {
           const data = await callOnce(provider, key, payload, models[i], signal);
           trackUsage(data);
@@ -482,6 +496,13 @@
             continue;
           }
           if (kind === 'transient') continue;
+          if (kind === 'modelday') {
+            // This model's daily quota is used up: park it till it refills, next model.
+            cooling.set(coolKey(provider, models[i]), Date.now() + dayRetryMs(err));
+            dailySpent.add(coolKey(provider, models[i]));
+            err.dailySpent = true;
+            continue;
+          }
           if (kind === 'ratelimit') {
             // Only this model's minute bucket is full: park it, try the next model.
             cooling.set(coolKey(provider, models[i]), Date.now() + retryAfterMs(err));
@@ -550,15 +571,22 @@
         signal?.addEventListener?.('abort', () => { clearTimeout(t); reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })); }, { once: true });
       });
     }
-    if (lastErr?.ratelimited) {
+    if (lastErr?.ratelimited && !lastErr?.dailySpent) {
       lastErr.code = 'AI_BUSY';
       lastErr.message = 'Clavis is getting a lot of requests right now — the free AI limit refills every minute.';
       throw lastErr;
     }
     // Everything is spent: make that unmistakable so the UI can offer refuel.
     const out = lastErr || new Error('All AI providers are unavailable');
-    if (classify(out) === 'exhausted' || /no key|unavailable/i.test(out.message || '')) {
+    if (out.dailySpent || ['exhausted', 'modelday'].includes(classify(out)) || /no key|unavailable|cooling down/i.test(out.message || '')) {
       out.code = out.code || 'AI_ALL_PROVIDERS_EXHAUSTED';
+      // A raw provider dump ("Rate limit reached for model … org_…") helps
+      // nobody; say what happened and what fixes it.
+      out.detail = out.message;
+      const hasGemini = !!keyFor('gemini');
+      out.message = hasGemini
+        ? 'Aaj ki free AI limit sab keys par khatam ho gayi hai, sir. Thodi der me apne aap wapas chalu ho jayega — ya ek aur key jod dijiye.'
+        : 'Groq ki aaj ki free limit khatam ho gayi hai, sir. Google AI Studio ki free key jod dijiye — Clavis turant usi par chalega.';
       announce('exhausted', chain[chain.length - 1], out);
     }
     throw out;

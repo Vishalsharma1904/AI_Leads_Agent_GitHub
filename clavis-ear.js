@@ -161,7 +161,6 @@
   /* ── what counts as "for Clavis" ───────────────────────────── */
   const NAME_RE = /\b(clavis|klavis|clevis|klevis|clavish|claves|clavice|jarvis|hey buddy|hi pal)\b|क्ल[ेैा]विस|क्लेविज़|जार्विस/i;
   const ASK_NOW_RE = /\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|bhejo|nikalo|sunao|chahiye|chahie|show me|open|tell me|find|search)\b|करो|दिखाओ|बताओ|चाहिए/i;
-  const CONVO_RE = /[\u0900-\u097F]|\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|band|bhejo|nikalo|sunao|chahiye|kya|kaise|kyun|kitn[ae]|kaun|kahan|haan|nahi|theek|acha|accha|aur|wapas|mujhe|mera|meri|humein|leads?)\b/i;
   const STOP_RE = /\b(stop|wait|ruko|ruk ja|ruk jao|bas|bas karo|chup|chup karo|shut up|hold on|one sec|ek (?:min|minute|second)|suno|sunno|listen|nahi nahi|no no|cancel)\b|रुको|बस|चुप|सुनो/i;
   const ASK_RE = /\b(karo|kar do|kardo|kariye|kijiye|karna|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|kholo|khol do|band|hatao|hata do|chalao|chala do|nikalo|nikal do|bhejo|bhej do|likho|likh do|search|find|show|open|close|tell|play|pause|stop|start|call|send|make|create|give|get|find|check|explain|summari[sz]e|translate|remind|set|go|zoom|scroll|type|read|what|what's|whats|which|who|whom|whose|why|how|when|where|kya|kyaa|kaise|kab|kahan|kaha|kitna|kitne|kitni|kaun|kyun|kyu|kis|konsa|kaunsa|can you|could you|would you|will you|please|plz|pls|zara|jara|chahiye|lao|le aao|de do|do na|suno|next|aur|agla|pichla|wapas|haan|han|nahi|nahin|yes|yeah|yep|no|nope|ok|okay|theek|thik|done|sure|bilkul|leads?|map|photo|photos|image|images|website|email|excel|whatsapp)\b|करो|दिखाओ|बताओ|खोलो|बंद|हटाओ|क्या|कैसे|कब|कहाँ|कितने|कौन|क्यों/i;
   function named(text) { return NAME_RE.test(String(text || '')); }
@@ -198,10 +197,10 @@
       if (e.fresh >= 2 && his) return { accept: true, barge: true, reason: 'his-voice', text: t };
       // Sir cutting in with a clear new instruction ("nahi, mujhe Noida ki
       // list chahiye") is heard and done — chatter without a request is not.
-      if (e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
+      if (e.fresh >= 4 && e.score < 0.25 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
       // Answering right after Clavis finished ("haan, Noida ki bhi dikhao"):
       // clearly new words, not an echo, a Hindi/Hinglish request.
-      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && CONVO_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
       return { accept: false, reason: 'unsure-while-speaking', text: t, echo: e };
     }
     // A recognizer can also deliver Clavis's words many seconds late.
@@ -217,7 +216,9 @@
       // a conversation — but only for a Hindi / Hinglish request, never
       // English chatter from a video ("go to the next video").
       const words = t.split(/\s+/).filter(Boolean).length;
-      if (v.verdict !== 'owner' && !voiceId.enabled() && words >= 2 && words <= 30 && CONVO_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      // Only a clear instruction (karo / dikhao / batao / chahiye …) — a room's
+      // Hindi chatter used to pass on words like "kya" or "aur" and start searches.
+      if (v.verdict !== 'owner' && !voiceId.enabled() && words >= 2 && words <= 30 && ASK_NOW_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
       if (v.verdict !== 'owner') return { accept: false, reason: voiceId.enabled() ? 'not-owner' : 'not-addressed', text: t, voice: v };
     }
     return { accept: true, barge: false, reason: 'ok', text: t };
@@ -692,8 +693,8 @@
       lsSet('clavis_sound_trigger_enabled', 'true');
       try { window.dispatchEvent(new CustomEvent('clavis:mic-granted')); } catch (_) {}
     }
-    try { window.ClavisVision?.setEnabled?.(true); window.ClavisVision?.start?.(); } catch (_) {}
-    try { window.ClavisProactive?.setEnabled?.(true); } catch (_) {}
+    // Screen watching and proactive tips stay off until he asks ("tips on") —
+    // allowing the mic once is not a request for unprompted remarks.
     lsSet(CONSENT, JSON.stringify({ at: now(), mic, screen: true, proactive: true }));
     card?.querySelector('.cv-status') && (card.querySelector('.cv-status').textContent = mic
       ? 'Ho gaya, sir. Ab bas app kholiye aur boliye — main sun rahi hoon.'
