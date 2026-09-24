@@ -295,6 +295,10 @@
   const COMPOSE_RE = /^(?:(?:ek|a|an|one|koi|mere\s+liye|meri|mera|apni|hamari)\s+)?(?:(?:short|chhota|chhoti|choti|formal|professional|achha|acchi|accha|sundar|nice|simple|detailed|quick|polite|romantic|funny|motivational)\s+)*(?:poem|kavita|shayari|email|e-mail|mail|letter|application|leave\s+application|essay|story|kahani|paragraph|summary|to-?do\s+list|article|report|description|bio|post|caption|speech|quotation|proposal|agenda|invoice|resume|cv|script|joke|quote|message|msg)\b/i;
   const needsCompose = (payload, verbatim) => !verbatim && COMPOSE_RE.test(String(payload || '').trim());
 
+  // Clauses on "aur / and / phir / ,". A chunk with no verb of its own is
+  // glued to its neighbour ("chrome aur notepad kholo", "search X and Y on
+  // youtube"); `extra` keeps that glued text so the planner can tell when a
+  // step silently ignored part of what he said.
   function splitClauses(prefix) {
     const parts = String(prefix || '').split(CONNECTOR).map((p) => p.trim()).filter(Boolean);
     const out = [];
@@ -302,11 +306,24 @@
     const acts = (c) => OPEN_VERB.test(norm(c)) || GO_VERB.test(norm(c)) || SEARCH_VERB.test(norm(c)) || SCROLL_WORD.test(norm(c)) || KEY_VERB.test(norm(c)) || WAIT_RE.test(norm(c));
     for (const p of parts) {
       if (!acts(p)) { pending = pending ? `${pending} aur ${p}` : p; continue; }
-      out.push(pending ? `${pending} aur ${p}` : p);
+      out.push({ text: pending ? `${pending} aur ${p}` : p, extra: pending });
       pending = '';
     }
-    if (pending) { if (out.length) out[out.length - 1] += ` aur ${pending}`; else out.push(pending); }
+    if (pending) {
+      if (out.length) { const last = out[out.length - 1]; last.text += ` aur ${pending}`; last.extra = last.extra ? `${last.extra} aur ${pending}` : pending; }
+      else out.push({ text: pending, extra: '' });
+    }
     return out;
+  }
+  // Glued text that is only app names / filler ("chrome aur notepad") is fine;
+  // anything else ("usme A1 me 500") was ignored by a key/scroll/open step.
+  function ignoredText(extra, steps) {
+    if (!extra) return false;
+    if (steps.some((s) => s.type === 'search-web' || s.type === 'type')) return false;
+    let rest = norm(extra);
+    (PC()?.matchApps(rest, { loose: true }) || []).forEach((a) => { rest = rest.replace(a.said, ' '); });
+    rest = rest.replace(/\b(aur|and|bhi|also|phir|then|ko|me|mein|pe|par|please|zara)\b/g, ' ').trim();
+    return rest.length > 0;
   }
 
   // The local planner. Returns { kind:'plan', steps, priority, contextual,
@@ -320,9 +337,9 @@
     let unparsed = 0;
     let typeTarget = null;
     const clauses = splitClauses(ty ? ty.prefix : raw);
-    for (const c of clauses) {
+    for (const { text: c, extra } of clauses) {
       const st = parseClause(c, { allowGeneric: Boolean(ty) || clauses.length > 1 || opts.allowGeneric });
-      if (st) { steps.push(...st); continue; }
+      if (st) { steps.push(...st); if (ignoredText(extra, st)) unparsed++; continue; }
       const a = ty ? P.matchApp(c) : null;          // "word me" — a target, no verb
       if (a) { typeTarget = a.key; continue; }
       unparsed++;
@@ -697,7 +714,7 @@
       case 'open': return doOpen(step, ctx, rest);
       case 'focus': return doFocus(step, ctx);
       case 'wait': await sleep(step.ms || 1000); return { ok: true };
-      case 'type': return doType(step, ctx);
+      case 'type': return doType(step, ctx, rest);
       case 'note': return doNote(step, ctx);
       case 'key': case 'hotkey': return doKey(step, ctx);
       case 'scroll': return doScroll(step, ctx);
@@ -790,7 +807,7 @@
     return { ok: true };
   }
 
-  async function doType(step, ctx) {
+  async function doType(step, ctx, rest) {
     const P = PC();
     const app = P.appFor(step.app || '') || ctx.app;
     const label = app?.label || 'window';
@@ -828,7 +845,8 @@
       for (let j = 0; j < lines[i].length; j += 160) await P.typeText(lines[i].slice(j, j + 160));
       if (i < lines.length - 1) await P.pressKeys(newline);
     }
-    return { ok: true, kind: 'type', say: app?.chat ? 'likh diya — bhejna ho to Enter dabaiye' : 'likh diya', label };
+    const willSend = (rest || []).some((s) => s.type === 'key' && /^(enter|return)$/i.test(s.key));
+    return { ok: true, kind: 'type', say: app?.chat && !willSend ? 'likh diya — bhejna ho to Enter dabaiye' : 'likh diya', label };
   }
   async function clipFallback(text, why) {
     const copied = await PC().copyText(text).catch(() => false);
@@ -1084,9 +1102,10 @@
     if (!res.ok) throw new Error(`reader ${res.status}`);
     const body = await res.text();
     const title = (body.match(/^Title:\s*(.+)$/m) || [])[1] || '';
-    const content = body.split(/^Markdown Content:\s*$/m)[1] || body;
+    const content = (body.split(/^Markdown Content:\s*$/m)[1] || body);
     const headings = uniq((content.match(/^#{1,3}\s+(.+)$/gm) || []).map((h) => h.replace(/^#+\s+/, '').replace(/[*_[\]]/g, '').trim())).filter(Boolean).slice(0, 12);
-    const text = content.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1').replace(/[#>*_`|-]{2,}/g, ' ').replace(/\s+/g, ' ').trim();
+    const text = content.replace(/!\[[^\]]*\]\([^)]*\)/g, ' ').replace(/\[([^\]]*)\]\([^)]*\)/g, '$1')
+      .replace(/^\s{0,3}(?:#{1,6}|>|[-*+]|\d+\.)\s+/gm, '').replace(/[#>*_`|-]{2,}/g, ' ').replace(/(?:^|\n)([^\n.!?]{3,120})(?=\n)/g, '$1.').replace(/\s+/g, ' ').replace(/\.\./g, '.').trim();
     return { url, title: title.trim(), description: '', headings, text: text.slice(0, 12000), ...contactsFrom(content), social: [], source: 'reader' };
   }
   async function fetchFromProxy(url) {
