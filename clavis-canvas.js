@@ -751,7 +751,7 @@
   async function showImages({ query, count } = {}) {
     const q = String(query || '').trim();
     if (!q) return { error: 'No image query given.' };
-    const n = clamp(Number(count) || 9, 3, 12);
+    const n = clamp(Number(count) || 6, 2, 6);   // 2-6 pictures, never a wall
     const u = understandQuery(q);
     let heading = u.name || q;
     await present('images', 'Images', heading, () => {

@@ -363,8 +363,10 @@ const RealScraper = (() => {
     cb.onLog('phase', '▶ PHASE 1 — Google Maps Business Discovery');
 
     // If no specific industry requested or 'ALL', auto-expand to commercial sectors
+    // "ALL" = the businesses that buy what HE sells (ClavisBusiness profile).
+    const profileBuyers = (() => { try { return window.ClavisBusiness?.buyerQueries?.() || null; } catch (_) { return null; } })();
     const activeIndustries = (!industries.length || industries.some(i => String(i).toUpperCase() === 'ALL'))
-      ? [
+      ? (profileBuyers && profileBuyers.length ? profileBuyers : [
           'Corporate Offices',
           'IT Companies',
           'Hotels',
@@ -372,7 +374,7 @@ const RealScraper = (() => {
           'Manufacturing Companies',
           'Shopping Malls',
           'Warehouses & Logistics'
-        ]
+        ])
       : industries;
 
     // Build search queries: industry × city
@@ -675,7 +677,10 @@ const RealScraper = (() => {
       lead && lead.company, lead && lead.industry,
       lead && lead.category, lead && lead.address
     ].map(v => String(v || '')).join(' ').toLowerCase();
-    return PROVIDER_RE.test(hay);
+    // Competitors follow what he sells (IT firms for an IT seller, etc.).
+    let re = PROVIDER_RE;
+    try { re = window.ClavisBusiness?.competitorRegex?.() || PROVIDER_RE; } catch (_) {}
+    return re.test(hay);
   }
 
   function scoreAndTrim(leads, targetCount) {
@@ -718,7 +723,7 @@ const RealScraper = (() => {
     });
 
     if (droppedCompetitors) {
-      cb.onLog('info', `🚫 Skipped ${droppedCompetitors} security/housekeeping providers (competitors, not customers)`);
+      cb.onLog('info', `🚫 Skipped ${droppedCompetitors} ${(window.ClavisBusiness?.label?.() || 'security/housekeeping').toLowerCase()} providers (competitors, not customers)`);
     }
     // Sort by lead score descending
     qualified.sort((a, b) => (b.leadScore || 0) - (a.leadScore || 0));

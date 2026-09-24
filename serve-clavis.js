@@ -25,6 +25,9 @@ http.createServer((req, res) => {
     res.statusCode = 404;
     return res.end('Not found');
   }
+  // Har request par browser dobara check kare (ETag se sasta) — git pull ke
+  // baad purani JS/CSS kabhi na chale, bina Ctrl+Shift+R ke bhi.
+  res.setHeader('Cache-Control', 'no-cache');
   return handler(req, res, opts);
 })
   .listen(PORT, '127.0.0.1', () => console.log(`Clavis UI → http://localhost:${PORT}`))

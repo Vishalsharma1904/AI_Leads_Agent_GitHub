@@ -26,6 +26,14 @@ Maine is system ko **portable** banaya hai taaki aap isey easily apne father ke 
 
 **Important:** Voice, Hands-Free wake words, Clap / Snap activation, Google sign-in, and backend AI require the app to be served from `http://localhost:3000`. `index.html` ko `file://` se double-click karke kholne par browser microphone permissions, authentication origin, aur backend CORS reliable nahi hote; us mode ko sirf static UI preview samjhein.
 
+### Naya update kaise chalayein (Clavis voice ke saath)
+
+1. Project folder me: `git checkout main` aur phir `git pull`
+2. `npm install` (sirf pehli baar, ya jab packages badlein)
+3. `npm run frontend` chalayein aur browser me `http://localhost:3000` kholein (ya `Start-Clavis.bat` / `Clavis.exe`). Server har file par cache check karta hai, isliye pull ke baad naya code apne aap aata hai — shak ho to ek baar Ctrl+Shift+R.
+4. **Settings → Voice AI → Google AI Studio key** me apni key daalein aur **Save & test** dabayein. Isi se Clavis Live chalta hai: aapki baat poori sunta hai, mic chalu rehta hai, emotions ke saath bolta hai.
+5. Bolkar try karein: "Clavis…", "thodi der chup ho jao" (phir naam / chutki / taali se jagayein), "caption band karo", "tum kya kya kar sakti ho".
+
 ### Google sign-in (Supabase Auth)
 
 Google OAuth is handled entirely by Supabase Auth. Configure `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_REDIRECT_URL=http://localhost:3000/` in `backend/.env`. The browser receives only the URL and publishable key from `/api/public-config`; Supabase owns session persistence and refresh. The FastAPI backend verifies the Supabase access token server-side and derives the user identity from its verified `sub` claim. Do not add Google client secrets, Supabase secret keys, or manual token storage to frontend files.

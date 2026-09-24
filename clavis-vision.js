@@ -33,7 +33,7 @@
   const LS_ENABLED = 'clavis_vision_enabled';
   const LS_INTERVAL = 'clavis_vision_interval_ms';
   const MIN_INTERVAL = 30000;   // don't hammer the vision API / the user's quota
-  const DEFAULT_INTERVAL = 45000;
+  const DEFAULT_INTERVAL = 180000;   // a calm look every 3 min (was 45 s)
   const MAX_WIDTH = 960;        // downscale before sending — cheaper + faster, plenty for UI understanding
 
   const SENSITIVE = /bank|netbank|paytm|phonepe|upi|\botp\b|password|passwd|credential|wallet|incognito|private browsing|aadhaar|pan card|salary|payslip|keychain|1password|bitwarden/i;
@@ -135,7 +135,7 @@
 
       const confidence = Number(parsed.confidence) || 0;
       const suggestion = String(parsed.suggestion || '').trim();
-      if ((forceSpeak || (parsed.ask && confidence >= 0.55)) && suggestion) {
+      if ((forceSpeak || (parsed.ask && confidence >= 0.7)) && suggestion) {
         if (forceSpeak || window.ClavisProactive?.canSpeak?.('vision')) {
           window.ClavisProactive?.deliver?.(suggestion, 'vision');
         }

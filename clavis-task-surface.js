@@ -1518,19 +1518,25 @@
         if (pipeTable) return suppressTables ? '' : renderPipeTable(pipeTable);
       }
 
-      if (lines.length === 1 && /^#{1,4}\s+/.test(lines[0])) {
-        var hLevel = lines[0].match(/^(#{1,4})\s+/)[1].length;
-        var hText = lines[0].replace(/^#{1,4}\s+/, '');
-        return '<h' + (hLevel + 1) + ' class="cts-heading cts-h' + (hLevel + 1) + '">' + inline(hText) + '</h' + (hLevel + 1) + '>';
-      }
-
-      var bullets = lines.filter(function (l) { return /^([-*•]|\d+[.)])\s+/.test(l); });
-      if (bullets.length && bullets.length === lines.length) {
-        return '<ul class="cts-list">' + lines.map(function (l) {
-          return '<li>' + inline(l.replace(/^([-*•]|\d+[.)])\s+/, '')) + '</li>';
-        }).join('') + '</ul>';
-      }
-      return '<p class="cts-summary">' + inline(lines.join(' ')) + '</p>';
+      // Headings, list items and prose can share one block — models write
+      // "### Title\n- a\n- b" without blank lines, which used to collapse
+      // into one run-on paragraph with the "###" showing.
+      var out = '', para = [], list = [];
+      function flushPara() { if (para.length) { out += '<p class="cts-summary">' + inline(para.join(' ')) + '</p>'; para = []; } }
+      function flushList() { if (list.length) { out += '<ul class="cts-list">' + list.map(function (l) { return '<li>' + inline(l) + '</li>'; }).join('') + '</ul>'; list = []; } }
+      lines.forEach(function (l) {
+        var h = l.match(/^(#{1,4})\s+(.*)$/);
+        if (h) {
+          flushPara(); flushList();
+          var lv = h[1].length + 1;
+          out += '<h' + lv + ' class="cts-heading cts-h' + lv + '">' + inline(h[2]) + '</h' + lv + '>';
+          return;
+        }
+        if (/^([-*•]|\d+[.)])\s+/.test(l)) { flushPara(); list.push(l.replace(/^([-*•]|\d+[.)])\s+/, '')); return; }
+        flushList(); para.push(l);
+      });
+      flushPara(); flushList();
+      return out;
     }).join('');
 
     codeBlocks.forEach(function (cbHtml, idx) {

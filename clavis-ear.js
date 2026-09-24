@@ -160,6 +160,8 @@
 
   /* ── what counts as "for Clavis" ───────────────────────────── */
   const NAME_RE = /\b(clavis|klavis|clevis|klevis|clavish|claves|clavice|jarvis|hey buddy|hi pal)\b|क्ल[ेैा]विस|क्लेविज़|जार्विस/i;
+  const ASK_NOW_RE = /\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|bhejo|nikalo|sunao|chahiye|chahie|show me|open|tell me|find|search)\b|करो|दिखाओ|बताओ|चाहिए/i;
+  const CONVO_RE = /[\u0900-\u097F]|\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|band|bhejo|nikalo|sunao|chahiye|kya|kaise|kyun|kitn[ae]|kaun|kahan|haan|nahi|theek|acha|accha|aur|wapas|mujhe|mera|meri|humein|leads?)\b/i;
   const STOP_RE = /\b(stop|wait|ruko|ruk ja|ruk jao|bas|bas karo|chup|chup karo|shut up|hold on|one sec|ek (?:min|minute|second)|suno|sunno|listen|nahi nahi|no no|cancel)\b|रुको|बस|चुप|सुनो/i;
   const ASK_RE = /\b(karo|kar do|kardo|kariye|kijiye|karna|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|kholo|khol do|band|hatao|hata do|chalao|chala do|nikalo|nikal do|bhejo|bhej do|likho|likh do|search|find|show|open|close|tell|play|pause|stop|start|call|send|make|create|give|get|find|check|explain|summari[sz]e|translate|remind|set|go|zoom|scroll|type|read|what|what's|whats|which|who|whom|whose|why|how|when|where|kya|kyaa|kaise|kab|kahan|kaha|kitna|kitne|kitni|kaun|kyun|kyu|kis|konsa|kaunsa|can you|could you|would you|will you|please|plz|pls|zara|jara|chahiye|lao|le aao|de do|do na|suno|next|aur|agla|pichla|wapas|haan|han|nahi|nahin|yes|yeah|yep|no|nope|ok|okay|theek|thik|done|sure|bilkul|leads?|map|photo|photos|image|images|website|email|excel|whatsapp)\b|करो|दिखाओ|बताओ|खोलो|बंद|हटाओ|क्या|कैसे|कब|कहाँ|कितने|कौन|क्यों/i;
   function named(text) { return NAME_RE.test(String(text || '')); }
@@ -190,21 +192,33 @@
       // New words over Clavis's voice interrupt it only when they are for
       // Clavis — a request/question, or (once enrolled) sir's own voice.
       // A conversation in the room shouldn't cut Clavis off.
+      // Other new words interrupt only when they are HIS voice (Voice ID) —
+      // a video or people in the room must never cut Clavis off.
       const his = voiceId.enabled() && voiceId.verdict(ctx.since || now() - 4000).verdict === 'owner';
-      if (e.fresh >= 3 && (his || looksLikeRequest(t))) return { accept: true, barge: true, reason: 'fresh-words', text: t };
+      if (e.fresh >= 2 && his) return { accept: true, barge: true, reason: 'his-voice', text: t };
+      // Sir cutting in with a clear new instruction ("nahi, mujhe Noida ki
+      // list chahiye") is heard and done — chatter without a request is not.
+      if (e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
+      // Answering right after Clavis finished ("haan, Noida ki bhi dikhao"):
+      // clearly new words, not an echo, a Hindi/Hinglish request.
+      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && CONVO_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
       return { accept: false, reason: 'unsure-while-speaking', text: t, echo: e };
     }
     // A recognizer can also deliver Clavis's words many seconds late.
     const late = echo(t, 9000);
     if (late.n >= 3 && late.score >= 0.8) return { accept: false, reason: 'late-echo', text: t, echo: late };
 
+    // Open mic (no "Clavis" said): only his registered voice counts. "Sounds
+    // like a request" was not enough — "I'm going to go to the next video"
+    // from a video in the room passed that test and opened photos.
     if (ctx.openMic && !byName) {
-      if (voiceId.enabled()) {
-        const v = voiceId.verdict(ctx.since || now() - 6000);
-        if (v.verdict === 'other') return { accept: false, reason: 'not-owner', text: t, voice: v };
-      }
-      const shortReply = t.split(/\s+/).length <= 3 && /\b(haan|han|ha|yes|yeah|no|nahi|nahin|ok|okay|theek|thik|sure|bilkul|done|chalo)\b/i.test(t);
-      if (!(looksLikeRequest(t) || (shortReply && clavisJustAsked()))) return { accept: false, reason: 'not-addressed', text: t };
+      const v = voiceId.enabled() ? voiceId.verdict(ctx.since || now() - 6000) : { verdict: 'unknown' };
+      // Without Voice ID, the few seconds right after a reply still work like
+      // a conversation — but only for a Hindi / Hinglish request, never
+      // English chatter from a video ("go to the next video").
+      const words = t.split(/\s+/).filter(Boolean).length;
+      if (v.verdict !== 'owner' && !voiceId.enabled() && words >= 2 && words <= 30 && CONVO_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      if (v.verdict !== 'owner') return { accept: false, reason: voiceId.enabled() ? 'not-owner' : 'not-addressed', text: t, voice: v };
     }
     return { accept: true, barge: false, reason: 'ok', text: t };
   }
@@ -456,12 +470,13 @@
     const bar = document.querySelector('.topbar-right') || document.querySelector('.topbar');
     const r = bar?.getBoundingClientRect?.();
     if (r && r.bottom > 0 && r.bottom < 140) {
-      let top = r.bottom + 10;
+      // ~1 cm below the bar: its frosted blur used to smear the words.
+      let top = r.bottom + 46;
       // A page's own icon row right under the top bar (the Clavis page has
       // one): sit below it instead of writing over its buttons.
       document.querySelectorAll('.jarvis-hero-actions, .view.active .view-header-actions, #do-live-time').forEach((el) => {
         const b = el.getBoundingClientRect();
-        if (b.width && b.height && b.top < top + 44 && b.bottom < 180 && b.right > window.innerWidth - 520) top = Math.max(top, b.bottom + 8);
+        if (b.width && b.height && b.top < top + 44 && b.bottom < 200 && b.right > window.innerWidth - 520) top = Math.max(top, b.bottom + 14);
       });
       cap.el.style.top = Math.round(top) + 'px';
       cap.el.style.right = Math.max(12, Math.round(window.innerWidth - r.right)) + 'px';
@@ -469,24 +484,40 @@
   }
   window.addEventListener('resize', () => place(), { passive: true });
 
+  // Typed out properly: a capital first letter, "I" in English, and a
+  // closing "?" or "." once the sentence is final.
+  const ASK = /^(kya|kaise|kyun|kyon|kab|kahan|kaun|kitn[ae]|kis|what|why|how|when|where|who|which|is|are|can|could|do|does|will|would|should)\b|\b(kya|na|hai na|kaise|kyun|kahan)$/i;
+  function tidy(text, settled) {
+    let t = String(text || '').replace(/\s+/g, ' ').trim();
+    if (!t) return t;
+    t = t.replace(/(^|\s)i(?=\s|'|$)/g, '$1I');
+    t = t.charAt(0).toUpperCase() + t.slice(1);
+    if (settled && !/[.?!।…]$/.test(t)) t += ASK.test(t) ? '?' : /[\u0900-\u097F]$/.test(t) ? '।' : '.';
+    return t;
+  }
   function render(text, settled) {
     capEnsure();
-    const next = String(text || '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+    const next = tidy(text, settled).split(' ').filter(Boolean);
     // Keep the words that didn't change; only the new tail animates in.
     let same = 0;
-    while (same < cap.words.length && same < next.length && cap.words[same].w.toLowerCase() === next[same].toLowerCase()) same++;
+    const bare = (w) => w.toLowerCase().replace(/[.?!।…]+$/, '');
+    while (same < cap.words.length && same < next.length && bare(cap.words[same].w) === bare(next[same])) same++;
+    // Same word, now with its closing mark: swap the text, don't re-animate.
+    if (same < cap.words.length && same === next.length - 1 && bare(cap.words[same].w) === bare(next[same])) same++;
+    for (let i = 0; i < Math.min(same, cap.words.length); i++) if (cap.words[i].w !== next[i]) { cap.words[i].w = next[i]; cap.words[i].el.textContent = next[i]; }
     for (let i = cap.words.length - 1; i >= same; i--) { cap.words[i].el.remove(); cap.words.pop(); }
     for (let i = same; i < next.length; i++) {
       const s = document.createElement('span');
       s.className = 'ce-w';
       s.textContent = next[i];
-      s.style.animationDelay = Math.min(0.28, (i - same) * 0.045) + 's';
+      const d = Math.min(0.36, (i - same) * 0.06) + 's';
+      s.style.animationDelay = `${d}, ${d}`;
       cap.line.appendChild(s);
       cap.line.appendChild(document.createTextNode(' '));
       cap.words.push({ w: next[i], el: s });
     }
-    // Long speech: only the latest ~26 words stay (the mask fades older ones).
-    while (cap.words.length > 26) {
+    // Long speech: only the latest ~18 words (two lines) stay (the mask fades older ones).
+    while (cap.words.length > 18) {
       const first = cap.words.shift();
       const sp = first.el.nextSibling;
       first.el.remove();
@@ -504,7 +535,7 @@
       clearTimeout(cap.hideTimer);
       place();
       render(t, false);
-      cap.el.classList.remove('is-out', 'is-dropped');
+      cap.el.classList.remove('is-out', 'is-dropped', 'is-idle');
       cap.el.classList.add('is-in', 'is-listening');
       caption._touched = now();
     },
@@ -518,10 +549,10 @@
       }
       if (text) render(text, true);
       if (!cap.el) return;
-      cap.el.classList.remove('is-listening', 'is-dropped');
+      cap.el.classList.remove('is-listening', 'is-dropped', 'is-idle');
       cap.el.classList.add('is-in', 'is-settled');
       clearTimeout(cap.hideTimer);
-      cap.hideTimer = setTimeout(() => this.clear(), 2600);
+      cap.hideTimer = setTimeout(() => this.clear(), 4200);   // long enough to read
     },
     listening(on) {
       if (!capEnabled()) return;
@@ -616,7 +647,8 @@
     checks.push(
       judge('mummy ne khana bana liya', { openMic: true }).accept === false,
       judge('Clavis mummy ko call karo', { openMic: true }).accept === true,
-      judge('map band karo', { openMic: true }).accept === true,
+      judge('map band karo', { openMic: true }).accept === (!voiceId.enabled()),   // a reply in the conversation window
+      judge("I'm going to go to the next video", { openMic: true }).accept === false,
       judge('photos dikhao').accept === true,
     );
     said.items = saved;
@@ -645,6 +677,51 @@
     if (c) c.checked = capEnabled();
   }
   window.clavisSyncVoiceIdUi = syncUi;
+
+  /* ── one-time permission (first launch only) ───────────────── */
+  // Sir asked to grant everything ONCE and never press a button again.
+  // One card on first launch; the choice is saved, the browser remembers
+  // the mic for this origin, and every later launch starts hands-free,
+  // screen awareness and proactive help on its own.
+  const CONSENT = 'clavis_consent_v1';
+  async function grantAll(card) {
+    let mic = false;
+    try { mic = await (window.requestClavisMicrophoneOnce?.() ?? Promise.resolve(false)); } catch (_) {}
+    if (mic) {
+      lsSet('jarvis_hands_free', 'true');
+      lsSet('clavis_sound_trigger_enabled', 'true');
+      try { window.dispatchEvent(new CustomEvent('clavis:mic-granted')); } catch (_) {}
+    }
+    try { window.ClavisVision?.setEnabled?.(true); window.ClavisVision?.start?.(); } catch (_) {}
+    try { window.ClavisProactive?.setEnabled?.(true); } catch (_) {}
+    lsSet(CONSENT, JSON.stringify({ at: now(), mic, screen: true, proactive: true }));
+    card?.querySelector('.cv-status') && (card.querySelector('.cv-status').textContent = mic
+      ? 'Ho gaya, sir. Ab bas app kholiye aur boliye — main sun rahi hoon.'
+      : 'Mic browser ne block kiya hai — address bar ke mic icon se allow kar dijiye.');
+    setTimeout(() => { card?.classList.remove('is-in'); setTimeout(() => card?.remove(), 320); }, mic ? 1500 : 3200);
+  }
+  function consentCard() {
+    if (lsGet(CONSENT) || document.getElementById('clavis-voiceid-sheet')) return;
+    if (lsGet('clavis_mic_permission_granted') === 'true') { lsSet(CONSENT, JSON.stringify({ at: now(), mic: true, inferred: true })); return; }
+    if (location.protocol === 'file:') return;   // the mic can't be kept on file:// pages
+    const el = document.createElement('div');
+    el.id = 'clavis-voiceid-sheet';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Clavis permissions');
+    el.innerHTML = `
+      <div class="cv-card">
+        <h3>Clavis ko ek baar ijazat dijiye</h3>
+        <p class="cv-sub">Sirf pehli baar. Uske baad app kholte hi Clavis sunegi, screen dekh kar madad offer karegi — koi button nahi.</p>
+        <p class="cv-line" style="font-style:normal;text-align:left;line-height:1.9">🎙️ Mic — hands-free, "Clavis" bolte hi<br>🖥️ Screen samajh kar sahi waqt pe suggestions<br>💡 Khud se yaad dilana aur help offer karna</p>
+        <p class="cv-status" aria-live="polite">Aap Settings me kabhi bhi band kar sakte hain.</p>
+        <div class="cv-actions"><button type="button" class="cv-cancel">Baad me</button><button type="button" class="cv-start">Sab allow karein</button></div>
+      </div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('is-in'));
+    el.querySelector('.cv-cancel').onclick = () => { el.classList.remove('is-in'); setTimeout(() => el.remove(), 320); };
+    el.querySelector('.cv-start').onclick = (ev) => { ev.currentTarget.disabled = true; grantAll(el); };
+  }
+  setTimeout(() => { try { consentCard(); } catch (_) {} }, 2600);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncUi, { once: true }); else setTimeout(syncUi, 0);
 
   window.ClavisEar = {

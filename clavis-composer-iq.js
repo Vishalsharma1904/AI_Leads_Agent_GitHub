@@ -30,7 +30,10 @@
 
   var TARGETS = [
     { sel: '#jarvis-input', scope: 'main' },
-    { sel: '.cts-composer-input', scope: 'peek' }
+    { sel: '.cts-composer-input', scope: 'peek' },
+    // Client AI and Candidate AI get the same ghost completion.
+    { sel: '#chat-input', scope: 'client' },
+    { sel: '#candidate-ai-input', scope: 'candidate' }
   ];
 
   var MIRROR_PROPS = [
@@ -478,7 +481,7 @@
       if (e.key !== 'Enter' || e.shiftKey) return;
       var t = e.target;
       if (!t || !t.matches) return;
-      if (!t.matches('#jarvis-input, .cts-composer-input')) return;
+      if (!t.matches('#jarvis-input, .cts-composer-input, #chat-input, #candidate-ai-input')) return;
       var v = (t.value || '').trim();
       if (v && global.ClavisIQ) global.ClavisIQ.learn('ask', { text: v });
     }, true);

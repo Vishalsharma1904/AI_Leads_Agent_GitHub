@@ -391,6 +391,32 @@
     }
   }
 
+  // ---- Variety: the same command never gets the same sentence twice ----
+  // Jarvis never answers "Dashboard khol raha hoon" word for word every time.
+  const VARIANTS = {
+    dashboard: ['Dashboard khol raha hoon.', 'Yeh raha aapka dashboard, sir.', 'Dashboard par chalte hain.', 'Overview samne hai, sir.'],
+    leads: ['Leads page par ja raha hoon.', 'Aapki leads yeh rahi.', 'Leads khol di, sir.', 'Leads database samne hai.'],
+    clavis: ['Clavis Studio khol raha hoon.', 'Main yahin hoon, sir.', 'Studio samne hai.'],
+    analytics: ['Analytics khol raha hoon.', 'Numbers yeh rahe, sir.', 'Analytics par chalte hain.'],
+    email: ['Email page khol raha hoon.', 'Inbox samne hai, sir.', 'Email outreach khol diya.'],
+    whatsapp: ['WhatsApp page par ja raha hoon.', 'WhatsApp khol diya, sir.'],
+    plugins: ['Plugins khol raha hoon.', 'Plugins samne hain.'],
+    settings: ['Settings khol raha hoon.', 'Settings yeh rahi, sir.', 'Settings khol di.'],
+    close_modal: ['Band kar diya.', 'Hata diya, sir.', 'Window band.'],
+    theme_dark: ['Dark mode laga raha hoon.', 'Andhera kar diya, sir — aankhon ko aaram.', 'Dark mode on.'],
+    theme_light: ['Light mode laga raha hoon.', 'Ujala kar diya, sir.', 'Light mode on.'],
+    theme_toggle: ['Theme badal diya.', 'Theme switch kar diya, sir.'],
+    export_leads: ['Leads export kar raha hoon.', 'File taiyar kar raha hoon, sir.', 'Export shuru — ek pal.'],
+    show_all_leads: ['Saari leads dikha raha hoon.', 'Filter hata diya — sab leads samne hain.', 'Poori list yeh rahi, sir.'],
+    task_window: ['Task window khol raha hoon.', 'Floating window samne hai.'],
+  };
+  function vary(cmd) {
+    const pool = VARIANTS[cmd.name];
+    if (!pool) return cmd.speak || '';
+    try { return window.ClavisEmotionalEngine?.pickDifferent?.(pool, 'nav_' + cmd.name) || pool[Math.floor(Math.random() * pool.length)]; }
+    catch (e) { return pool[0]; }
+  }
+
   // ---- Main Route function ----
   function route(text) {
     const raw = String(text || '').trim();
@@ -418,7 +444,7 @@
             } catch(e) {
               console.warn('[ClavisVoiceNav] action error for', cmd.name, e);
             }
-            return { handled: true, spoken: cmd.speak || '', navigate: cmd.name };
+            return { handled: true, spoken: vary(cmd), navigate: cmd.name };
           }
         }
       }

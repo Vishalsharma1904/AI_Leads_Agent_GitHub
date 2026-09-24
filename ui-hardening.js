@@ -76,7 +76,17 @@
     // NB: do NOT observe 'aria-hidden' here — sync() writes it, so watching it
     // would re-trigger this observer. We only watch the inputs that change a
     // dialog's visibility (style/class/hidden).
-    new MutationObserver(syncAll).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
+    // Only a change ON a dialog (or on <body>, which themes/overlays toggle)
+    // can change whether a dialog is visible. Reacting to every style/class
+    // write in the page meant getComputedStyle + getBoundingClientRect on
+    // every dialog in EVERY animation frame (orb, caption, panels all write
+    // styles) — a forced layout per frame and the main source of jank.
+    new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        const t = m.target;
+        if (t === document.body || (t.nodeType === 1 && t.matches(selector))) { syncAll(); return; }
+      }
+    }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
     document.addEventListener('keydown', onKeydown, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });

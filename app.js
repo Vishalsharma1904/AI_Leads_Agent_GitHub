@@ -853,12 +853,13 @@ function showView(viewName) {
     breadcrumb.textContent = labels[viewName] || viewName;
   }
 
-  // Settings opens as a macOS overlay — never as a blank page view (requires login)
+  // Settings opens as a macOS overlay — never as a blank page view.
+  // openSettingsModal() owns the access check (localhost / signed-in /
+  // app shell visible). Gating on the skylark_logged_in flag here too
+  // meant that whenever that flag was 'false' — it is reset on every page
+  // load — the sidebar's Settings (and #settings) silently did nothing.
   if (viewName === 'settings') {
-    const isLoggedIn = localStorage.getItem('skylark_logged_in') === 'true';
-    if (isLoggedIn && typeof window.openSettingsModal === 'function') {
-      window.openSettingsModal();
-    }
+    if (typeof window.openSettingsModal === 'function') window.openSettingsModal();
     return;
   }
 
@@ -1639,8 +1640,10 @@ function renderTableRows(leads) {
       <td><span style="font-size:12px;font-weight:600;color:var(--gray-700)">${escHtml(lead.city||'—')}</span></td>
       <td>
         <div style="font-size:11px; font-weight:700;">
-          <span style="color:#6366f1;">🛡️ ${lead.securityScore || 70}%</span>
-          <span style="color:#10b981; margin-left:6px;">🧹 ${lead.housekeepingScore || 70}%</span>
+          ${lead.fitScore != null
+            ? `<span style="color:#2F5233;" title="Fit for what you sell">🎯 ${lead.fitScore}%</span>`
+            : `<span style="color:#6366f1;">🛡️ ${lead.securityScore || 70}%</span>
+          <span style="color:#10b981; margin-left:6px;">🧹 ${lead.housekeepingScore || 70}%</span>`}
         </div>
       </td>
       <td><span class="td-truncate">${lead.phone ? `<a href="tel:${escHtml(lead.phone)}" style="color:var(--gray-700)">${escHtml(lead.phone)}</a>` : '<span style="color:var(--gray-300)">—</span>'}</span></td>
