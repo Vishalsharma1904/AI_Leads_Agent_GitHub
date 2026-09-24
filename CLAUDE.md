@@ -34,6 +34,10 @@ This repo now contains **two products**:
 ├── clavis-voice.js      # TTS: female-first (Gemini TTS, key+model rotation, emotion styles) → male fallback that speaks Hindi
 ├── clavis-automation.js # PC + website automation (open apps, type into them, multi-step tasks, website brief)
 ├── clavis-olive.css     # Rich olive-green primary buttons + send button (tokens: --olive-*, --cream)
+├── clavis-business.js   # Business profile (what the owner sells): lead search list, competitor filter, fit score, prompts
+├── clavis-appearance.js # Settings → Appearance: themes, accent, surface/text colours, fonts, minimal (loaded in <head>)
+├── clavis-perf.js       # Graphics tiers Auto/Smooth/Max (orb DPR/fps/glass, blur) — loaded in <head> before the orb
+├── clavis-silk.css      # Slow expo-out motion for menus, dialogs, chat bubbles, buttons
 ├── AndroidApp/          # Android WebView wrapper
 └── backend/             # Separate FastAPI voice-calling server (Exotel + OpenRouter)
     ├── main.py                              # API entrypoint incl. /ws/audio, /api/calls/outbound

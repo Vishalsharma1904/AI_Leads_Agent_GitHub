@@ -133,6 +133,54 @@
     return null;
   }
 
+  /* ── status / capabilities ─────────────────────────────────── */
+  async function statusLine() {
+    const now = new Date();
+    const time = now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
+    let total = 0, today = 0;
+    try {
+      const leads = (await window.MemoryEngine?.getAllLeads?.()) || window.allLeads || [];
+      total = leads.length;
+      const d = now.toDateString();
+      today = leads.filter((l) => new Date(l.createdAt || l.timestamp || l.sourceTimestamp || 0).toDateString() === d).length;
+    } catch (_) {}
+    let task = '';
+    try {
+      const c = window.ClavisTask?.current?.();
+      if (c && !/completed|failed|idle/.test(c.phase || '')) task = ` Abhi "${String(c.title || 'ek kaam').split(' · ').pop().slice(0, 40)}" chal raha hai.`;
+    } catch (_) {}
+    const biz = (() => { try { return window.ClavisBusiness?.profile?.().id !== 'security' ? ` Leads ${window.ClavisBusiness.label()} ke hisaab se nikal rahi hain.` : ''; } catch (_) { return ''; } })();
+    const screen = canvasOpen() ? ` Display par ${canvasKind() || 'kuch'} khula hai.` : '';
+    const nudge = total === 0 ? ' Shuruaat karein? Bas city boliye.' : today === 0 ? ' Aaj abhi tak koi nayi lead nahi — ek search chalaun?' : ' Kuch aur chahiye to boliye.';
+    const open = pick([`${time} baj rahe hain, sir.`, `Sir, abhi ${time}.`, `Quick update, sir — ${time}.`], 'status_open');
+    const nums = pick([`Database me ${total} leads, aaj ${today} nayi.`, `${total} leads saved, jinme ${today} aaj ki.`, `Aaj ${today} nayi leads, total ${total}.`], 'status_nums');
+    return `${open} ${nums}${task}${biz}${screen}${nudge}`;
+  }
+  const CAPABILITIES = [
+    '### Leads & business',
+    '- **Leads for any city / industry** — "Gurgaon ki leads", "Pune ke 20 hotels"',
+    '- **Your business profile** — "hum solar lagate hain" (competitors filtered automatically)',
+    '- **Candidates** — "Noida me 10 security guards chahiye"',
+    '- **Export, email, WhatsApp, Google Sheets** — "leads export karo"',
+    '',
+    '### See things',
+    '- **Maps** — "India Gate map pe dikhao", "Cyber Hub ke paas hospitals", "satellite", "zoom in"',
+    '- **Photos** — "shiv ji ki photo", "Taj Mahal ki tasveer"',
+    '- **Websites** — "stripe.com ke baare me batao" (screenshot + brief + my take)',
+    '- **Your screen** — "screen pe kya hai", "is screenshot ko ChatGPT ko do"',
+    '',
+    '### Your PC',
+    '- **Open any app** — Chrome, Excel, Word, Notepad, File Explorer, Claude, ChatGPT',
+    '- **Type & automate** — "notepad kholo aur likho …", "YouTube pe Arijit search karo", "scroll karo"',
+    '',
+    '### Me',
+    '- **Talk naturally** — interrupt me any time; "ruko", "bas", "Clavis…"',
+    '- **Voice** — "ladke ki awaaz me bolo", "female voice"; Voice ID: "meri awaaz register karo"',
+    '- **Look** — "accent blue karo", "claude wala theme", "minimal mode on"',
+    '- **Clean up** — "map band karo", "close everything"',
+    '- **Status** — "Clavis, status" · I remember what you teach me',
+  ].join('\n');
+
   /* ── places: instant, no AI round trip ─────────────────────── */
   // "India Gate map pe dikhao", "show Cyber Hub on map", "map pe Noida",
   // "hospitals near Cyber Hub", "Sector 44 ke paas ATM". Before, these
@@ -240,6 +288,16 @@
 
     const place = placeIntent(raw);
     if (place) return place;
+
+    // Jarvis-style status report: numbers first, then the one thing that matters.
+    if (words.length <= 7 && /\b(status|briefing|brief me|update do|aaj ka update|kya chal raha|kya ho raha|report do|situation)\b/.test(t) && !/\blead\s+\w+\s+ka\s+status\b/.test(t)) {
+      return { handled: true, spoken: await statusLine() };
+    }
+    // "Tum kya kya kar sakti ho" — show the range, say one line.
+    if (/\b(kya\s*kya\s*kar\s*sakt[aei]|what\s+can\s+you\s+do|tum\s+kya\s+kar\s+sakt[aei]|capabilities|features\s+batao|help\s+menu)\b/.test(t)) {
+      try { window.ClavisCanvas?.showDocument?.({ title: 'What I can do', markdown: CAPABILITIES }); } catch (_) {}
+      return { handled: true, spoken: pick(['Screen par poori list rakh di hai, sir — leads se lekar PC control tak. Kahiye, kahan se shuru karein?', 'Kaafi kuch, sir. List samne hai — bas ek kaam boliye.'], 'caps') };
+    }
 
     return { handled: false };
   }
