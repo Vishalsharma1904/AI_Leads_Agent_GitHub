@@ -57,7 +57,7 @@ html[data-theme="dark"] #clavis-ear-caption {
 #clavis-ear-caption .ce-clip {
   display: flex;
   flex-direction: column-reverse;
-  max-height: calc(1.42em * 3);
+  max-height: calc(1.42em * 2);
   overflow: hidden;
   font: 500 15.5px/1.42 Inter, "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
   -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);

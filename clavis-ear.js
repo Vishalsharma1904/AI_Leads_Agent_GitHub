@@ -485,8 +485,8 @@
       cap.line.appendChild(document.createTextNode(' '));
       cap.words.push({ w: next[i], el: s });
     }
-    // Long speech: only the latest ~26 words stay (the mask fades older ones).
-    while (cap.words.length > 26) {
+    // Long speech: only the latest ~18 words (two lines) stay (the mask fades older ones).
+    while (cap.words.length > 18) {
       const first = cap.words.shift();
       const sp = first.el.nextSibling;
       first.el.remove();
@@ -645,6 +645,51 @@
     if (c) c.checked = capEnabled();
   }
   window.clavisSyncVoiceIdUi = syncUi;
+
+  /* ── one-time permission (first launch only) ───────────────── */
+  // Sir asked to grant everything ONCE and never press a button again.
+  // One card on first launch; the choice is saved, the browser remembers
+  // the mic for this origin, and every later launch starts hands-free,
+  // screen awareness and proactive help on its own.
+  const CONSENT = 'clavis_consent_v1';
+  async function grantAll(card) {
+    let mic = false;
+    try { mic = await (window.requestClavisMicrophoneOnce?.() ?? Promise.resolve(false)); } catch (_) {}
+    if (mic) {
+      lsSet('jarvis_hands_free', 'true');
+      lsSet('clavis_sound_trigger_enabled', 'true');
+      try { window.dispatchEvent(new CustomEvent('clavis:mic-granted')); } catch (_) {}
+    }
+    try { window.ClavisVision?.setEnabled?.(true); window.ClavisVision?.start?.(); } catch (_) {}
+    try { window.ClavisProactive?.setEnabled?.(true); } catch (_) {}
+    lsSet(CONSENT, JSON.stringify({ at: now(), mic, screen: true, proactive: true }));
+    card?.querySelector('.cv-status') && (card.querySelector('.cv-status').textContent = mic
+      ? 'Ho gaya, sir. Ab bas app kholiye aur boliye — main sun rahi hoon.'
+      : 'Mic browser ne block kiya hai — address bar ke mic icon se allow kar dijiye.');
+    setTimeout(() => { card?.classList.remove('is-in'); setTimeout(() => card?.remove(), 320); }, mic ? 1500 : 3200);
+  }
+  function consentCard() {
+    if (lsGet(CONSENT) || document.getElementById('clavis-voiceid-sheet')) return;
+    if (lsGet('clavis_mic_permission_granted') === 'true') { lsSet(CONSENT, JSON.stringify({ at: now(), mic: true, inferred: true })); return; }
+    if (location.protocol === 'file:') return;   // the mic can't be kept on file:// pages
+    const el = document.createElement('div');
+    el.id = 'clavis-voiceid-sheet';
+    el.setAttribute('role', 'dialog');
+    el.setAttribute('aria-label', 'Clavis permissions');
+    el.innerHTML = `
+      <div class="cv-card">
+        <h3>Clavis ko ek baar ijazat dijiye</h3>
+        <p class="cv-sub">Sirf pehli baar. Uske baad app kholte hi Clavis sunegi, screen dekh kar madad offer karegi — koi button nahi.</p>
+        <p class="cv-line" style="font-style:normal;text-align:left;line-height:1.9">🎙️ Mic — hands-free, "Clavis" bolte hi<br>🖥️ Screen samajh kar sahi waqt pe suggestions<br>💡 Khud se yaad dilana aur help offer karna</p>
+        <p class="cv-status" aria-live="polite">Aap Settings me kabhi bhi band kar sakte hain.</p>
+        <div class="cv-actions"><button type="button" class="cv-cancel">Baad me</button><button type="button" class="cv-start">Sab allow karein</button></div>
+      </div>`;
+    document.body.appendChild(el);
+    requestAnimationFrame(() => el.classList.add('is-in'));
+    el.querySelector('.cv-cancel').onclick = () => { el.classList.remove('is-in'); setTimeout(() => el.remove(), 320); };
+    el.querySelector('.cv-start').onclick = (ev) => { ev.currentTarget.disabled = true; grantAll(el); };
+  }
+  setTimeout(() => { try { consentCard(); } catch (_) {} }, 2600);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncUi, { once: true }); else setTimeout(syncUi, 0);
 
   window.ClavisEar = {

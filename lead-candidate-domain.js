@@ -242,6 +242,13 @@
     var isCandidate = (CANDIDATE_CUES.test(source) || (roles.length > 0 && /\b(chahiye|chahie|need|require|hiring|bhejo|lao)\b/i.test(source) && !hasLeadTarget)) && !/\bleads?\b/i.test(source);
     var isExplicitLead = hasLeadTarget && (hasLeadAction || /\b(\d+\s*(?:leads?|companies|clients?|[a-z]+))\b/i.test(source));
     var isLead = !isCandidate && (isExplicitLead || (hasLeadTarget && /\b(mujhe|hume|humko|give|send|provide)\b/i.test(source)) || (hasLeadTarget && cityList.length > 0 && (hasLeadAction || hasIndustryTarget)));
+    // "Gurgaon ki leads", "gurugram leads", "delhi ki leads dikhao": the word
+    // "leads" plus a named city IS the request — it used to fall through to
+    // the AI, which asked him for "more details".
+    if (!isCandidate && !isLead && /\bleads?\b/i.test(source) && cityList.length > 0
+        && source.split(/\s+/).length <= 8 && !/\b(saved|purani|puraani|existing|database|stats?|export|download|delete|count|kitni|kitne)\b/i.test(source)) {
+      isLead = true;
+    }
     var workstream = isCandidate ? 'candidates' : (isLead ? 'leads' : 'general');
 
     return {

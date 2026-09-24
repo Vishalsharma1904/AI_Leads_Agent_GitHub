@@ -878,7 +878,11 @@ window.saveClavisCredential = saveClavisCredential;
 // something worth reading or seeing: a list/table/draft/research answer,
 // an attachment, a task pipeline, or when speech is off. Small talk and
 // quick answers stay in the voice and never flash the window.
-const CLAVIS_SHOW_RE = /\b(show|dikha\w*|list|table|compare|comparison|research|report|summar\w*|draft|likh\w*|write|email|mail|plan|steps?|step by step|code|script|export|excel|sheet|breakdown|analy[sz]\w*|document|pdf|itinerary|schedule|chart|graph|detail\w*)\b/i;
+// Only requests whose answer is genuinely worth READING. A bare "dikhao" /
+// "show" / "detail" used to open it too — so "map dikhao" flashed both the
+// map and the window. Places, pictures and websites belong to the display.
+const CLAVIS_SHOW_RE = /\b(list|table|compare|comparison|research|report|summar\w*|draft|write|plan|step by step|steps|code|script|export|breakdown|analy[sz]\w*|document|pdf|itinerary|schedule|chart|graph)\b|\blikh(o|do|kar|iye)\b|\b(email|mail|letter|application)\s+(likh\w*|draft|banao|bana do|write)/i;
+const CLAVIS_DISPLAY_RE = /\b(map|maps|naksha|photo|photos|foto|image|images|tasveer\w*|picture|pictures|pics?|website|site|nearby|location|kahan\s+hai|where\s+is)\b/i;
 function clavisSetDisplay(taskId, mode) {
   const t = taskId && window.ClavisTask?.Store?.get?.(taskId);
   if (t) t.display = mode;
@@ -889,14 +893,16 @@ function clavisDisplayOf(taskId) {
 function clavisWantsWindow(text, ctx = {}) {
   if (!jarvisSpeechEnabled) return true;        // nothing would be heard, so show it
   if (ctx.attachments || ctx.images) return true;
-  return CLAVIS_SHOW_RE.test(String(text || ''));
+  const t = String(text || '');
+  if (CLAVIS_DISPLAY_RE.test(t) && !CLAVIS_SHOW_RE.test(t)) return false;   // the display shows it
+  return CLAVIS_SHOW_RE.test(t);
 }
 function clavisAnswerWantsWindow(reply) {
   const t = String(reply || '');
   if (t.length > 520) return true;
   if (/```|^\s*\|.*\|\s*$|^#{1,4}\s/m.test(t)) return true;
   if ((t.match(/^\s*([-*•]|\d+[.)])\s+/gm) || []).length >= 3) return true;
-  return /https?:\/\//.test(t);
+  return /https?:\/\//.test(t) && t.length > 220;   // a single link in a short answer stays spoken
 }
 function clavisReveal(taskId) {
   if (clavisDisplayOf(taskId) === 'window') window.ClavisTaskSurface?.show?.();

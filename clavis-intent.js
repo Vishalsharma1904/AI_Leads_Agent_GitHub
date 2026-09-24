@@ -143,6 +143,17 @@
     const v = voiceIntent(t);
     if (v) return v;
 
+    // "Hum solar lagate hain" / "mera business IT services hai" → leads,
+    // competitor filtering and advice follow what he sells.
+    if (window.ClavisBusiness && /\b(mera|meri|hamara|humara|hamari|my|our)\s+(business|kaam|company|dhandha)\b|\b(main|mai|hum|we|i)\b.*\b(provide|bechta|bechte|bechti|sell|supply|lagate|lagata|karte|karta)\b/.test(t) && words.length <= 14) {
+      const id = window.ClavisBusiness.detect(t);
+      if (id && id !== window.ClavisBusiness.profile().id) {
+        window.ClavisBusiness.set(id);
+        const p = window.ClavisBusiness.profile();
+        return { handled: true, spoken: `Samajh gayi, sir — ab leads ${p.label} ke customers ki niklengi: ${p.buyers.slice(0, 3).join(', ')} aur baaki. Competitors apne aap hat jayenge.` };
+      }
+    }
+
     const closing = CLOSE.test(t);
     const repeated = /\b(close|band|hatao|clothes|cloze)\b[\s,]+\b(close|band|hatao|clothes|cloze)\b/.test(t);
     const namesApp = APPS.test(t);

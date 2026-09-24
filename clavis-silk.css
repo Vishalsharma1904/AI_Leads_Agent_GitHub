@@ -1,0 +1,80 @@
+/* ============================================================
+ * clavis-silk.css · slow, settled, buttery motion
+ * ------------------------------------------------------------
+ * Only the surfaces that had NO motion or a hurried one get it —
+ * page switches, the floating window, toasts and the rail already
+ * have tuned motion and are left alone. Everything here animates
+ * opacity + transform only (compositor-friendly, 60 fps), eases out
+ * long ("expo-out"), and leaves faster than it arrives.
+ *
+ *   menus / dropdowns   snapped in (0 s)        → 340 ms rise
+ *   settings dialogs    0.2 s linear-ish fade   → 440 ms fade + lift
+ *   chat bubbles        popped in               → 520 ms rise
+ *   buttons & pills     ~180 ms                 → 240 ms hover, 120 ms press
+ * ============================================================ */
+:root {
+  --silk: cubic-bezier(0.22, 1, 0.36, 1);
+  --silk-out: cubic-bezier(0.4, 0, 1, 1);
+  --silk-in-ms: 440ms;
+}
+
+/* Menus and composer dropdowns — they are display-toggled, so a CSS
+   animation replays on every open. */
+#jarvis-more-panel,
+#jarvis-composer-add-dropdown,
+#jarvis-composer-insp-dropdown,
+#jarvis-composer-model-dropdown {
+  animation: silkPop 340ms var(--silk) both;
+  transform-origin: top right;
+}
+#jarvis-composer-add-dropdown,
+#jarvis-composer-insp-dropdown,
+#jarvis-composer-model-dropdown { transform-origin: bottom left; }
+@keyframes silkPop {
+  from { opacity: 0; transform: translateY(-5px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Dialog overlays: a calmer fade, and the card lifts into place. */
+.mac-settings-overlay,
+.settings-overlay {
+  transition-duration: var(--silk-in-ms) !important;
+  transition-timing-function: var(--silk) !important;
+}
+.mac-settings-overlay.active > .mac-dialog,
+.mac-settings-overlay.active > [role="dialog"],
+.settings-overlay.active > [role="dialog"] {
+  animation: silkDialog 500ms var(--silk) both;
+}
+@keyframes silkDialog {
+  from { opacity: 0; transform: translateY(10px) scale(0.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* New chat turns ease in instead of popping. */
+#jarvis-messages > .jarvis-bubble,
+#jarvis-messages > .chat-message,
+.chat-messages > .chat-message {
+  animation: silkRise 520ms var(--silk) both;
+}
+@keyframes silkRise {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* Buttons and pills: a touch slower on hover, quick on press. */
+.btn-primary, .generate-btn, .smodal-btn-primary, #jarvis-send-btn,
+.topbar-right > button, .topbar-right > a, .do-quick-action, .jarvis-more-item {
+  transition-timing-function: var(--silk) !important;
+}
+.btn-primary:active, .generate-btn:active, .smodal-btn-primary:active, #jarvis-send-btn:active {
+  transition-duration: 120ms !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #jarvis-more-panel, #jarvis-composer-add-dropdown, #jarvis-composer-insp-dropdown, #jarvis-composer-model-dropdown,
+  .mac-settings-overlay.active > .mac-dialog, .mac-settings-overlay.active > [role="dialog"],
+  #jarvis-messages > .jarvis-bubble, #jarvis-messages > .chat-message, .chat-messages > .chat-message {
+    animation: none !important;
+  }
+}

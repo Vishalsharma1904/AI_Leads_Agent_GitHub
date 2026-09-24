@@ -1639,8 +1639,10 @@ function renderTableRows(leads) {
       <td><span style="font-size:12px;font-weight:600;color:var(--gray-700)">${escHtml(lead.city||'—')}</span></td>
       <td>
         <div style="font-size:11px; font-weight:700;">
-          <span style="color:#6366f1;">🛡️ ${lead.securityScore || 70}%</span>
-          <span style="color:#10b981; margin-left:6px;">🧹 ${lead.housekeepingScore || 70}%</span>
+          ${lead.fitScore != null
+            ? `<span style="color:#2F5233;" title="Fit for what you sell">🎯 ${lead.fitScore}%</span>`
+            : `<span style="color:#6366f1;">🛡️ ${lead.securityScore || 70}%</span>
+          <span style="color:#10b981; margin-left:6px;">🧹 ${lead.housekeepingScore || 70}%</span>`}
         </div>
       </td>
       <td><span class="td-truncate">${lead.phone ? `<a href="tel:${escHtml(lead.phone)}" style="color:var(--gray-700)">${escHtml(lead.phone)}</a>` : '<span style="color:var(--gray-300)">—</span>'}</span></td>
