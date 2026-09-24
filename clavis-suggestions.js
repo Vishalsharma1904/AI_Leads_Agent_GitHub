@@ -84,6 +84,11 @@
     const input = document.querySelector('#jarvis-input');
     if (!input) return;
 
+    // clavis-luxe.js's composer assist (.lx-suggest) supersedes these chips
+    // (clavis-luxe.css hides this wrap). Don't mark an invisible row as
+    // "visible" — the quiet-state logic below would read it as chips up.
+    if (document.querySelector('#view-jarvis .lx-suggest')) { hide(); return; }
+
     // Check if view-jarvis is active
     const jarvisView = document.getElementById('view-jarvis');
     if (jarvisView && !jarvisView.classList.contains('active')) return;
@@ -105,12 +110,68 @@
     }
     requestAnimationFrame(() => {
       w.classList.add('is-visible');
+      scheduleQuiet();
     });
   }
 
   function hide() {
     if (!wrap) return;
     wrap.classList.remove('is-visible');
+    scheduleQuiet();
+  }
+
+  /* ── Composer quiet state ────────────────────────────────────
+     The feature-tip ticker above the composer, the in-box hint and the
+     suggestion chips must not talk over each other. While the composer
+     has text, chips are up, or a ghost completion is live, #view-jarvis
+     gets data-cs-quiet="1" and clavis-composer-iq.css blurs the tip out;
+     it comes back once the field is empty and idle. The same states are
+     also matched with :has() in CSS — this is the fallback for engines
+     without :has(), and it costs nothing when nothing changes. */
+  const watched = new WeakSet();
+  let quietRaf = 0;
+
+  function watchClass(el) {
+    if (!el || watched.has(el)) return;
+    watched.add(el);
+    new MutationObserver(scheduleQuiet).observe(el, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  function computeQuiet() {
+    quietRaf = 0;
+    const view = document.getElementById('view-jarvis');
+    const input = document.getElementById('jarvis-input');
+    if (!view || !input) return;
+    // CSS keys off :placeholder-shown, which needs a non-empty placeholder
+    // (the visible hint is drawn by .lx-ph; the native one is transparent).
+    if (!input.getAttribute('placeholder')) input.setAttribute('placeholder', 'Message Clavis');
+    const lx = view.querySelector('.lx-suggest');
+    const mirror = input.parentElement ? input.parentElement.querySelector('.ciq-mirror') : null;
+    watchClass(lx);
+    watchClass(mirror);
+    const quiet =
+      (input.value || '').length > 0 ||
+      !!(lx && lx.classList.contains('is-on')) ||
+      !!(mirror && mirror.classList.contains('is-live')) ||
+      !!(wrap && wrap.isConnected && wrap.classList.contains('is-visible') && wrap.offsetParent !== null);
+    if (quiet) {
+      if (view.getAttribute('data-cs-quiet') !== '1') view.setAttribute('data-cs-quiet', '1');
+    } else if (view.hasAttribute('data-cs-quiet')) {
+      view.removeAttribute('data-cs-quiet');
+    }
+  }
+
+  function scheduleQuiet() {
+    if (quietRaf) return;
+    quietRaf = requestAnimationFrame(computeQuiet);
+  }
+
+  function onComposerEvent(e) {
+    const t = e.target;
+    if (!t || t.id !== 'jarvis-input') return;
+    scheduleQuiet();
+    // Chips leave ~180ms after blur (clavis-luxe.js) — look again after.
+    if (e.type === 'focusout') setTimeout(scheduleQuiet, 240);
   }
 
   function onInput(e) {
@@ -135,8 +196,12 @@
   function install() {
     if (installed) return;
     installed = true;
-    document.addEventListener('input', onInput, { passive: true });
+    // Capture phase: the voice path dispatches a non-bubbling 'input'.
+    document.addEventListener('input', onInput, { passive: true, capture: true });
     document.addEventListener('focusin', onFocus, { passive: true });
+    ['input', 'focusin', 'focusout', 'keyup'].forEach((type) => {
+      document.addEventListener(type, onComposerEvent, { passive: true, capture: true });
+    });
 
     // Initial check
     setTimeout(() => {
@@ -144,6 +209,7 @@
       if (input && !input.value.trim()) {
         show();
       }
+      scheduleQuiet();
     }, 400);
   }
 
@@ -160,5 +226,5 @@
     }
   });
 
-  window.ClavisSuggestions = { show, hide, install };
+  window.ClavisSuggestions = { show, hide, install, refreshQuiet: scheduleQuiet };
 })();

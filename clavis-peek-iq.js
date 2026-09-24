@@ -185,10 +185,10 @@
     if (row) row.innerHTML = '';
   }
 
-  function think(query, answer, count) {
+  function think(query, answer, count, subject) {
     if (!IQ()) return;
     var token = ++currentToken;
-    var res = IQ().suggest({ query: query, answer: answer, count: count || 4 });
+    var res = IQ().suggest({ query: query, answer: answer, count: count || 4, subject: subject || '' });
     renderChips(res.chips, res.signal.domain, true);
 
     res.refine.then(function (better) {
@@ -322,7 +322,20 @@
      moment it opens, so nothing in clavis-task-surface.js has to change.
      ══════════════════════════════════════════════════════════ */
 
-  var lastSeen = { query: '', answer: '' };
+  var lastSeen = { query: '', answer: '', subject: '' };
+
+  /* What the chips should be about. His raw words are voice-typed
+     Hinglish ("neemaroli baba ki photo dihao"); clavis-luxe.js knows
+     the cleaned words and, for a photo search, the real name. */
+  function aboutTask(task) {
+    var raw = (task && (task._text || task.title)) || '';
+    try {
+      var L = global.ClavisLuxe;
+      var s = L && typeof L.subjectFor === 'function' ? L.subjectFor(task) : null;
+      if (s && s.query) return { query: s.query, subject: s.subject || '' };
+    } catch (e) {}
+    return { query: raw, subject: '' };
+  }
 
   function rebuildQuickMenu(menu) {
     if (!menu || menu.dataset.iq === '1') return;
@@ -332,6 +345,7 @@
     var res = IQ().suggest({
       query: lastSeen.query || (IQ().memory().asked ? 'continue' : ''),
       answer: lastSeen.answer,
+      subject: lastSeen.subject,
       count: 6
     });
 
@@ -381,12 +395,15 @@
 
       if (task.phase === 'working' || task.phase === 'understanding') {
         clearChips();
-        lastSeen.query = task._text || task.title || lastSeen.query;
+        lastSeen.query = aboutTask(task).query || lastSeen.query;
+        lastSeen.subject = '';
         return;
       }
 
       if (task.phase === 'completed') {
-        var query = task._text || task.title || '';
+        var about = aboutTask(task);
+        var query = about.query;
+        var subject = about.subject;
         var answer = (task.result && (task.result.text || task.result.summary)) || '';
         // Rows carry their own meaning; give the reader something to read.
         if (!answer && task.result && task.result.rows && task.result.rows.length) {
@@ -394,10 +411,11 @@
         }
         lastSeen.query = query;
         lastSeen.answer = answer;
+        lastSeen.subject = subject;
         // One frame behind paint(), so the chips arrive with the answer,
         // not before the body it belongs to.
         requestAnimationFrame(function () {
-          requestAnimationFrame(function () { think(query, answer, 4); });
+          requestAnimationFrame(function () { think(query, answer, 4, subject); });
         });
         return;
       }
@@ -467,7 +485,7 @@
   }
 
   global.ClavisPeekIQ = {
-    refresh: function (q, a) { think(q || lastSeen.query, a || lastSeen.answer, 4); },
+    refresh: function (q, a) { think(q || lastSeen.query, a || lastSeen.answer, 4, q ? '' : lastSeen.subject); },
     clear: clearChips,
     reveal: function () {
       var b = doc.querySelector('#' + SURFACE_ID + ' .cts-body');

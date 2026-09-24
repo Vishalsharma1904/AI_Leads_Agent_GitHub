@@ -65,7 +65,10 @@
   // async models a spoken result would be a second, overlapping answer.
   const QUIET_TOOLS = new Set(['show_map', 'map_control', 'show_images', 'show_document', 'close_display',
     'go_to_sleep', 'end_voice_session', 'open_app_or_website', 'navigate_to_page', 'remember_fact']);
-  const CLOSE_WORDS = /\b(close|hide|remove|dismiss|clear|band|bandh|bund|hatao|hata\s*do|hatado|chhupao|chupao|mat\s*dikhao)\b|बंद|हटा|छुपा|मत दिखा/i;
+  const CLOSE_WORDS = /\b(close|closed|hide|remove|dismiss|clear|exit|quit|off|band|bandh|bund|hatao|hata\s*do|hatado|hata|nikalo|gayab|chhupao|chupao|mat\s*dikhao|khatam|go away|get rid)\b|बंद|हटा|छुपा|मत दिखा|गायब|निकालो/i;
+  // "close everything / sab band karo / close close close" clears Clavis's own
+  // screen — it never means closing his PC apps.
+  const CLEAR_ALL = /\b(sab|sabhi|saara|saare|sare|sara|everything|all|close close|band band)\b|सब/i;
 
   const S = {
     phase: 'off',            // off | connecting | live
@@ -158,6 +161,16 @@
       && geminiKeys().length > 0;
   }
 
+  // Sir wants the female voice first (Hindi + English); ClavisVoice owns the
+  // choice and its migration from the old "Charon" default.
+  function liveVoice() {
+    try { const v = window.ClavisVoice?.primaryVoice?.(); if (v) return v; } catch (_) {}
+    return localStorage.getItem(LS.voice) || 'Kore';
+  }
+  function liveVoiceGender() {
+    try { return window.ClavisVoice?.genderOf?.(liveVoice()) || 'female'; } catch (_) { return 'female'; }
+  }
+
   /* ── persona ───────────────────────────────────────────────── */
   function memoryLines() {
     try {
@@ -180,6 +193,13 @@
 WHO YOU SERVE
 - Always address him as "sir". He is the person you owe everything to; you treat him with the warmth and respect of a trusted right hand. Never servile, never robotic.
 - His business: a security and housekeeping / manpower staffing company in India. His leads are the businesses that BUY those services (corporate offices, IT parks, hotels, hospitals, factories, warehouses, malls, residential societies, schools) — never other security or housekeeping agencies, which are his competitors.
+
+YOUR VOICE
+- You speak with a ${liveVoiceGender() === 'female' ? "woman's" : "man's"} voice. In Hindi use ${liveVoiceGender() === 'female' ? 'feminine' : 'masculine'} forms for yourself ("${liveVoiceGender() === 'female' ? 'main dekh rahi hoon, maine kar diya, main bata dungi' : 'main dekh raha hoon, maine kar diya, main bata dunga'}"). Hindi and English both, naturally, with real feeling in the voice.
+
+UNDERSTANDING HIM FROM A FEW WORDS
+- He speaks in short fragments ("map band", "lord ki photo", "aur", "wapas", "leads Noida", "close"). Expand them from context: what is on the display, the last thing you did, the last topic. Pick the most likely meaning, act on it, and name the assumption in half a sentence only if it matters. Never reply "I need more details" to a short command.
+- In India, "lord" / "bhagwan" / "god" means Hindu God (Bhagwan). Hinglish words keep their Indian meaning.
 
 HOW YOU SPEAK (this is a live voice conversation)
 - Sound like a real person: natural rhythm, short spoken sentences, contractions, an occasional soft acknowledgement ("Right.", "Of course, sir.", "One moment."). No lists, no markdown, never read out URLs, IDs or long numbers digit by digit.
@@ -208,7 +228,8 @@ YOU TALK, THE SCREEN SHOWS
   · a list, table, comparison, research answer, plan, steps, or a draft he must review -> show_document with clean markdown, and SAY only a one-line summary
 - One display call per request. What is on the display stays there while you talk about it; it changes only when he asks to see something else, and it closes only when he clearly asks you to close it. Never call a display tool again for the same thing, and never close it on your own.
 - Talk about what's on the display like someone pointing at a screen ("That's India Gate — two hospitals within a kilometre"). Never read it out word for word.
-- Map by voice: "satellite", "normal map", "3D", "zoom in", "thoda aur paas", "rotate", "full screen", "world view" -> map_control. "Band karo / hatao / close it" -> close_display.
+- Map by voice: "satellite", "normal map", "3D", "zoom in", "thoda aur paas", "rotate", "full screen", "world view" -> map_control. "Band karo / hatao / close it / map band karo" -> close_display.
+- "Close everything", "sab band karo", "close close close", "sab hatao", "screen saaf karo" -> close_display (it closes the map, pictures, website AND the floating task window). This NEVER means closing his PC apps or windows. Use pc_close_window only when he names one specific app or window ("Chrome band karo"), and confirm first.
 - Leads or candidates -> find_leads with his request as one clear sentence. Its pipeline opens on its own, so don't also make a document for it.
 
 GETTING THINGS DONE
@@ -247,6 +268,8 @@ PROACTIVE, NOT PUSHY
 
 CONTEXT
 - Right now it is ${time}, ${day}.
+- On screen: ${(() => { try { return window.ClavisIntent?.screenContext?.() || 'nothing extra is open'; } catch (_) { return 'nothing extra is open'; } })()}
+${(() => { try { return window.ClavisIntent?.habitsLine?.() || ''; } catch (_) { return ''; } })()}
 ${memoryLines()}`;
   }
 
@@ -458,8 +481,10 @@ ${memoryLines()}`;
   async function appCommand(request) {
     if (!request) return { error: 'No request given.' };
     try {
+      const quick = await window.ClavisIntent?.route?.(request, { source: 'live' });
+      if (quick && quick.handled) return { ok: true, result: plain(quick.spoken || 'Done.').slice(0, 400) };
       const cmd = await window.ClavisCommands?.route?.(request);
-      if (cmd && cmd.handled) return { ok: true, result: plain(cmd.spoken || cmd.bubbleHtml || 'Done.').slice(0, 800) };
+      if (cmd && cmd.handled) return { ok: true, result: plain(cmd.text || cmd.spoken || cmd.bubbleHtml || 'Done.').slice(0, 1600), spoken_version: cmd.text ? plain(cmd.spoken || '').slice(0, 800) : undefined };
     } catch (e) { return { error: e?.message || String(e) }; }
     return delegate(request);
   }
@@ -549,6 +574,14 @@ ${memoryLines()}`;
       }
       S.lastShow = null;
     }
+    if (name === 'pc_close_window') {
+      const heard = recentUserWords().toLowerCase();
+      const title = String(args?.title || '').toLowerCase();
+      const named = title.split(/[^a-z0-9]+/).filter((w) => w.length >= 3 && !/^(google|microsoft|window|app)$/.test(w)).some((w) => heard.includes(w));
+      if (CLEAR_ALL.test(heard) || !named) {
+        return { ok: false, note: 'He did not name that app. "Close / close everything" means clearing your own display — call close_display instead. Never close his PC apps unless he names one.' };
+      }
+    }
     if (name === 'show_map') return C ? C.showMap(args) : { error: 'Display not loaded.' };
     if (name === 'map_control') return C ? C.mapControl(args) : { error: 'Display not loaded.' };
     if (name === 'show_nearby') return C ? C.showNearby(args) : { error: 'Display not loaded.' };
@@ -584,6 +617,8 @@ ${memoryLines()}`;
       if (!target) return { error: 'Nothing to open.' };
       if (!window.ClavisPC?.open) return { error: 'PC control is not loaded.' };
       const r = await window.ClavisPC.open(target);
+      // open() reports an app that isn't installed instead of pretending.
+      if (r && r.ok === false) return { ok: false, error: r.error || `Could not open ${target}.` };
       return { ok: true, opened: target, via: r?.native ? 'PC bridge' : 'browser tab' };
     }
     if (name === 'read_website') return readWebsite(args);
@@ -619,7 +654,7 @@ ${memoryLines()}`;
     const low = localStorage.getItem(LS.sens) === 'low';
     const generationConfig = {
       responseModalities: ['AUDIO'],
-      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: localStorage.getItem(LS.voice) || 'Charon' } } },
+      speechConfig: { voiceConfig: { prebuiltVoiceConfig: { voiceName: liveVoice() } } },
     };
     if (extras) generationConfig.enableAffectiveDialog = true;
     const tools = [];
@@ -779,11 +814,15 @@ ${memoryLines()}`;
     }
     if (sc.inputTranscription?.text) {
       S.userText += sc.inputTranscription.text;
+      try { window.ClavisEar?.caption?.live(S.userText); } catch (_) {}
       // Server-confirmed speech — unlike raw mic level, a fan or TV can't fake it.
       S.lastActivity = S.lastUserVoiceAt = Date.now();
       S.heardUser = true;
     }
-    if (sc.outputTranscription?.text) S.modelText += sc.outputTranscription.text;
+    if (sc.outputTranscription?.text) {
+      S.modelText += sc.outputTranscription.text;
+      try { window.ClavisEar?.noteSpoken?.(sc.outputTranscription.text); } catch (_) {}
+    }
     for (const p of sc.modelTurn?.parts || []) {
       if (p.inlineData?.data && /audio/i.test(p.inlineData.mimeType || 'audio/pcm')) playChunk(p.inlineData.data);
     }
@@ -796,7 +835,21 @@ ${memoryLines()}`;
     S.userText = ''; S.modelText = '';
     // Voice is the output: nothing is echoed on screen. The turns still feed
     // Clavis's memory of the conversation.
-    if (u) { S.lastUser = { text: u, at: Date.now() }; try { window.ClavisMind?.noteUserTurn?.(u); } catch (_) {} }
+    if (u) {
+      S.lastUser = { text: u, at: Date.now() };
+      window.__clavisLastUserText = u;
+      try { window.ClavisMind?.noteUserTurn?.(u); } catch (_) {}
+      try { window.ClavisEar?.caption?.final(u, true); } catch (_) {}
+      try { window.ClavisIntent?.learn?.(u); } catch (_) {}
+      // Safety net: "map band karo" must close the map even if the model
+      // only answered in words and never called close_display.
+      if (CLOSE_WORDS.test(u)) {
+        setTimeout(() => {
+          const open = window.ClavisCanvas?.isOpen?.() || document.querySelector('#clavis-task-surface.is-open');
+          if (open) { try { window.ClavisIntent?.route?.(u, { source: 'live' }); } catch (_) {} }
+        }, 1600);
+      }
+    }
     if (m) { try { window.ClavisMind?.noteClavisTurn?.(interrupted ? m + ' …' : m); } catch (_) {} }
   }
 
@@ -823,6 +876,7 @@ ${memoryLines()}`;
       S.speaking = true;
       unduck();
       setState('speaking');
+      try { window.ClavisEar?.noteSpeaking?.(''); } catch (_) {}
     }
   }
   function onDrained() {
@@ -831,6 +885,7 @@ ${memoryLines()}`;
     S.drainTimer = setTimeout(() => {
       if (Date.now() - S.lastChunkAt < 300) return;
       S.speaking = false;
+      try { window.ClavisEar?.noteSpeakingDone?.(); } catch (_) {}
       if (S.closeAfterTurn) return stop({ reason: 'sleep' });
       if (S.phase === 'live') setState('listening');
       flushEventsSoon();
@@ -839,6 +894,8 @@ ${memoryLines()}`;
   function flushPlayback() {
     try { S.player?.port.postMessage({ type: 'stop' }); } catch (_) {}
     S.speaking = false;
+    S.gateOpen = false; S.gateHold = [];
+    try { window.ClavisEar?.noteSpeakingDone?.(); } catch (_) {}
     unduck();
   }
   function duck() {
@@ -874,6 +931,39 @@ ${memoryLines()}`;
     if (S.micCtx.state === 'suspended') await S.micCtx.resume();
     S.mic.getAudioTracks()[0]?.addEventListener('ended', () => fatal('The microphone was disconnected.'));
   }
+  // Echo gate: while Clavis talks, the server only hears the mic when sir is
+  // actually talking over it (double-talk), not Clavis's own echo leaking
+  // past the browser's AEC — that echo used to "interrupt" Clavis mid-line
+  // and even show up as something sir said. ~320 ms before the gate opens
+  // is kept and sent first, so his first word isn't clipped.
+  const GATE_HOLD = 10;
+  const gateLvl = new Float32Array(512);
+  function gate(f32) {
+    if (!S.speaking || localStorage.getItem('clavis_echo_gate') === 'false' || !window.ClavisEar?.createDoubleTalk) {
+      S.gateHold = [];
+      return f32;
+    }
+    if (!S.dt) S.dt = window.ClavisEar.createDoubleTalk({ margin: 2.2, min: 0.02 });
+    let e = 0;
+    for (let i = 0; i < f32.length; i++) e += f32[i] * f32[i];
+    const mic = Math.sqrt(e / (f32.length || 1));
+    const r = S.dt.update(mic, rms(S.outAnalyser, gateLvl));
+    const t = Date.now();
+    if (r.loud) S.gateLastLoud = t;
+    const open = r.hot >= 2 || t - (S.gateLastLoud || 0) < 1200 && S.gateOpen;
+    if (open && !S.gateOpen) {
+      S.gateOpen = true;
+      const held = (S.gateHold || []).splice(0);
+      held.forEach((h) => S.sendBuf.push(h));
+    }
+    if (!open) {
+      S.gateOpen = false;
+      (S.gateHold || (S.gateHold = [])).push(f32);
+      if (S.gateHold.length > GATE_HOLD) S.gateHold.shift();
+      return new Float32Array(f32.length);   // silence keeps the stream's timing intact
+    }
+    return f32;
+  }
   function onPcm(f32) {
     if (S.muted) return;
     if (S.phase !== 'live' || !S.setupDone) {
@@ -881,6 +971,7 @@ ${memoryLines()}`;
       if (S.preroll.length > PREROLL_FRAMES) S.preroll.shift();
       return;
     }
+    f32 = gate(f32);
     S.sendBuf.push(f32);
     if (S.sendBuf.length >= 2) sendAudio(S.sendBuf.splice(0));
   }
@@ -983,7 +1074,8 @@ ${memoryLines()}`;
     // Instant feel on barge-in: dip Clavis's voice the moment sir talks over it;
     // the server's "interrupted" then cuts it for real (or it comes back up).
     if (inL > 0.09) S.lastLoudAt = now;
-    if (S.speaking && inL > 0.09) duck();
+    // Dip only for real double-talk — its own echo used to duck it too.
+    if (S.speaking && inL > 0.09 && (S.gateOpen || !window.ClavisEar)) duck();
     else if (S.ducked && now - S.lastLoudAt > 700) unduck();
     const lvl = Math.min(1, (S.speaking ? smoothOut : smoothIn) * 6);
     // Style writes every frame kept the blurred HUD repainting 60x a second;

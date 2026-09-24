@@ -156,7 +156,9 @@
     'saari sare koi kuch apna apne me mein ko ka ki ke se par pe hi bhi to tak karo ' +
     'karna kar do dena bare baare wala wali wale ek do teen ' +
     'liye layi karke karta karte karti bina sath saath jaise waise agar lekin magar ' +
-    'kyunki isliye kaunsa konsa upar niche andar bahar yaha waha yahan wahan'
+    'kyunki isliye kaunsa konsa upar niche andar bahar yaha waha yahan wahan ' +
+    // voice-typed spellings of the same request words — never a subject
+    'dihao dikao dikhau dikhaao dekhao dehao dikha dikhaiye btao bta bataao smjhao samjao chaiye chahie krna kro plz pls'
   ).split(/\s+/).forEach(function (w) { STOP[w] = 1; });
 
   /* Domains are prior probabilities, not routing rules. They decide
@@ -374,6 +376,29 @@
       if (!swallowed) kept.push(t);
     });
 
+    /* A proper name he typed (or clavis-luxe.js spelled out) in capitals
+       is one subject however many words it has: "Neem Karoli Baba" must
+       not come back as "Neem Karoli". Runs of Capitalised words in the
+       question, trimmed of stop words, replace any shorter term inside. */
+    var runs = [];
+    var qWords = String(query || '').replace(/[^\p{L}\p{N}\s'-]/gu, ' ').split(/\s+/).filter(Boolean);
+    var cur = [];
+    function closeRun() {
+      while (cur.length && STOP[cur[0].toLowerCase()]) cur.shift();
+      while (cur.length && STOP[cur[cur.length - 1].toLowerCase()]) cur.pop();
+      if (cur.length >= 2 && cur.length <= 4) runs.push(cur.join(' ').toLowerCase());
+      cur = [];
+    }
+    qWords.forEach(function (w) { if (/^[A-Z][a-z]{1,}$/.test(w)) cur.push(w); else closeRun(); });
+    closeRun();
+    if (runs.length) {
+      var seenRun = {};
+      kept = kept.map(function (t) {
+        var run = runs.filter(function (r) { return r !== t && (' ' + r + ' ').indexOf(' ' + t + ' ') !== -1; })[0];
+        return run || t;
+      }).filter(function (t) { if (seenRun[t]) return false; seenRun[t] = 1; return true; });
+    }
+
     return { terms: kept, acros: acroMap };
   }
 
@@ -479,6 +504,9 @@
   function T(sig) {
     var h = sig.head || '';
     var a = sig.acros || null;
+    // A subject handed in by the caller (a photo search's real name) keeps
+    // its proper casing in the prompt too: "Neem Karoli Baba", not lowercase.
+    if (sig.subjectCased && normalise(sig.subjectCased) === h) h = sig.subjectCased;
     return {
       h: h,
       H: prettify(h, a),
@@ -951,6 +979,9 @@
       'label: max 28 characters, no trailing period, reads like a button.\n' +
       'prompt: the full message that will be sent if the user taps it, first person, natural.\n' +
       'Language for BOTH fields: ' + (LANG_NAME[sig.lang] || 'English') + '.\n' +
+      'Spell every name correctly with its standard capitalisation, even if the user misspelled it (e.g. "neemaroli baba" is "Neem Karoli Baba"). ' +
+      'The user is Indian: "lord"/"bhagwan" means the Hindu deities, "shiv ji" is Lord Shiva. ' +
+      (sig.subjectCased ? 'The subject is exactly: ' + sig.subjectCased + '. Every chip must be about it. ' : '') +
       'Rules: every suggestion must be specific to the actual subject discussed — never generic filler like ' +
       '"tell me more" or "any other questions". Each of the four must open a genuinely different direction ' +
       '(e.g. deeper mechanism, a comparison, a concrete application, a risk or a number). ' +
@@ -994,8 +1025,25 @@
     var query = String(c.query || '');
     var answer = String(c.answer || '');
     var count = c.count || 4;
+    /* chips are built from his words — mend the voice-typing first
+       (clavis-luxe.js's dictionary, when it is loaded) */
+    try { if (global.ClavisLuxe && typeof global.ClavisLuxe.fixTypos === 'function') query = global.ClavisLuxe.fixTypos(query); } catch (e) {}
     var sig;
     try { sig = analyze(query, answer); } catch (e) { sig = analyze('', ''); }
+    /* the caller knows the subject for certain (a photo search resolved
+       "lord" to the Hindu deities): it leads, spelled as given */
+    var subject = String(c.subject || '').replace(/\s+/g, ' ').trim();
+    if (subject) {
+      var sj = normalise(subject);
+      if (sj) {
+        sig.topics = [sj].concat(sig.topics.filter(function (t) { return t !== sj && sj.indexOf(t) === -1 && t.indexOf(sj) === -1; })).slice(0, 7);
+        sig.head = sj;
+        sig.second = sig.topics[1] || '';
+        sig.subjectCased = subject;
+        sig.acros = Object.assign({}, sig.acros || {});
+        subject.split(' ').forEach(function (w) { if (w) sig.acros[w.toLowerCase()] = w; });
+      }
+    }
 
     var chips;
     try { chips = localChips(sig, count); } catch (e) { chips = []; }

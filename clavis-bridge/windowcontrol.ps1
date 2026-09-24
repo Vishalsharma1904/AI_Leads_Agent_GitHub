@@ -49,6 +49,53 @@ public class ClavisWindows {
 }
 "@
 
+# Foreground helper, compiled SEPARATELY and guarded: Windows refuses a plain
+# SetForegroundWindow from a background process (the taskbar just flashes),
+# so "open Notepad, then type" could type into the wrong window. Borrowing
+# the current foreground thread's input queue (AttachThreadInput) for the
+# one call is the standard fix, and it sends no keystrokes. If this block
+# ever fails to compile, everything else here keeps working and 'focus'
+# falls back to the original ShowWindow + SetForegroundWindow path.
+$script:HasForeground = $false
+try {
+  Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public class ClavisForeground {
+  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+  [DllImport("user32.dll")] static extern int GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
+  [DllImport("kernel32.dll")] static extern int GetCurrentThreadId();
+  [DllImport("user32.dll")] static extern bool AttachThreadInput(int idAttach, int idAttachTo, bool fAttach);
+  [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hWnd);
+  [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+  public static bool Focus(IntPtr h) {
+    // Only un-minimize: SW_RESTORE on a maximized window would shrink it.
+    if (IsIconic(h)) ShowWindow(h, 9);
+    IntPtr fg = GetForegroundWindow();
+    if (fg == h) return true;
+    int fgThread = GetWindowThreadProcessId(fg, IntPtr.Zero);
+    int me = GetCurrentThreadId();
+    bool attached = false;
+    if (fgThread != 0 && fgThread != me) attached = AttachThreadInput(me, fgThread, true);
+    try {
+      BringWindowToTop(h);
+      SetForegroundWindow(h);
+    } finally {
+      if (attached) AttachThreadInput(me, fgThread, false);
+    }
+    return GetForegroundWindow() == h;
+  }
+}
+"@
+  $script:HasForeground = $true
+} catch {
+  $script:HasForeground = $false
+}
+
 $SW_MINIMIZE = 6
 $SW_MAXIMIZE = 3
 $SW_RESTORE  = 9
@@ -110,6 +157,10 @@ function Run-Action($payload) {
     }
     'focus' {
       $h = Resolve-WindowHandle $payload
+      if ($script:HasForeground) {
+        # focused = did Windows actually bring it to the front (it can refuse).
+        return @{ focused = [bool][ClavisForeground]::Focus($h) }
+      }
       [void][ClavisWindows]::ShowWindow($h, $SW_RESTORE)
       [void][ClavisWindows]::SetForegroundWindow($h)
       return $null

@@ -179,7 +179,9 @@
       this.outputSocket = socket;
       const ready = new Promise((resolve, reject) => { this.readyResolve = resolve; this.readyReject = reject; });
       const voiceSettings = {
-        voice: localStorage.getItem('clavis_gemini_voice') || 'Charon',
+        // ClavisVoice passes the MALE fallback voice here when the female
+        // voice's quota is spent — the backend has its own key and quota.
+        voice: options.voice || localStorage.getItem('clavis_gemini_voice') || 'Kore',
       };
       socket.onopen = () => socket.send(JSON.stringify({ type: 'start', generation_id: generationId, voice_settings: voiceSettings }));
       socket.onmessage = (event) => {

@@ -148,7 +148,11 @@
 
   /* Short enough to sit in a 300px header without wrapping. */
   function shortTitle(task) {
-    var t = String((task && task.title) || '').trim();
+    // The surface's cleaned title ("Neem Karoli Baba — Photos"), not his raw,
+    // typo-ridden words; falls back to the raw title if the surface is older.
+    var clean = '';
+    try { clean = (global.ClavisTaskSurface && global.ClavisTaskSurface.titleFor) ? global.ClavisTaskSurface.titleFor(task) : ''; } catch (e) { clean = ''; }
+    var t = String(clean || (task && task.title) || '').trim();
     var cut = t.indexOf(' · ');
     if (cut > -1) t = t.slice(cut + 3).trim();
     t = t.replace(/[…\s]+$/, '');

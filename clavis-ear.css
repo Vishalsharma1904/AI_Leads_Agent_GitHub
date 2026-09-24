@@ -1,0 +1,201 @@
+/* ============================================================
+ * clavis-ear.css · the live caption + Voice ID sheet
+ * ------------------------------------------------------------
+ * What sir says appears under the top-right buttons as OPEN text:
+ * no pill, no bubble, no card. Each new word arrives with a soft
+ * blur-to-clear rise; older words fade out through a top mask so a
+ * long sentence takes three lines at most. Interim words sit a touch
+ * softer and "settle" to full ink when the sentence is final.
+ * ============================================================ */
+
+#clavis-ear-caption {
+  --ce-ink: #1f2a17;
+  --ce-glow: 0 0 14px rgba(255, 253, 244, 0.95), 0 0 2px rgba(255, 253, 244, 0.9);
+  --ce-dot: var(--olive-600, #5a6b2f);
+  position: fixed;
+  top: 50px;
+  right: 16px;
+  z-index: 2147482000;
+  display: flex;
+  flex-direction: row-reverse;
+  align-items: flex-start;
+  gap: 9px;
+  max-width: min(460px, calc(100vw - 32px));
+  pointer-events: none;
+  opacity: 0;
+  transform: translateY(-6px);
+  filter: blur(6px);
+  transition:
+    opacity 0.42s cubic-bezier(0.22, 0.9, 0.24, 1),
+    transform 0.42s cubic-bezier(0.22, 0.9, 0.24, 1),
+    filter 0.42s cubic-bezier(0.22, 0.9, 0.24, 1);
+  will-change: opacity, transform, filter;
+}
+html[data-theme="dark"] #clavis-ear-caption {
+  --ce-ink: #f4efdf;
+  --ce-glow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.55);
+  --ce-dot: var(--olive-400, #9aae5b);
+}
+@media (prefers-color-scheme: dark) {
+  html:not([data-theme]) #clavis-ear-caption {
+    --ce-ink: #f4efdf;
+    --ce-glow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.55);
+    --ce-dot: var(--olive-400, #9aae5b);
+  }
+}
+
+#clavis-ear-caption.is-in { opacity: 1; transform: none; filter: none; }
+#clavis-ear-caption.is-out {
+  opacity: 0;
+  transform: translateY(-8px);
+  filter: blur(8px);
+  transition-duration: 0.52s;
+}
+#clavis-ear-caption.is-dropped .ce-line { opacity: 0.35; transition: opacity 0.2s; }
+
+/* Newest line stays; overflow leaves through the top, softly. */
+#clavis-ear-caption .ce-clip {
+  display: flex;
+  flex-direction: column-reverse;
+  max-height: calc(1.42em * 3);
+  overflow: hidden;
+  font: 500 15.5px/1.42 Inter, "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
+          mask-image: linear-gradient(to bottom, transparent 0, #000 0.9em);
+}
+#clavis-ear-caption .ce-line {
+  margin: 0;
+  text-align: right;
+  letter-spacing: -0.006em;
+  color: var(--ce-ink);
+  text-shadow: var(--ce-glow);
+  opacity: 0.8;
+  transition: opacity 0.32s ease;
+  text-wrap: pretty;
+}
+#clavis-ear-caption.is-settled .ce-line { opacity: 1; }
+
+#clavis-ear-caption .ce-w {
+  display: inline-block;
+  animation: ceWordIn 0.46s cubic-bezier(0.22, 0.9, 0.24, 1) both;
+}
+@keyframes ceWordIn {
+  from { opacity: 0; filter: blur(7px); transform: translateY(6px) scale(0.985); }
+  to   { opacity: 1; filter: blur(0);   transform: none; }
+}
+
+/* A single breathing dot while Clavis listens — no container. */
+#clavis-ear-caption .ce-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-top: 0.62em;
+  border-radius: 50%;
+  background: var(--ce-dot);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent);
+  opacity: 0;
+  transform: scale(0.6);
+  transition: opacity 0.3s, transform 0.3s;
+}
+#clavis-ear-caption.is-listening .ce-dot {
+  opacity: 1;
+  transform: none;
+  animation: ceBreath 1.6s ease-in-out infinite;
+}
+@keyframes ceBreath {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent); }
+  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ce-dot) 0%, transparent); }
+}
+
+@media (max-width: 640px) {
+  #clavis-ear-caption { max-width: calc(100vw - 24px); }
+  #clavis-ear-caption .ce-clip { font-size: 14.5px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #clavis-ear-caption, #clavis-ear-caption .ce-w { transition: opacity 0.2s; animation: none; filter: none; transform: none; }
+  #clavis-ear-caption.is-listening .ce-dot { animation: none; }
+}
+
+/* ── Voice ID sheet ──────────────────────────────────────────── */
+#clavis-voiceid-sheet {
+  position: fixed;
+  inset: 0;
+  z-index: 2147482600;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: rgba(20, 24, 14, 0.28);
+  -webkit-backdrop-filter: blur(6px);
+          backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+#clavis-voiceid-sheet.is-in { opacity: 1; }
+#clavis-voiceid-sheet .cv-card {
+  width: min(420px, 100%);
+  padding: 26px 24px 20px;
+  border-radius: 22px;
+  text-align: center;
+  color: #1f2a17;
+  background: linear-gradient(180deg, rgba(255, 253, 245, 0.96), rgba(247, 243, 228, 0.94));
+  border: 1px solid rgba(90, 107, 47, 0.18);
+  box-shadow: 0 24px 60px -18px rgba(30, 40, 16, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  transform: translateY(8px) scale(0.98);
+  transition: transform 0.4s cubic-bezier(0.22, 0.9, 0.24, 1);
+}
+#clavis-voiceid-sheet.is-in .cv-card { transform: none; }
+html[data-theme="dark"] #clavis-voiceid-sheet .cv-card {
+  color: #f4efdf;
+  background: linear-gradient(180deg, rgba(38, 44, 28, 0.96), rgba(28, 32, 21, 0.96));
+  border-color: rgba(190, 205, 140, 0.16);
+  box-shadow: 0 24px 60px -18px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+#clavis-voiceid-sheet h3 { margin: 10px 0 6px; font: 600 18px/1.3 Inter, system-ui, sans-serif; letter-spacing: -0.01em; }
+#clavis-voiceid-sheet .cv-sub { margin: 0 0 14px; font: 400 13.5px/1.5 Inter, system-ui, sans-serif; opacity: 0.75; }
+#clavis-voiceid-sheet .cv-line {
+  margin: 0 0 12px;
+  font: 500 15px/1.55 Lora, Georgia, serif;
+  font-style: italic;
+}
+#clavis-voiceid-sheet .cv-status { min-height: 1.4em; margin: 0 0 16px; font: 500 13px/1.4 Inter, system-ui, sans-serif; opacity: 0.8; }
+#clavis-voiceid-sheet .cv-actions { display: flex; gap: 10px; justify-content: center; }
+#clavis-voiceid-sheet button {
+  min-width: 110px;
+  padding: 9px 18px;
+  border-radius: 999px;
+  font: 600 13.5px/1 Inter, system-ui, sans-serif;
+  cursor: pointer;
+  border: 1px solid rgba(90, 107, 47, 0.25);
+  background: transparent;
+  color: inherit;
+}
+#clavis-voiceid-sheet .cv-start {
+  border-color: transparent;
+  color: var(--cream, #f6f1df);
+  background: linear-gradient(180deg, var(--olive-600, #5a6b2f), var(--olive-800, #3c4a1f));
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.18), 0 6px 16px -6px rgba(60, 74, 31, 0.6);
+}
+#clavis-voiceid-sheet button:disabled { opacity: 0.55; cursor: default; }
+#clavis-voiceid-sheet .cv-ring { position: relative; width: 56px; height: 56px; margin: 0 auto; }
+#clavis-voiceid-sheet .cv-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+#clavis-voiceid-sheet .cv-track { fill: none; stroke: rgba(90, 107, 47, 0.16); stroke-width: 3; }
+#clavis-voiceid-sheet .cv-fill {
+  fill: none;
+  stroke: var(--olive-600, #5a6b2f);
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 119.4;
+  stroke-dashoffset: 119.4;
+  transition: stroke-dashoffset 0.2s linear;
+}
+#clavis-voiceid-sheet .cv-mic {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  color: var(--olive-600, #5a6b2f);
+}
+#clavis-voiceid-sheet.is-recording .cv-mic { animation: ceBreathDot 1.2s ease-in-out infinite; }
+#clavis-voiceid-sheet.is-done .cv-fill { stroke-dashoffset: 0; }
+@keyframes ceBreathDot { 50% { transform: scale(1.35); opacity: 0.6; } }

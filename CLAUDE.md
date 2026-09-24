@@ -29,6 +29,11 @@ This repo now contains **two products**:
 ├── config.js            # API keys, webhook URLs, settings
 ├── email_script_gas.js # Google Apps Script for email automation
 ├── README.md            # User documentation (Hinglish)
+├── clavis-ear.js        # Hearing: self-echo guard, Voice ID (opt-in), double-talk barge-in, Siri-style live caption
+├── clavis-intent.js     # Instant local intents (close map / close everything / map control / voice switch), habits, display skills
+├── clavis-voice.js      # TTS: female-first (Gemini TTS, key+model rotation, emotion styles) → male fallback that speaks Hindi
+├── clavis-automation.js # PC + website automation (open apps, type into them, multi-step tasks, website brief)
+├── clavis-olive.css     # Rich olive-green primary buttons + send button (tokens: --olive-*, --cream)
 ├── AndroidApp/          # Android WebView wrapper
 └── backend/             # Separate FastAPI voice-calling server (Exotel + OpenRouter)
     ├── main.py                              # API entrypoint incl. /ws/audio, /api/calls/outbound
@@ -56,6 +61,11 @@ All API keys and settings are in `config.js` via `window.SKYLARK_CONFIG`:
 - `SHEETS_WEB_APP_URL` — Google Sheets sync endpoint
 - `EMAIL_WEBHOOK_URL` — Email automation webhook
 - `DEFAULT_CITY` — Default search city (Gurugram)
+
+## Voice pipeline rules (2026-09)
+- Spoken words are NEVER typed into the composer — they preview in the live caption (`ClavisEar.caption`).
+- Every recognizer transcript goes through `ClavisEar.judge()` (via `commitJarvisVoiceInput`) so Clavis never answers its own voice.
+- "Close / close everything" clears Clavis's own screen (display + floating window) — never the user's PC apps.
 
 ## Important Notes
 - Primary language in codebase is **Hinglish** (Hindi + English mix)

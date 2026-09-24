@@ -4,8 +4,10 @@
  *  A tiny localhost helper that gives Clavis (a browser page) real
  *  OS powers a sandboxed page can never have on its own:
  *    - open an app / file / website          POST /open   {target}
+ *    - launch ANY installed app by name       POST /launch {app, names?, exe?, url?}
  *    - save text and open it in Notepad       POST /notepad {text, filename?}
  *    - take a real OS screenshot (all screens) GET  /screenshot
+ *    - read the foreground browser tab's URL  GET  /browser-url
  *
  *  Pure Node stdlib — no npm install needed. Run it once:
  *      node bridge.js         (or double-click Start-Bridge.bat)
@@ -91,6 +93,169 @@ function saveAndOpenNote(text, filename) {
       const args = PLATFORM === 'win32' ? [target] : [target];
       try { spawn(editor, args, { detached: true, stdio: 'ignore', windowsHide: false }).unref(); } catch (_) {}
       resolve(target);
+    });
+  });
+}
+
+// `start "" "<target>" "<arg>"…` — for a browser opened straight onto a page
+// (and in its own window, so Clavis's window isn't hijacked). Quotes are
+// stripped from every piece; inside quotes cmd treats & | ^ < > literally.
+function startWithArgs(target, args) {
+  return new Promise((resolve, reject) => {
+    const q = (v) => `"${String(v).replace(/"/g, '')}"`;
+    if (PLATFORM !== 'win32') return execFile(PLATFORM === 'darwin' ? 'open' : 'xdg-open', [String(args[args.length - 1] || target)], (err) => err ? reject(err) : resolve());
+    exec(`start "" ${q(target)} ${args.map(q).join(' ')}`, { windowsHide: true }, (err) => err ? reject(err) : resolve());
+  });
+}
+
+// ── Installed apps (POST /launch) ─────────────────────────────
+// "Any app installed on his PC" — two sources, merged:
+//   - Start-menu shortcuts (.lnk): classic desktop apps (Chrome, Office,
+//     VS Code, Claude…), read straight from disk, instant.
+//   - Get-StartApps (listapps.ps1): ALSO Store apps (WhatsApp, ChatGPT,
+//     Calculator…) which have no .lnk; launched via shell:AppsFolder, the
+//     same thing the Start menu does.
+// Matching a name against what is actually installed means a missing app
+// is reported as missing (so Clavis can open its web version) instead of
+// `start` popping a "Windows cannot find…" dialog that blocks until closed.
+const APP_CACHE_MS = 10 * 60 * 1000;
+const JUNK_APP = /uninstall|read ?me|\bhelp\b|documentation|release notes|licen[cs]e|manual|website|what's new|changelog|\bsetup\b|repair/i;
+let appCache = { at: 0, apps: [], ok: false };
+let appScan = null;
+
+function scanStartMenu() {
+  if (PLATFORM !== 'win32') return [];
+  const roots = [
+    path.join(process.env.ProgramData || 'C:\\ProgramData', 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+    path.join(process.env.APPDATA || path.join(os.homedir(), 'AppData', 'Roaming'), 'Microsoft', 'Windows', 'Start Menu', 'Programs'),
+  ];
+  const out = [];
+  const walk = (dir, depth) => {
+    if (depth > 4) return;
+    let entries;
+    try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch (_) { return; }
+    for (const e of entries) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full, depth + 1);
+      else if (/\.lnk$/i.test(e.name)) out.push({ name: e.name.replace(/\.lnk$/i, ''), target: full, kind: 'lnk' });
+    }
+  };
+  roots.forEach((r) => walk(r, 0));
+  return out;
+}
+
+function listStartApps() {
+  return new Promise((resolve) => {
+    if (PLATFORM !== 'win32') return resolve([]);
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'listapps.ps1')],
+      { windowsHide: true, timeout: 20000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
+        if (err) return resolve([]);
+        try {
+          const parsed = JSON.parse(String(stdout || '').trim() || '[]');
+          const arr = Array.isArray(parsed) ? parsed : [parsed];
+          resolve(arr.filter((a) => a && a.Name && a.AppID && !/^https?:/i.test(String(a.AppID)))
+            .map((a) => ({ name: String(a.Name), target: `shell:AppsFolder\\${a.AppID}`, kind: 'startapps' })));
+        } catch (_) { resolve([]); }
+      });
+  });
+}
+
+function refreshApps() {
+  if (appScan) return appScan;
+  appScan = (async () => {
+    const lnk = scanStartMenu();
+    const store = await listStartApps();
+    const seen = new Set();
+    const apps = [];
+    for (const a of [...store, ...lnk]) {
+      const k = a.name.toLowerCase();
+      if (JUNK_APP.test(a.name) || seen.has(k)) continue;
+      seen.add(k);
+      apps.push(a);
+    }
+    appCache = { at: Date.now(), apps, ok: apps.length > 0 };
+    return appCache;
+  })().finally(() => { appScan = null; });
+  return appScan;
+}
+
+async function installedApps(force = false) {
+  if (force || !appCache.ok || Date.now() - appCache.at > APP_CACHE_MS) await refreshApps();
+  return appCache;
+}
+
+const normAppName = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9+#. ]+/g, ' ').replace(/\s+/g, ' ').trim();
+// 1 = exact name, 0.9 = "Excel 2016" / "Google Chrome" for "chrome",
+// ~0.85→0.65 = every spoken word is in the name, 0.55 = plain substring.
+function scoreAppName(appName, query) {
+  const a = normAppName(appName), q = normAppName(query);
+  if (!a || !q) return 0;
+  if (a === q) return 1;
+  if (a.startsWith(q + ' ') || a.endsWith(' ' + q)) return 0.9;
+  const aw = a.split(' '), qw = q.split(' ');
+  if (qw.every((w) => aw.includes(w))) return Math.max(0.65, 0.85 - (aw.length - qw.length) * 0.05);
+  if (q.length >= 4 && a.includes(q)) return 0.55;
+  return 0;
+}
+function findInstalledApp(apps, candidates) {
+  let best = null;
+  candidates.forEach((c, ci) => {
+    for (const app of apps) {
+      const score = scoreAppName(app.name, c) - ci * 0.01; // the caller's first name is preferred
+      if (score > (best ? best.score : 0)) best = { ...app, score };
+    }
+  });
+  return best && best.score >= 0.64 ? best : null;
+}
+
+async function launchApp({ app, names, exe, system, url, newWindow } = {}) {
+  const label = String(app || '').trim().slice(0, 80);
+  if (!label) throw new Error('No app given.');
+  // Only bare shell names / protocols ("winword", "spotify:") — never a command line.
+  const safeExe = /^[a-z0-9._-]+:?$/i.test(String(exe || '')) ? String(exe) : '';
+  const cleanUrl = typeof url === 'string' && /^https?:\/\/[^\s"]+$/i.test(url) ? url : '';
+  const urlArgs = cleanUrl ? [...(newWindow ? ['--new-window'] : []), cleanUrl] : [];
+  if (PLATFORM !== 'win32') { await openTarget(cleanUrl || safeExe || label); return { via: 'open', match: label }; }
+  // Built-into-Windows tools (notepad, explorer, calc…) need no lookup.
+  if (system && safeExe && !cleanUrl) { await openTarget(safeExe); return { via: 'system', match: label }; }
+  const candidates = [...new Set([label, ...(Array.isArray(names) ? names : [])].map((n) => String(n).slice(0, 80)).filter(Boolean))].slice(0, 6);
+  let cache = await installedApps();
+  let hit = findInstalledApp(cache.apps, candidates);
+  if (!hit && cache.ok) { cache = await installedApps(true); hit = findInstalledApp(cache.apps, candidates); } // installed since the last scan?
+  if (hit) {
+    if (urlArgs.length) {
+      // A browser straight onto a page: its shell name takes arguments, a
+      // .lnk does too; a Store AppsFolder id does not.
+      if (safeExe && !safeExe.endsWith(':')) {
+        try { await startWithArgs(safeExe, urlArgs); return { via: 'exe+url', match: hit.name }; } catch (_) { /* try the shortcut */ }
+      }
+      if (hit.kind === 'lnk') { await startWithArgs(hit.target, urlArgs); return { via: 'lnk+url', match: hit.name }; }
+    }
+    await openTarget(hit.target);
+    if (cleanUrl) await openTarget(cleanUrl);
+    return { via: hit.kind, match: hit.name };
+  }
+  // No app list at all (scan blocked) — the shell name is the best guess left.
+  if (!cache.ok && safeExe) {
+    if (urlArgs.length && !safeExe.endsWith(':')) await startWithArgs(safeExe, urlArgs);
+    else await openTarget(safeExe);
+    return { via: 'exe', match: label };
+  }
+  const err = new Error(`No installed app matches "${label}" (not installed).`);
+  err.code = 'NOT_INSTALLED';
+  throw err;
+}
+
+// URL in a browser window's address bar, via UI Automation (browserurl.ps1)
+// — read-only: no keystrokes, no clipboard. Foreground window by default.
+function browserUrl(handle) {
+  return new Promise((resolve) => {
+    if (PLATFORM !== 'win32') return resolve('');
+    const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'browserurl.ps1')];
+    if (/^\d{1,20}$/.test(String(handle || ''))) args.push('-Handle', String(handle));
+    execFile('powershell', args, { windowsHide: true, timeout: 15000 }, (err, stdout) => {
+      if (err) return resolve('');
+      resolve(String(stdout || '').trim().split(/\r?\n/)[0].slice(0, 2000));
     });
   });
 }
@@ -465,6 +630,10 @@ function runPythonScript(code, args) {
 }
 
 // ── Router ────────────────────────────────────────────────
+// Advertised on /ping so the browser knows which endpoints this build has
+// (an older bridge without them still works through /open).
+const FEATURES = ['launch', 'apps', 'browser-url', 'focus-verify'];
+
 const server = http.createServer(async (req, res) => {
   if (req.method === 'OPTIONS') { cors(res); res.writeHead(204); return res.end(); }
 
@@ -474,7 +643,7 @@ const server = http.createServer(async (req, res) => {
   if (origin && !ALLOWED_ORIGINS.has(origin)) return json(res, 403, { ok: false, error: 'This page is not allowed to use the Clavis bridge.' });
 
   // /ping is unauthenticated so the browser can detect the bridge is up.
-  if (url.pathname === '/ping') return json(res, 200, { ok: true, platform: PLATFORM, name: 'clavis-bridge', version: 2, controlEnabled: ALLOW_CONTROL });
+  if (url.pathname === '/ping') return json(res, 200, { ok: true, platform: PLATFORM, name: 'clavis-bridge', version: 3, controlEnabled: ALLOW_CONTROL, features: FEATURES });
 
   if ((req.headers['x-clavis-token'] || '') !== TOKEN) return json(res, 401, { ok: false, error: 'Bad or missing bridge token.' });
 
@@ -483,6 +652,24 @@ const server = http.createServer(async (req, res) => {
       const { target } = await readBody(req);
       await openTarget(target);
       return json(res, 200, { ok: true, opened: target });
+    }
+    if (url.pathname === '/launch' && req.method === 'POST') {
+      // Same grant as /open (start an app) — no ALLOW_CONTROL needed.
+      try {
+        const r = await launchApp(await readBody(req));
+        return json(res, 200, { ok: true, ...r });
+      } catch (err) {
+        return json(res, err.code === 'NOT_INSTALLED' ? 404 : 500, { ok: false, error: err.message || String(err) });
+      }
+    }
+    if (url.pathname === '/apps' && req.method === 'GET') {
+      const { apps } = await installedApps(url.searchParams.get('refresh') === '1');
+      return json(res, 200, { ok: true, apps: apps.map((a) => a.name).slice(0, 500) });
+    }
+    if (url.pathname === '/browser-url' && req.method === 'GET') {
+      // Read-only like /active-window: which page is in front, nothing clicked.
+      const found = await browserUrl(url.searchParams.get('handle'));
+      return json(res, 200, { ok: true, url: found, title: activeWindowLatest.title || '', process: activeWindowLatest.process || '' });
     }
     if (url.pathname === '/notepad' && req.method === 'POST') {
       const { text, filename } = await readBody(req);
@@ -543,17 +730,24 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-  console.log(`\n  Clavis bridge running → http://127.0.0.1:${PORT}`);
-  console.log(`  Platform: ${PLATFORM}   Token: ${TOKEN === 'clavis-local' ? 'clavis-local (default)' : '(custom)'}`);
-  console.log('  Endpoints: POST /open, POST /notepad, GET /screenshot, GET /active-window, GET /screen-size');
-  console.log(`  Mouse/keyboard control (POST /pc-control): ${ALLOW_CONTROL ? 'ENABLED — Clavis can move the mouse and type on this PC.' : 'off (set CLAVIS_BRIDGE_ALLOW_CONTROL=1 to enable)'}`);
-  console.log('  Keep this window open. Close it to revoke Clavis\'s PC access.\n');
-});
-server.on('error', (e) => {
-  if (e.code === 'EADDRINUSE') console.error(`  Port ${PORT} is busy — the bridge may already be running.`);
-  else console.error('  Bridge error:', e.message);
-});
+// Only listen when run directly (`node bridge.js` / the .bat files); a
+// `require()` from a test gets the pure helpers below without a server.
+if (require.main === module) {
+  server.listen(PORT, '127.0.0.1', () => {
+    console.log(`\n  Clavis bridge running → http://127.0.0.1:${PORT}`);
+    console.log(`  Platform: ${PLATFORM}   Token: ${TOKEN === 'clavis-local' ? 'clavis-local (default)' : '(custom)'}`);
+    console.log('  Endpoints: POST /open, POST /launch, POST /notepad, GET /screenshot, GET /active-window, GET /browser-url, GET /screen-size, GET /apps');
+    console.log(`  Mouse/keyboard control (POST /pc-control): ${ALLOW_CONTROL ? 'ENABLED — Clavis can move the mouse and type on this PC.' : 'off (set CLAVIS_BRIDGE_ALLOW_CONTROL=1 to enable)'}`);
+    console.log('  Keep this window open. Close it to revoke Clavis\'s PC access.\n');
+    // Warm the installed-app list so the first "excel kholo" is instant.
+    if (PLATFORM === 'win32') setTimeout(() => { refreshApps().catch(() => {}); }, 1500);
+  });
+  server.on('error', (e) => {
+    if (e.code === 'EADDRINUSE') console.error(`  Port ${PORT} is busy — the bridge may already be running.`);
+    else console.error('  Bridge error:', e.message);
+  });
+}
+module.exports = { scoreAppName, findInstalledApp, launchApp, FEATURES, server };
 
 // "Close this window to revoke Clavis's access" must be true for the helper
 // processes too, not just the HTTP server — kill them on any exit path.

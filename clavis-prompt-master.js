@@ -202,13 +202,19 @@ ${promptEscaped}
   }
 
   // Check if text matches the Prompt Master pattern
+  // FIX: "claude khol do" / "chatgpt kholo aur likho …" used to match
+  // (AI name + "khol"/"likh") and grabbed a screenshot + wrote a prompt
+  // instead of simply opening the app. Now it needs the screen or the word
+  // "prompt" — or "is/ye … daalo/bhejo" (hand THIS to the AI) — too; plain
+  // opening/typing goes to clavis-automation.js.
   function isPromptMasterIntent(text) {
     const t = String(text || '').toLowerCase();
     const hasScreenshot = /\b(screenshot|screen shot|screen|page ka)\b/.test(t);
-    const hasTargetAI = /\b(chatgpt|claude|gemini|bard|perplexity)\b/.test(t);
-    const hasPromptOrAction = /\b(prompt|likh|daalo|daal do|bhejo|bhej do|khol|banao|craft)\b/.test(t);
+    const hasTargetAI = /\b(chatgpt|chat gpt|claude|gemini|bard|perplexity)\b/.test(t);
+    const hasPrompt = /\bprompt\b/.test(t);
+    const handsItOver = /\b(daalo|daal do|bhejo|bhej do|paste karo)\b/.test(t) && /\b(is|ise|isko|ye|yeh|this|page|screen)\b/.test(t);
 
-    return (hasScreenshot && hasTargetAI) || (hasTargetAI && hasPromptOrAction) || (hasScreenshot && /\bprompt\b/.test(t));
+    return (hasScreenshot && hasTargetAI) || (hasTargetAI && (hasPrompt || handsItOver)) || (hasScreenshot && hasPrompt);
   }
 
   window.ClavisPromptMaster = {

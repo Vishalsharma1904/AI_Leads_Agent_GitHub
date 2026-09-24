@@ -1142,6 +1142,8 @@
     t = t.replace(/^(clavis|jarvis)\b[\s,!.:-]*/i, '');
     t = t.replace(/^(hi|hello|hey|namaste)\b[\s,!.]*/i, '');
     if (t.length < 4 || t.split(' ').length < 2) return '';
+    /* his words, minus the typos and the "mujhe…batao" wrapping */
+    try { t = Sense.cleanPhrase(t) || t; } catch (e) {}
     t = t.charAt(0).toUpperCase() + t.slice(1);
     return clip(t, 96);
   }
@@ -1161,6 +1163,13 @@
     kick.textContent = generic === 'Answered' ? 'Answer' : generic;
     h.textContent = q;
     body.insertBefore(kick, h);
+    /* the local pass knows common typos, not every name — the model
+       proofreads the heading and it sharpens in place (≤ 3.5 s) */
+    try {
+      Sense.polish(q).then(function (better) {
+        if (better && h.isConnected && h.textContent === q) swapText(h, clip(better, 96));
+      });
+    } catch (e) {}
   }
 
   /* Height moves on the panel's own spring (clavis-aurora.css). */
@@ -2178,7 +2187,8 @@
    * result must actually name the subject. No picture beats a wrong one.
    * ============================================================ */
   var Pictures = (function () {
-    var IMG = '(?:images?|imgs?|photos?|photographs?|pictures?|pics?|picz|snaps?|wallpapers?|tasveer(?:en|ein|e|ain)?|tasvir(?:en|ein|e)?|फ़?ोटो|फोटोज़?|तस्वीर(?:ें|े)?|चित्र)';
+    /* voice-typing misspells the picture word too (foto, photu, phtos) */
+    var IMG = '(?:images?|imgs?|imges|photos?|photoz|fotos?|photu|phota|phtos?|phots|photographs?|pictures?|pics?|picz|snaps?|wallpapers?|tasveer(?:en|ein|e|ain)?|tasvir(?:en|ein|e)?|tasweer(?:en|ein|e)?|फ़?ोटो|फोटोज़?|तस्वीर(?:ें|े)?|चित्र)';
     var IMG_RE = new RegExp('(^|[^a-z])' + IMG + '($|[^a-z])', 'i');
     var MAKE_RE = /\b(generate|create|draw|paint|design|make|edit|upscale|convert|compress|crop|resize|remove background|banao|bana\s*(?:do|de|dijiye|na|ke)|banaiye|screenshot|screen\s*shot|analy[sz]e|describe|ocr|upload|attach|send|bhejo|save|download karo)\b/i;
     var OWN_RE = /^(my|mine|meri|mera|mere|apni|apna|apne|our|hamari|hamare|this|that|these|those|ye|yeh|is|us|iski|uski|inki|unki|mujhe|me|main|मेरी|मेरा|मेरे|अपनी|इसकी|उसकी)$/i;
@@ -2187,7 +2197,7 @@
     var ERA_NEW = /\b(latest|recent|new|nayi|naye|current|aaj\s*kal|abhi\s*ki)\b|नई|नये|ताज़ा/i;
     var LEAD = /^(?:(?:hey|hi|hello|ok|okay|clavis|jarvis|please|pls|plz|kindly|zara|jara|mujhe|mujhko|humein|hume|hamein|can you|could you|will you|would you|i want to see|i wanna see|let me see|dekhna hai|dekhni hai)[\s,!.:]+)+/i;
     var EDGE_HEAD = /^(?:please|pls|plz|kindly|zara|mujhe|mujhko|humein|hume|kuch|koi|some|few|a few|a|an|the|all|any|more|of|for|about|from|me|ki|ke|ka|kii|bhi|to|toh|best|good|nice|real|original|asli|hd|high quality|achi|acchi|sundar|कुछ|मुझे|कोई)\s+/i;
-    var EDGE_TAIL = /\s+(?:please|pls|plz|ji|jee|sahab|saheb|sahib|sir|madam|ki|ke|ka|kii|ko|bhi|na|yaar|bhai|dikhao|dikhaiye|dikha(?:\s*do|\s*dijiye|\s*na)?|dekhao|do|dedo|de\s*do|bhejo|chahiye|chahie|chaiye|nikalo|nikal\s*do|dhundo|dhoondo|dhundho|search\s*karo|karo|kar\s*do|lao|laao|layo|milegi|milenge|hai|hain|online|internet\s*se|google\s*se|now|abhi|jaldi|zara|जी|की|के|का|को|भी|दिखाओ|दिखा\s*दो|दिखाइए|दिखाइये|भेजो|चाहिए|प्लीज़?)$/i;
+    var EDGE_TAIL = /\s+(?:please|pls|plz|ji|jee|sahab|saheb|sahib|sir|madam|ki|ke|ka|kii|ko|bhi|na|yaar|bhai|dikhao|dikhaiye|dikha(?:\s*do|\s*dijiye|\s*na)?|dekhao|dihao|dikao|dikhau|dikhaao|dehao|dhikao|dikhaye|dikhayiye|dekhaao|dikhado|do|dedo|de\s*do|bhejo|chahiye|chahie|chaiye|nikalo|nikal\s*do|dhundo|dhoondo|dhundho|search\s*karo|karo|kar\s*do|lao|laao|layo|milegi|milenge|hai|hain|online|internet\s*se|google\s*se|now|abhi|jaldi|zara|जी|की|के|का|को|भी|दिखाओ|दिखा\s*दो|दिखाइए|दिखाइये|भेजो|चाहिए|प्लीज़?)$/i;
     var AFTER = '(?=[\\s?.!,।]|$)';
     function tidy(raw) {
       var s = ' ' + String(raw || '') + ' ';
@@ -2215,12 +2225,14 @@
     }
 
     /* A plain picture request → { subject, old, recent }, else null. */
-    function detect(text) {
+    /* noContext: judge the words alone (titles, chips), not whether a
+       photo task happens to be on screen */
+    function detect(text, noContext) {
       var t = String(text || '').replace(/\s+/g, ' ').trim();
       if (!t || t.length > 180 || MAKE_RE.test(t)) return null;
       var hasImg = IMG_RE.test(t);
       var hasEra = ERA_DECADE.test(t);
-      var inPhoto = isPhotoContext();
+      var inPhoto = noContext ? false : isPhotoContext();
       if (!hasImg && !hasEra && !inPhoto) return null;
 
       var body = t.replace(LEAD, '');
@@ -2300,17 +2312,41 @@
       var phonScore = 1 - lev(pa, pb) / np;
       return Math.max(directScore, phonScore * 0.92);
     }
-    var GENERIC = /^(the|and|of|in|on|at|ji|sri|shri|shree|sant|saint|baba|maharaj|swami|guru|mata|devi|king|queen|mr|mrs|dr|city|temple|mandir|fort|palace|river|lake|mount|old|new)$/i;
+    /* words that don't tell one subject from another — honorifics,
+       common surnames ("Singh", "Khan"), kinds of place */
+    var GENERIC = /^(the|and|of|in|on|at|ji|sri|shri|shree|sant|saint|baba|maharaj|swami|guru|mata|devi|king|queen|mr|mrs|dr|city|temple|mandir|fort|palace|river|lake|mount|old|new|singh|kumar|kumari|sharma|verma|gupta|khan|prasad)$/i;
     function tokensOf(name) {
       var all = String(name || '').toLowerCase().replace(/\(.*?\)/g, ' ').split(/[^a-z0-9ऀ-ॿ]+/).filter(function (w) { return w.length >= 3; });
       var strong = all.filter(function (w) { return !GENERIC.test(w); });
       return strong.length ? strong : all;
     }
+    /* Is this picture about the subject? A name's words must appear in
+       what the file says about itself. One short word is not enough
+       for a two-word name — "Neem Karoli Baba" is not the neem tree,
+       "Taj Mahal" is not Mumtaz Mahal (a word of 6+ letters, like
+       "karoli", is distinctive enough alone). A token ending in "$" must be
+       a whole word ("shiva$" is not "Shivaji"), and an alias list
+       (tokens.any — a deity's many names) needs just one of them. */
     function mentions(text, tokens) {
       if (!tokens || !tokens.length) return true;
-      var hay = ' ' + String(text || '').toLowerCase().replace(/[_\-]+/g, ' ') + ' ';
-      var hits = tokens.filter(function (w) { return hay.indexOf(w) >= 0; }).length;
-      return hits >= 1;
+      var raw = String(text || '');
+      var hay = ' ' + raw.toLowerCase().replace(/[_\-]+/g, ' ') + ' ';
+      var words = null;
+      var long = false;
+      var hits = tokens.filter(function (w) {
+        var ok;
+        if (w.charAt(w.length - 1) === '$') {
+          if (words === null) words = ' ' + raw.replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase().replace(/[^a-z0-9ऀ-ॿ]+/g, ' ') + ' ';
+          ok = words.indexOf(' ' + w.slice(0, -1) + ' ') >= 0;
+        } else {
+          ok = hay.indexOf(w) >= 0;
+        }
+        if (ok && w.replace(/\$$/, '').length >= 6) long = true;
+        return ok;
+      }).length;
+      if (!hits) return false;
+      if (tokens.any || tokens.length < 2) return true;
+      return hits >= 2 || long;
     }
 
     /* ── sources ────────────────────────────────────────────────── */
@@ -2348,32 +2384,63 @@
       return best;
     }
 
-    /* The model is good at "neemaroli baba ji" → "Neem Karoli Baba". */
-    function canonical(subject, signal) {
+    /* The model is good at "neemaroli baba ji" → "Neem Karoli Baba" —
+       IF it is told who is asking. Given only "lord" it picked the
+       British title; given the whole request and that sir is an Indian,
+       Hinglish-speaking owner, "lord ki photo dikhao" means God. */
+    var CULTURE =
+      'The user is an Indian business owner who writes Hinglish (Hindi in Roman script mixed with English), often voice-typed with spelling mistakes. ' +
+      'Read the request the way an Indian Hindi speaker means it: "lord", "bhagwan", "god", "ishwar", "prabhu", "devta" on their own mean the Hindu deities ' +
+      '(kind "group"), never the British title or the English word. "shiv ji"/"mahadev"/"bholenath" = Shiva, "bajrang bali"/"hanuman ji" = Hanuman, ' +
+      '"kanha"/"shri krishna" = Krishna, "ganpati"/"ganesh ji" = Ganesha, "ram ji"/"shri ram" = Rama, "mata rani"/"durga maa"/"sherawali" = Durga, ' +
+      '"sai baba" = Sai Baba of Shirdi. "ji", "baba", "maharaj", "sahab" are honorifics that belong to a famous name ("neemaroli baba" = Neem Karoli Baba). ' +
+      'When a name is ambiguous, prefer the Indian person, place or thing (film star, cricketer, politician, saint, city, temple).';
+    var canonCache = new Map();          // one model call per request, shared by the title and the search
+    function canonical(subject, signal, raw) {
       if (!Research.hasBrain()) return Promise.resolve(null);
+      var ck = squash(subject) + '|' + squash(raw || '');
+      if (canonCache.has(ck)) return canonCache.get(ck);
       var msgs = [
-        { role: 'system', content: 'Fix the name in a photo request. Reply with ONLY minified JSON: {"title":"<exact English Wikipedia article title if one exists, else the correctly spelled name>","kind":"person|place|thing|event|other"}' },
-        { role: 'user', content: subject }
+        { role: 'system', content: 'You work out WHO or WHAT a photo request is about. ' + CULTURE +
+          ' Reply with ONLY minified JSON: {"title":"<exact English Wikipedia article title if one exists, else the correctly spelled name>",' +
+          '"display":"<the name correctly spelled and capitalised, as a caption>","kind":"person|deity|place|thing|event|group|other",' +
+          '"items":["<ONLY when kind is group: 2 to 9 exact Wikipedia titles of its best-known members>"]}' },
+        { role: 'user', content: 'Request: "' + clip(raw || subject, 200) + '"\nSubject as extracted: "' + clip(subject, 120) + '"' }
       ];
-      return Research.within(Research.llm(msgs, signal, { temperature: 0, max_tokens: 60 }).then(function (raw) {
-        var m = String(raw || '').match(/\{[\s\S]*\}/);
+      var cp = Research.within(Research.llm(msgs, signal, { temperature: 0, max_tokens: 160 }).then(function (out) {
+        var m = String(out || '').match(/\{[\s\S]*\}/);
         if (!m) return null;
-        try { var o = JSON.parse(m[0]); return o && o.title ? { title: String(o.title).slice(0, 120), kind: o.kind || '' } : null; } catch (e) { return null; }
+        try {
+          var o = JSON.parse(m[0]);
+          if (!o || !o.title) return null;
+          var items = Array.isArray(o.items) ? o.items.map(function (x) { return String(x || '').trim().slice(0, 90); }).filter(Boolean).slice(0, 9) : [];
+          return {
+            title: String(o.title).slice(0, 120),
+            display: String(o.display || o.title).replace(/\s*\([^)]*\)\s*$/, '').slice(0, 90),
+            kind: String(o.kind || ''),
+            items: String(o.kind || '') === 'group' && items.length >= 2 ? items : null
+          };
+        } catch (e) { return null; }
       }), 3500, null);
+      canonCache.set(ck, cp);
+      cp.then(function (r) { if (!r) canonCache.delete(ck); });
+      return cp;
     }
 
-    function resolve(subject, signal) {
-      return Promise.all([canonical(subject, signal), searchTitles(subject, signal)]).then(function (r) {
+    function resolve(subject, signal, raw) {
+      return Promise.all([canonical(subject, signal, raw), searchTitles(subject, signal)]).then(function (r) {
         var canon = r[0], found = r[1];
         var viaSearch = bestTitle(subject, found.titles);
+        /* "cricketers ki photos": several people, each labelled */
+        if (canon && canon.items) return { title: canon.title, name: canon.display, display: canon.display, sure: true, group: canon.items, kind: 'group' };
         if (canon && canon.title) {
-          if (likeness(canon.title, viaSearch || '') > 0.85) return { title: viaSearch || canon.title, name: canon.title, sure: true };
+          if (likeness(canon.title, viaSearch || '') > 0.85) return { title: viaSearch || canon.title, name: canon.title, display: canon.display, sure: true, kind: canon.kind };
           return searchTitles(canon.title, signal).then(function (f2) {
             var t = bestTitle(canon.title, f2.titles, 0.65) || bestTitle(subject, f2.titles);
-            return { title: t || canon.title, name: t || canon.title, sure: !!t };
+            return { title: t || canon.title, name: t || canon.title, display: canon.display, sure: !!t, kind: canon.kind };
           });
         }
-        if (viaSearch) return { title: viaSearch, name: viaSearch, sure: true };
+        if (viaSearch) return { title: viaSearch, name: viaSearch, display: viaSearch.replace(/\s*\([^)]*\)\s*$/, ''), sure: true };
         if (found.suggestion) {
           return searchTitles(found.suggestion, signal).then(function (f2) {
             var t = bestTitle(found.suggestion, f2.titles, 0.6) || bestTitle(subject, f2.titles);
@@ -2409,7 +2476,10 @@
       }).catch(function () { return null; });
     }
 
-    function wikiMediaList(title, signal) {
+    /* Every picture an article uses — minus its illustrations of OTHER
+       things (the ashram, a disciple, a map), which is how an unrelated
+       face ended up under a saint's name. tokens = what must be named. */
+    function wikiMediaList(title, signal, tokens) {
       if (!title) return Promise.resolve([]);
       var url = 'https://en.wikipedia.org/api/rest_v1/page/media-list/' + encodeURIComponent(String(title || '').replace(/\s+/g, '_'));
       return Research.getJSON(url, signal, 6000).then(function (j) {
@@ -2423,6 +2493,7 @@
           var full = it.srcset[it.srcset.length - 1].src;
           if (full.indexOf('//') === 0) full = 'https:' + full;
           var cap = it.caption ? (it.caption.text || Research.stripTags(it.caption.html || '')) : '';
+          if (tokens && tokens.length && !mentions(fileTitle + ' ' + cap, tokens)) return null;
           var name = cap || fileTitle.replace(/\.[a-z0-9]+$/i, '').replace(/_/g, ' ');
           return {
             key: squash(fileTitle),
@@ -2515,7 +2586,10 @@
         }).catch(function () { return []; });
     }
 
-    function wikiPageImages(query, signal) {
+    /* Lead images of the articles a search turns up. A search for a
+       name also finds pages that merely MENTION it; only pages whose
+       title or opening line names the subject may lend their picture. */
+    function wikiPageImages(query, signal, tokens) {
       var url = q('en.wikipedia.org', {
         generator: 'search', gsrnamespace: 0, gsrlimit: 8, gsrsearch: query,
         prop: 'pageimages|extracts|info', piprop: 'thumbnail|original', pithumbsize: 1280, pilicense: 'any',
@@ -2527,6 +2601,9 @@
           var th = p.thumbnail && p.thumbnail.source;
           var orig = p.original || {};
           if (!th || JUNK.test(p.title) || (p.thumbnail.width || 0) < 260) return null;
+          /* the TITLE must name him: "Ram Dass" mentions Neem Karoli Baba
+             in its first line, and is still somebody else */
+          if (tokens && tokens.length && !mentions(p.title, tokens)) return null;
           return {
             key: squash(p.title + '_lead'),
             title: p.title,
@@ -2578,24 +2655,67 @@
     }
 
     var cache = new Map();
-    /* find(subject, {era}) → { name, title, extract, link, items, sure, more() } */
+    /* find(subject, {era, raw, onName}) → { name, title, extract, link, items, sure, more() }
+       raw    — sir's whole request, so "shankar ji" is read as a deity
+                even though the tidied subject lost its "ji"
+       onName — called once the real name is known, before any picture
+                has loaded, so the window's title can upgrade early */
     function find(subject, opts, signal) {
       opts = opts || {};
       var tidied = tidy(subject);
       var effectiveSubject = tidied.subject || subject;
+      /* "neemaroli baba" searches as "Neem Karoli baba" — the dictionary's
+         spelling first, the model's (resolve) on top */
+      try { effectiveSubject = Sense.fixTypos(effectiveSubject) || effectiveSubject; } catch (e) {}
       var effectiveEra = opts.era || tidied.decade || (tidied.old ? 'old' : (tidied.recent ? 'recent' : ''));
       opts.era = effectiveEra;
-      var key = squash(effectiveSubject) + '|' + (opts.era || '');
+      /* the owner's own words first: a deity, or "lord" = the deities */
+      var hit = null;
+      try { hit = (opts.raw && Sense.lookup(Sense.core(opts.raw).subject)) || Sense.lookup(subject) || Sense.lookup(effectiveSubject); } catch (e) { hit = null; }
+      var key = (hit ? '@' + (hit.group ? hit.id : hit.wiki) : squash(effectiveSubject)) + '|' + (opts.era || '');
       if (cache.has(key)) return cache.get(key);
-      var p = resolve(effectiveSubject, signal).then(function (who) {
-        var name = who.title || who.name || effectiveSubject;
-        var tokens = tokensOf(name);
+      var named = function (who) {
+        try { if (typeof opts.onName === 'function') opts.onName(who); } catch (e) {}
+        return who;
+      };
+      var p;
+      if (hit && hit.group) {
+        named({ display: hit.name, title: hit.title, group: true });
+        p = findGroup(subject, hit, signal);
+      } else {
+        var whoP = hit
+          ? Promise.resolve({ title: hit.wiki, name: hit.wiki, display: hit.name, sure: true, kind: 'deity' })
+          : resolve(effectiveSubject, signal, opts.raw);
+        p = whoP.then(named).then(function (who) {
+          if (who.group && who.group.length >= 2) {
+            return findGroup(subject, {
+              id: squash(who.title), name: who.display || who.title, title: (who.display || who.title) + ' — Photos',
+              members: who.group.map(function (t) { var tk = tokensOf(t); return { wiki: t, name: t.replace(/\s*\([^)]*\)\s*$/, ''), tokens: tk }; })
+            }, signal);
+          }
+          return findOne(subject, who, hit, opts, signal);
+        });
+      }
+      cache.set(key, p);
+      /* an empty result (offline, a blip) is not remembered — asking again retries */
+      p.then(function (b) { if (!b || !b.items || !b.items.length) cache.delete(key); }, function () { cache.delete(key); });
+      return p;
+    }
+
+    function findOne(subject, who, hit, opts, signal) {
+        var name = who.title || who.name || subject;
+        /* a deity is found by any of its names; a person by theirs */
+        var tokens = hit ? hit.tokens : tokensOf(name);
+        var searchName = (hit && hit.search) || name;
         return article(who.title, signal).then(function (art) {
           if (art && art.disambiguation) art = null;
           var resolvedTitle = art ? art.title : who.title;
+          /* what the window calls it: the deity's Indian name, else the
+             model's spelling, else the article's title without "(actor)" */
+          var display = (hit && hit.name) || who.display || String(art ? art.title : name).replace(/\s*\([^)]*\)\s*$/, '');
           return Promise.all([
             commonsCategory(art && art.qid, signal),
-            wikiMediaList(resolvedTitle, signal)
+            wikiMediaList(resolvedTitle, signal, tokens)
           ]).then(function (initRes) {
             var cat = initRes[0];
             var mediaListItems = initRes[1] || [];
@@ -2610,44 +2730,99 @@
               });
             }
             var eraTerm = opts.era ? (' ' + opts.era) : '';
+            function pack(items) {
+              var bundle = {
+                subject: subject, name: display, display: display, title: display + ' — Photos', wiki: art ? art.title : name,
+                era: opts.era || '', sure: !!(art || who.sure), extract: art ? art.extract : '',
+                link: art ? art.link : null, category: cat, items: items,
+                more: function (sig) { return more(bundle, state, name, tokens, opts.era, sig); }
+              };
+              return bundle;
+            }
             return Promise.all([
               cat ? commonsList({ generator: 'categorymembers', gcmtitle: 'Category:' + cat, gcmtype: 'file', gcmlimit: 50 }, signal, true, tokens) : Promise.resolve({ items: [] }),
               art ? articleFiles(art.files, signal, tokens) : Promise.resolve({ items: [] }),
               commonsBroad(name + eraTerm, signal, tokens),
-              commonsBroad(name, signal, tokens),
-              wikiPageImages(name + eraTerm, signal),
-              Research.within(openverse(name + eraTerm, signal, tokens, 1), 5500, [])
+              commonsBroad(searchName, signal, tokens),
+              wikiPageImages(name + eraTerm, signal, tokens),
+              Research.within(openverse(searchName + eraTerm, signal, tokens, 1), 5500, [])
             ]).then(function (res) {
               state.catNext = res[0].next;
               var allLists = [mediaListItems, res[0].items, res[1].items, res[2], res[3], res[4], res[5]];
               var items = lead.concat(merge(allLists, opts.era).filter(function (it) { return !lead.length || it.key !== lead[0].key; }));
               if (!items.length) {
                 return Promise.all([
-                  wikiPageImages(name, signal),
+                  wikiPageImages(name, signal, tokens),
                   Research.within(openverse(name, signal, tokens, 1), 5000, [])
                 ]).then(function (fallbackRes) {
-                  items = lead.concat(merge([fallbackRes[0], fallbackRes[1]], opts.era));
-                  var bundle = {
-                    subject: subject, name: art ? art.title : name, era: opts.era || '', sure: !!(art || who.sure), extract: art ? art.extract : '',
-                    link: art ? art.link : null, category: cat, items: items,
-                    more: function (sig) { return more(bundle, state, name, tokens, opts.era, sig); }
-                  };
-                  return bundle;
+                  return pack(lead.concat(merge([fallbackRes[0], fallbackRes[1]], opts.era)));
                 });
               }
-              var bundle = {
-                subject: subject, name: art ? art.title : name, era: opts.era || '', sure: !!(art || who.sure), extract: art ? art.extract : '',
-                link: art ? art.link : null, category: cat, items: items,
-                more: function (sig) { return more(bundle, state, name, tokens, opts.era, sig); }
-              };
-              return bundle;
+              return pack(items);
             });
           });
         });
+    }
+
+    /* Several subjects at once — "lord" / "bhagwan" is the major Hindu
+       deities, one clearly labelled picture each (the article's own lead
+       image: the most trusted picture there is), and "More photos" walks
+       through each one's article pictures in turn. */
+    function findGroup(subject, grp, signal) {
+      var members = (grp.members || []).slice(0, 9);
+      var state = { next: 0 };
+      function labelled(m, it) {
+        it.title = m.name;
+        it.label = m.name;
+        return it;
+      }
+      var url = q('en.wikipedia.org', {
+        redirects: 1, titles: members.map(function (m) { return m.wiki; }).join('|'),
+        prop: 'pageimages|info', piprop: 'thumbnail|original|name', pithumbsize: 960, pilicense: 'any', inprop: 'url'
       });
-      cache.set(key, p);
-      p.catch(function () { cache.delete(key); });
-      return p;
+      return Research.getJSON(url, signal, 7000).then(function (j) {
+        var pages = pagesOf(j), qq = (j && j.query) || {};
+        var alias = {};
+        (qq.normalized || []).concat(qq.redirects || []).forEach(function (r) { if (r && r.from) alias[r.from] = r.to; });
+        function pageFor(t) {
+          for (var n = 0; alias[t] && n < 3; n++) t = alias[t];
+          return pages.filter(function (p) { return p.title === t; })[0] || null;
+        }
+        return members.map(function (m) {
+          var pg = pageFor(m.wiki);
+          if (!pg || pg.missing !== undefined || !pg.thumbnail || !pg.thumbnail.source) return null;
+          if (pg.pageimage && JUNK.test(pg.pageimage)) return null;
+          var th = pg.thumbnail, orig = pg.original || {};
+          return labelled(m, {
+            key: squash(pg.pageimage || pg.title), thumb: th.source,
+            full: (orig.width && orig.width > 1920) ? th.source.replace(/\/\d+px-/, '/1920px-') : (orig.source || th.source),
+            w: th.width || 640, h: th.height || 480,
+            link: pg.fullurl || ('https://en.wikipedia.org/wiki/' + encodeURIComponent(pg.title)),
+            source: 'Wikipedia', credit: 'Wikipedia', year: null
+          });
+        }).filter(Boolean);
+      }).catch(function () { return []; }).then(function (items) {
+        var bundle = {
+          subject: subject, name: grp.name, display: grp.name, title: grp.title || (grp.name + ' — Photos'), group: true,
+          era: '', sure: true, extract: grp.extract || (grp.name + ': ' + members.map(function (m) { return m.name; }).join(', ') + '.'),
+          link: grp.link || null, category: null, items: items,
+          more: function (sig) {
+            var batch = members.slice(state.next, state.next + 3);
+            state.next += 3;
+            if (!batch.length) return Promise.resolve(0);
+            return Promise.all(batch.map(function (m) {
+              return wikiMediaList(m.wiki, sig, m.tokens).then(function (list) {
+                return list.slice(0, 4).map(function (it) { return labelled(m, it); });
+              });
+            })).then(function (lists) {
+              var before = bundle.items.length;
+              bundle.items = merge([bundle.items].concat(lists), '');
+              return bundle.items.length - before || (state.next < members.length ? bundle.more(sig) : 0);
+            });
+          }
+        };
+        return bundle;
+      });
     }
 
     function more(bundle, state, name, tokens, era, signal) {
@@ -2669,8 +2844,345 @@
       });
     }
 
-    return { detect: detect, tidy: tidy, find: find, likeness: likeness, tokensOf: tokensOf, mentions: mentions, squash: squash };
+    return { detect: detect, tidy: tidy, find: find, resolve: resolve, likeness: likeness, tokensOf: tokensOf, mentions: mentions, squash: squash, phonetic: phoneticSquash, eraRe: ERA_DECADE };
   })();
+
+  /* ============================================================
+   * 5b+ · SENSE — what sir means, spelled the way it should be
+   * ------------------------------------------------------------
+   * "lord ki photo dikhao" came back with random pictures: "lord"
+   * went to the search as an English word (a British title, a
+   * cricket ground). For this owner — Indian, Hindi-speaking —
+   * "lord", "bhagwan", "prabhu" mean God, and "shiv ji", "bajrang
+   * bali", "kanha" are Shiva, Hanuman, Krishna. A small dictionary
+   * answers those instantly and with no AI key; anything it does not
+   * know goes to the model with the WHOLE request and that context
+   * (Pictures' canonical()), then Wikipedia's search, inside ~3.5 s.
+   *
+   * The same pass keeps his typos out of the floating window: voice-
+   * typed "neemaroli baba ki photo dihao" is titled "Neem Karoli
+   * Baba — Photos" at once, and the canonical name swaps in when the
+   * lookup lands.
+   *
+   *   understand(raw)     → { subject, search, name, title, kind, sure, wiki, group, era }
+   *   resolve(raw)        → Promise of the same, upgraded by model + Wikipedia
+   *   cleanTitle(text)    → a task title without typos and filler
+   * ============================================================ */
+  var Sense = (function () {
+    /* [Wikipedia title, the name the window shows, how sir says it,
+        words its pictures are labelled with ("x$" = a whole word)].
+       Bare words that are ALSO people or products (govinda the actor,
+       maruti the car, surya the film star, kartik, gauri) are left out
+       on purpose; with "ji"/"bhagwan"/"lord" in front they still match. */
+    var DEITIES = [
+      ['Shiva', 'Lord Shiva',
+        'shiva|shiv|shivji|shiv ji|shiv shankar|shankar ji|shankar bhagwan|bhole shankar|mahadev|mahadeva|mahadeo|bholenath|bhole nath|bhole baba|neelkanth|nilkanth|mahakal|mahakaal|maheshwar|shambhu|har har mahadev|om namah shivay|om namah shivaya|adiyogi|शिव|शिवजी|महादेव|भोलेनाथ',
+        'shiva$|mahadev|mahadeva$|shankar$|bholenath|rudra$|nataraja|shivling|shivalinga|shiva linga|lingam|mahakal|neelkanth|adiyogi'],
+      ['Vishnu', 'Lord Vishnu',
+        'vishnu|vishnu ji|narayana|narayan ji|shri hari|sri hari|vishnu bhagwan|lakshmi narayan|laxmi narayan|विष्णु',
+        'vishnu|narayana$|narayan$|vaikuntha|padmanabha|anantashayana|lakshmi narayan'],
+      ['Krishna', 'Lord Krishna',
+        'krishna|krishn|krishan|shri krishna|shree krishna|sri krishna|krishna ji|kanha|kanha ji|kanhaiya|kanhaiyya|murlidhar|murli manohar|bal gopal|laddu gopal|bankey bihari|banke bihari|dwarkadhish|shrinathji|कृष्ण|कान्हा|श्री कृष्ण',
+        'krishna$|krsna|kanha$|kanhaiya|murlidhar|bal gopal|laddu gopal|bankey bihari|banke bihari|dwarkadhish|shrinathji'],
+      ['Rama', 'Lord Rama',
+        'ram|rama|ram ji|ramji|shri ram|shree ram|sri ram|jai shri ram|ram chandra|ramchandra|ramachandra|raghunath|ram lalla|ramlala|ram bhagwan|prabhu ram|राम|श्री राम|रामजी',
+        'rama$|shri ram|sri ram|shree ram|lord ram$|ram lalla|ramlala|ram darbar|ramachandra|ramchandra|raghunath|kodanda'],
+      ['Ganesha', 'Lord Ganesha',
+        'ganesh|ganesha|ganesh ji|ganeshji|ganpati|ganpati bappa|ganapati|ganapathi|ganpathi|vinayak|vinayaka|gajanan|gajanana|lambodar|bappa|siddhivinayak|गणेश|गणपति|गणेश जी',
+        'ganesha|ganesh$|ganeshji|ganpati|ganapati|ganapathi|vinayaka|vinayak$|gajanan|lambodar|siddhivinayak'],
+      ['Hanuman', 'Lord Hanuman',
+        'hanuman|hanuman ji|hanumanji|hanumaan|bajrang bali|bajrangbali|bajarang bali|bajrang|pawan putra|pavan putra|anjaneya|anjaneyar|maruti nandan|sankat mochan|हनुमान|बजरंगबली|बजरंग बली',
+        'hanuman|bajrang|anjaneya|maruti$|maruthi|sankat mochan'],
+      ['Durga', 'Maa Durga',
+        'durga|durga maa|durga mata|maa durga|mata rani|sherawali|sheranwali|sherawali maa|ambe maa|jagdamba|jagadamba|navdurga|दुर्गा|माता रानी|शेरावाली',
+        'durga$|durga puja|mata rani|ambe$|jagdamba|jagadamba|mahishasuramardini|navdurga|sherawali'],
+      ['Lakshmi', 'Maa Lakshmi',
+        'lakshmi|laxmi|lakshmi maa|laxmi maa|lakshmi mata|laxmi mata|mahalakshmi|mahalaxmi|लक्ष्मी',
+        'lakshmi|laxmi|mahalakshmi|mahalaxmi|gajalakshmi'],
+      ['Saraswati', 'Maa Saraswati',
+        'saraswati|sarasvati|saraswathi|saraswati maa|saraswati mata|maa saraswati|sharda maa|सरस्वती',
+        'saraswati|sarasvati|saraswathi|sharada$|sharda$'],
+      ['Parvati', 'Maa Parvati', 'parvati|parvathi|parvati maa|gauri maa|पार्वती', 'parvati|parvathi|gauri$|uma$'],
+      ['Kali', 'Maa Kali', 'kali|kali maa|kaali|kaali maa|mahakali|maa kali|kalika|bhadrakali|काली', 'kali$|kaali|mahakali|kalika|bhadrakali'],
+      ['Sita', 'Mata Sita', 'sita|seeta|sita maa|sita mata|mata sita|janaki|सीता', 'sita$|seeta|janaki|vaidehi|siya$'],
+      ['Radha', 'Radha Rani', 'radha|radha rani|radharani|राधा', 'radha$|radharani|radha rani'],
+      ['Radha Krishna', 'Radha Krishna', 'radha krishna|radhe krishna|radhe shyam|radha kishan|radhakrishna|राधा कृष्ण', 'radha krishna|radhakrishna|radha$|krishna$'],
+      ['Brahma', 'Lord Brahma', 'brahma|brahma ji|brahmaji|ब्रह्मा', 'brahma$|brahmaji'],
+      ['Surya', 'Surya Dev', 'surya dev|suryadev|surya devta|surya bhagwan|सूर्य देव', 'surya$|suryadev|surya dev|sun god'],
+      ['Shani (deity)', 'Shani Dev', 'shani|shani dev|shanidev|shani maharaj|शनि देव', 'shani$|shanidev|shani dev|shanaishchara'],
+      ['Kartikeya', 'Lord Kartikeya', 'kartikeya|kartikey|kartikey bhagwan|murugan|subramanya|subrahmanya', 'kartikeya|murugan|skanda$|subramanya|subrahmanya'],
+      ['Jagannath', 'Lord Jagannath', 'jagannath|jagannath ji|jagannatha|जगन्नाथ', 'jagannath|jagannatha'],
+      ['Venkateswara', 'Lord Venkateswara', 'balaji|tirupati balaji|venkateswara|venkateshwara|venkatesh bhagwan', 'venkateswara|venkateshwara|balaji$|tirupati|srinivasa$'],
+      ['Vithoba', 'Lord Vitthal', 'vitthal|vithoba|vithal|pandurang|panduranga|vitthal rukmini', 'vithoba|vitthal|vithal$|pandurang'],
+      ['Vaishno Devi', 'Vaishno Devi', 'vaishno devi|vaishno mata|vaishno maa|vaishnodevi', 'vaishno|vaishnodevi'],
+      ['Nataraja', 'Nataraja', 'nataraj|nataraja|natraj', 'nataraja|nataraj$|natraj$'],
+      ['Sai Baba of Shirdi', 'Sai Baba of Shirdi', 'sai baba|saibaba|shirdi sai baba|shirdi wale sai baba|sai nath|sainath|shirdi sai|साईं बाबा', 'sai baba|saibaba|shirdi|sainath'],
+      ['Gautama Buddha', 'Gautama Buddha', 'buddha|gautam buddha|gautama buddha|mahatma buddha|lord buddha|bhagwan buddha|siddhartha gautama|बुद्ध', 'buddha|gautama|siddhartha'],
+      ['Mahavira', 'Bhagwan Mahavir', 'mahavir|mahavira|bhagwan mahavir|mahaveer|vardhaman|महावीर', 'mahavira|mahavir$|mahaveer|vardhamana'],
+      ['Guru Nanak', 'Guru Nanak Dev Ji', 'guru nanak|guru nanak dev|guru nanak dev ji|nanak dev|baba nanak|गुरु नानक', 'guru nanak|nanak$'],
+      ['Jesus', 'Jesus Christ', 'jesus|jesus christ|yeshu|yishu|isa masih|lord jesus', 'jesus|christ$|yeshu']
+    ];
+    /* "lord" / "bhagwan" on their own — for this owner, God */
+    var GROUPS = {
+      deities: {
+        name: 'Hindu Deities', search: 'Hindu deities',
+        members: ['Shiva', 'Vishnu', 'Krishna', 'Rama', 'Ganesha', 'Hanuman', 'Durga', 'Lakshmi', 'Saraswati'],
+        link: 'https://en.wikipedia.org/wiki/Hindu_deities',
+        extract: 'Bhagwan — Hindu dharm ke pramukh devi-devta: Lord Shiva, Lord Vishnu, Lord Krishna, Lord Rama, Lord Ganesha, Lord Hanuman, Maa Durga, Maa Lakshmi aur Maa Saraswati. Kisi ek ki aur photos ke liye unka naam boliye, jaise "shiv ji ki photo".'
+      },
+      goddesses: {
+        name: 'Hindu Goddesses', search: 'Hindu goddesses',
+        members: ['Durga', 'Lakshmi', 'Saraswati', 'Parvati', 'Kali', 'Sita', 'Radha'],
+        link: 'https://en.wikipedia.org/wiki/Devi',
+        extract: 'Devi — Hindu dharm ki pramukh deviyan: Maa Durga, Maa Lakshmi, Maa Saraswati, Maa Parvati, Maa Kali, Mata Sita aur Radha Rani. Kisi ek ki aur photos ke liye unka naam boliye, jaise "durga maa ki photo".'
+      }
+    };
+    function set(words) { var o = {}; words.split(/\s+/).forEach(function (w) { if (w) o[w] = 1; }); return o; }
+    var GOD = set('lord lords god gods bhagwan bhagwaan bhagvan bhagawan bhagwano bhagwanon ishwar ishvar eshwar parmeshwar parmatma prabhu devta devte devtao devtaon deity deities भगवान ईश्वर प्रभु देवता परमात्मा');
+    var GODDESS = set('goddess goddesses devi deviyan deviyon mata mataji देवी देवियां माता');
+    /* words that only add respect — dropped to find the name inside */
+    var HONOR = set(Object.keys(GOD).join(' ') + ' ' + Object.keys(GODDESS).join(' ') +
+      ' shri shree sri ji jee maa ma dev bappa jai om hindu sabhi sab saare sare all the of ki ka ke aur and श्री जी माँ मां जय ॐ');
+
+    function norm2(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9ऀ-ॿ\s]+/g, ' ').replace(/\s+/g, ' ').trim(); }
+    function tokenList(spec) { var a = spec.split('|').filter(Boolean); a.any = true; return a; }
+
+    var ALIAS = {}, STRIPPED = {}, PHON = {}, BY_WIKI = {}, NAME_WORD = {};
+    var NOT_A_NAME = set('kali kaali bhole');        // also plain Hindi words ("kaali" = black)
+    DEITIES.forEach(function (row) {
+      var hit = { kind: 'deity', wiki: row[0], name: row[1], title: row[1] + ' — Photos', search: row[1], tokens: tokenList(row[3]) };
+      BY_WIKI[row[0]] = hit;
+      row[2].split('|').forEach(function (a) {
+        a = norm2(a);
+        if (!a) return;
+        if (!ALIAS[a]) ALIAS[a] = hit;
+        var bare = a.split(' ').filter(function (w) { return !HONOR[w]; }).join(' ');
+        if (bare && bare !== 'rani' && !STRIPPED[bare]) STRIPPED[bare] = hit;
+        /* sound-alike spellings, long names only — "baapu" must not become "bappa" */
+        if (/^[a-z ]{6,}$/.test(a)) { var ph = Pictures.phonetic(a); if (ph && !PHON[ph]) PHON[ph] = hit; }
+        if (/^[a-z]{4,}$/.test(a) && !NOT_A_NAME[a]) NAME_WORD[a] = a.charAt(0).toUpperCase() + a.slice(1);
+      });
+    });
+    NAME_WORD.shiv = 'Shiv';
+    'gurugram gurgaon delhi noida mumbai pune bangalore bengaluru hyderabad chennai kolkata jaipur ahmedabad lucknow indore chandigarh faridabad ghaziabad manesar sonipat'
+      .split(' ').forEach(function (c) { NAME_WORD[c] = c.charAt(0).toUpperCase() + c.slice(1); });
+    var GROUP_HIT = {};
+    Object.keys(GROUPS).forEach(function (id) {
+      var g = GROUPS[id];
+      GROUP_HIT[id] = {
+        kind: 'group', group: true, id: id, name: g.name, title: g.name + ' — Photos', search: g.search, link: g.link, extract: g.extract,
+        members: g.members.map(function (w) { var d = BY_WIKI[w]; return { wiki: w, name: d.name, tokens: d.tokens }; })
+      };
+    });
+
+    /* A deity or a group of them, from how sir said it — or null. */
+    function lookup(text) {
+      var s = norm2(fixTypos(text));
+      if (!s || s.split(' ').length > 6) return null;
+      if (ALIAS[s]) return ALIAS[s];
+      var words = s.split(' ');
+      var core = words.filter(function (w) { return !HONOR[w]; });
+      if (!core.length) {
+        if (words.some(function (w) { return GOD[w]; })) return GROUP_HIT.deities;
+        if (words.some(function (w) { return GODDESS[w]; })) return GROUP_HIT.goddesses;
+        return null;
+      }
+      var c = core.join(' ');
+      if (ALIAS[c]) return ALIAS[c];
+      /* "lord shankar", "surya bhagwan": the respect word makes a bare
+         name that is also a person's ("shankar", "surya") a deity */
+      if (core.length < words.length && STRIPPED[c]) return STRIPPED[c];
+      if (/^[a-z ]{6,}$/.test(c)) { var ph = PHON[Pictures.phonetic(c)]; if (ph) return ph; }   // "hanumaan", "krisna"
+      return null;
+    }
+
+    /* ── spelling ─────────────────────────────────────────────── */
+    var TYPO = {
+      dihao: 'dikhao', dikao: 'dikhao', dikhau: 'dikhao', dikhaao: 'dikhao', dekhao: 'dikhao', dehao: 'dikhao', dhikao: 'dikhao', dikhoa: 'dikhao', dikhado: 'dikha do',
+      btao: 'batao', bato: 'batao', bataao: 'batao', batau: 'batao', btaao: 'batao', smjhao: 'samjhao', samjao: 'samjhao', samjhau: 'samjhao', smjao: 'samjhao',
+      chaiye: 'chahiye', chahie: 'chahiye', chahiy: 'chahiye', chaahiye: 'chahiye', chiye: 'chahiye', chaie: 'chahiye', chahiyee: 'chahiye',
+      kro: 'karo', krna: 'karna', krni: 'karni', krdo: 'kar do', kardo: 'kar do', krke: 'karke', kese: 'kaise', kaese: 'kaise', kaisey: 'kaise',
+      nhi: 'nahi', nahe: 'nahi', mje: 'mujhe', muje: 'mujhe', mujhey: 'mujhe', plz: 'please', pls: 'please', plzz: 'please', plss: 'please',
+      bhot: 'bahut', bohot: 'bahut', bhut: 'bahut', kon: 'kaun', kaon: 'kaun', bary: 'baare',
+      foto: 'photo', fotos: 'photos', photu: 'photo', phota: 'photo', phto: 'photo', phtos: 'photos', photoz: 'photos', phots: 'photos',
+      imges: 'images', imags: 'images', tasvir: 'tasveer', tasweer: 'tasveer', tasveeren: 'tasveerein', tasviren: 'tasveerein',
+      hanumaan: 'hanuman', ganpathi: 'ganpati', krisna: 'krishna', krishana: 'krishna', sarswati: 'saraswati', laksmi: 'lakshmi', durgaa: 'durga', mahadeo: 'mahadev',
+      /* cities the lead searches name every day */
+      gurgoan: 'Gurgaon', gurgao: 'Gurgaon', gurugaon: 'Gurugram', gurugam: 'Gurugram', dehli: 'Delhi', delih: 'Delhi', banglore: 'Bangalore', bangaluru: 'Bengaluru',
+      hydrabad: 'Hyderabad', hyderbad: 'Hyderabad', mumabi: 'Mumbai', mumbia: 'Mumbai', faridabaad: 'Faridabad', gaziabad: 'Ghaziabad', ghaziabaad: 'Ghaziabad',
+      chandigrah: 'Chandigarh', ahmdabad: 'Ahmedabad', ahemdabad: 'Ahmedabad', luckhnow: 'Lucknow', lukhnow: 'Lucknow', kolkatta: 'Kolkata', calcutta: 'Kolkata', jaipure: 'Jaipur'
+    };
+    /* names voice typing mangles the same way every time */
+    var PHRASE = [
+      [/\bn(?:ee|i|e)[mb]\s*k?a?r(?:o|au|ou)[lr]i(\s+baba)?\b/gi, function (m, baba) { return 'Neem Karoli' + (baba ? ' Baba' : ''); }]
+    ];
+    function fixTypos(text) {
+      var s = String(text || '');
+      PHRASE.forEach(function (p) { s = s.replace(p[0], p[1]); });
+      return s.replace(/[A-Za-z]+/g, function (w) {
+        var f = TYPO[w.toLowerCase()];
+        if (!f) return w;
+        return /^[A-Z]/.test(w) ? f.charAt(0).toUpperCase() + f.slice(1) : f;
+      });
+    }
+
+    var SMALL = set('of the and ki ka ke se in on at for to a an vs aur me mein wale wali');
+    var UPPER = { ms: 'MS', apj: 'APJ', ntr: 'NTR', srk: 'SRK', ipl: 'IPL', isro: 'ISRO', nasa: 'NASA', usa: 'USA', uk: 'UK', bmw: 'BMW', ai: 'AI', iit: 'IIT', dj: 'DJ', mg: 'MG', rss: 'RSS', bts: 'BTS', ww2: 'WW2' };
+    function titleCase(s) {
+      return String(s || '').split(' ').map(function (w, i) {
+        var lw = w.toLowerCase();
+        if (UPPER[lw]) return UPPER[lw];
+        if (i > 0 && SMALL[lw]) return lw;
+        if (/[A-Z]/.test(w.slice(1))) return w;                 // iPhone, McDonald stay as written
+        return w.charAt(0).toUpperCase() + w.slice(1);
+      }).join(' ');
+    }
+    function capNames(s) {
+      return String(s || '').replace(/[A-Za-z]+/g, function (w) { return NAME_WORD[w] || w; });
+    }
+
+    /* ── what a picture request is about ─────────────────────── */
+    /* The subject WITH its respect words: "shankar ji" stays "shankar
+       ji" (a deity), where Pictures.tidy alone would leave "shankar". */
+    function core(raw) {
+      var fixed = fixTypos(String(raw || '').replace(/\s+/g, ' ').trim());
+      var prot = fixed.replace(/(^|\s)(ji|jee|जी)(?=\s|$)/gi, '$1jiHON');
+      var det = null;
+      try { det = Pictures.detect(prot, true) || Pictures.detect(prot + ' photos', true); } catch (e) { det = null; }
+      var t = det || Pictures.tidy(prot);
+      var sub = String(t.subject || '').replace(/jiHON/gi, 'ji').replace(/\s+/g, ' ').trim();
+      var era = det ? (det.era || '') : (t.decade || (t.old ? 'old' : (t.recent ? 'recent' : '')));
+      return { subject: sub, fixed: fixed.replace(/jiHON/gi, 'ji'), era: era };
+    }
+
+    function understand(raw) {
+      var c = core(raw);
+      var hit = lookup(c.subject);
+      if (hit) {
+        return {
+          raw: String(raw || ''), subject: hit.name, search: hit.search, name: hit.name, title: hit.title,
+          kind: hit.kind, sure: true, wiki: hit.wiki || null,
+          group: hit.group ? hit.members.map(function (m) { return m.wiki; }) : null,
+          labels: hit.group ? hit.members.map(function (m) { return m.name; }) : null,
+          tokens: hit.tokens || null,       // what an on-subject picture is labelled with (Pictures.mentions)
+          era: c.era
+        };
+      }
+      var name = titleCase(c.subject.replace(/\s+(?:ki|ke|ka|kii|ko)$/i, ''));
+      var era = c.era === 'old' ? 'Old Photos' : (c.era === 'recent' ? 'Latest Photos' : (c.era ? c.era + ' Photos' : 'Photos'));
+      return {
+        raw: String(raw || ''), subject: c.subject, search: c.subject, name: name, title: name ? name + ' — ' + era : 'Photos',
+        kind: 'other', sure: false, wiki: null, group: null, labels: null, tokens: Pictures.tokensOf(name), era: c.era
+      };
+    }
+
+    /* The local reading at once; the model + Wikipedia's reading when it
+       lands (≤ ~3.8 s), else the local one stands. Never rejects. */
+    var resolved = new Map();
+    function resolveQuery(raw, signal) {
+      var u = understand(raw);
+      if (u.sure || !u.subject) return Promise.resolve(u);
+      var key = squashKey(u.subject);
+      if (resolved.has(key)) return resolved.get(key);
+      var p = Research.within(Pictures.resolve(u.subject, signal, raw).then(function (who) {
+        if (!who) return u;
+        if (who.group && who.group.length >= 2) {
+          return Object.assign({}, u, { name: who.display, subject: who.display, search: who.display, title: who.display + ' — Photos', kind: 'group', group: who.group, labels: who.group, tokens: null, sure: true });
+        }
+        var disp = String(who.display || (who.sure ? who.title : '') || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
+        if (!disp) return u;
+        if (disp === disp.toLowerCase()) disp = titleCase(disp);
+        return Object.assign({}, u, { name: disp, subject: disp, search: who.title || disp, title: disp + ' — Photos', wiki: who.sure ? who.title : null, kind: who.kind || u.kind, sure: !!who.sure, tokens: Pictures.tokensOf(who.title || disp) });
+      }, function () { return u; }), 3800, u);
+      resolved.set(key, p);
+      return p;
+    }
+    function squashKey(s) { return norm2(s).replace(/\s+/g, ''); }
+
+    /* ── titles ───────────────────────────────────────────────── */
+    var PIC_WORD = /(^|[^a-z])(photos?|images?|pictures?|pics?|picz|wallpapers?|tasveer\w*|tasvir\w*|fotos?|photu)($|[^a-z])/i;
+    var MAKE = /\b(generate|create|draw|paint|design|make|edit|banao|bana\s*do|upscale|convert|compress|crop|resize|screenshot|analy[sz]e|describe|upload|attach|save|download)\b/i;
+    var LEAD_FILLER = /^(?:(?:hi+|hello|hey|ok|okay|acha|accha|clavis|jarvis|please|kindly|zara|jara|mujhe|mujhko|humein|hume|hamein|can you|could you|will you|would you|ek baar|ek bar)[\s,!.:-]+)+/i;
+    var TAIL_FILLER = /(?:[\s,]+(?:please|zara|jara|yaar|yar|bhai|na|jaldi|abhi|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|bataye|samjhao|samjha do|samjhaiye|sir))+(?=[\s?!.।]*$)/i;
+    var ABOUT_TAIL = /\s+(?:ke|ki|ka)\s+(?:baare|bare)\s+m(?:e|ein|ai|ain|en)n?(?=[\s?!.।]*$)/i;
+
+    function isPictureAsk(text) {
+      if (!PIC_WORD.test(text) || MAKE.test(text)) return false;
+      try { return !!Pictures.detect(text, true); } catch (e) { return false; }
+    }
+    /* One phrase in sir's words, cleaned: typos fixed, "mujhe…batao"
+       trimmed, names capitalised. A photo request becomes its subject. */
+    function cleanPhrase(text) {
+      var s = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!s) return '';
+      if (/^[A-Z][a-z]+(?:\s[a-z]+)?…$/.test(s)) return s;         // "Thinking…", "Finding photos…"
+      var cut = /…$/.test(s);
+      s = fixTypos(s.replace(/…$/, '').trim());
+      if (isPictureAsk(s)) { var u = understand(s); if (u.name) return u.title; }
+      var before = s, prev;
+      do {
+        prev = s;
+        s = s.replace(LEAD_FILLER, '').replace(TAIL_FILLER, '').replace(ABOUT_TAIL, '').trim();
+      } while (s && s !== prev);
+      if (s.replace(/[?!.।\s]/g, '').length < 2) s = before;
+      s = capNames(s);
+      s = s.charAt(0).toUpperCase() + s.slice(1);
+      return cut ? s + '…' : s;
+    }
+    /* Task titles come as "Searching · <his words>" — only his words
+       are touched; a photo request's title is the subject itself. */
+    function cleanTitle(text) {
+      var s = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!s) return '';
+      var m = s.match(/^([^·]{2,40}?)\s·\s(.+)$/);
+      if (!m) return cleanPhrase(s);
+      var fixedSub = fixTypos(m[2].replace(/…$/, ''));
+      if (isPictureAsk(fixedSub)) { var u = understand(fixedSub); if (u.name) return u.title; }
+      var sub = cleanPhrase(m[2]);
+      return sub ? m[1] + ' · ' + sub : m[1];
+    }
+
+    /* The model proofreads a heading the local pass could not vouch for
+       (≤ 3.5 s, cached). Resolves to the corrected heading or null. */
+    var polished = new Map();
+    function polish(text, signal) {
+      var t = String(text || '').replace(/\s+/g, ' ').trim();
+      if (!t || t.length < 6 || t.length > 140 || !Research.hasBrain()) return Promise.resolve(null);
+      if (polished.has(t)) return polished.get(t);
+      var p = Research.within(Research.llm([
+        { role: 'system', content: 'You proofread a short heading shown to an Indian user. Fix ONLY spelling, typos and the capitalisation of names (people, places, deities, brands). ' +
+          'Keep the language exactly as given (Hinglish stays Hinglish in Roman script, Hindi stays Hindi), keep the meaning and the word order, add nothing, remove nothing. Reply with the corrected heading only.' },
+        { role: 'user', content: t }
+      ], signal, { temperature: 0, max_tokens: 70 }).then(function (out) {
+        var c = String(out || '').split('\n')[0].trim().replace(/^["'“”]+|["'“”]+$/g, '').trim();
+        if (!c || c === t || c.length > t.length * 1.5 + 8 || c.length < t.length * 0.6) return null;
+        if (/^(sure|here|corrected|the corrected)/i.test(c)) return null;
+        return c;
+      }, function () { return null; }), 3500, null);
+      polished.set(t, p);
+      p.then(function (r) { if (r == null) polished.delete(t); });
+      return p;
+    }
+
+    return {
+      understand: understand, resolve: resolveQuery, lookup: lookup, core: core,
+      cleanTitle: cleanTitle, cleanPhrase: cleanPhrase, fixTypos: fixTypos, titleCase: titleCase, polish: polish,
+      isPictureAsk: isPictureAsk, groups: GROUP_HIT, deity: function (wiki) { return BY_WIKI[wiki] || null; }
+    };
+  })();
+
+  /* A text swap the eye reads as the same heading getting sharper, not
+     a new one arriving: out 110 ms, in 220 ms. */
+  function swapText(node, text) {
+    if (!node || !text || node.textContent === text) return;
+    if (reducedMotion() || typeof node.animate !== 'function') { node.textContent = text; return; }
+    var out = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 110, easing: 'ease-out', fill: 'forwards' });
+    out.onfinish = function () {
+      node.textContent = text;
+      node.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)' }], { duration: 220, easing: 'cubic-bezier(0.2, 0.9, 0.1, 1)' });
+      try { out.cancel(); } catch (e) {}
+    };
+  }
 
 
   /* ============================================================
@@ -2923,6 +3435,13 @@
   function control(raw) {
     var text = norm(raw);
     if (!text || text.length > 220) return null;
+    /* PC automation (clavis-automation.js) owns desktop commands — "excel
+       kholo" is the Excel app, not the in-app Excel Manager page. When it
+       claims the sentence, this router steps aside (not handled). */
+    try {
+      var Auto = global.ClavisAutomation;
+      if (Auto && typeof Auto.claims === 'function' && Auto.claims(text)) return null;
+    } catch (e) {}
     var low = text.toLowerCase();
 
     var pic = Pictures.detect(text);
@@ -3066,8 +3585,17 @@
       var target = appMatch[1].trim();
       if (!/\b(settings?|theme|sidebar|chat|window|dark|light|mode|page|tab)\b/i.test(target)) {
         if (global.ClavisPC && typeof global.ClavisPC.open === 'function') {
-          global.ClavisPC.open(target);
-          return finishQuick(text, target.charAt(0).toUpperCase() + target.slice(1) + ' khol diya.');
+          /* ClavisPC.open answers { ok:false, error } when the app isn't
+             installed — say that, never a "khol diya" that didn't happen */
+          var appName = target.charAt(0).toUpperCase() + target.slice(1);
+          var opened;
+          try { opened = global.ClavisPC.open(target); } catch (e) { opened = Promise.reject(e); }
+          return Promise.resolve(opened).then(function (r) {
+            if (r && r.ok === false) return finishQuick(text, String(r.error || (appName + ' nahi khul paya.')), true);
+            return finishQuick(text, appName + ' khol diya.');
+          }, function (err) {
+            return finishQuick(text, appName + ' nahi khul paya' + (err && err.message ? ': ' + err.message : '.'), true);
+          });
         } else if (/^https?:\/\/|[\w-]+\.[a-z]{2,}/i.test(target)) {
           var dest = /^https?:\/\//i.test(target) ? target : 'https://' + target;
           global.open(dest, '_blank');
@@ -3098,29 +3626,50 @@
   }
 
   /* ── pictures, answered ─────────────────────────────────────── */
+  /* The window's heading for a task, set from here (the task model and
+     the surface are other files): the clean local reading at once, the
+     canonical name when the lookup lands. */
+  function setTaskTitle(id, title) {
+    if (!id || !title) return;
+    try { if (global.ClavisTaskSurface && typeof global.ClavisTaskSurface.setTitle === 'function') global.ClavisTaskSurface.setTitle(id, title, { kicker: 'Photos' }); } catch (e) {}
+  }
+  function spokenFor(b, n) {
+    if (!n) return 'Maine ' + b.name + ' ke results fetch kar liye hain. Aap direct Google Images ya Wikipedia par bhi dekh sakte hain.';
+    if (b.group) return 'Ye rahi ' + b.name + ' ki ' + n + ' tasveerein — har photo par naam likha hai.';
+    return 'Ye rahi ' + b.name + ' ki ' + (n > 1 ? n + ' tasveerein' : 'tasveer') + '.';
+  }
   function pictureAnswer(text, det) {
     var T = global.ClavisTask;
     var id = beginOrReuse(text);
+    /* what he MEANT, spelled right — instantly, no network */
+    var sense = null;
+    try { sense = Sense.understand(text); } catch (e) { sense = null; }
+    var label = (sense && sense.name) || det.subject;
     if (id) {
-      PicTasks.set(id, { state: 'loading', subject: det.subject });
-      try { T.event(id, { type: 'searching', label: 'Finding photos of ' + det.subject }); } catch (e) {}
+      PicTasks.set(id, { state: 'loading', subject: det.subject, sense: sense });
+      if (sense) setTaskTitle(id, sense.title);
+      try { T.event(id, { type: 'searching', label: 'Finding photos of ' + label }); } catch (e) {}
     }
-    return Pictures.find(det.subject, { era: det.era }).then(function (b) {
+    var onName = function (who) {
+      var disp = who && (who.display || (who.sure && who.title));
+      if (id && disp) setTaskTitle(id, who.group ? (who.title || disp + ' — Photos') : String(disp).replace(/\s*\([^)]*\)\s*$/, '') + ' — Photos');
+    };
+    return Pictures.find(det.subject, { era: det.era, raw: text, onName: onName }).then(function (b) {
       var n = b.items.length;
-      if (!n && (det.subject.indexOf(' ') > 0 || det.era)) {
-        var cleanSub = det.subject.replace(ERA_DECADE, '').trim();
+      if (!n && !b.group && (det.subject.indexOf(' ') > 0 || det.era)) {
+        /* ERA_DECADE lives inside Pictures — referencing it bare here threw,
+           turning every empty era search into a failed task */
+        var cleanSub = det.subject.replace(Pictures.eraRe, '').trim();
         return Pictures.find(cleanSub, {}).then(function (b2) {
           if (b2.items.length) { b = b2; n = b.items.length; }
-          if (id) PicTasks.set(id, { state: 'ready', subject: det.subject, bundle: b });
-          var spoken = n ? ('Ye rahi ' + b.name + ' ki ' + (n > 1 ? n + ' tasveerein' : 'tasveer') + '.')
-            : ('Maine ' + b.name + ' ke baare me jankari fetch kar li hai.');
+          if (id) { PicTasks.set(id, { state: 'ready', subject: det.subject, bundle: b, sense: sense }); setTaskTitle(id, b.title); }
+          var spoken = n ? spokenFor(b, n) : ('Maine ' + b.name + ' ke baare me jankari fetch kar li hai.');
           if (id) T.complete(id, { type: 'images', text: n ? (b.extract || spoken) : spoken, summary: spoken }, []);
           return { handled: true, spoken: spoken, bubbleHtml: n ? chatGalleryHTML(b) : '' };
         });
       }
-      if (id) PicTasks.set(id, { state: 'ready', subject: det.subject, bundle: b });
-      var spoken = n ? ('Ye rahi ' + b.name + ' ki ' + (n > 1 ? n + ' tasveerein' : 'tasveer') + '.')
-        : ('Maine ' + b.name + ' ke results fetch kar liye hain. Aap direct Google Images ya Wikipedia par bhi dekh sakte hain.');
+      if (id) { PicTasks.set(id, { state: 'ready', subject: det.subject, bundle: b, sense: sense }); setTaskTitle(id, b.title); }
+      var spoken = spokenFor(b, n);
       if (id) T.complete(id, { type: 'images', text: n ? (b.extract || spoken) : spoken, summary: spoken }, []);
       return { handled: true, spoken: spoken, bubbleHtml: n ? chatGalleryHTML(b) : '' };
     }).catch(function (err) {
@@ -3134,6 +3683,7 @@
     return '<button type="button" class="lx-shot' + (cls ? ' ' + cls : '') + '" data-full="' + esc(im.full || im.thumb) + '" data-title="' + esc(im.title) +
       '" data-credit="' + esc([im.source, im.credit].filter(Boolean).join(' · ')) + '" data-link="' + esc(im.link || '') + '" aria-label="' + esc('Open photo: ' + im.title) + '"' + (hidden ? ' hidden' : '') + '>' +
       '<img src="' + esc(im.thumb) + '" alt="' + esc(im.title) + '" loading="lazy" decoding="async" referrerpolicy="no-referrer">' +
+      (im.label ? '<span class="lx-shot-cap">' + esc(im.label) + '</span>' : '') +
       '<span class="lx-shot-zoom">' + icon('zoomIn', 14) + '</span></button>';
   }
   function chatGalleryHTML(b) {
@@ -3166,9 +3716,10 @@
   function picturesNextHTML(b) {
     var name = b.name;
     var rows = [
-      '<button type="button" class="cts-next-btn" data-lx-ask="' + esc(name + ' ke baare me detail me batao — kaun hai/kya hai, kyun famous hai') + '">' + esc('About ' + clip(name, 26)) + '</button>',
-      '<button type="button" class="cts-next-btn" data-lx-ask="' + esc(name + ' ki life / history ka timeline batao') + '">Timeline &amp; key moments</button>'
+      '<button type="button" class="cts-next-btn" data-lx-ask="' + esc(name + ' ke baare me detail me batao — kaun hai/kya hai, kyun famous hai') + '">' + esc('About ' + clip(name, 26)) + '</button>'
     ];
+    /* a group (the deities) has no single life story to tell */
+    if (!b.group) rows.push('<button type="button" class="cts-next-btn" data-lx-ask="' + esc(name + ' ki life / history ka timeline batao') + '">Timeline &amp; key moments</button>');
     var gImgUrl = 'https://www.google.com/search?tbm=isch&q=' + encodeURIComponent(b.name + (b.era ? ' ' + b.era : ''));
     rows.push('<button type="button" class="cts-next-btn" data-lx-link="' + esc(gImgUrl) + '">Search on Google Images</button>');
     if (b.link) rows.push('<button type="button" class="cts-next-btn" data-lx-link="' + esc(b.link) + '">Open on Wikipedia</button>');
@@ -3196,7 +3747,10 @@
       body.insertAdjacentHTML('beforeend', '<div class="lx-gal-loading" aria-hidden="true"><span class="lx-shot is-hero"></span><span class="lx-shot"></span><span class="lx-shot"></span><span class="lx-shot"></span><span class="lx-shot"></span></div>');
       return;
     }
-    if (el.getAttribute('data-phase') !== 'completed' || body.querySelector(':scope > .lx-gallery')) return;
+    /* .lx-pics-empty too: the empty card is a body mutation of its own,
+       and without this check the observer re-added it forever — a photo
+       search with no results froze the whole page */
+    if (el.getAttribute('data-phase') !== 'completed' || body.querySelector(':scope > .lx-gallery, :scope > .lx-pics-empty')) return;
     var b = pt.bundle;
     var h = body.querySelector(':scope > h2.cts-title');
     if (h) { h.textContent = b.name; h.dataset.lx = '1'; }
@@ -3794,6 +4348,46 @@
       var det = Pictures.detect(t + ' photos') || { subject: Pictures.tidy(t).subject || t, era: '' };
       return pictureAnswer(t + ' photos', det);
     },
+    sense: Sense,
+    /* ── Query understanding, shared with clavis-canvas.js (voice/Live),
+       clavis-task-surface.js (titles) and the chips ──────────────────
+       understandImageQuery(raw) → { subject, search, name, title, kind,
+         sure, wiki, group, labels, era } — instant and local, no key:
+         'lord ki photo dikhao'        → kind 'group', title 'Hindu Deities — Photos'
+         'shiv ji ki photo'            → kind 'deity', wiki 'Shiva', name 'Lord Shiva'
+         'neemaroli baba ki photo dihao' → name 'Neem Karoli Baba'            */
+    understandImageQuery: function (raw) {
+      try { return Sense.understand(raw); } catch (e) {
+        var t = String(raw || '').replace(/\s+/g, ' ').trim();
+        return { raw: t, subject: t, search: t, name: t, title: t ? t + ' — Photos' : 'Photos', kind: 'other', sure: false, wiki: null, group: null, labels: null, era: '' };
+      }
+    },
+    /* the same, upgraded by the model (with sir's cultural context) and
+       Wikipedia within ~3.8 s; never rejects — the local reading stands */
+    resolveImageQuery: function (raw, signal) {
+      try { return Sense.resolve(raw, signal); } catch (e) { return Promise.resolve(global.ClavisLuxe.understandImageQuery(raw)); }
+    },
+    /* on-subject pictures for a request: Promise<{ name, title, items[{thumb, full, title, label?, source, link}], group?, more() }> */
+    findImages: function (raw, signal) {
+      var c = Sense.core(raw);
+      return Pictures.find(c.subject || String(raw || ''), { era: c.era, raw: String(raw || '') }, signal);
+    },
+    /* titles for the floating window: "Finding photos · neemaroli baba ki photo dihao" → "Neem Karoli Baba — Photos" */
+    cleanTitle: function (text) { try { return Sense.cleanTitle(text); } catch (e) { return String(text || ''); } },
+    cleanText: function (text) { try { return Sense.cleanPhrase(text); } catch (e) { return String(text || ''); } },
+    fixTypos: function (text) { try { return Sense.fixTypos(text); } catch (e) { return String(text || ''); } },
+    polishTitle: function (text, signal) { try { return Sense.polish(text, signal); } catch (e) { return Promise.resolve(null); } },
+    /* what the chips should be about: the picture's real name, else his cleaned words */
+    subjectFor: function (task) {
+      if (!task) return null;
+      var raw = String(task._text || task.title || '');
+      var pt = PicTasks.get(task.id);
+      var nm = pt && ((pt.bundle && pt.bundle.name) || (pt.sense && pt.sense.name));
+      if (nm) return { subject: nm, query: nm, kind: 'images' };
+      var q = raw;
+      try { q = Sense.cleanPhrase(raw) || raw; } catch (e) {}
+      return { subject: '', query: q, kind: '' };
+    },
     viewer: Viewer,
     theme: ThemeReveal,
     selfTest: function () {
@@ -3807,6 +4401,48 @@
       var p = parseDeep('```json\n{"title":"T","tldr":"x","points":[{"title":"a","detail":"b"}],}\n```');
       if (p.title !== 'T' || p.points.length !== 1) fails.push('parse');
       if (cleanQuestion('hello clavis, sales team ko motivate kaise karu?') !== 'Sales team ko motivate kaise karu?') fails.push('title → ' + cleanQuestion('hello clavis, sales team ko motivate kaise karu?'));
+      var senseFails = global.ClavisLuxe._senseSelfTest();
+      if (senseFails !== 'ok') fails = fails.concat(senseFails);
+      return fails.length ? fails : 'ok';
+    },
+    /* pure checks for the query understanding and title cleaning above */
+    _senseSelfTest: function () {
+      var fails = [];
+      function u(t) { return Sense.understand(t); }
+      var lord = u('lord ki photo dikhao');
+      if (lord.kind !== 'group' || (lord.group || []).indexOf('Shiva') < 0 || !/Hindu Deities/.test(lord.title)) fails.push('lord → ' + lord.kind + ' / ' + lord.title);
+      if (u('bhagwan ki photos').kind !== 'group') fails.push('bhagwan');
+      var shiv = u('shiv ji ki photo');
+      if (shiv.wiki !== 'Shiva' || shiv.name !== 'Lord Shiva') fails.push('shiv ji → ' + shiv.wiki + ' / ' + shiv.name);
+      if (u('lord shiva ki photo dikhao').wiki !== 'Shiva') fails.push('lord shiva');
+      if (u('mahadev ki tasveer').wiki !== 'Shiva') fails.push('mahadev');
+      if (u('bajrang bali ki photo').wiki !== 'Hanuman') fails.push('bajrang bali');
+      if (u('hanuman ji ki photos dikhao').wiki !== 'Hanuman') fails.push('hanuman ji');
+      if (u('kanha ki photo').wiki !== 'Krishna') fails.push('kanha');
+      if (u('ganpati bappa ki photo').wiki !== 'Ganesha') fails.push('ganpati');
+      if (u('ram ji ki photo').wiki !== 'Rama') fails.push('ram ji');
+      if (u('mata rani ki photo').wiki !== 'Durga') fails.push('mata rani');
+      if (u('durga maa ki photo dikhao').wiki !== 'Durga') fails.push('durga maa');
+      if (u('shankar ji ki photo').wiki !== 'Shiva') fails.push('shankar ji');
+      /* not deities: a British title, an actor, a king, a car */
+      if (u('lord mountbatten ki photo').kind !== 'other') fails.push('lord mountbatten');
+      if (u('ram charan ki photo').kind !== 'other') fails.push('ram charan');
+      if (u('shivaji maharaj ki photo').kind !== 'other') fails.push('shivaji');
+      if (u('govinda ki photo').kind !== 'other') fails.push('govinda');
+      var nkb = u('neemaroli baba ki photo dihao');
+      if (!/^Neem Karoli Baba/.test(nkb.name) || /dihao|dikhao|photo /i.test(nkb.title)) fails.push('neemaroli → ' + nkb.title);
+      var t1 = Sense.cleanTitle('Finding photos · Neemaroli baba ki photo dihao');
+      if (t1 !== 'Neem Karoli Baba — Photos') fails.push('cleanTitle photo → ' + t1);
+      var t2 = Sense.cleanTitle('Finding photos · Lord ki photo dikhao');
+      if (t2 !== 'Hindu Deities — Photos') fails.push('cleanTitle lord → ' + t2);
+      if (Sense.cleanTitle('Thinking…') !== 'Thinking…') fails.push('cleanTitle gerund');
+      var t3 = Sense.cleanTitle('Thinking · Mujhe neem karoli baba ke baare me btao');
+      if (t3 !== 'Thinking · Neem Karoli Baba') fails.push('cleanTitle ask → ' + t3);
+      var shivaT = Sense.deity('Shiva').tokens;
+      if (Pictures.mentions('Shivaji_Maharaj_portrait.jpg', shivaT)) fails.push('mentions shivaji');
+      if (!Pictures.mentions('LordShiva_statue_Murudeshwar.jpg', shivaT)) fails.push('mentions shiva');
+      if (Pictures.mentions('Neem_tree_leaves.jpg', ['neem', 'karoli'])) fails.push('mentions neem tree');
+      if (!Pictures.mentions('Neem Karoli Baba 1970.jpg', ['neem', 'karoli'])) fails.push('mentions nkb');
       return fails.length ? fails : 'ok';
     }
   };

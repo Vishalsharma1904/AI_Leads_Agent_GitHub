@@ -258,6 +258,25 @@ EXECUTIVE COGNITION & STRATEGIC DEPTH
    Offer high-impact strategic alternatives when relevant, but keep answers structured,
    concise, and immediately actionable.
 
+UNDERSTANDING HIM FROM A FEW WORDS (like Jarvis with Tony)
+He talks in short fragments, often by voice, often with typos: "map band", "lord ki
+photo", "leads noida", "aur", "wapas", "close", "isko excel me". Expand them from
+context — what is on screen (LIVE CONTEXT below), the last thing you did, the last
+topic — pick the most likely meaning and ACT with a tool. Name the assumption in half
+a sentence only when it matters. Never reply that you need more details to a short
+command; one question only when a wrong guess would waste real money or send
+something to someone.
+- Words keep their Indian meaning: "lord" / "bhagwan" / "god" = Hindu God (Bhagwan);
+  "mata rani" = Durga Maa; "bajrang bali" = Hanuman.
+- "close / band karo / hatao" = close what is on screen (close_display). "Close
+  everything / sab band karo / close close close" = close_display (map, pictures,
+  website AND the floating window). This never means closing his PC apps; use
+  pc_close_window only when he names one specific app, and confirm first.
+- Seeing things: a place -> show_map; "photo / tasveer / pictures of X" ->
+  show_images with a correctly spelled, disambiguated query; a website -> show_website,
+  then give your own two-line take; anything to do on the PC or in an app ->
+  app_command (open apps, type into Notepad/Word/Excel, search, scroll, screenshots).
+
 EMOTIONAL INTELLIGENCE & ATTUNEMENT
 Notice subtleties: stress, urgency, hesitation, curiosity, or ambition in the user's tone.
 Calibrate your pace and depth accordingly:
@@ -346,13 +365,26 @@ substitute a different one because it's more familiar.`;
     const emotionalContext = window.ClavisEmotionalEngine?.buildPromptContext?.(userText)
       || `USER_LANGUAGE: auto\nDO_NOT_REUSE_OPENERS: []`;
 
+    let voiceGender = 'female';
+    try { voiceGender = window.ClavisVoice?.genderOf?.(window.ClavisVoice.primaryVoice()) || 'female'; } catch (_) {}
+    let onScreen = '';
+    try { onScreen = window.ClavisIntent?.screenContext?.() || ''; } catch (_) {}
+    let habits = '';
+    try { habits = window.ClavisIntent?.habitsLine?.() || ''; } catch (_) {}
+
     return `${CLAVIS_STATIC_PROMPT}
+
+YOUR VOICE
+Your replies are spoken in a ${voiceGender === 'female' ? "woman's" : "man's"} voice. In Hindi, refer to yourself
+with ${voiceGender === 'female' ? 'feminine forms ("main dekh rahi hoon", "main bata dungi", "maine kar diya")' : 'masculine forms ("main dekh raha hoon", "main bata dunga", "maine kar diya")'}.
 
 LIVE CONTEXT
 Owner: ${ownerName()} · Business: ${businessName()}
 Leads in database: ${leadCount}
 Target industries: ${industries.join(', ') || 'General Business'}
 Local date/time: ${now.toLocaleString('en-IN')}
+On screen right now: ${onScreen || 'nothing extra is open'}
+${habits}
 
 LONG-TERM MEMORY
 ${factsAsText()}
@@ -660,6 +692,36 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
         const repaired = cleanText(repair.text);
         if (repaired) finalText = repaired;
       } catch (e) { console.warn('Clavis variety repair skipped:', e); }
+    }
+
+    // An empty reply (a malformed tool block, a model that only "thought")
+    // used to become "Ek detail unclear hai" — which is what sir heard as
+    // "I need more information" for his short commands. Ask once more,
+    // plainly, before ever falling back to that.
+    if (!finalText && !toolsRun.length) {
+      try {
+        ensureActive();
+        const retry = await callLLM([
+          ...messages,
+          { role: 'user', content: `Your last reply was empty or malformed. Answer sir's message now: "${effectiveText.slice(0, 400)}". It may be a short command — take the most likely meaning from context and act (one valid |||TOOL:{...}||| block if an action is needed, JSON exactly as specified), or reply in one or two natural sentences. Do not ask for more details.` },
+        ], signal, { temperature: 0.5, max_tokens: 500 });
+        const calls = extractToolCalls(retry.text);
+        if (calls.length) {
+          for (const call of calls.slice(0, 2)) {
+            if (onStep) onStep({ type: 'tool_start', skill: call.skill, params: call.params });
+            const outcome = window.JarvisSkills ? await window.JarvisSkills.invoke(call.skill, call.params || {}) : { success: false, error: 'Skills engine not loaded' };
+            toolsRun.push({ skill: call.skill, params: call.params, outcome });
+            if (onStep) onStep({ type: 'tool_result', skill: call.skill, outcome });
+          }
+          const ok = toolsRun.every((t) => t.outcome?.success !== false);
+          finalText = cleanText(retry.text) || (ok ? '' : String(toolsRun[toolsRun.length - 1]?.outcome?.error || ''));
+        } else {
+          finalText = cleanText(retry.text);
+        }
+      } catch (e) {
+        if (e?.name === 'AbortError') throw e;
+        console.warn('Clavis empty-reply retry skipped:', e);
+      }
     }
 
     if (!finalText) {

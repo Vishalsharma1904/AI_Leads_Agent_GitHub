@@ -1003,10 +1003,98 @@
     });
   }
 
+  /* ── Title hygiene ──────────────────────────────────────────
+     Task titles are built from what sir typed or said — voice-typed
+     Hinglish, typos and all ("Finding photos · neemaroli baba ki photo
+     dihao"). The task model is another file, so the clean-up happens
+     here, at render time: ClavisLuxe.cleanTitle when it is loaded (typo
+     dictionary, "mujhe…batao" trimmed, names capitalised, a photo
+     request titled by its subject), a whitespace/case pass when not.
+     A resolver that learns the real name later — the photo search's
+     "Neem Karoli Baba" — swaps it in with setTitle(id, title): the
+     heading sharpens in place, the body is not repainted. */
+  var titleOverrides = {};
+  var cleanCache = {}, cleanCacheSize = 0;
+  var paintedId = null;
+  function basicClean(t) {
+    var s = String(t || '').replace(/\s+/g, ' ').trim();
+    return s ? s.charAt(0).toUpperCase() + s.slice(1) : s;
+  }
+  function cleanTitleText(t) {
+    var s = String(t == null ? '' : t);
+    if (!s) return s;
+    if (Object.prototype.hasOwnProperty.call(cleanCache, s)) return cleanCache[s];
+    var out = s;
+    try {
+      var L = global.ClavisLuxe;
+      out = (L && typeof L.cleanTitle === 'function') ? (L.cleanTitle(s) || basicClean(s)) : basicClean(s);
+    } catch (e) { out = basicClean(s) || s; }
+    if (++cleanCacheSize > 300) { cleanCache = {}; cleanCacheSize = 0; }
+    cleanCache[s] = out;
+    return out;
+  }
+  function displayTitle(task) {
+    if (task && titleOverrides[task.id]) return titleOverrides[task.id].title;
+    return cleanTitleText((task && task.title) || 'Working');
+  }
+  function kickerFor(task) {
+    var ov = task && titleOverrides[task.id];
+    return ov && ov.kicker ? '<p class="cts-kicker">' + esc(ov.kicker) + '</p>' : '';
+  }
+  function unesc(s) {
+    return String(s).replace(/&(amp|lt|gt|quot|#39);/g, function (m, k) {
+      return { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }[k];
+    });
+  }
+  /* Bodies registered by other files (clavis-aurora.js's lead/contacts/
+     data bodies) print task.title — or its "· <his words>" half — as is.
+     The heading of whatever renderer ran is cleaned here, after the
+     fact; a heading that is not his words is left alone. */
+  function cleanHeading(html, task) {
+    if (!html || !task || !task.title) return html;
+    return html.replace(/<h2 class="cts-title">([^<]*)<\/h2>/, function (m, inner) {
+      var text = unesc(inner).trim();
+      var raw = String(task.title).replace(/\s+/g, ' ').trim();
+      var cut = raw.indexOf(' · ');
+      var sub = cut > -1 ? raw.slice(cut + 3).replace(/[…\s]+$/, '').trim() : null;
+      var out = null;
+      if (text === raw) out = displayTitle(task);
+      else if (sub && text === sub) {
+        var ov = titleOverrides[task.id];
+        var c = ov ? ov.title : cleanTitleText(raw);
+        var k = c.indexOf(' · ');
+        out = k > -1 ? c.slice(k + 3) : c;
+      }
+      return out && out !== text ? '<h2 class="cts-title">' + esc(out) + '</h2>' : m;
+    });
+  }
+  /* The live line can carry his words too ("Searching dehli hotels"). */
+  function cleanLine(text) {
+    try {
+      var L = global.ClavisLuxe;
+      return (L && typeof L.fixTypos === 'function') ? L.fixTypos(text) : text;
+    } catch (e) { return text; }
+  }
+  function swapTitle(node, text) {
+    if (!node || node.textContent === text) return;
+    var reduced = false;
+    try { reduced = global.matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) {}
+    if (reduced || typeof node.animate !== 'function') { node.textContent = text; return; }
+    var out = node.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 110, easing: 'ease-out', fill: 'forwards' });
+    out.onfinish = function () {
+      node.textContent = text;
+      node.animate([{ opacity: 0, filter: 'blur(3px)' }, { opacity: 1, filter: 'blur(0px)' }], { duration: 220, easing: 'cubic-bezier(0.2, 0.9, 0.1, 1)' });
+      try { out.cancel(); } catch (e) {}
+    };
+  }
+
   /* shared pieces ------------------------------------------------ */
+  /* overrideTitle is a renderer's own fixed wording ("Clavis", an
+     approval's title) and is shown as given; the task's title — his
+     words — goes through the clean-up above. */
   function titleBlock(task, overrideTitle) {
-    var t = overrideTitle || task.title || 'Working';
-    return '<h2 class="cts-title">' + esc(t) + '</h2>';
+    var t = overrideTitle ? overrideTitle : displayTitle(task);
+    return (overrideTitle ? '' : kickerFor(task)) + '<h2 class="cts-title">' + esc(t) + '</h2>';
   }
   /* The live line is the single most recent activity — a scrolling
      log of internal steps is exactly the dashboard feeling we are
@@ -1015,7 +1103,7 @@
     var last = task.events.length ? task.events[task.events.length - 1] : null;
     var text = (last && last.label) || task.subtitle || fallback || '';
     if (!text) return '';
-    return '<p class="cts-live"><span class="cts-live-text">' + esc(text) + '</span></p>';
+    return '<p class="cts-live"><span class="cts-live-text">' + esc(cleanLine(text)) + '</span></p>';
   }
   function meter(task) {
     if (task.phase === 'completed' || task.phase === 'failed') return '';
@@ -1034,7 +1122,7 @@
   }
 
   register('thinking', function (task) {
-    return titleBlock(task, task.confidence < 0.4 ? 'Clavis' : task.title) +
+    return titleBlock(task, task.confidence < 0.4 && !titleOverrides[task.id] ? 'Clavis' : null) +
            liveLine(task, 'Thinking…') + meter(task);
   });
 
@@ -1373,7 +1461,11 @@
     // otherwise show up as a second, redundant table right below it.
     var textHtml = richText(r.text || r.summary || '', { suppressTables: hasRows });
 
-    return '<h2 class="cts-title">' + esc(completionHeadline(task)) + '</h2>' +
+    // A heading a resolver set (a photo search's real name) outlives the
+    // run; everything else gets the generic headline that clavis-luxe.js
+    // turns into his cleaned question.
+    var ov = titleOverrides[task.id];
+    return (ov ? kickerFor(task) : '') + '<h2 class="cts-title">' + esc(ov ? ov.title : completionHeadline(task)) + '</h2>' +
            previewHtml +
            textHtml +
            stats([
@@ -1654,7 +1746,7 @@
     var wantsShow = userPinned || shouldSurfaceShow(task);
     var density = densityFor(task);
     var width = DENSITY[density];
-    var html = (rendererFor(task) || registry.thinking)(task);
+    var html = cleanHeading((rendererFor(task) || registry.thinking)(task), task);
     var acts = actionsFor(task);
     var signature = task.id + '|' + task.phase + '|' + task.mode + '|' + density + '|' + html + '|' + acts.map(function (a) { return a.id; }).join(',');
     // Never closes itself: a turn that has nothing to show leaves whatever
@@ -1666,6 +1758,7 @@
     }
     if (!wantsShow) return;
     lastSignature = signature;
+    paintedId = task.id;
 
     el.dataset.phase = task.phase;
     el.dataset.mode = task.mode;
@@ -1822,9 +1915,51 @@
     schedule(task);
   });
 
+  function signatureOf(task) {
+    var density = densityFor(task);
+    var html = cleanHeading((rendererFor(task) || registry.thinking)(task), task);
+    var acts = actionsFor(task);
+    return task.id + '|' + task.phase + '|' + task.mode + '|' + density + '|' + html + '|' + acts.map(function (a) { return a.id; }).join(',');
+  }
+
+  /* setTitle(id, title, { kicker }): a cleaner/canonical heading for one
+     task (and optionally the small label above it, e.g. "Photos"). If
+     that task is on screen and nothing else changed, only the heading
+     text crossfades — no repaint, no re-entrance, no flicker. */
+  function setTitle(id, title, opts) {
+    var clean = String(title == null ? '' : title).replace(/\s+/g, ' ').trim();
+    var kicker = opts && opts.kicker ? String(opts.kicker) : ((titleOverrides[id] && titleOverrides[id].kicker) || '');
+    var prev = titleOverrides[id];
+    if (!id || !clean || (prev && prev.title === clean && prev.kicker === kicker)) return false;
+    var task = null;
+    try { task = Task.Store && Task.Store.get ? Task.Store.get(id) : null; } catch (e) { task = null; }
+    var before = null;
+    try { before = task ? signatureOf(task) : null; } catch (e) { before = null; }
+    titleOverrides[id] = { title: clean, kicker: kicker };
+    var keys = Object.keys(titleOverrides);
+    if (keys.length > 60) delete titleOverrides[keys[0]];
+    if (!task || !el) return true;
+    if (before && before === lastSignature && paintedId === id && el.classList.contains('is-open')) {
+      var h = bodyEl && bodyEl.querySelector(':scope > h2.cts-title');
+      var kick = bodyEl && bodyEl.querySelector(':scope > .cts-kicker');
+      // clavis-luxe.js owns a finished answer's heading (data-lx) — leave it
+      if (h && !h.dataset.lx) swapTitle(h, clean);
+      if (kicker && kick && kick.textContent !== kicker && !(h && h.dataset.lx)) swapTitle(kick, kicker);
+      try { lastSignature = signatureOf(task); } catch (e) {}
+    } else {
+      var cur = null;
+      try { cur = Task.current(); } catch (e) {}
+      if (cur && cur.id === id) schedule(cur);
+    }
+    return true;
+  }
+
   global.ClavisTaskSurface = {
     register: register,
     registry: registry,
+    setTitle: setTitle,
+    titleFor: function (task) { return task ? displayTitle(task) : ''; },
+    cleanTitle: cleanTitleText,
     // show({ user: true }) = sir asked for the window (pins it open for
     // voice tasks too); plain show() = the app revealing a result.
     show: function (opts) {
