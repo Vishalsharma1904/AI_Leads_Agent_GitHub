@@ -2697,7 +2697,8 @@
         });
       }
       cache.set(key, p);
-      p.catch(function () { cache.delete(key); });
+      /* an empty result (offline, a blip) is not remembered — asking again retries */
+      p.then(function (b) { if (!b || !b.items || !b.items.length) cache.delete(key); }, function () { cache.delete(key); });
       return p;
     }
 
@@ -3090,6 +3091,7 @@
         }
         var disp = String(who.display || (who.sure ? who.title : '') || '').replace(/\s*\([^)]*\)\s*$/, '').trim();
         if (!disp) return u;
+        if (disp === disp.toLowerCase()) disp = titleCase(disp);
         return Object.assign({}, u, { name: disp, subject: disp, search: who.title || disp, title: disp + ' — Photos', wiki: who.sure ? who.title : null, kind: who.kind || u.kind, sure: !!who.sure, tokens: Pictures.tokensOf(who.title || disp) });
       }, function () { return u; }), 3800, u);
       resolved.set(key, p);
@@ -3433,6 +3435,13 @@
   function control(raw) {
     var text = norm(raw);
     if (!text || text.length > 220) return null;
+    /* PC automation (clavis-automation.js) owns desktop commands — "excel
+       kholo" is the Excel app, not the in-app Excel Manager page. When it
+       claims the sentence, this router steps aside (not handled). */
+    try {
+      var Auto = global.ClavisAutomation;
+      if (Auto && typeof Auto.claims === 'function' && Auto.claims(text)) return null;
+    } catch (e) {}
     var low = text.toLowerCase();
 
     var pic = Pictures.detect(text);
@@ -3576,8 +3585,17 @@
       var target = appMatch[1].trim();
       if (!/\b(settings?|theme|sidebar|chat|window|dark|light|mode|page|tab)\b/i.test(target)) {
         if (global.ClavisPC && typeof global.ClavisPC.open === 'function') {
-          global.ClavisPC.open(target);
-          return finishQuick(text, target.charAt(0).toUpperCase() + target.slice(1) + ' khol diya.');
+          /* ClavisPC.open answers { ok:false, error } when the app isn't
+             installed — say that, never a "khol diya" that didn't happen */
+          var appName = target.charAt(0).toUpperCase() + target.slice(1);
+          var opened;
+          try { opened = global.ClavisPC.open(target); } catch (e) { opened = Promise.reject(e); }
+          return Promise.resolve(opened).then(function (r) {
+            if (r && r.ok === false) return finishQuick(text, String(r.error || (appName + ' nahi khul paya.')), true);
+            return finishQuick(text, appName + ' khol diya.');
+          }, function (err) {
+            return finishQuick(text, appName + ' nahi khul paya' + (err && err.message ? ': ' + err.message : '.'), true);
+          });
         } else if (/^https?:\/\/|[\w-]+\.[a-z]{2,}/i.test(target)) {
           var dest = /^https?:\/\//i.test(target) ? target : 'https://' + target;
           global.open(dest, '_blank');
@@ -3729,7 +3747,10 @@
       body.insertAdjacentHTML('beforeend', '<div class="lx-gal-loading" aria-hidden="true"><span class="lx-shot is-hero"></span><span class="lx-shot"></span><span class="lx-shot"></span><span class="lx-shot"></span><span class="lx-shot"></span></div>');
       return;
     }
-    if (el.getAttribute('data-phase') !== 'completed' || body.querySelector(':scope > .lx-gallery')) return;
+    /* .lx-pics-empty too: the empty card is a body mutation of its own,
+       and without this check the observer re-added it forever — a photo
+       search with no results froze the whole page */
+    if (el.getAttribute('data-phase') !== 'completed' || body.querySelector(':scope > .lx-gallery, :scope > .lx-pics-empty')) return;
     var b = pt.bundle;
     var h = body.querySelector(':scope > h2.cts-title');
     if (h) { h.textContent = b.name; h.dataset.lx = '1'; }
