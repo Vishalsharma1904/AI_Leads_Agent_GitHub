@@ -70,6 +70,9 @@ All API keys and settings are in `config.js` via `window.SKYLARK_CONFIG`:
 - Spoken words are NEVER typed into the composer — they preview in the live caption (`ClavisEar.caption`).
 - Every recognizer transcript goes through `ClavisEar.judge()` (via `commitJarvisVoiceInput`) so Clavis never answers its own voice.
 - "Close / close everything" clears Clavis's own screen (display + floating window) — never the user's PC apps.
+- Clavis Live is patient (END_SENSITIVITY_LOW, `clavis_live_patience_ms`, default 1100 ms) and keeps the mic open: after ~2.5 s of silence it sends `audioStreamEnd` and holds ~0.4 s of audio until the next voice, so sessions stay open ~10 min cheaply.
+- Sleep: "thodi der chup ho jao" → `go_to_sleep` / `ClavisIntent.sleep()`; `clavis_slept_at` makes the next wake (name / snap / clap) a one-time sleepy "meri aankh lag gayi thi" greeting.
+- Risky actions (delete, send, overwrite, bulk, closing PC apps, spending) are confirmed once in his language; harmless ones (show, open, search, on/off switches) just happen.
 
 ## Important Notes
 - Primary language in codebase is **Hinglish** (Hindi + English mix)

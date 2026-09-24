@@ -114,6 +114,98 @@
     return null;
   }
 
+  /* ── sleep / wake ("thodi der chup ho jao") ────────────────── */
+  const SLEEP = /\b(so\s*jao|sojao|so\s*ja|go to sleep|sleep mode|chup\s*(ho\s*ja\w*|hoja\w*|raho|rho|kar\s*ja\w*)|thodi\s*der\s*(chup|shant|aaram|so)|aaram\s*kar\w*|rest\s*kar\w*|shant\s*(ho\s*ja\w*|raho)|abhi\s*mat\s*bolo|shut\s*up|be quiet|take a (nap|rest))\b|सो जाओ|चुप हो|चुप रहो|आराम करो/;
+  const SLEPT = 'clavis_slept_at';
+  const SLEEP_LINES = [
+    'Theek hai sir, main thoda aaram kar leti hoon. Naam lijiyega to haazir.',
+    'Ji sir, chup ho gayi. Chutki bajaiye ya "Clavis" boliye, main aa jaungi.',
+    'Okay sir, ek chhoti si jhapki. Zarurat ho to bas awaaz dijiye.',
+    'Samajh gayi — ab main chup. Taali bajaiye, turant jaag jaungi.',
+    'Theek hai. Main yahin hoon, bas shaant. Naam lenge to sun lungi.',
+  ];
+  const WAKE_LINES = [
+    'Hmm… aah… good morning sir! Meri aankh lag gayi thi — boliye, kya karna hai?',
+    'Uff, maaf kijiye sir, thodi jhapki aa gayi thi. Haan, boliye.',
+    'Aah… main jaag gayi, sir. Kahaan the hum?',
+    'Mmm… haan sir, haazir hoon. Bas zara si aankh lag gayi thi — boliye.',
+    'Good morning sir… ya shayad good evening? Aankh lag gayi thi. Bataiye, kya karun?',
+    'Hmm? Haan sir! Main yahin hoon — bataiye.',
+  ];
+  function sleep(reason = 'asked') {
+    try { localStorage.setItem(SLEPT, JSON.stringify({ at: Date.now(), reason })); } catch (_) {}
+    try { window.ClavisProactive?.snooze?.(30); } catch (_) {}
+    try { window.ClavisEar?.caption?.clear?.(400); } catch (_) {}
+    // Live says its own sleepy line and closes itself after it.
+    if (window.ClavisLive?.isActive?.()) { window.ClavisLive.sleep?.({ reason }); return { handled: true, spoken: '', text: 'Going to sleep.' }; }
+    try { window.clavisGoToSleep?.(); } catch (_) {}
+    return { handled: true, spoken: pick(SLEEP_LINES, 'sleep'), style: 'sleepy' };
+  }
+  // One-shot: the yawning line after a nap he asked for (legacy voice path;
+  // Clavis Live reads the same marker and yawns in its own words).
+  function wakeLine() {
+    let st = null;
+    try { st = JSON.parse(localStorage.getItem(SLEPT) || 'null'); localStorage.removeItem(SLEPT); } catch (_) {}
+    if (!st || !st.at || Date.now() - st.at > 12 * 3600e3) return '';
+    if (st.reason === 'busy') return pick(['Ji sir, main wapas aa gayi. Boliye.', 'Haan sir, main yahin hoon — boliye.'], 'wake-busy');
+    return pick(WAKE_LINES, 'wake');
+  }
+
+  /* ── "clap wala band karo", "caption on", "tips off" ──────── */
+  const TURN_ON = /\b(on|chalu|chaalu|start|enable|shuru|laga\s*do|lagao|activate|wapas\s*lao|dikhao)\b|चालू|शुरू/;
+  const TURN_OFF = /\b(off|band|bandh|bund|stop|disable|hatao|hata\s*do|nahi\s*chahiye|mat\s*dikhao|rok\s*do|roko|mute)\b|बंद/;
+  const ls = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
+  const isDark = () => { try { return (window.ThemeController?.get?.() || document.documentElement.getAttribute('data-theme')) === 'dark'; } catch (_) { return false; } };
+  const SWITCHES = [
+    { name: 'Hands-free listening', re: /\b(hands?\s*free|handsfree|always\s*listening|wake\s*word)\b/,
+      get: () => ls('jarvis_hands_free') !== 'false', set: (on) => window.toggleJarvisHandsFree?.() },
+    { name: 'Clap / snap wake', re: /\b(clap|claps|snap|snaps|taali|tali|taaliyan|chutki|chutkiyan)\b/,
+      get: () => !!window.ClavisAudioTrigger?.running, set: () => window.toggleClavisSoundTriggers?.() },
+    { name: 'Live caption', re: /\b(caption|captions|subtitle|subtitles|live\s*text|likha\s*hua)\b/,
+      get: () => ls('clavis_live_caption') !== 'false', set: (on) => window.ClavisEar?.caption?.setEnabled?.(on) },
+    { name: 'Desk pet', re: /\b(desk\s*pet|pet|billi|kitty|cat|puppy)\b/,
+      get: () => ls('skylark-pet-enabled') !== 'false', set: (on) => window.NexusPet?.setEnabled?.(on) },
+    { name: 'Proactive tips', re: /\b(proactive|tips|tip|sujhav|salah|nudges?)\b/,
+      get: () => !!window.ClavisProactive?.status?.().enabled, set: (on) => window.ClavisProactive?.setEnabled?.(on) },
+    { name: 'Screen watching', re: /\b(screen\s*(watch\w*|dekhna|dekhte|monitor\w*|awareness)|vision)\b/,
+      get: () => !!window.ClavisVision?.isEnabled?.(), set: (on) => window.ClavisVision?.setEnabled?.(on) },
+    { name: 'UI sounds', re: /\b(ui\s*sounds?|click\s*sounds?|sound\s*effects?|button\s*sounds?)\b/,
+      get: () => !!window.SoundFX?.isEnabled?.(), set: (on) => window.SoundFX?.toggleSound?.(on) },
+    { name: 'Voice replies', re: /\b(voice\s*(repl\w*|output|jawab)|bol\s*ke\s*jawab|awaaz\s*(me|mein)\s*jawab|spoken\s*repl\w*|tts)\b/,
+      get: () => ls('jarvis_speech_enabled') !== 'false', set: () => window.toggleJarvisSpeech?.() },
+    { name: 'Sidebar', re: /\b(side\s*bar|sidebar)\b/,
+      get: () => !document.getElementById('sidebar')?.classList.contains('collapsed'), set: () => window.toggleSidebarCollapse?.() },
+    { name: 'Dark mode', re: /\b(dark\s*(mode|theme)|night\s*mode|andhera)\b/,
+      get: () => isDark(), set: () => window.toggleDayNightTheme?.() },
+    { name: 'Light mode', re: /\b(light\s*(mode|theme)|day\s*mode|ujala)\b/,
+      get: () => !isDark(), set: () => window.toggleDayNightTheme?.() },
+  ];
+  async function toggleIntent(t, words) {
+    if (words.length > 8) return null;
+    const on = TURN_ON.test(t);
+    const off = TURN_OFF.test(t);
+    if (on === off) return null;           // neither, or both ("on karo, off nahi") — not a switch
+    const sw = SWITCHES.find((x) => x.re.test(t));
+    if (!sw) return null;
+    let was = null;
+    try { was = sw.get(); } catch (_) {}
+    if (was === on) return { handled: true, spoken: pick([`${sw.name} pehle se ${on ? 'on' : 'off'} hai, sir.`, `Wo already ${on ? 'on' : 'off'} hai, sir.`], 'switch-same') };
+    try {
+      const r = sw.set(on);
+      // Async switches (clap / snap needs the mic) report the truth, not the wish.
+      if (r && typeof r.then === 'function') {
+        await r;
+        let now = null;
+        try { now = sw.get(); } catch (_) {}
+        if (now !== on) return { handled: true, spoken: `${sw.name} abhi ${on ? 'on' : 'off'} nahi ho paaya, sir${on ? ' — mic ki permission check kar lijiye' : ''}.` };
+      }
+    } catch (e) { return { handled: true, spoken: `${sw.name} abhi badal nahi paaya, sir.` }; }
+    try { window.SoundFX?.playToggle?.('settings'); } catch (_) {}
+    return { handled: true, spoken: pick(on
+      ? [`${sw.name} on kar diya, sir.`, `Done — ${sw.name} chalu.`, `${sw.name} on hai ab.`]
+      : [`${sw.name} band kar diya, sir.`, `Theek hai — ${sw.name} off.`, `${sw.name} off hai ab.`], 'switch') };
+  }
+
   /* ── map control while a map is open ───────────────────────── */
   function mapIntent(t) {
     if (!canvasOpen() || !/map|nearby|place/i.test(canvasKind() || 'map')) return null;
@@ -174,7 +266,10 @@
     '- **Type & automate** — "notepad kholo aur likho …", "YouTube pe Arijit search karo", "scroll karo"',
     '',
     '### Me',
-    '- **Talk naturally** — interrupt me any time; "ruko", "bas", "Clavis…"',
+    '- **Talk naturally** — I wait till you finish; interrupt me any time ("ruko", "nahi, Noida ki dikhao")',
+    '- **Sleep & wake** — "thodi der chup ho jao"; wake me with "Clavis", a snap or a clap',
+    '- **Switch things on/off** — "caption band karo", "clap wala on karo", "tips off", "dark mode on", "pet hatao"',
+    '- **Risky things** — before deleting or sending anything I ask once: "kar doon, sir?"',
     '- **Voice** — "ladke ki awaaz me bolo", "female voice"; Voice ID: "meri awaaz register karo"',
     '- **Look** — "accent blue karo", "claude wala theme", "minimal mode on"',
     '- **Clean up** — "map band karo", "close everything"',
@@ -225,6 +320,12 @@
 
     const v = voiceIntent(t);
     if (v) return v;
+
+    // "thodi der chup ho jao" → sleep until his name, a snap or a clap.
+    if (SLEEP.test(t) && words.length <= 9 && !/\b(mat|nahi|don'?t)\s+(so|sona|chup)\b/.test(t)) return sleep('asked');
+
+    const sw = await toggleIntent(t, words);
+    if (sw) return sw;
 
     // "accent blue karo", "claude wala theme", "minimal mode on"
     try {
@@ -396,6 +497,18 @@
     canvas = true;
     const r6 = await route('zoom in');
     window.ClavisCanvas = saved.C; window.ClavisTaskSurface = saved.T;
+    const savedLive = window.ClavisLive, savedPet = window.NexusPet;
+    let petOn = true;
+    window.ClavisLive = { isActive: () => false };
+    window.NexusPet = { setEnabled: (on) => { petOn = on; } };
+    const pk = 'skylark-pet-enabled', prevPet = localStorage.getItem(pk);
+    localStorage.setItem(pk, 'true');
+    const r7 = await route('pet band karo');
+    const r8 = await route('thodi der chup ho jao');
+    const woke = wakeLine();
+    const r9 = await route('leads ki list dikhao');
+    window.ClavisLive = savedLive; window.NexusPet = savedPet;
+    if (prevPet == null) localStorage.removeItem(pk); else localStorage.setItem(pk, prevPet);
     const checks = [
       r1.handled && /map/i.test(r1.spoken),
       r2.handled && clearedAll,
@@ -403,13 +516,16 @@
       r4.handled === true,
       r5.handled === false,
       r6.handled === true,
+      r7.handled && petOn === false,
+      r8.handled && !!r8.spoken && !!woke,
+      !r9.handled,
     ];
     const passed = checks.filter(Boolean).length;
     console[passed === checks.length ? 'log' : 'error'](`ClavisIntent self-test: ${passed}/${checks.length}`, checks);
     return passed === checks.length;
   }
 
-  window.ClavisIntent = { route, screenContext, learn, habitsLine, clearAll, registerSkills, _selfTest };
+  window.ClavisIntent = { route, screenContext, learn, habitsLine, clearAll, registerSkills, sleep, wakeLine, _selfTest };
 
   // JarvisSkills loads earlier (defer order), but be safe either way.
   if (!registerSkills()) window.addEventListener('DOMContentLoaded', registerSkills, { once: true });

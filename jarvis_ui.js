@@ -967,9 +967,14 @@ async function handleJarvisSend(options) {
     try {
       const quick = await window.ClavisIntent?.route?.(text, { source: requestSource });
       if (quick && quick.handled) {
+        // Typed commands get a small visible confirmation too (this page
+        // shows no chat bubbles); spoken ones stay voice-only.
+        if (requestSource !== 'voice' && (quick.spoken || quick.text)) {
+          try { showToast('success', 'Clavis', String(quick.text || quick.spoken)); } catch (_) {}
+        }
         if (quick.spoken) {
           window.ClavisMind?.noteClavisTurn?.(quick.spoken);
-          if (jarvisSpeechEnabled && !quick.silent) speakJarvisText(quick.spoken);
+          if (jarvisSpeechEnabled && !quick.silent) speakJarvisText(quick.spoken, { style: quick.style });
           else setJarvisStatus('online', 'Clavis Online');
         } else {
           setJarvisStatus('online', 'Clavis Online');
@@ -1740,6 +1745,7 @@ function initClavisSoundTriggers() {
     clavisFinalTranscript = '';
     playWakeChime();
     setJarvisStatus('awake', `${kind} detected — boliye...`);
+    clavisYawnIfSlept();
     Promise.resolve(detectorStopped).finally(() => {
       window.setTimeout(() => startJarvisVoiceInput({ soundTrigger: true, handsFreeCapture: true, awakeCapture: true, persistent: true }), 120);
     });
@@ -1795,6 +1801,23 @@ async function toggleClavisSoundTriggers() {
   const started = await startClavisSoundTriggers();
   if (started) showToast('success', 'Clap / Snap on', 'Clavis will activate immediately on a clap or snap.');
   else localStorage.setItem('clavis_sound_trigger_enabled', 'false');
+}
+
+// "Thodi der chup ho jao" without Clavis Live: drop the conversation window
+// and any capture; the wake listener keeps waiting for "Clavis" / a clap.
+window.clavisGoToSleep = function clavisGoToSleep() {
+  jarvisAwake = false;
+  clavisFollowUpUntil = 0;
+  clearTimeout(clavisFollowUpTimer);
+  clavisFinalTranscript = '';
+  window.ClavisEar?.caption?.listening(false);
+  setJarvisStatus('online', 'So rahi hoon — "Clavis" boliye, snap ya clap');
+};
+// Woken after a nap he asked for: a sleepy, varied "meri aankh lag gayi thi".
+function clavisYawnIfSlept() {
+  if (window.ClavisLive?.isAvailable?.()) return;   // Live yawns in its own words
+  const line = window.ClavisIntent?.wakeLine?.();
+  if (line) setTimeout(() => speakJarvisText(line, { style: 'sleepy' }), 450);
 }
 
 function toggleJarvisHandsFree() {
@@ -1993,6 +2016,7 @@ function startWakeListener() {
 
           playWakeChime();
           setJarvisStatus('awake', 'Haan sir, boliye...');
+          if (!wake.remainder) clavisYawnIfSlept();
           const remainder = wake.remainder;
           stopWakeListener(true);
           clearTimeout(relistenTimer);
@@ -2107,14 +2131,16 @@ function scheduleHandsFreeRelisten() {
       // can just answer, no "Clavis" needed. Words in this window still pass
       // ClavisEar (not echo, sounds like a request, his voice if enrolled);
       // silence or chatter drops back to wake-word listening.
-      // Only with Voice ID: otherwise any voice in the room could answer.
+      // With Voice ID the window is long (only his voice counts); without
+      // it, ClavisEar accepts only a Hindi/Hinglish request in it.
+      const hisVoice = Boolean(window.ClavisEar?.voiceId?.enabled?.());
       const followUp = localStorage.getItem('clavis_followup_window') !== 'false'
-        && Boolean(window.ClavisEar?.voiceId?.enabled?.())
         && !window.ClavisLive?.isActive?.() && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+      const windowMs = hisVoice ? 20000 : 10000;
       jarvisAwake = followUp;
       clavisFinalTranscript = '';
       clavisCaptureStartAt = 0;
-      clavisFollowUpUntil = followUp ? Date.now() + 7000 : 0;
+      clavisFollowUpUntil = followUp ? Date.now() + windowMs : 0;
       clearTimeout(clavisFollowUpTimer);
       if (followUp) {
         clavisFollowUpTimer = setTimeout(() => {
@@ -2124,7 +2150,7 @@ function scheduleHandsFreeRelisten() {
             window.ClavisEar?.caption?.listening(false);
             setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
           }
-        }, 7100);
+        }, windowMs + 100);
         window.ClavisEar?.caption?.listening(true);
       }
       startWakeListener();
@@ -2772,7 +2798,7 @@ window.stopJarvisSpeech = stopJarvisSpeech;
 // Single production voice path: Google Gemini over the cancellable PCM socket.
 // The old browser/cloud renderers remain named legacy* above so no call site
 // can accidentally reintroduce a second voice persona.
-async function speakJarvisText(text) {
+async function speakJarvisText(text, opts = {}) {
   const clean = String(text || '')
     .replace(/\|\|\|[\s\S]*?\|\|\|/g, '')
     .replace(/https?:\/\/\S+/g, '')
@@ -2814,7 +2840,7 @@ async function speakJarvisText(text) {
   // Hindi is read by the Hindi voice instead of "Google UK English Male".
   if (window.ClavisVoice) {
     try {
-      const ok = await window.ClavisVoice.speak(clean, { signal: controller.signal });
+      const ok = await window.ClavisVoice.speak(clean, { signal: controller.signal, style: opts.style });
       if (ok) { onSpeechFinished(); return true; }
       if (!active()) return false;
     } catch (e) { console.warn('[ClavisVoice]', e); }

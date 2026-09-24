@@ -136,6 +136,26 @@
   /* ── feeling → speaking style ─────────────────────────────── */
   // The TTS model takes a short natural-language direction before the
   // text ("Say warmly: …"). It follows sir's mood first, then the reply's.
+  const FEEL = [
+    ['sleepy', /\b(jhapki|aankh lag|so gayi|so gaya|neend|good morning sir|jaag gayi|jaag gaya|yawn)\b|^(hmm|aah|mmm)…/i,
+      'sleepy and slow, like someone who just woke from a short nap — a soft yawn at the start, then warm and a little embarrassed'],
+    ['laugh', /\b(haha+|hehe+|lol|mazaa aa gaya|kamaal|funny|mazedaar)\b|😄|😂|🤣/i,
+      'amused and warm, with a genuine light laugh in the voice'],
+    ['sad', /\b(sorry|maaf|afsos|dukh|bura laga|unfortunately|sadly|nahi ho paaya|nahi mil (paaya|payi|saka|saki)|fail ho gaya|khatam ho gayi)\b/i,
+      'soft, a little lower and slower, genuinely sorry — sad but steady'],
+    ['fear', /\b(risky|risk|khatra|khatarnak|dhyan (dijiye|rakhiye|se)|careful|warning|saavdhaan|dar lag|danger|delete kar doon|pakka\?)\b/i,
+      'concerned and careful, a little tense and quicker, like someone gently raising a real worry'],
+    ['anger', /\b(bilkul galat|ye theek nahi|bardasht|hadd hai|ridiculous|unacceptable|bekaar|ghatiya)\b|\buff+\b/i,
+      'firm, clipped and annoyed at the situation (never at him), controlled'],
+    ['excited', /\b(wow|shandaar|zabardast|badhai|congratulations|congrats|mubarak|amazing|kya baat|done ho gaya|mil gay[ae]|ready hai)\b|🎉|!{2,}/i,
+      'excited and bright, energy and a smile in the voice'],
+  ];
+  function feelingOf(text, hint) {
+    const byHint = FEEL.find(([k]) => k === hint);
+    if (byHint) return byHint[2];
+    const hit = FEEL.find(([, re]) => re.test(String(text || '')));
+    return hit ? hit[2] : '';
+  }
   function styleFor(text) {
     const E = window.ClavisEmotionalEngine;
     let user = 'neutral', reply = 'composed';
@@ -158,7 +178,10 @@
       thoughtful: 'thoughtful and unhurried',
       composed: 'calm, warm and confident',
     };
-    const mood = byUser[user] || byReply[reply] || byReply.composed;
+    // What the reply itself feels like wins: a joke gets a real little laugh,
+    // bad news a softer voice, a warning real concern — like a person.
+    const felt = feelingOf(text, S.style);
+    const mood = felt || byUser[user] || byReply[reply] || byReply.composed;
     const lang = langOf(text);
     const accent = lang === 'en'
       ? 'natural Indian English'
@@ -374,6 +397,7 @@
     if (!clean) return false;
     stop();
     const id = ++S.gen;
+    S.style = opts.style || '';
     S.aborter = new AbortController();
     S.speaking = true;
     opts.signal?.addEventListener?.('abort', () => { if (id === S.gen) stop(); }, { once: true });
