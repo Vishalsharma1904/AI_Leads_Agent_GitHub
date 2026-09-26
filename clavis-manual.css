@@ -654,3 +654,77 @@ html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .do
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .donut-legend-dot[style*="#f59e0b"] { background: #D9B477 !important; }
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .donut-legend-dot[style*="#10b981"] { background: #93B58E !important; }
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .donut-legend-dot[style*="#ef4444"] { background: #D69A8B !important; }
+
+/* ── 16. Shadows: warm, soft, layered ───────────────────────────
+   Shadows are tinted warm sepia (never grey-black) so they melt into
+   the ivory. Every lifted thing uses the same recipe at a different
+   height: a 0.5 px hairline + a tight contact shadow + a wide, very
+   faint ambient one. Resting cards barely lift; hover lifts a little;
+   menus, windows and dialogs float progressively higher.            */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) {
+  --pz-sh-rest:  0 0 0 .5px rgba(60,48,30,.075), 0 1px 1px rgba(60,48,30,.02), 0 3px 8px -4px rgba(60,48,30,.06);
+  --pz-sh-hover: 0 0 0 .5px rgba(60,48,30,.085), 0 2px 4px -1px rgba(60,48,30,.04), 0 16px 34px -16px rgba(60,48,30,.18);
+  --cc-sh-1:     var(--pz-sh-rest);
+  --cc-sh-hover: var(--pz-sh-hover);
+  --cc-sh-pop:   0 0 0 .5px rgba(60,48,30,.08), 0 1px 2px rgba(60,48,30,.04), 0 8px 18px -8px rgba(60,48,30,.08), 0 26px 56px -22px rgba(60,48,30,.20);
+  --cc-sh-dlg:   0 0 0 .5px rgba(60,48,30,.09), 0 2px 4px rgba(60,48,30,.03), 0 14px 32px -12px rgba(60,48,30,.09), 0 48px 104px -36px rgba(60,48,30,.32);
+  --pz-sh-olive: 0 1px 1px rgba(40,64,44,.14), 0 4px 10px -4px rgba(47,82,51,.34), 0 12px 24px -14px rgba(47,82,51,.30);
+  --pz-sh-olive-hover: 0 1px 2px rgba(40,64,44,.14), 0 8px 16px -6px rgba(47,82,51,.36), 0 20px 36px -18px rgba(47,82,51,.34);
+}
+html[data-theme="dark"]:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) {
+  --pz-sh-rest:  0 0 0 .5px rgba(255,255,255,.07), 0 2px 6px -3px rgba(0,0,0,.45);
+  --pz-sh-hover: 0 0 0 .5px rgba(255,255,255,.09), 0 18px 36px -16px rgba(0,0,0,.65);
+  --cc-sh-pop:   0 0 0 .5px rgba(255,255,255,.08), 0 10px 22px -10px rgba(0,0,0,.5), 0 28px 60px -22px rgba(0,0,0,.7);
+  --cc-sh-dlg:   0 0 0 .5px rgba(255,255,255,.09), 0 16px 36px -14px rgba(0,0,0,.55), 0 52px 110px -36px rgba(0,0,0,.8);
+  --pz-sh-olive: 0 0 0 .5px rgba(255,255,255,.06), 0 6px 16px -8px rgba(0,0,0,.6);
+  --pz-sh-olive-hover: 0 0 0 .5px rgba(255,255,255,.08), 0 12px 26px -12px rgba(0,0,0,.7);
+}
+
+/* resting cards: a breath of lift, a touch more on hover */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.do-stat-card, .do-chart-wrap, .stat-card, .svc-card, .industry-card, .lead-card, .cand-card) {
+  border-color: transparent !important;
+  box-shadow: var(--pz-sh-rest) !important;
+  transition: box-shadow 420ms cubic-bezier(.22,1,.36,1), translate 420ms cubic-bezier(.22,1,.36,1), background-color 200ms ease !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.do-stat-card, .stat-card, .svc-card, .industry-card, .lead-card, .cand-card):hover {
+  box-shadow: var(--pz-sh-hover) !important;
+  translate: 0 -1px;
+}
+
+/* composer: a soft pillow under the input */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.jarvis-input-container, .claude-input-container) {
+  box-shadow: 0 0 0 .5px rgba(60,48,30,.10), 0 2px 4px -2px rgba(60,48,30,.05), 0 14px 32px -18px rgba(60,48,30,.18) !important;
+  transition: box-shadow 420ms cubic-bezier(.22,1,.36,1) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.jarvis-input-container, .claude-input-container):focus-within {
+  box-shadow: 0 0 0 .5px rgba(63,96,69,.28), 0 0 0 4px rgba(63,96,69,.07), 0 18px 40px -20px rgba(60,48,30,.22) !important;
+}
+
+/* olive buttons: a coloured, soft drop — never a black one */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .pg-btn-primary, .enr-btn-primary, .generate-leads-btn, .desktop-notif-btn--primary) {
+  box-shadow: var(--pz-sh-olive) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .pg-btn-primary, .enr-btn-primary, .generate-leads-btn):hover:not(:disabled) {
+  box-shadow: var(--pz-sh-olive-hover) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#jarvis-send-btn, .claude-send-btn, .cts-composer-send) {
+  box-shadow: 0 2px 6px -2px rgba(47,82,51,.40), 0 8px 16px -10px rgba(47,82,51,.35) !important;
+}
+
+/* floating windows, menus, dialogs, notifications, voice bar */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.ccv, #clavis-task-surface .cts, #clavis-task-surface.cts, #clavis-live-hud.clh, .topbar-profile-menu, #jarvis-more-panel, .jarvis-composer-dropdown, .cand-source-menu) {
+  box-shadow: var(--cc-sh-pop) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body .ccv.is-expanded,
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.settings-modal, .cx-setup-dialog, .modal-card, .mac-dialog, .jarvis-modal, .pg-modal-card, #clavis-voiceid-sheet .cv-card) {
+  box-shadow: var(--cc-sh-dlg) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body .desktop-notification-card {
+  box-shadow: 0 0 0 .5px rgba(60,48,30,.08), 0 2px 4px -1px rgba(60,48,30,.04), 0 16px 36px -16px rgba(60,48,30,.20) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body .desktop-notification-container:not(:hover):not(:focus-within) .desktop-notification-card:not(:first-child) {
+  box-shadow: 0 0 0 .5px rgba(60,48,30,.07), 0 3px 8px -5px rgba(60,48,30,.10) !important;
+}
+html[data-theme="dark"]:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.jarvis-input-container, .claude-input-container, .desktop-notification-card) {
+  box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 16px 36px -16px rgba(0,0,0,.65) !important;
+}
