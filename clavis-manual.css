@@ -404,3 +404,98 @@ html[data-theme="dark"] .sc-manual-sub { color: #6a6660; }
   .cvm-row { flex-wrap: wrap; gap: 4px; }
   .cvm-phrase { max-width: 100%; white-space: normal; }
 }
+
+/* ── 9. Rail: ONE width, ONE clock ─────────────────────────────
+   Four layers used to disagree (inline 220 · luxe 236 · luxe 232 ·
+   a FLIP slide on the page) so the rail overshot and the page
+   slid twice. Now the rail and the page read the same number and
+   share the same duration + curve — the page contracts exactly as
+   much as the rail grows, left to right, nothing else moves.     */
+@media (min-width: 769px) {
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar {
+    width: var(--sidebar-expanded, 220px) !important;
+    min-width: var(--sidebar-expanded, 220px) !important;
+    max-width: var(--sidebar-expanded, 220px) !important;
+    transform: none !important;
+    transition: width 440ms cubic-bezier(.32,.72,0,1), min-width 440ms cubic-bezier(.32,.72,0,1),
+      max-width 440ms cubic-bezier(.32,.72,0,1), background-color 240ms ease, box-shadow 240ms ease !important;
+    overflow: hidden !important;
+    will-change: width;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed:not(.au-peek) {
+    width: 64px !important; min-width: 64px !important; max-width: 64px !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed.au-peek {
+    box-shadow: none !important; z-index: 60 !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content {
+    margin-left: var(--sidebar-expanded, 220px) !important;
+    width: calc(100% - var(--sidebar-expanded, 220px)) !important;
+    max-width: calc(100% - var(--sidebar-expanded, 220px)) !important;
+    transform: none !important;
+    transition: margin-left 440ms cubic-bezier(.32,.72,0,1), width 440ms cubic-bezier(.32,.72,0,1),
+      max-width 440ms cubic-bezier(.32,.72,0,1) !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed:not(.au-peek) ~ #main-content {
+    margin-left: 64px !important; width: calc(100% - 64px) !important; max-width: calc(100% - 64px) !important;
+  }
+  html.sidebar-resizing:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar,
+  html.sidebar-resizing:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content {
+    transition: none !important;
+  }
+  /* labels: fade only — no stagger, no slide, no width games */
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) {
+    transform: none !important;
+    transition: opacity 220ms ease 120ms, color 180ms ease !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.collapsed:not(.au-peek) :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) {
+    transition: opacity 90ms ease 0ms, color 180ms ease !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar,
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content { transition-duration: 1ms !important; }
+}
+
+/* ── 10. Voice bar: compact pill at the top of the sheet ───────── */
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh.clh-top {
+  width: min(360px, calc(100vw - 32px)) !important;
+  padding: 4px 5px 4px 8px !important;
+  gap: 6px !important;
+  border-radius: 999px !important;
+  background: var(--cc-surface, #fff) !important;
+  box-shadow: 0 1px 2px rgba(20,20,19,.06), 0 6px 20px -8px rgba(20,20,19,.16) !important;
+  transform: translate(-50%, -10px) scale(.96) !important;
+  transition: opacity 320ms cubic-bezier(.16,1,.3,1), transform 460ms cubic-bezier(.32,.72,0,1),
+    top 420ms cubic-bezier(.32,.72,0,1), left 420ms cubic-bezier(.32,.72,0,1) !important;
+}
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh.clh-top.is-in { transform: translate(-50%, 0) scale(1) !important; }
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh-top .clh-orb { flex-basis: 22px !important; height: 22px !important; }
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh-top .clh-orb span { width: 12px !important; height: 12px !important; background: var(--cc-accent, #2F5233) !important; }
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh-top .clh-state { font-size: 10px !important; letter-spacing: .06em !important; }
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh-top .clh-caption { font-size: 12.5px !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh-top .clh-btn { width: 28px !important; height: 28px !important; border-radius: 999px !important; }
+html:not(#m):not(#m):not(#m):not(#m):not(#m) body #clavis-live-hud.clh-top .clh-btn svg { width: 15px !important; height: 15px !important; }
+
+/* ── 11. Display windows: map + floating window side by side ───── */
+html body .ccv.ccv.is-paired:not(.is-expanded) { width: var(--ccv-w, 520px); }
+html body .ccv {
+  max-height: var(--ccv-maxh, calc(100vh - var(--ccv-top, 110px) - 24px));
+  border-radius: 20px;
+  background: var(--cc-surface, #fff);
+  border: 0.5px solid rgba(20,20,19,.08);
+  box-shadow: 0 1px 2px rgba(20,20,19,.05), 0 18px 48px -18px rgba(20,20,19,.22);
+}
+html body .ccv.is-left { left: var(--ccv-left, 88px); right: auto; }
+html body .ccv .ccv-map { height: min(380px, calc(var(--ccv-maxh, 520px) - 120px)); }
+/* Expanded: grows on BOTH axes into a centred box, equal margins all round */
+html body .ccv.is-expanded,
+html body .ccv.is-expanded.is-left {
+  top: max(28px, 6vh); bottom: max(28px, 6vh);
+  left: max(32px, 7vw); right: max(32px, 7vw);
+  width: auto; max-height: none;
+  z-index: 2147482100;
+  border-radius: 24px;
+}
+html body .ccv.is-expanded .ccv-map { height: auto; }
+html body .ccv-backdrop.is-on { z-index: 2147482050; cursor: zoom-out; }

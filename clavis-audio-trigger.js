@@ -36,7 +36,7 @@
   const SETTLE_MS = 650;       // wait this long after the last impulse before judging the pattern
   const MIN_GAP = 110, MAX_GAP = 650;
   const ISOLATION_MS = 1500;   // a lone snap must come out of quiet
-  const CRISP_MS = 45, LOUD = 0.08;
+  const CRISP_MS = 40, LOUD = 0.16;   // a lone snap has to be a real, firm snap
 
   // Pure pattern judgement (covered by _selfTest). group: [{at, ms, level}],
   // quietBefore: ms since the impulse before this group.
@@ -122,7 +122,7 @@
           this.ownsStream = true;
         }
         this.context = new AudioContextCtor({ latencyHint: 'playback' });
-        await this.context.audioWorklet.addModule('clavis-clap-worklet.js?v=1');
+        await this.context.audioWorklet.addModule('clavis-clap-worklet.js?v=2');
         this.source = this.context.createMediaStreamSource(this.stream);
         this.node = new AudioWorkletNode(this.context, 'clavis-clap', { numberOfInputs: 1, numberOfOutputs: 0 });
         this.node.port.postMessage({ sens: SENS[this.options.sensitivity] || 1 });
@@ -207,7 +207,7 @@
         judge(snap, 'auto', Infinity) === 'single',         // one crisp snap out of silence
         judge(snap, 'auto', 400) === null,                  // ...but not mid-typing
         judge([{ at: 0, ms: 80, level: 0.3 }], 'auto', Infinity) === null,   // a thud, not a snap
-        judge([{ at: 0, ms: 20, level: 0.05 }], 'auto', Infinity) === null,  // too faint
+        judge([{ at: 0, ms: 20, level: 0.1 }], 'auto', Infinity) === null,   // too faint
         judge(snap, 'double', Infinity) === null,
         judge([{ at: 0, ms: 80, level: 0.05 }], 'single', 0) === 'single',
       ];

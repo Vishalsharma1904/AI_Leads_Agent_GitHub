@@ -193,8 +193,31 @@
     obs.observe(overlay, { attributes: true, attributeFilter: ['class', 'style'] });
   }
 
+  /* ══════════════════════════════════════════════════════════════
+     3. LOCATION — ask once, up front, so "meri location dikhao" is
+        instant later (the map reads the cached fix, then refines).
+  ══════════════════════════════════════════════════════════════ */
+  function askLocationOnce() {
+    try {
+      if (!navigator.geolocation || localStorage.getItem('clavis_geo_asked')) return;
+      var go = function () {
+        localStorage.setItem('clavis_geo_asked', '1');
+        navigator.geolocation.getCurrentPosition(function (p) {
+          try { localStorage.setItem('clavis_last_pos', JSON.stringify({ lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy || 0, at: Date.now() })); } catch (_) {}
+        }, function () {}, { enableHighAccuracy: false, timeout: 10000, maximumAge: 300000 });
+      };
+      if (navigator.permissions && navigator.permissions.query) {
+        navigator.permissions.query({ name: 'geolocation' }).then(function (st) {
+          if (st.state === 'granted') go();
+          else if (st.state === 'prompt') window.addEventListener('pointerdown', go, { once: true });
+        }).catch(go);
+      } else go();
+    } catch (_) {}
+  }
+
   /* ── Init ────────────────────────────────────────────────── */
   function init() {
+    askLocationOnce();
     observeNotifications();
     watchShortcutsOverlay();
     // Also try immediately in case overlay is already open

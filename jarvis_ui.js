@@ -24,12 +24,70 @@ let jarvisSpeechAudioUrl = '';
 let jarvisHandsFree = false;      // master toggle for "always listening"
 let wakeRecognition = null;       // background recognizer listening for Clavis wake phrases
 let commandRecognition = null;    // active recognizer capturing a command after wake
-let jarvisAwake = false;          // true while actively taking a command
+let jarvisAwake = false;          // sirf ClavisWake ka local mirror — khud true mat karo, clavisWakeUp() use karo
 let relistenTimer = null;
 let jarvisVoiceSession = 0;
 let wakeRestartTimer = null;
 let wakeStopRequested = false;
 let clavisSoundTriggerBound = false;
+
+// ── Jaaga hai ya soya: ClavisWake hi single source of truth ────────
+// Pehle jarvisAwake bina expiry ke true reh jaata tha, aur kamre ki har
+// baat LLM tak jaati thi (keys ek ghante me khatam). Ab:
+//   soya  → sirf wake word / snap / clap / tap / typing se jaagta hai
+//   jaaga → command lo, jawab do, phir ~9 s follow-up, phir wapas soya
+const CLAVIS_ASLEEP_LABEL = 'Bolo "Clavis"';
+function clavisIsAwake() {
+  const W = window.ClavisWake;
+  return W ? W.isAwake() : jarvisAwake;
+}
+// Naam / snap / clap / tap ke baad pehla voice turn = command (koi bhi baat
+// chalegi). Uske baad ke turns follow-up hain: sirf request / sawaal / naam /
+// Voice ID owner. Typing ke baad bhi voice = follow-up.
+let clavisFreshWake = false;
+function clavisWakeUp(source, opts) {
+  window.ClavisWake?.wake?.(source || 'word', opts || {});
+  jarvisAwake = true;
+  clavisFreshWake = source !== 'typed';
+  clavisFollowUpUntil = 0;   // naya wake = command window, follow-up nahi
+}
+function clavisOpenMic() {
+  return clavisIsAwake() && !clavisFreshWake;
+}
+// Ek accepted turn ke dauraan Clavis busy rehta hai (window expire nahi
+// hoti); jawab bol chuka → busy(false) → follow-up window shuru.
+let clavisTurnHeld = false;
+function clavisHoldTurn() {
+  if (!window.ClavisWake) return;
+  clavisTurnHeld = true;
+  window.ClavisWake.busy(true, 'turn');
+}
+function clavisReleaseTurn() {
+  if (!clavisTurnHeld) return;
+  clavisTurnHeld = false;
+  window.ClavisWake?.busy?.(false, 'turn');
+}
+// Bolte waqt window expire na ho — lekin sirf tab jab pehle se jaaga ho
+// (proactive / boot ki awaaz soye hue Clavis ko nahi jagati).
+let clavisSpeechHeld = false;
+function clavisHoldSpeech() {
+  if (!window.ClavisWake || clavisSpeechHeld || !clavisIsAwake()) return;
+  clavisSpeechHeld = true;
+  window.ClavisWake.busy(true, 'speech');
+}
+function clavisReleaseSpeech() {
+  if (!clavisSpeechHeld) return;
+  clavisSpeechHeld = false;
+  window.ClavisWake?.busy?.(false, 'speech');
+}
+// clavis-task-controller.js / clavis-luxe.js window.jarvisHandsFree padhte hain.
+try {
+  Object.defineProperty(window, 'jarvisHandsFree', {
+    configurable: true,
+    get: () => jarvisHandsFree,
+    set: (v) => { jarvisHandsFree = Boolean(v); },
+  });
+} catch (_) {}
 
 async function refreshClavisConnectionStatus() {
   // A local (bring-your-own) key is enough — no backend needed.
@@ -277,12 +335,12 @@ async function initJarvisUI() {
   window.addEventListener('clavis:mic-granted', () => {
     localStorage.setItem('clavis_mic_permission_granted', 'true');
     jarvisHandsFree = localStorage.getItem('jarvis_hands_free') !== 'false';
-    localStorage.setItem('jarvis_hands_free', 'true');
-    localStorage.setItem('clavis_sound_trigger_enabled', 'true');
+    if (localStorage.getItem('jarvis_hands_free') === null) localStorage.setItem('jarvis_hands_free', 'true');
+    if (localStorage.getItem('clavis_sound_trigger_enabled') === null) localStorage.setItem('clavis_sound_trigger_enabled', 'true');
     const handsFreeButton = document.getElementById('jarvis-handsfree-btn');
-    handsFreeButton?.classList.add('active');
-    handsFreeButton?.setAttribute('aria-pressed', 'true');
-    updateClavisSoundTriggerButton(true);
+    handsFreeButton?.classList.toggle('active', jarvisHandsFree);
+    handsFreeButton?.setAttribute('aria-pressed', String(jarvisHandsFree));
+    updateClavisSoundTriggerButton(localStorage.getItem('clavis_sound_trigger_enabled') !== 'false');
     setJarvisStatus(window.currentJarvisStatus || 'online', window.currentJarvisStatus === 'listening' ? 'Sun raha hoon — bolo "Clavis"' : 'Mic ready · voice controls restored');
     if (!window.LocalSpeechEngine?.inputSocket && !isJarvisSpeaking) {
       setTimeout(() => {
@@ -331,12 +389,15 @@ async function initJarvisUI() {
   updateJarvisChatStage(hasExisting);
 }
 
-// ── Interactive Orb Click Handler (talk/interrupt toggle) ──
+// ── Interactive Orb Click Handler (interrupt only) ──
+// The orb used to also START listening on click, but it's a huge hit
+// target — an incidental click near it woke Clavis unasked. Owner wants
+// wake to come only from clap/snap/name, never a click. The dedicated
+// mic buttons (#jarvis-voice-btn, #jarvis-composer-voice-btn) still start
+// voice input on purpose; the orb now only interrupts while it's talking.
 function handleOrbClick() {
   if (isJarvisSpeaking) {
     stopJarvisGeneration();
-  } else {
-    startJarvisVoiceInput();
   }
 }
 window.handleOrbClick = handleOrbClick;
@@ -649,27 +710,22 @@ function renderClavisBrainState() {
   const existing = document.getElementById('clavis-brain-card');
   if (has) { existing?.remove(); return; }
   if (existing || !welcome) return;
-  const card = document.createElement('div');
+  const card = document.createElement('button');
+  card.type = 'button';
   card.id = 'clavis-brain-card';
-  card.style.cssText = 'margin:14px auto 0;max-width:440px;background:rgba(99,102,241,.06);border:1px solid rgba(99,102,241,.28);border-radius:14px;padding:14px 16px;text-align:left;';
-  card.innerHTML = `
-    <div style="font-weight:700;font-size:14px;color:var(--gray-800,#1f2430);margin-bottom:4px;">⚡ Connect Clavis's brain to start talking</div>
-    <div style="font-size:12.5px;color:var(--gray-600,#5b616e);line-height:1.5;margin-bottom:10px;">
-      Clavis needs a <b>Groq</b> AI key to think (free tier, no OpenAI account required):
-      open <a href="https://console.groq.com/keys" target="_blank" rel="noopener" style="color:#6366f1;font-weight:600;">console.groq.com/keys</a> → Create key → paste it below.
-    </div>
-    <div style="display:flex;gap:8px;">
-      <input id="clavis-brain-key" type="password" placeholder="Paste Groq key (gsk_...)" autocomplete="off"
-        style="flex:1;padding:9px 11px;border:1px solid rgba(0,0,0,.15);border-radius:9px;font-size:12.5px;background:#fff;color:#1f2430;">
-      <button id="clavis-brain-save" onclick="saveClavisBrainKey()"
-        style="padding:9px 16px;border:none;border-radius:9px;background:#6366f1;color:#fff;font-weight:600;font-size:12.5px;cursor:pointer;white-space:nowrap;">Connect</button>
-    </div>
-    <div id="clavis-brain-msg" style="font-size:11.5px;margin-top:6px;min-height:14px;"></div>`;
+  card.className = 'cx-brain-card';
+  card.innerHTML = `<span class="cx-brain-dot" aria-hidden="true"></span>
+    <span class="cx-brain-text"><b>Clavis ko jagane ke liye ek free key chahiye</b><small>2 minute ka setup — link, paste, ho gaya.</small></span>
+    <span class="cx-brain-cta">Setup karein</span>`;
+  card.addEventListener('click', saveClavisBrainKey);
   welcome.appendChild(card);
-  document.getElementById('clavis-brain-key')?.addEventListener('keydown', (e) => { if (e.key === 'Enter') saveClavisBrainKey(); });
 }
 
+// Key judte hi card hata do.
+['clavis:keys-ready', 'clavis:vault-changed'].forEach((ev) => window.addEventListener(ev, () => setTimeout(renderClavisBrainState, 50)));
+
 function saveClavisBrainKey() {
+  if (window.ClavisSetup?.open) return window.ClavisSetup.open({ reason: 'manual' });
   openClavisCredentialDialog();
 }
 window.saveClavisBrainKey = saveClavisBrainKey;
@@ -813,7 +869,7 @@ async function saveClavisCredential() {
   if (input) input.value = key;
   const valid = provider === 'openrouter' ? /^sk-or-\S{10,}$/.test(key)
     : provider === 'groq' ? /^gsk_\S{10,}$/.test(key)
-    : provider === 'gemini' ? /^AIza\S{10,}$/.test(key)
+    : provider === 'gemini' ? /^(?:AIza|AQ\.)\S{10,}$/.test(key)
     : provider === 'openai' ? /^sk-\S{10,}$/.test(key)
     : /^\S{10,}$/.test(key);
   if (!valid) {
@@ -835,6 +891,14 @@ async function saveClavisCredential() {
       if (provider === 'groq') {
         localStorage.setItem('skylark-llm-key', key);
         localStorage.setItem('skylark-llm-engine', 'groq');
+      } else if (provider === 'gemini') {
+        localStorage.setItem('skylark-llm-key', key);
+        localStorage.setItem('skylark-llm-engine', 'gemini');
+        fetch('http://localhost:8000/api/credentials/gemini-local', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ key })
+        }).catch(() => {});
       }
       if (window.JarvisEngine?.addProviderKey) {
         window.JarvisEngine.addProviderKey(provider, key);
@@ -892,6 +956,7 @@ function clavisDisplayOf(taskId) {
 }
 function clavisWantsWindow(text, ctx = {}) {
   if (!jarvisSpeechEnabled) return true;        // nothing would be heard, so show it
+  if (window.ClavisVoiceState?.isSilent?.()) return true;   // silent mode: the answer is read, not heard
   if (ctx.attachments || ctx.images) return true;
   const t = String(text || '');
   if (CLAVIS_DISPLAY_RE.test(t) && !CLAVIS_SHOW_RE.test(t)) return false;   // the display shows it
@@ -923,7 +988,79 @@ function clavisSpokenSummary(text) {
 }
 const CLAVIS_EMOJI_RE = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}\u{FE0F}]/gu;
 
+// Side-talk token: jab LLM ko lage ki baat Clavis se thi hi nahi (sir kisi
+// aur se baat kar rahe the / TV), woh sirf `[[silent]]` lautata hai.
+const CLAVIS_SILENT_TOKEN_RE = /\[\[\s*silent\s*\]\]/gi;
+const CLAVIS_SILENT_HEAD_RE = /^\s*\[\[\s*silent\s*\]\]/i;
+// Every [[…]] directive (and a stray leading "[[" / trailing "]]") is removed
+// from anything shown or spoken — see ClavisVoiceState.stripDirectives.
+function clavisStripSilent(text) {
+  return window.ClavisVoiceState?.stripDirectives
+    ? window.ClavisVoiceState.stripDirectives(text)
+    : String(text || '').replace(CLAVIS_SILENT_TOKEN_RE, '').replace(/[ \t]{2,}/g, ' ').trim();
+}
+window.clavisStripSilent = clavisStripSilent;
+
+// Overheard baat par chup: koi bubble nahi, koi awaaz nahi, task hata do, so jao.
+function clavisSideTalk(taskId, text, turnStartedAt) {
+  try {
+    const T = window.ClavisTask;
+    if (T) {
+      if (taskId) T.clear(taskId);
+      // JarvisEngine wrapper (clavis-task-controller) apna alag task bhi banata hai.
+      (T.Store?.all?.() || []).forEach((t) => {
+        if (t && t._text === text && (t.startedAt || 0) >= turnStartedAt - 50) T.clear(t.id);
+      });
+    }
+  } catch (e) { console.warn('[Clavis side-talk] task clear failed', e); }
+  try { window.JarvisEngine?.forgetLastTurn?.(); } catch (_) {}
+  try { window.ClavisEar?.caption?.clear?.(); } catch (_) {}
+  if (window.ClavisWake?.continuous?.() && window.ClavisWake.state().source !== 'typed') {
+    // Continuous conversation: side talk is ignored, the session goes on.
+    console.info('[ClavisWake] side-talk — ignored, still listening:', text);
+    window.ClavisVoiceState?.rest?.('side talk');
+    return;
+  }
+  console.info('[ClavisWake] side-talk — not for Clavis, going back to sleep:', text);
+  window.ClavisWake?.sleep?.('side-talk');
+  setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
+}
+
+let clavisTurnSeq = 0;
 async function handleJarvisSend(options) {
+  const isVoice = Boolean(options && typeof options === 'object' && options.source === 'voice');
+  const W = window.ClavisWake;
+  if (W) {
+    if (isVoice) {
+      // Backstop: soye hue Clavis tak koi voice turn nahi pahunchna chahiye.
+      if (!W.isAwake()) {
+        console.info('[ClavisWake] voice turn dropped (asleep):', options && options.text);
+        return;
+      }
+    } else {
+      const draft = (typeof options === 'string' ? options : (options && options.text) || document.getElementById('jarvis-input')?.value || '').trim();
+      const hasAtt = Boolean((options && (options.attachments?.length || options.images?.length)) || window.clavisComposerAttachments?.length);
+      if (!draft && !hasAtt) return;
+      clavisWakeUp('typed');
+    }
+  }
+  clavisTurnSeq++;
+  clavisHoldTurn();
+  const VS = window.ClavisVoiceState;
+  if (isVoice) VS?.mark?.('dispatch');
+  VS?.set?.('PROCESSING', isVoice ? 'voice turn' : 'typed turn');
+  try {
+    return await clavisHandleSendCore(options);
+  } finally {
+    // Bol raha ho to 'speech' hold window ko zinda rakhta hai; turn ka hold
+    // hamesha yahin chhootta hai — koi path busy me atka nahi reh sakta.
+    clavisReleaseTurn();
+    if (VS && !isJarvisSpeaking && /^(PROCESSING|EXECUTING)$/.test(VS.state())) VS.rest('turn done');
+  }
+}
+
+async function clavisHandleSendCore(options) {
+  const turnStartedAt = Date.now();
   const input = document.getElementById('jarvis-input');
   // Voice transcripts use this same composer, so keep their origin explicit.
   // Otherwise a spoken answer is promoted into the text task window.
@@ -983,6 +1120,31 @@ async function handleJarvisSend(options) {
         return;
       }
     } catch (e) { console.warn('Clavis intent route failed:', e); }
+  }
+
+  // ── App first: tabs, top-bar buttons, Settings sections, floating windows,
+  //    mute / mic (clavis-app-map.js). "candidate tab kholo" opens the tab —
+  //    only "PC me …" / "MS Excel" / a website goes on to the PC below.
+  //    "A aur B": app/map parts run now; a leftover part goes on as `text`.
+  if (!attachments.length && !images.length && window.ClavisAppMap?.handle) {
+    try {
+      const app = await window.ClavisAppMap.handle(text);
+      if (app && app.handled) {
+        if (requestSource !== 'voice' && app.spoken) {
+          try { showToast('success', 'Clavis', String(app.spoken)); } catch (_) {}
+        }
+        if (!app.rest) {
+          if (app.spoken) {
+            window.ClavisMind?.noteClavisTurn?.(app.spoken);
+            if (jarvisSpeechEnabled) speakJarvisText(app.spoken);
+            else setJarvisStatus('online', 'Clavis Online');
+          } else setJarvisStatus('online', 'Clavis Online');
+          if (jarvisHandsFree) scheduleHandsFreeRelisten();
+          return;
+        }
+        text = app.rest;   // the rest of a compound command → normal pipeline
+      }
+    } catch (e) { console.warn('Clavis app map failed:', e); }
   }
 
   // ── "Shut up" / "chup" — silence Clavis instantly, don't echo or call AI. ──
@@ -1128,7 +1290,10 @@ async function handleJarvisSend(options) {
 
   jarvisController = new AbortController();
 
+  const turnSignal = jarvisController.signal;   // aborted by barge-in / "chup" / a newer turn
+  const clavisStream = clavisStreamSpeaker(turnSignal);
   const onStep = (step) => {
+    clavisToolAck(step, requestSource, () => clavisStream.spoke);
     if (taskId && window.ClavisTask) {
       if (step.type === 'tool_start') {
         window.ClavisTask.toolStart(taskId, step.skill || 'tool', step.detail || '');
@@ -1140,10 +1305,33 @@ async function handleJarvisSend(options) {
 
   let voiceStream = null;
   let voiceStreamFailed = false;
-  const onTextDelta = async (delta) => {
+  // `[[silent]]` kabhi bola na jaaye: shuru ke chars tab tak roko jab tak
+  // pakka na ho ki yeh token nahi hai.
+  let deltaHead = '';
+  let deltaDecided = false;
+  let silentReply = false;
+  const onTextDelta = async (rawDelta) => {
+    let delta = String(rawDelta || '');
+    if (!deltaDecided) {
+      deltaHead += delta;
+      const head = deltaHead.trimStart().toLowerCase();
+      if ('[[silent]]'.startsWith(head)) return;   // abhi pata nahi — ruko
+      deltaDecided = true;
+      if (CLAVIS_SILENT_HEAD_RE.test(head)) { silentReply = true; return; }
+      delta = deltaHead;
+      deltaHead = '';
+    }
+    if (silentReply) return;
+    delta = clavisStripSilent(delta);
+    if (!delta) return;
+    window.ClavisVoiceState?.mark?.('llm_first_token');
     if (window.ClavisLive?.isActive?.()) return;
     if (clavisDisplayOf(taskId) === 'window') return;   // on screen -> spoken summary at the end
-    if (!jarvisSpeechEnabled || voiceStreamFailed || !window.LocalSpeechEngine) return;
+    if (!jarvisSpeechEnabled || window.ClavisVoiceState?.isSilent?.()) return;
+    // No healthy backend voice (the usual case): say each sentence as it
+    // arrives through ClavisVoice — first audio no longer waits for the whole reply.
+    if (!voiceStream && window.LocalSpeechEngine?.healthCached?.() !== true) { clavisStream.push(delta); return; }
+    if (voiceStreamFailed || !window.LocalSpeechEngine) return;
     try {
       if (!voiceStream) {
         isJarvisSpeaking = true;
@@ -1165,9 +1353,18 @@ async function handleJarvisSend(options) {
   try {
     const response = await window.JarvisEngine.sendMessage(text, jarvisController.signal, onStep, onTextDelta, {
       images: images,
-      attachments: attachments
+      attachments: attachments,
+      source: requestSource
     });
     hideJarvisTyping();
+    // Typed message hamesha Clavis ke liye hai — wahan [[silent]] sirf strip hota hai.
+    if (requestSource === 'voice' && response && (silentReply || CLAVIS_SILENT_HEAD_RE.test(String(response.text || '')))) {
+      // Baat Clavis se thi hi nahi — chup, bubble nahi, wapas so jao.
+      if (voiceStream) { try { window.LocalSpeechEngine?.stop?.(); } catch (_) {} isJarvisSpeaking = false; }
+      clavisSideTalk(taskId, text, turnStartedAt);
+      return;
+    }
+    if (response && typeof response.text === 'string') response.text = clavisStripSilent(response.text);
     if (response) {
       if (clavisDisplayOf(taskId) !== 'window' && (clavisAnswerWantsWindow(response.text) || (response.toolsRun || []).some((t) => !/^(search_web|remember_fact|get_lead_stats|get_candidate_stats|navigate_to_page|pc_|show_)/.test(t.skill || '')))) {
         clavisSetDisplay(taskId, 'window');
@@ -1185,13 +1382,15 @@ async function handleJarvisSend(options) {
       window.ClavisMind?.noteClavisTurn?.(response.text);
       refreshJarvisSidePanels();
 
-      if (jarvisSpeechEnabled && voiceStream && !voiceStreamFailed) {
+      if (clavisStream.spoke) {
+        // Already speaking it sentence by sentence; the queue finishes the rest.
+      } else if (jarvisSpeechEnabled && voiceStream && !voiceStreamFailed) {
         await window.LocalSpeechEngine.finishSpeech();
         isJarvisSpeaking = false;
         window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
         window.ClavisBargeIn?.disarm?.();
         setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
-      } else if (jarvisSpeechEnabled) {
+      } else if (jarvisSpeechEnabled && !turnSignal.aborted) {
         speakJarvisText(onScreen ? clavisSpokenSummary(response.text) : response.text);
       } else {
         setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
@@ -1261,23 +1460,19 @@ function updateLastToolChip(label, state) {
 }
 
 function stopJarvisGeneration() {
+  // Stops the answer (generation + voice) — not the listening: the command
+  // ear stays open so he can say the next thing right away.
   if (jarvisController) {
     jarvisController.abort();
     jarvisController = null;
   }
-  jarvisVoiceSession++;
-  jarvisVoiceStopRequested = true;
-  clearTimeout(jarvisVoiceCommitTimer);
-  try { jarvisRecognition?.stop(); } catch (_) {}
-  jarvisRecognition = null;
-  document.getElementById('jarvis-voice-btn')?.classList.remove('recording');
   window.stopJarvisSpeech?.();
-  window.LocalSpeechEngine?.stopInput?.();
   isJarvisSpeaking = false;
   if (currentPlayingAudio) {
     try { currentPlayingAudio.pause(); } catch {}
     currentPlayingAudio = null;
   }
+  window.ClavisEar?.noteSpeakingDone?.();
 }
 
 function sendQuickJarvis(text) {
@@ -1298,6 +1493,12 @@ function clearJarvisChat() {
 }
 
 // ── Voice input (push-to-talk, wake word, clap and snap) ───────
+// One recognizer at a time (ClavisVoiceState.mic). While Clavis is awake a
+// single native recognizer — the "command ear" — stays open across turns AND
+// while Clavis speaks (echo-guarded barge-in); the wake listener runs only
+// while asleep. See docs/VOICE_PIPELINE.md for why (the old wake/command/
+// relisten recognizers aborted each other and left gaps where nothing heard).
+const CLAVIS_VS = window.ClavisVoiceState;
 let jarvisVoiceFinalTranscript = '';
 let jarvisVoiceCommitTimer = null;
 let jarvisVoiceStopRequested = false;
@@ -1305,6 +1506,33 @@ let jarvisVoiceStopRequested = false;
 let groqMediaRecorder = null;
 let groqAudioChunks = [];
 let isGroqRecording = false;
+
+// A batch recognizer (Groq Whisper) has no partials, so the turn ends on real
+// silence measured on the mic (RMS) — not a fixed 20 s cap.
+function clavisSilenceWatch(stream, onEnd, silenceMs = 1200) {
+  let ctx = null, iv = 0;
+  try {
+    ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const an = ctx.createAnalyser();
+    an.fftSize = 1024;
+    ctx.createMediaStreamSource(stream).connect(an);
+    const buf = new Float32Array(an.fftSize);
+    let floor = 0.004, spoke = false, quietSince = 0;
+    iv = setInterval(() => {
+      an.getFloatTimeDomainData(buf);
+      let s = 0; for (let i = 0; i < buf.length; i++) s += buf[i] * buf[i];
+      const r = Math.sqrt(s / buf.length);
+      const voice = r > Math.max(0.015, floor * 3);
+      if (!voice) floor = floor * 0.95 + r * 0.05;
+      if (voice) { spoke = true; quietSince = 0; CLAVIS_VS.mark('last_voice'); return; }
+      if (!spoke) return;
+      if (!quietSince) quietSince = Date.now();
+      else if (Date.now() - quietSince >= silenceMs) { stop(); onEnd(); }
+    }, 50);
+  } catch (_) {}
+  function stop() { clearInterval(iv); iv = 0; try { ctx?.close(); } catch (_) {} ctx = null; }
+  return stop;
+}
 
 async function legacyStartGroqWhisperVoiceInput(options = {}) {
   const btn = document.getElementById('jarvis-composer-voice-btn') || document.getElementById('jarvis-voice-btn');
@@ -1322,6 +1550,7 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     });
+    CLAVIS_VS.mic.claim('groq', () => { groqAudioChunks = []; try { if (groqMediaRecorder?.state !== 'inactive') groqMediaRecorder.stop(); } catch (_) {} });
     groqAudioChunks = [];
     isGroqRecording = true;
     const groqStartedAt = Date.now();
@@ -1334,6 +1563,9 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
     }
 
     groqMediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    const stopVad = clavisSilenceWatch(stream, () => {
+      if (groqMediaRecorder && groqMediaRecorder.state !== 'inactive') groqMediaRecorder.stop();
+    });
 
     groqMediaRecorder.ondataavailable = (e) => {
       if (e.data && e.data.size > 0) {
@@ -1343,12 +1575,14 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
 
     groqMediaRecorder.onstop = async () => {
       isGroqRecording = false;
+      stopVad();
+      CLAVIS_VS.mic.release('groq');
       window.ClavisEar?.tap?.stop?.('groq');
-      window.ClavisEar?.caption?.listening(false);
       btn?.classList.remove('recording');
       stream.getTracks().forEach(track => track.stop());
 
       if (!groqAudioChunks.length) {
+        window.ClavisEar?.caption?.listening(false);
         setJarvisStatus('online', 'Clavis Online');
         return;
       }
@@ -1359,16 +1593,19 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
         return;
       }
 
+      CLAVIS_VS.mark('endpoint');
       setJarvisStatus('thinking', 'Groq Whisper se samajh raha hoon...');
-      if (composerStatus) composerStatus.textContent = '⚡ Groq Whisper transcribing...';
+      if (composerStatus) composerStatus.textContent = 'Groq Whisper transcribing...';
 
       try {
         const text = await window.ClavisDirect.transcribeWithGroq(audioBlob);
         if (composerStatus) composerStatus.textContent = '';
         if (text && text.trim()) {
+          CLAVIS_VS.mark('final');
+          clavisShowVoicePreview(text.trim());
           commitJarvisVoiceInput(text.trim(), {
             since: groqStartedAt, source: 'groq',
-            requireWake: Boolean(options.handsFreeCapture && !options.awakeCapture && !options.soundTrigger && !jarvisAwake),
+            requireWake: Boolean(options.handsFreeCapture && !options.awakeCapture && !options.soundTrigger && !clavisIsAwake()),
           });
         } else {
           setJarvisStatus('online', 'Kuch boliyega...');
@@ -1380,23 +1617,26 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
         // Fallback to browser recognition
         legacyStartNativeSpeechRecognition(options);
       }
+      // Continuous session: listen for the next turn.
+      if (clavisIsAwake()) setTimeout(() => { if (clavisIsAwake() && !isGroqRecording && !isJarvisSpeaking) legacyStartGroqWhisperVoiceInput({ ...options, initialText: '' }); }, 250);
     };
 
     btn?.classList.add('recording');
-    setJarvisStatus(options.handsFreeCapture ? 'awake' : 'listening', 'Bolte rahiye... (Tap to send)');
-    if (composerStatus) composerStatus.textContent = '⚡ Groq Whisper listening...';
+    setJarvisStatus(options.handsFreeCapture ? 'awake' : 'listening', 'Bolte rahiye...');
+    if (composerStatus) composerStatus.textContent = 'Groq Whisper listening...';
     groqMediaRecorder.start(200);
 
-    // Auto-stop safety after 20s
+    // Safety cap for one very long turn.
     setTimeout(() => {
       if (isGroqRecording && groqMediaRecorder && groqMediaRecorder.state !== 'inactive') {
         groqMediaRecorder.stop();
       }
-    }, 20000);
+    }, 45000);
 
   } catch (err) {
     console.warn('Microphone permission error or MediaRecorder unsupported:', err);
     isGroqRecording = false;
+    CLAVIS_VS.mic.release('groq');
     btn?.classList.remove('recording');
     legacyStartNativeSpeechRecognition(options);
   }
@@ -1404,6 +1644,10 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
 
 function startJarvisVoiceInput(options = {}) {
   window._clavisLastInputSource = 'voice';
+  // Orb / mic button / keyboard shortcut = sir ne khud bulaya → jaago.
+  // (Wake word aur clap/snap apne handler me pehle hi jaga chuke hote hain.)
+  if (!options.handsFreeCapture && !options.soundTrigger && !window.ClavisLive?.isActive?.()) clavisWakeUp('tap');
+  clavisPrewarm();
 
   // Clavis Live (Gemini Live API) owns voice whenever a Google AI Studio key
   // is connected. Background wake listening (handsFreeCapture without a wake)
@@ -1415,9 +1659,10 @@ function startJarvisVoiceInput(options = {}) {
       if (!options.handsFreeCapture && !options.soundTrigger) live.stop({ reason: 'user' });
       return;
     }
-    const woke = !options.handsFreeCapture || options.awakeCapture || options.soundTrigger;
-    if (woke && live.isAvailable()) {
+    const woke = (!options.handsFreeCapture || options.awakeCapture || options.soundTrigger) && clavisIsAwake();
+    if (woke && live.isAvailable() && !CLAVIS_VS.isSilent()) {
       const trigger = options.soundTrigger ? 'clap' : options.awakeCapture ? 'wake word' : 'button';
+      stopCommandEar();
       live.start({ trigger, initialText: options.initialText || '' }).then((ok) => { if (!ok) startJarvisVoiceInput({ ...options, forceLegacy: true }); });
       return;
     }
@@ -1427,36 +1672,156 @@ function startJarvisVoiceInput(options = {}) {
   // Tier 1: If backend LocalSpeechEngine is running and has active input socket, use it
   if (window.startLocalJarvisVoiceInput && window.LocalSpeechEngine?.inputSocket) {
     const localOptions = { ...options, persistent: Boolean(options.persistent) };
+    CLAVIS_VS.mic.claim('local', () => window.LocalSpeechEngine?.stopInput?.());
+    // The backend streams partial transcripts: preview them verbatim.
+    localOptions.onPartial = (t) => { if (t) { CLAVIS_VS.mark('first_partial'); CLAVIS_VS.mark('last_voice'); clavisShowVoicePreview(t); } };
     localOptions.onFinal = (rawText) => {
       const text = String(rawText || '').trim();
       if (!text) return;
-      if (options.handsFreeCapture && !options.awakeCapture) {
+      CLAVIS_VS.mark('endpoint');
+      if (options.handsFreeCapture && !options.awakeCapture && !clavisIsAwake()) {
         const wake = clavisWakeMatch(text);
-        if (!wake) return;
-        if (!wake.remainder) {
-          jarvisAwake = true;
+        if (!wake) { window.ClavisEar?.caption?.clear?.(); return; }   // soya hai — sirf naam sunta hai
+        if (clavisWordCount(wake.remainder) < 2) {
+          clavisWakeUp('word');
+          playWakeChime();
           window.LocalSpeechEngine.stopInput();
           setJarvisStatus('awake', 'Haan sir, boliye...');
           setTimeout(() => startJarvisVoiceInput({ handsFreeCapture: true, awakeCapture: true, persistent: true }), 120);
           return;
         }
-        commitJarvisVoiceInput(wake.remainder);
+        commitJarvisVoiceInput(text, { source: 'local' });   // naam + command ek saath
         return;
       }
-      commitJarvisVoiceInput(text);
+      commitJarvisVoiceInput(text, { source: 'local', openMic: clavisOpenMic() });
     };
     window.startLocalJarvisVoiceInput(localOptions);
     return;
   }
 
-  // Tier 2: Groq Whisper STT (Superfast ~300ms, accurate Hindi/English)
-  if (window.ClavisDirect?.keyFor?.('groq')) {
-    legacyStartGroqWhisperVoiceInput(options);
+  // Soye hue Clavis ke liye room audio ko cloud STT (Groq) par bhejna = keys
+  // khatam. Background wake sirf free local recognizer / clap / snap / tap se.
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const backgroundOnly = Boolean(options.handsFreeCapture && !options.awakeCapture && !options.soundTrigger && !clavisIsAwake());
+  if (backgroundOnly && !SR) {
+    setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
     return;
   }
 
-  // Tier 3: Native Browser SpeechRecognition (works 100% locally offline)
+  // Tier 2: the browser recognizer — live partials in the caption, semantic
+  // endpointing, stays open across turns. Groq Whisper (batch, no partials)
+  // is only the fallback for a browser without Web Speech.
+  if (!SR && window.ClavisDirect?.keyFor?.('groq') && !backgroundOnly) {
+    legacyStartGroqWhisperVoiceInput(options);
+    return;
+  }
   legacyStartNativeSpeechRecognition(options);
+}
+
+// ── The command ear ────────────────────────────────────────────
+const clavisEar = {
+  rec: null, session: 0, running: false, startedAt: 0, stopRequested: false,
+  seed: '', consumed: 0, lastLen: 0, heard: '', holding: false, lastVoiceAt: 0,
+  timer: null, options: {}, utterStartAt: 0,
+  tail: null,   // the still-open (interim) result: {idx, words}
+  skip: null,   // words already used from result idx (he may keep talking in it)
+};
+// Everything heard so far is used up (committed / echo / "chup"). An interim
+// result can still grow, so it is skipped by word count, not dropped whole.
+function clavisEarConsumeAll() {
+  const ear = clavisEar;
+  if (ear.tail) { ear.consumed = ear.tail.idx; ear.skip = { ...ear.tail }; }
+  else { ear.consumed = ear.lastLen; ear.skip = null; }
+  ear.seed = ''; ear.heard = '';
+}
+// One language for wake + command so the wake recognizer can simply become
+// the command ear (no restart gap). en-IN writes Hinglish in Roman script,
+// which is what the command parsers and the caption expect.
+function clavisEarLang() {
+  return localStorage.getItem('clavis_voice_language') || localStorage.getItem('jarvis_voice_lang') || 'en-IN';
+}
+function clavisWakeLang() {
+  return localStorage.getItem('clavis_wake_lang') || clavisEarLang();
+}
+function clavisEarAlive() {
+  return Boolean(clavisEar.rec && !clavisEar.stopRequested && (clavisEar.running || Date.now() - clavisEar.startedAt < 1500));
+}
+// Is Clavis audibly speaking right now? ClavisEar tracks every voice engine
+// (with a safety expiry); the bare isJarvisSpeaking flag could stay stuck
+// true after a cut-off reply and leave the ear treating him as echo.
+function clavisSpeakingNow() {
+  if (!window.ClavisEar) return Boolean(isJarvisSpeaking);
+  return Boolean(window.ClavisEar.isSpeaking() || (isJarvisSpeaking && window.LocalSpeechEngine?.outputSocket));
+}
+
+function stopCommandEar() {
+  const ear = clavisEar;
+  clearTimeout(ear.timer); clearTimeout(jarvisVoiceCommitTimer);
+  ear.stopRequested = true; jarvisVoiceStopRequested = true;
+  ear.session++; jarvisVoiceSession++;
+  const rec = ear.rec;
+  ear.rec = null; ear.running = false;
+  if (jarvisRecognition === rec) jarvisRecognition = null;
+  ear.seed = ''; ear.heard = ''; ear.holding = false; ear.consumed = 0; ear.utterStartAt = 0; ear.tail = null; ear.skip = null;
+  jarvisVoiceFinalTranscript = '';
+  if (rec) {
+    try { rec.onend = null; rec.onresult = null; rec.onerror = null; rec.onstart = null; } catch (_) {}
+    try { if (typeof rec.abort === 'function') rec.abort(); else rec.stop(); } catch (_) {}
+  }
+  CLAVIS_VS.mic.release('command');
+  document.getElementById('jarvis-voice-btn')?.classList.remove('recording');
+  document.getElementById('jarvis-composer-voice-btn')?.classList.remove('recording');
+  window.ClavisEar?.tap?.stop?.('native');
+}
+window.clavisStopCommandEar = stopCommandEar;
+
+// Wire a recognizer as the command ear (a fresh one, or the running wake
+// recognizer adopted in place — see startWakeListener).
+function clavisEarBind(rec, options, startIndex = 0) {
+  const ear = clavisEar;
+  CLAVIS_VS.mic.claim('command', stopCommandEar);
+  ear.stopRequested = false; jarvisVoiceStopRequested = false;
+  const session = ++ear.session; jarvisVoiceSession++;
+  ear.options = options || {};
+  ear.rec = rec; jarvisRecognition = rec;
+  ear.consumed = startIndex; ear.lastLen = startIndex; ear.holding = false; ear.utterStartAt = 0; ear.tail = null; ear.skip = null;
+  ear.startedAt = startIndex ? Date.now() : 0;   // an adopted recognizer is already running
+  const composerStatus = document.getElementById('jarvis-composer-status');
+  rec.onstart = () => { if (session === ear.session) { ear.running = true; if (composerStatus?.textContent) composerStatus.textContent = ''; } };
+  rec.onspeechstart = () => { if (session === ear.session && !clavisSpeakingNow()) CLAVIS_VS.mark('speech_start'); };
+  rec.onresult = (e) => { if (session === ear.session) clavisEarResult(e); };
+  rec.onerror = (ev) => {
+    if (session !== ear.session) return;
+    const err = ev?.error;
+    if (err === 'not-allowed' || err === 'service-not-allowed') {
+      stopCommandEar();
+      CLAVIS_VS.set('ERROR', 'mic blocked');
+      if (composerStatus) composerStatus.textContent = 'Microphone blocked — allow it in browser settings, then retry.';
+      showToast('error', 'Voice input error', 'Microphone permission is blocked. Allow it in the browser address bar.');
+      return;
+    }
+    if (err === 'audio-capture') CLAVIS_VS.set('ERROR', 'audio-capture');
+    // no-speech / aborted / network: onend reopens it (and the watchdog backs that up).
+    if (err === 'network' && composerStatus) composerStatus.textContent = 'Voice service reconnecting…';
+  };
+  rec.onend = () => {
+    if (session !== ear.session) return;
+    ear.running = false;
+    if (ear.stopRequested) return;
+    // Chrome closes continuous sessions by itself (silence, network, ~60 s).
+    // Keep what he already said as the seed so no word is lost; reopen now.
+    ear.seed = ear.heard; ear.consumed = 0; ear.lastLen = 0; ear.tail = null; ear.skip = null;
+    ear.startedAt = 0;   // not alive until a start() succeeds (the watchdog counts from here)
+    setTimeout(() => {
+      if (session !== ear.session || ear.stopRequested || ear.running) return;
+      try { rec.start(); ear.startedAt = Date.now(); } catch (_) { /* watchdog retries */ }
+    }, 50);
+  };
+  document.getElementById('jarvis-composer-voice-btn')?.classList.add('recording');
+  if (window.ClavisEar?.voiceId?.enabled?.()) window.ClavisEar.tap.start('native');
+  window.ClavisEar?.caption?.listening(true);
+  CLAVIS_VS.rest('ear open');
+  return session;
 }
 
 function legacyStartNativeSpeechRecognition(options = {}) {
@@ -1467,148 +1832,133 @@ function legacyStartNativeSpeechRecognition(options = {}) {
     showToast('error', 'Not Supported', 'Voice input isn\'t supported in this browser. Try Chrome.');
     return;
   }
-  const btn = document.getElementById('jarvis-composer-voice-btn') || document.getElementById('jarvis-voice-btn');
-  const composerStatus = document.getElementById('jarvis-composer-status');
-  if (composerStatus) composerStatus.textContent = '';
-  if (jarvisRecognition) {
-    jarvisVoiceStopRequested = true;
-    clearTimeout(jarvisVoiceCommitTimer);
-    jarvisRecognition.stop();
-    jarvisRecognition = null;
-    btn?.classList.remove('recording');
+  const ear = clavisEar;
+  const initialText = String(options.initialText || '').trim();
+  // Already open: a wake remainder joins the turn; a tap means "that's it, send".
+  if (ear.rec && clavisEarAlive()) {
+    if (initialText) { ear.seed = `${ear.seed} ${initialText}`.trim(); ear.heard = `${ear.heard} ${initialText}`.trim(); clavisShowVoicePreview(ear.heard); clavisEarSchedule(); }
+    else if (!options.handsFreeCapture && ear.heard.trim()) clavisEarCommit('tap');
+    window.ClavisEar?.caption?.listening(true);
     return;
   }
+  if (ear.rec) stopCommandEar();
+  stopWakeListener(true);
 
-  const session = ++jarvisVoiceSession;
   const recognition = new SpeechRecognition();
-  recognition.lang = localStorage.getItem('clavis_voice_language')
-    || localStorage.getItem('jarvis_voice_lang')
-    || 'hi-IN';
+  recognition.lang = clavisEarLang();
   recognition.interimResults = true;
   recognition.continuous = true;
-  jarvisRecognition = recognition;
-  const initialText = String(options.initialText || '').trim();
-  let hasFinalSpeech = false;
-  let utterStartAt = 0;
-  const commitMeta = () => ({
-    since: utterStartAt || Date.now() - 6000, source: 'native', openMic: Boolean(options.followUp),
-    requireWake: Boolean(options.handsFreeCapture && !options.awakeCapture && !options.soundTrigger && !jarvisAwake),
-  });
-  jarvisVoiceFinalTranscript = initialText;
-  jarvisVoiceStopRequested = false;
-
-  btn?.classList.add('recording');
+  recognition.maxAlternatives = 1;
+  clavisEarBind(recognition, options, 0);
+  ear.seed = initialText; ear.heard = initialText;
   setJarvisStatus(options.handsFreeCapture ? 'awake' : 'listening', options.handsFreeCapture ? 'Haan sir, boliye...' : 'Sun raha hoon...');
-  if (window.ClavisEar?.voiceId?.enabled?.()) window.ClavisEar.tap.start('native');
-  window.ClavisEar?.caption?.listening(true);
-  recognition.onresult = (e) => {
-    if (session !== jarvisVoiceSession) return;
-    let finalText = jarvisVoiceFinalTranscript;
-    let interimText = '';
-    for (let i = e.resultIndex || 0; i < e.results.length; i++) {
-      const result = e.results[i];
-      if (!result?.[0]) continue;
-      if (result.isFinal) {
-        hasFinalSpeech = true;
-        finalText += ` ${result[0].transcript.trim()}`;
-      }
-      else interimText += `${result[0].transcript.trim()} `;
-    }
-    if (finalText.trim()) jarvisVoiceFinalTranscript = finalText.trim();
-    const transcript = `${jarvisVoiceFinalTranscript} ${interimText}`.trim();
-    if (!utterStartAt && transcript) utterStartAt = Date.now() - 700;
-    // His words preview in the Siri-style caption (top right), never in the
-    // composer: the composer stays his, and Clavis's own voice can't land there.
-    clavisShowVoicePreview(transcript);
-    clearTimeout(jarvisVoiceCommitTimer);
-    if (/\b(go for it|that's it|thats it|backseat|done|over)\.?\s*$/i.test(transcript)) {
-      commitJarvisVoiceInput(transcript, commitMeta());
-    } else if (hasFinalSpeech) {
-      const pauseMs = clavisPauseFor(transcript, options.handsFreeCapture ? 1500 : 1300);
-      jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript, commitMeta()), pauseMs);
-    }
-  };
-  recognition.onerror = (event) => {
-    if (session !== jarvisVoiceSession) return;
-    if (['aborted', 'no-speech'].includes(event.error)) return;
-    if (event.error === 'network') {
-      // Chrome's SpeechRecognition service can briefly lose its network while
-      // the microphone is still healthy. onend() already restarts it; do not
-      // turn this transient condition into a repeated red notification.
-      if (composerStatus) composerStatus.textContent = options.handsFreeCapture
-        ? 'Wake word reconnecting…'
-        : 'Voice service reconnecting…';
-      jarvisVoiceStopRequested = false;
-      clearTimeout(jarvisVoiceCommitTimer);
-      return;
-    }
-    const reason = event.error || 'unknown browser voice error';
-    clearTimeout(jarvisVoiceCommitTimer);
-    jarvisVoiceStopRequested = true;
-    btn?.classList.remove('recording');
-    jarvisRecognition = null;
-    if (composerStatus) composerStatus.textContent = event.error === 'not-allowed'
-      ? 'Microphone blocked — allow it in browser settings, then retry.'
-      : `Voice input stopped (${reason}) — try again.`;
-    showToast('error', 'Voice input error', event.error === 'not-allowed'
-      ? 'Microphone permission is blocked. Allow it in the browser address bar.'
-      : `Browser voice recognition reported “${reason}”. Check the microphone and try again.`);
-  };
-  recognition.onend = () => {
-    if (session !== jarvisVoiceSession) return;
-    if (jarvisRecognition === recognition) jarvisRecognition = null;
-    btn?.classList.remove('recording');
-    if (jarvisVoiceStopRequested) { window.ClavisEar?.tap?.stop?.('native'); window.ClavisEar?.caption?.listening(false); return; }
-    if (hasFinalSpeech && jarvisVoiceFinalTranscript.trim()) {
-      clearTimeout(jarvisVoiceCommitTimer);
-      // Chrome may end its service during a perfectly valid pause. Give the
-      // user the same pause window instead of submitting half a sentence.
-      jarvisVoiceCommitTimer = setTimeout(() => commitJarvisVoiceInput(jarvisVoiceFinalTranscript, commitMeta()), options.handsFreeCapture ? 1500 : 1300);
-    } else {
-      window.setTimeout(() => {
-        if (session !== jarvisVoiceSession || jarvisVoiceStopRequested || jarvisRecognition) return;
-        try { recognition.start(); jarvisRecognition = recognition; btn?.classList.add('recording'); } catch (_) {}
-      }, 180);
-    }
-  };
-  try { recognition.start(); } catch (error) {
-    jarvisRecognition = null;
-    btn?.classList.remove('recording');
-    if (composerStatus) composerStatus.textContent = 'Microphone could not start — try again.';
-    showToast('error', 'Voice input error', 'Microphone could not start. Please try again.');
+  // "Clavis, leads dikhao" ek hi saans me: wake ke saath command aa chuka hai.
+  if (initialText) { clavisShowVoicePreview(initialText); CLAVIS_VS.mark('first_partial'); CLAVIS_VS.mark('last_voice'); clavisEarSchedule(); }
+  try { recognition.start(); ear.startedAt = Date.now(); } catch (error) {
+    // Another recognizer still closing — the watchdog reopens this in ~1.5 s.
+    console.info('[Clavis ear] start deferred:', error?.message || error);
   }
 }
 
-// How long to wait for more words. Hindi speakers pause mid-thought
-// ("okay to tum mujhe … aur jo hai …"); committing on every pause sent
-// fragments to the AI, which then asked "what exactly do you want?".
-//   finished command (…karo / dikhao / batao / chahiye / ?)  → quick
-//   dangling thought (…mujhe / tum / jo / aur / matlab / okay) → wait
-//   anything else (ends on a noun: "Gurgaon ki leads")         → a beat
-const CLAVIS_DONE_END = /(\b(karo|kardo|kar do|kariye|kijiye|karein|karna hai|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|samjhao|kholo|khol do|band karo|band kar do|hatao|hata do|nikalo|nikal do|bhejo|bhej do|likho|likh do|chahiye|chalao|chala do|dhundho|dhoondho|lao|le aao|sunao|bolo|ruko|bas|chup|stop|please|thanks|thank you|shukriya|done|ho gaya|theek hai|hai na|kya hai|kaun hai|kahan hai|kaise ho)|[?!.।])\s*$/i;
-const CLAVIS_DANGLING_END = /\b(ki|ke|ka|ko|se|me|mein|par|pe|aur|ya|ki jo|jo|jaise|matlab|yaani|mtlb|like|um+|uh+|hmm+|toh|to|phir|fir|abhi|bhi|ek|koi|kuch|mujhe|mujhko|muje|tum|tumhe|tumko|aap|aapko|hum|hame|humko|main|mai|mera|meri|mere|apna|apni|and|or|the|a|an|for|of|in|with|my|your|this|that|okay|ok|so|well|actually|basically|clavis|sir)$/i;
-function clavisPauseFor(text, base) {
-  const t = String(text || '').trim().toLowerCase();
-  if (!t) return base;
-  if (CLAVIS_DONE_END.test(t)) return base;
-  if (CLAVIS_DANGLING_END.test(t)) return base + 2200;
-  if (t.split(/\s+/).length <= 1) return base + 900;
-  return base + 600;
+function clavisEarResult(e) {
+  const ear = clavisEar;
+  let fin = '', interim = '';
+  const n = e.results.length;
+  for (let i = ear.consumed; i < n; i++) {
+    const r = e.results[i];
+    let t = String(r?.[0]?.transcript || '').trim();
+    if (ear.skip && i === ear.skip.idx) t = t.split(/\s+/).slice(ear.skip.words).join(' ');
+    if (!t) continue;
+    if (r.isFinal) fin += ' ' + t; else interim += ' ' + t;
+  }
+  ear.lastLen = n;
+  const lastR = e.results[n - 1];
+  ear.tail = lastR && !lastR.isFinal ? { idx: n - 1, words: clavisWordCount(lastR[0]?.transcript) } : null;
+  const heard = `${ear.seed} ${fin} ${interim}`.replace(/\s+/g, ' ').trim();
+  if (!heard) return;
+
+  // Clavis is talking: only a real barge-in counts, never its own echo.
+  if (clavisSpeakingNow()) {
+    const v = window.ClavisEar?.judge?.(heard, { since: Date.now() - 3000 }) || { accept: false };
+    if (!(v.accept && v.barge)) {
+      // Echo / room noise: forget it so it never prefixes his next command.
+      clavisEarConsumeAll();
+      return;
+    }
+    interruptClavisSpeech();
+    const stop = CLAVIS_VS.parseStop(heard);
+    if (stop && stop.kind === 'hush') {
+      // "chup" / "stop" / "wait" over Clavis: quiet instantly, keep listening.
+      clavisEarConsumeAll();
+      CLAVIS_VS.mark('first_partial'); CLAVIS_VS.mark('endpoint'); CLAVIS_VS.mark('dispatch');
+      window.ClavisEar?.caption?.clear?.();
+      if (/\b(wait|ruko|ruk jao)\b/i.test(heard)) ear.holding = true;
+      CLAVIS_VS.rest('hushed');
+      return;
+    }
+  }
+
+  ear.heard = heard;
+  if (!ear.utterStartAt) ear.utterStartAt = Date.now() - 700;
+  CLAVIS_VS.mark('first_partial'); CLAVIS_VS.mark('last_voice'); CLAVIS_VS.notePartial();
+  if (fin) CLAVIS_VS.mark('final');
+  CLAVIS_VS.set('USER_SPEAKING', 'partial');
+  // Bolte-bolte window expire na ho.
+  if (clavisIsAwake() && (!ear.options.followUp || window.ClavisEar?.looksLikeRequest?.(heard) || window.ClavisWake?.named?.(heard))) {
+    window.ClavisWake?.touch?.(6000);
+  }
+  // His words, verbatim, in the caption (never in the composer).
+  clavisShowVoicePreview(heard);
+  if (!ear.holding && CLAVIS_VS.isHold(heard)) ear.holding = true;
+  clavisEarSchedule();
 }
-// A voice fragment that is obviously unfinished (all filler / ends on a
-// dangling word, no verb) is not a request — keep listening instead of
-// sending it to the AI.
-function clavisIsFragment(text) {
-  const t = String(text || '').trim().toLowerCase().replace(/[.,!?।]+$/g, '');
-  const words = t.split(/\s+/).filter(Boolean);
-  if (!words.length) return true;
-  if (words.length > 6) return false;
-  if (CLAVIS_DONE_END.test(t)) return false;
-  // Any action verb anywhere = a real request ("ek report likho sales ki").
-  if (/\b(karo|kar|kijiye|dikhao|dikha|batao|bata|kholo|khol|band|hatao|nikalo|nikal|bhejo|likho|likh|chahiye|chalao|dhundho|lao|search|open|close|show|find|send|write|play|call|leads?|map|photo|photos)\b/.test(t)) return false;
-  if (words.length <= 3 && /^(aur|to|toh|phir|fir|matlab|and|so|or|ya)\b/.test(t)) return true;
-  return CLAVIS_DANGLING_END.test(t);
+
+// Semantic endpoint: ~0.7 s after a finished sentence, 1.3 s neutral, 2.8 s
+// after a dangling word; "wait / ruko" holds until "done / ab batao".
+function clavisEarSchedule() {
+  const ear = clavisEar;
+  clearTimeout(ear.timer);
+  ear.lastVoiceAt = Date.now();
+  const d = CLAVIS_VS.endpointDelay(ear.heard, { holding: ear.holding });
+  if (d === 0) { clavisEarCommit('release'); return; }
+  ear.timer = setTimeout(clavisEarCheck, d === Infinity ? 1000 : d);
 }
+function clavisEarCheck() {
+  const ear = clavisEar;
+  if (!ear.heard) return;
+  const silence = Date.now() - ear.lastVoiceAt;
+  const verdict = CLAVIS_VS.decide(ear.heard, silence, { holding: ear.holding });
+  if (verdict === 'commit') { clavisEarCommit('endpoint'); return; }
+  if (verdict === 'drop') {
+    clavisEarConsumeAll(); ear.holding = false; ear.utterStartAt = 0;
+    window.ClavisEar?.caption?.clear?.();
+    CLAVIS_VS.rest('hold expired');
+    return;
+  }
+  ear.timer = setTimeout(clavisEarCheck, 250);
+}
+function clavisEarCommit(reason) {
+  const ear = clavisEar;
+  clearTimeout(ear.timer);
+  const raw = ear.heard;
+  clavisEarConsumeAll(); ear.holding = false;
+  const since = ear.utterStartAt || Date.now() - 6000;
+  ear.utterStartAt = 0;
+  const text = CLAVIS_VS.stripHold(raw);
+  if (!text) { window.ClavisEar?.caption?.clear?.(); CLAVIS_VS.rest('empty'); return; }
+  CLAVIS_VS.mark('endpoint');
+  const o = ear.options || {};
+  commitJarvisVoiceInput(text, {
+    since, source: 'native', fromEar: true, reason,
+    openMic: Boolean(o.followUp),
+    requireWake: Boolean(o.handsFreeCapture && !o.awakeCapture && !o.soundTrigger && !clavisIsAwake()),
+  });
+}
+
+// Kept for other callers: the endpoint rules now live in ClavisVoiceState.
+const CLAVIS_DONE_END = CLAVIS_VS.DONE_END;
+const CLAVIS_DANGLING_END = CLAVIS_VS.DANGLING_END;
+function clavisIsFragment(text) { return CLAVIS_VS.isFragment(text); }
 
 // Live preview of what sir is saying. The caption owns it; the composer is
 // only a fallback for a build without clavis-ear.js.
@@ -1630,69 +1980,262 @@ function interruptClavisSpeech() {
   window.ClavisBargeIn?.disarm?.();
   window.ClavisMind?.noteInterrupted?.();
   window.ClavisEar?.noteSpeakingDone?.();
+  CLAVIS_VS.set('USER_SPEAKING', 'barge-in');
   setJarvisStatus('interrupted', 'Aap boliye...');
   return true;
 }
 window.interruptClavisSpeech = interruptClavisSpeech;
 
+// Quiet now (voice "chup" / "stop" / silent mode) without touching the mic.
+function clavisHushNow() {
+  if (jarvisController) { try { jarvisController.abort('hush'); } catch (_) {} jarvisController = null; }
+  stopJarvisSpeech();
+  try { window.ClavisLive?.hush?.(); } catch (_) {}
+  isJarvisSpeaking = false;
+  window.ClavisBargeIn?.disarm?.();
+  window.ClavisMind?.noteSpeakingStopped?.();
+  window.ClavisEar?.noteSpeakingDone?.();
+}
+// A new spoken turn replaces whatever the last one was still doing.
+function clavisCancelStaleTurn() {
+  clavisGateClear();
+  if (jarvisController) { try { jarvisController.abort('superseded'); } catch (_) {} jarvisController = null; }
+  if (clavisSpeakingNow()) {
+    stopJarvisSpeech();
+    isJarvisSpeaking = false;
+    window.ClavisBargeIn?.disarm?.();
+    window.ClavisEar?.noteSpeakingDone?.();
+  }
+}
+
+// Deterministic voice commands — decided locally in < 1 ms, never via the LLM:
+// hush ("chup", "shut up"), sleep ("so jao", "bas karo", "stop listening"),
+// silent-for-N ("5 minute chup raho").
+function clavisVoiceFastPath(text) {
+  const cmd = CLAVIS_VS.parseStop(text);
+  if (!cmd) return false;
+  CLAVIS_VS.mark('dispatch');
+  window.ClavisEar?.caption?.final(text, true);
+  clavisHushNow();
+  if (cmd.kind === 'hush') {
+    CLAVIS_VS.rest('hush');
+    setJarvisStatus('awake', 'Chup — boliye jab chahiye');
+    return true;
+  }
+  if (cmd.kind === 'silent') {
+    const min = Math.max(1, Math.round(cmd.ms / 60000));
+    if (window.ClavisLive?.isActive?.()) { try { window.ClavisLive.stop({ reason: 'silent' }); } catch (_) {} }
+    CLAVIS_VS.silence(cmd.ms);
+    window.ClavisProactive?.snooze?.(Math.ceil(cmd.ms / 60000));
+    setJarvisStatus('awake', `Chup hoon — ${min} min`);
+    try { showToast('info', 'Silent mode', `Clavis ${min} min tak nahi bolega — sun raha hai, jawab screen par.`); } catch (_) {}
+    clavisEnsureListening();
+    return true;
+  }
+  // sleep
+  CLAVIS_VS.unsilence();
+  clavisGateClear();
+  const r = window.ClavisIntent?.sleep?.('asked');   // sleeps (or lets Live say its line first)
+  if (!r) { window.ClavisWake?.sleep?.('asked'); window.clavisGoToSleep?.(); }
+  if (r?.spoken && jarvisSpeechEnabled) speakJarvisText(r.spoken, { style: r.style });
+  return true;
+}
+
+// ── Background-tab gate: he's on another tab, so a spoken ACTION is asked
+//    first ("Sir, aap dusre tab par hain — kya main '…' kar doon? Haan ya na?").
+//    Answers and typed turns are never gated.
+const clavisGate = { pending: null };
+function clavisTabAway() {
+  try { return Boolean(document.hidden || !document.hasFocus()); } catch (_) { return false; }
+}
+const CLAVIS_ACTION_RE = /\b(karo|kar do|kardo|kariye|kijiye|kholo|khol do|band karo|band kar do|bhejo|bhej do|hatao|hata do|chalao|chala do|nikalo|nikal do|likho|likh do|mita do|bana do|banao|dikhao|dikha do|lagao|chalu karo|open|close|send|delete|remove|start|run|play|pause|call|create|add|export|download|sync|save|type|search|show|find|go to|navigate|switch)\b/i;
+const CLAVIS_QUESTION_RE = /\?\s*$|^(kya|kaise|kyun|kyon|kab|kahan|kaun|kitn[aei]|what|why|how|when|where|who|which|is|are|do you|does)\b|\b(kya hai|kaun hai|kahan hai|kaise hai|batao|bataiye|bata do|samjhao|explain|tell me)\b/i;
+function clavisLooksLikeAction(text) {
+  const t = String(text || '').trim();
+  return CLAVIS_ACTION_RE.test(t) && !CLAVIS_QUESTION_RE.test(t);
+}
+function clavisGateClear(answer) {
+  const p = clavisGate.pending;
+  if (!p) return;
+  clavisGate.pending = null;
+  clearTimeout(p.timer);
+  if (answer !== 'yes') { try { p.onNo?.(); } catch (_) {} }
+}
+function clavisAskBeforeActing(text, run, onNo) {
+  clavisGateClear();
+  const task = text.length > 70 ? text.slice(0, 67) + '…' : text;
+  const q = `Sir, aap dusre tab par hain — kya main "${task}" kar doon? Haan ya na?`;
+  const p = { text, run: run || (() => { clavisCancelStaleTurn(); handleJarvisSend({ source: 'voice', text }); }), onNo };
+  // ~12 s to answer after the question has been said.
+  p.timer = setTimeout(() => {
+    if (clavisGate.pending !== p) return;
+    console.info('[Clavis gate] no answer — not done:', text);
+    clavisGateClear();
+    window.ClavisEar?.caption?.clear?.();
+  }, 12000 + q.length * 70);
+  clavisGate.pending = p;
+  window.ClavisWake?.touch?.(30000);
+  window.ClavisEar?.caption?.final(text, true);
+  if (jarvisSpeechEnabled && !CLAVIS_VS.isSilent()) speakJarvisText(q, { force: true });
+  else { try { showToast('info', 'Clavis', q); } catch (_) {} }
+}
+// A spoken yes / no for the pending question. Returns true when consumed.
+function clavisGateOffer(text) {
+  const p = clavisGate.pending;
+  if (!p) return false;
+  const yn = CLAVIS_VS.parseYesNo(text);
+  if (!yn) return false;   // not an answer (or its own question heard back)
+  clavisGateClear(yn);
+  window.ClavisEar?.caption?.final(text, true);
+  CLAVIS_VS.mark('dispatch');
+  if (yn === 'yes') p.run();
+  else {
+    CLAVIS_VS.rest('gate: no');
+    if (jarvisSpeechEnabled) speakJarvisText('Theek hai sir, nahi karta.');
+  }
+  return true;
+}
+window.clavisGateOffer = clavisGateOffer;
+// For Clavis Live's action tools: resolves true right away when he's on this
+// tab; otherwise asks aloud and resolves with his answer.
+window.clavisBackgroundGate = function clavisBackgroundGate(label) {
+  if (!clavisTabAway()) return Promise.resolve(true);
+  return new Promise((resolve) => clavisAskBeforeActing(String(label || 'yeh kaam'), () => resolve(true), () => resolve(false)));
+};
+
+// Open the connections the next turn will need while he is still talking.
+let clavisPrewarmed = false;
+function clavisPrewarm() {
+  if (clavisPrewarmed) return;
+  clavisPrewarmed = true;
+  try {
+    ['https://generativelanguage.googleapis.com', 'https://api.groq.com', 'https://openrouter.ai'].forEach((href) => {
+      const l = document.createElement('link');
+      l.rel = 'preconnect'; l.href = href; l.crossOrigin = 'anonymous';
+      document.head.appendChild(l);
+    });
+  } catch (_) {}
+}
+
+function clavisWordCount(text) {
+  return String(text || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
 function commitJarvisVoiceInput(transcript, meta = {}) {
   const input = document.getElementById('jarvis-input');
-  let finalText = clavisCommitCommand(String(transcript || '').trim());
+  meta = meta || {};
+  const heard = clavisCommitCommand(String(transcript || '').trim());
+  let finalText = heard;
   clearTimeout(jarvisVoiceCommitTimer);
   if (!finalText) return;
-  if (meta && meta.requireWake) {
-    const wake = clavisWakeMatch(finalText);
-    if (!wake) { window.ClavisEar?.caption?.final(finalText, false); jarvisVoiceFinalTranscript = ''; return; }
-    finalText = wake.remainder;
-    if (!finalText) {
-      jarvisAwake = true;
-      playWakeChime();
-      setJarvisStatus('awake', 'Haan sir, boliye...');
-      window.ClavisEar?.caption?.listening(true);
+
+  // ── Wake gate: soya hai to sirf naam se jaagta hai ─────────────
+  const wake = clavisWakeMatch(finalText);
+  // Clavis ka apna naam uski apni awaaz me ("Main Clavis hoon") wake nahi hai.
+  const selfName = Boolean(wake && window.ClavisEar && window.ClavisEar.msSinceSpoke?.() < 4000 && !window.ClavisEar.judge(finalText).accept);
+  const byName = Boolean(wake && !selfName);
+  if (!clavisIsAwake() || meta.requireWake) {
+    if (!byName) {
+      // Overheard — koi LLM nahi, koi task nahi, caption bhi saaf.
+      console.info('[ClavisWake] asleep, ignored:', finalText);
+      window.ClavisEar?.caption?.clear?.();
+      jarvisVoiceFinalTranscript = '';
       return;
     }
   }
+  if (byName) {
+    clavisWakeUp('word');
+    finalText = wake.remainder;
+    // "Gurugram ki leads dikhao, Clavis" — naam aakhir me, command pehle.
+    if (clavisWordCount(finalText) < 2 && clavisWordCount(wake.before) >= 2) finalText = wake.before;
+    const stopOnly = window.ClavisCommands?.isStop?.(finalText) || CLAVIS_VS.parseStop(finalText);
+    if (clavisWordCount(finalText) < 2 && !stopOnly) {
+      // Sirf "Clavis" / "Hey Clavis" — jaag gaya, ab command suno.
+      jarvisVoiceFinalTranscript = '';
+      playWakeChime();
+      clavisYawnIfSlept();
+      setJarvisStatus('awake', 'Haan sir, boliye...');
+      window.ClavisEar?.caption?.listening(true);
+      CLAVIS_VS.rest('named');
+      clavisEnsureListening();
+      return;
+    }
+  }
+  // A yes / no for the background-tab question (said after the question ended).
+  if (clavisGate.pending && !clavisSpeakingNow() && clavisGateOffer(finalText)) return;
+
+  const openMic = !byName && Boolean(meta.openMic || clavisOpenMic());
+  const session = Boolean(window.ClavisWake?.continuous?.() && clavisIsAwake());
+
   // One gate for every recognizer: Clavis's own voice (echo), background
   // chatter in open-mic moments, and — once enrolled — voices that aren't his.
-  const verdict = window.ClavisEar?.judge?.(finalText, meta || {}) || { accept: true };
+  const verdict = window.ClavisEar?.judge?.(byName ? heard : finalText, { ...meta, openMic, session }) || { accept: true };
   if (!verdict.accept) {
     console.info('[ClavisEar] ignored (' + verdict.reason + '):', finalText);
     window.ClavisEar?.caption?.final(finalText, false);
     jarvisVoiceFinalTranscript = '';
+    CLAVIS_VS.rest('ignored');
     return;
+  }
+  // Follow-up (bina naam, no continuous session) me sirf wahi jo sach me
+  // Clavis se maanga gaya ho: request/sawaal, ya Voice ID se pakka sir ki awaaz.
+  // In a continuous session the LLM's [[silent]] filters side talk instead.
+  if (openMic && !verdict.barge && !session) {
+    const ear = window.ClavisEar;
+    const owner = Boolean(ear?.voiceId?.enabled?.() && verdict.reason === 'ok');
+    if (!(window.ClavisWake?.named?.(finalText) || ear?.looksLikeRequest?.(finalText) || owner || !ear)) {
+      console.info('[ClavisWake] follow-up ignored (not a request):', finalText);
+      window.ClavisEar?.caption?.final(finalText, false);
+      jarvisVoiceFinalTranscript = '';
+      CLAVIS_VS.rest('ignored');
+      return;
+    }
   }
   if (verdict.barge) interruptClavisSpeech();
-  // "okay to tum mujhe…" — he hasn't said it yet. Nudge, keep listening.
-  if (clavisIsFragment(finalText)) {
+  // "okay to tum mujhe…" — he hasn't said it yet. The ear already waited
+  // for him (semantic endpoint); other recognizers keep the old rule.
+  if (!meta.fromEar && clavisIsFragment(finalText)) {
     window.ClavisEar?.caption?.final(finalText, false);
     jarvisVoiceFinalTranscript = '';
-    jarvisAwake = true;
-    setJarvisStatus('awake', 'Haan sir, boliye…');
+    if (clavisIsAwake()) {
+      window.ClavisWake?.touch?.(6000);
+      setJarvisStatus('awake', 'Haan sir, boliye…');
+    }
     return;
   }
+  CLAVIS_VS.mark('intent');
+  if (clavisVoiceFastPath(finalText)) return;
   window.ClavisEar?.tap?.stop?.('native');
   window.ClavisEar?.caption?.final(finalText, true);
+  // Accepted voice turn: agle turns follow-up hain; task controller isse
+  // pehchaanta hai ki yeh bola gaya tha.
+  clavisFreshWake = false;
+  window.__clavisLastVoiceAt = Date.now();
+  jarvisVoiceFinalTranscript = '';
+  // He's on another tab: an action is asked first; an answer just happens.
+  if (clavisTabAway() && clavisLooksLikeAction(finalText)) {
+    clavisAskBeforeActing(finalText);
+    return;
+  }
   // "Clavis, get me leads..." in one breath: hand the command straight to Live.
-  if (window.ClavisLive?.isAvailable?.() && !window.ClavisLive.isActive()) {
-    jarvisVoiceFinalTranscript = '';
-    jarvisVoiceSession++;
+  if (window.ClavisLive?.isAvailable?.() && !window.ClavisLive.isActive() && !CLAVIS_VS.isSilent()) {
+    stopCommandEar();
     window.LocalSpeechEngine?.stopInput?.();
-    try { jarvisRecognition?.stop(); } catch {}
-    jarvisRecognition = null;
-    window.ClavisLive.start({ trigger: 'wake word', initialText: finalText });
+    clavisHoldTurn();   // Live jawab dega — tab tak window expire na ho
+    Promise.resolve(window.ClavisLive.start({ trigger: 'wake word', initialText: finalText }))
+      .then((ok) => {
+        clavisReleaseTurn();
+        if (ok === false && clavisIsAwake()) { clavisEnsureListening(); handleJarvisSend({ source: 'voice', text: finalText }); }
+      })
+      .catch(() => { clavisReleaseTurn(); clavisEnsureListening(); });
     return;
   }
   if (!window.ClavisEar && input) {
     input.value = finalText;
     input.dispatchEvent(new Event('input'));
   }
-  jarvisVoiceFinalTranscript = '';
-  jarvisVoiceStopRequested = true;
-  jarvisVoiceSession++;
-  window.LocalSpeechEngine?.stopInput?.();
-  try { jarvisRecognition?.stop(); } catch {}
-  jarvisRecognition = null;
-  document.getElementById('jarvis-voice-btn')?.classList.remove('recording');
+  // The ear stays open (continuous + barge-in); only this turn is handed on.
+  clavisCancelStaleTurn();
   handleJarvisSend({ source: 'voice', text: finalText });
 }
 
@@ -1708,21 +2251,26 @@ let clavisCaptureStartAt = 0;     // when the current spoken command began (voic
 let clavisFollowUpUntil = 0;      // open-mic window after a reply: no wake word needed
 let clavisFollowUpTimer = null;
 
+// Wake phrases ab ClavisWake me rehte hain (ek hi list, word-boundary match:
+// "Clavis", "Hey Clavis", "Hey Buddy", "Hey Clay" + saved extra phrases).
+// Yeh do functions purane callers ke liye naam se bache hain.
 function getClavisWakeWords() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('clavis_wake_words') || 'null');
-    if (Array.isArray(saved) && saved.length) return saved.map(String).map(s => s.trim().toLowerCase()).filter(Boolean).slice(0, 8);
-  } catch (_) {}
-  return ['clavis', 'hey clavis', 'hey buddy', 'hi pal'];
+  if (window.ClavisWake?.phrases) return window.ClavisWake.phrases();
+  return ['hey clavis', 'hey buddy', 'hey clay', 'clavis'];
 }
 
 function clavisWakeMatch(text) {
-  const normalized = String(text || '').toLowerCase()
-    // How recognizers actually spell "Clavis" out loud.
+  if (window.ClavisWake?.match) {
+    const m = window.ClavisWake.match(text);
+    return m ? { phrase: m.phrase, remainder: String(m.rest || '').trim(), before: m.before || '' } : null;
+  }
+  const normalized = ' ' + String(text || '').toLowerCase()
     .replace(/क्ल[ेैा]विस|क्लेविज़|klavis|clevis|klevis|clavish|claves|clavice|clavis/g, 'clavis')
-    .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim();
-  const phrase = getClavisWakeWords().sort((a, b) => b.length - a.length).find(word => normalized.includes(word));
-  return phrase ? { phrase, remainder: normalized.slice(normalized.indexOf(phrase) + phrase.length).trim() } : null;
+    .replace(/[^\p{L}\p{N}\s]/gu, ' ').replace(/\s+/g, ' ').trim() + ' ';
+  const phrase = getClavisWakeWords().sort((a, b) => b.length - a.length).find(word => normalized.includes(' ' + word + ' '));
+  if (!phrase) return null;
+  const at = normalized.indexOf(' ' + phrase + ' ');
+  return { phrase, remainder: normalized.slice(at + phrase.length + 2).trim(), before: normalized.slice(0, at).trim() };
 }
 
 function clavisCommitCommand(text) {
@@ -1733,6 +2281,8 @@ function initClavisSoundTriggers() {
   if (clavisSoundTriggerBound || !window.ClavisAudioTrigger) return;
   clavisSoundTriggerBound = true;
   window.ClavisAudioTrigger.addEventListener('trigger', (event) => {
+    // The toolbar switch is the authority: off means off, whatever restarted the detector.
+    if (localStorage.getItem('clavis_sound_trigger_enabled') === 'false') { stopClavisSoundTriggers(); return; }
     const kind = event.detail?.kind === 'snap' ? 'Snap' : 'Clap';
     if (window.ClavisCognition && !window.ClavisCognition.admitSignal(kind.toLowerCase(), event.detail?.confidence)) return;
     const detectorStopped = stopClavisSoundTriggers();
@@ -1741,7 +2291,7 @@ function initClavisSoundTriggers() {
     window.ClavisMind?.noteInterrupted?.();
     isJarvisSpeaking = false;
     stopWakeListener(true);
-    jarvisAwake = true;
+    clavisWakeUp(kind.toLowerCase());   // 'snap' | 'clap'
     clavisFinalTranscript = '';
     playWakeChime();
     setJarvisStatus('awake', `${kind} detected — boliye...`);
@@ -1777,6 +2327,7 @@ function updateClavisSoundTriggerButton(enabled) {
 
 async function startClavisSoundTriggers() {
   if (!window.ClavisAudioTrigger || isJarvisSpeaking) return false;
+  if (localStorage.getItem('clavis_sound_trigger_enabled') === 'false') return false;
   initClavisSoundTriggers();
   const started = await window.ClavisAudioTrigger.start({ clap: true, snap: true });
   if (started) updateClavisSoundTriggerButton(true);
@@ -1789,8 +2340,8 @@ function stopClavisSoundTriggers() {
 
 async function toggleClavisSoundTriggers() {
   window._clavisSoundToggleAt = Date.now();
-  const isRunning = window.ClavisAudioTrigger?.running;
-  if (isRunning) {
+  const isOn = localStorage.getItem('clavis_sound_trigger_enabled') !== 'false';
+  if (isOn) {
     localStorage.setItem('clavis_sound_trigger_enabled', 'false');
     stopClavisSoundTriggers();
     updateClavisSoundTriggerButton(false);
@@ -1806,18 +2357,69 @@ async function toggleClavisSoundTriggers() {
 // "Thodi der chup ho jao" without Clavis Live: drop the conversation window
 // and any capture; the wake listener keeps waiting for "Clavis" / a clap.
 window.clavisGoToSleep = function clavisGoToSleep() {
+  window.ClavisWake?.sleep?.('asked');
   jarvisAwake = false;
   clavisFollowUpUntil = 0;
   clearTimeout(clavisFollowUpTimer);
   clavisFinalTranscript = '';
   window.ClavisEar?.caption?.listening(false);
-  setJarvisStatus('online', 'So rahi hoon — "Clavis" boliye, snap ya clap');
+  setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
 };
+
+// ClavisWake ne sula diya (window khatam / "chup ho jao" / side-talk):
+// command capture band, Live band, sirf sasta local wake listener chalta rahe.
+function clavisOnFellAsleep() {
+  jarvisAwake = false;
+  clavisFreshWake = false;
+  clavisFollowUpUntil = 0;
+  clearTimeout(clavisFollowUpTimer);
+  clearTimeout(relistenTimer);
+  clavisFinalTranscript = '';
+  clavisCaptureStartAt = 0;
+  clavisTurnHeld = false;
+  clavisSpeechHeld = false;
+  // Command ear — soye hue me kuch capture nahi hona chahiye.
+  stopCommandEar();
+  clavisGateClear();
+  CLAVIS_VS.unsilence();
+  CLAVIS_VS.set('SLEEPING', 'asleep');
+  // Groq recorder — chunks phenk do taaki onstop kuch transcribe na kare.
+  if (isGroqRecording && groqMediaRecorder && groqMediaRecorder.state !== 'inactive') {
+    groqAudioChunks = [];
+    try { groqMediaRecorder.stop(); } catch (_) {}
+  }
+  if (window.ClavisLive?.isActive?.()) {
+    try { window.ClavisLive.stop({ reason: 'sleep' }); } catch (_) {}
+  }
+  window.ClavisEar?.caption?.listening(false);
+  if (!isJarvisSpeaking) setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
+  // Wake listener hamesha chalta rahe (local, koi LLM nahi) — also while the
+  // sleep line is being said, so "Clavis" right after it still wakes.
+  if (jarvisHandsFree) {
+    setTimeout(() => {
+      if (!jarvisHandsFree || clavisIsAwake()) return;
+      if (!wakeRecognition) startWakeListener();
+      if (localStorage.getItem('clavis_sound_trigger_enabled') !== 'false' && !window.ClavisAudioTrigger?.running) startClavisSoundTriggers();
+    }, 120);
+  }
+}
+window.addEventListener('clavis:wake-change', (ev) => {
+  const d = ev?.detail || {};
+  if (d.awake) { jarvisAwake = true; return; }
+  clavisOnFellAsleep();
+});
 // Woken after a nap he asked for: a sleepy, varied "meri aankh lag gayi thi".
 function clavisYawnIfSlept() {
-  if (window.ClavisLive?.isAvailable?.()) return;   // Live yawns in its own words
+  if (window.ClavisLive?.isAvailable?.()) return;   // Live greets in its own words
   const line = window.ClavisIntent?.wakeLine?.();
-  if (line) setTimeout(() => speakJarvisText(line, { style: 'sleepy' }), 450);
+  if (line) { setTimeout(() => speakJarvisText(line, { style: 'sleepy' }), 450); return; }
+  // A plain wake still gets one short line, so sir knows Clavis is up.
+  const female = (localStorage.getItem('jarvis_voice_gender') || 'female') !== 'male';
+  const lines = female
+    ? ['Haan sir, main Clavis — boliye.', 'Ji sir, main sun rahi hoon.', 'Haan sir, boliye — main haazir hoon.']
+    : ['Haan sir, main Clavis — boliye.', 'Ji sir, main sun raha hoon.', 'Haan sir, boliye — main haazir hoon.'];
+  const pickLine = lines[(clavisYawnIfSlept.n = ((clavisYawnIfSlept.n || 0) + 1) % lines.length)];
+  setTimeout(() => speakJarvisText(pickLine, { quick: true }), 250);
 }
 
 function toggleJarvisHandsFree() {
@@ -1872,6 +2474,12 @@ function toggleJarvisHandsFree() {
 }
 
 function setJarvisStatus(state, label) {
+  // Soya hua Clavis "Listening" nahi dikhata — pill wahi bataye jo sach hai:
+  //   soya → Bolo "Clavis" · jaaga → Sun raha hoon · Soch raha hoon · Bol raha hoon
+  const wakeState = window.ClavisWake?.state?.();
+  const asleep = Boolean(wakeState && !wakeState.awake);
+  const handsFreeOn = jarvisHandsFree && localStorage.getItem('clavis_mic_permission_granted') === 'true';
+  if (asleep && handsFreeOn && (state === 'listening' || state === 'awake' || state === 'online')) state = 'idle';
   // Keep the canvas renderer and DOM status pill on the same state machine.
   window.currentJarvisStatus = state;
   window.isJarvisSpeaking = isJarvisSpeaking;
@@ -1881,26 +2489,31 @@ function setJarvisStatus(state, label) {
   const micLabel = document.getElementById('clavis-mic-live-label');
   const micGranted = localStorage.getItem('clavis_mic_permission_granted') === 'true';
   if (micStatus && micLabel) {
-    const listening = state === 'listening' || state === 'awake';
-    micLabel.textContent = !micGranted ? 'Mic setup needed' : listening ? 'Mic listening' : 'Mic ready';
-    micStatus.dataset.state = !micGranted ? 'needed' : listening ? 'listening' : 'ready';
-    micStatus.title = !micGranted ? 'Tap the microphone once to grant access' : listening ? 'Clavis is listening locally' : 'Microphone permission is ready';
+    const listening = !asleep && (state === 'listening' || state === 'awake');
+    const wakeOnly = asleep && handsFreeOn;
+    micLabel.textContent = !micGranted ? 'Mic setup needed' : listening ? 'Mic listening' : wakeOnly ? 'Wake word on' : 'Mic ready';
+    micStatus.dataset.state = !micGranted ? 'needed' : listening ? 'listening' : wakeOnly ? 'wake' : 'ready';
+    micStatus.title = !micGranted ? 'Tap the microphone once to grant access'
+      : listening ? 'Clavis is listening to you'
+      : wakeOnly ? 'Clavis so raha hai — sirf "Clavis", snap ya clap sunta hai (local, koi AI call nahi)'
+      : 'Microphone permission is ready';
   }
   if (txt) {
     let shortLabel = 'Online';
-    if (state === 'listening') shortLabel = 'Listening';
-    else if (state === 'awake') shortLabel = 'Awake';
-    else if (state === 'speaking') shortLabel = 'Speaking';
-    else if (state === 'thinking') shortLabel = 'Thinking';
+    if (state === 'idle') shortLabel = handsFreeOn ? CLAVIS_ASLEEP_LABEL : 'Online';
+    else if (state === 'listening' || state === 'awake') shortLabel = 'Sun raha hoon';
+    else if (state === 'speaking') shortLabel = 'Bol raha hoon';
+    else if (state === 'thinking') shortLabel = 'Soch raha hoon';
     else if (state === 'unavailable') shortLabel = 'Unavailable';
-    else if (state === 'interrupted') shortLabel = 'Interrupted';
+    else if (state === 'interrupted') shortLabel = 'Sun raha hoon';
+    else if (state === 'online' && asleep && handsFreeOn) shortLabel = CLAVIS_ASLEEP_LABEL;
     else shortLabel = (label && label.length <= 15) ? label : 'Online';
     txt.textContent = shortLabel;
   }
   const voiceCaption = document.getElementById('clavis-voice-caption');
   if (voiceCaption) voiceCaption.textContent = state === 'speaking' ? 'Clavis is speaking...' : label;
   if (pill) {
-    pill.classList.remove('listening', 'awake', 'thinking');
+    pill.classList.remove('listening', 'awake', 'thinking', 'idle', 'speaking', 'interrupted', 'offline', 'error', 'unavailable');
     if (state !== 'online') pill.classList.add(state);
   }
 
@@ -1936,8 +2549,13 @@ function setJarvisStatus(state, label) {
   }
 }
 
+let wakeRunning = false;
+let wakeStartedAt = 0;
 function startWakeListener() {
-  if (!jarvisHandsFree || localStorage.getItem('clavis_mic_permission_granted') !== 'true') return;
+  if (localStorage.getItem('clavis_mic_permission_granted') !== 'true') return;
+  // Awake = the command ear listens, not the wake listener (one recognizer).
+  if (clavisIsAwake()) { clavisEnsureListening(); return; }
+  if (!jarvisHandsFree) return;
   // With Clavis Live connected, hands-free means a REAL wake word on the free
   // browser recognizer: nothing is sent anywhere as a command until sir says
   // "Clavis" (the old path treated every overheard sentence as a command).
@@ -1957,127 +2575,72 @@ function startWakeListener() {
     return;
   }
   if (window.ClavisLive?.isActive?.() || wakeRecognition) return;
+  CLAVIS_VS.mic.claim('wake', () => stopWakeListener(true));
   wakeStopRequested = false;
   // Voice ID scores the follow-up window from this tap (only once enrolled).
   if (window.ClavisEar?.voiceId?.enabled?.()) window.ClavisEar.tap.start('wake');
 
-  wakeRecognition = new SR();
+  const recognizer = new SR();
+  wakeRecognition = recognizer;
   // en-IN writes "Clavis" (and Hinglish) in Latin script; hi-IN tends to
   // write it in Devanagari, which the wake matcher would miss.
-  wakeRecognition.lang = localStorage.getItem('clavis_wake_lang') || 'en-IN';
-  wakeRecognition.continuous = true;
-  wakeRecognition.interimResults = true;
+  recognizer.lang = clavisWakeLang();
+  recognizer.continuous = true;
+  recognizer.interimResults = true;
+  recognizer.onstart = () => { if (wakeRecognition === recognizer) wakeRunning = true; };
 
-  wakeRecognition.onresult = (e) => {
+  recognizer.onresult = (e) => {
+    if (wakeRecognition !== recognizer) return;
     const latest = e.results[e.results.length - 1];
     const latestText = String(latest?.[0]?.transcript || '').trim();
 
-    // Clavis is talking. The recognizer hears its voice too, so nothing here
-    // is a command — unless it is sir talking OVER it (a stop word, his own
-    // new words, or its name), which is a real barge-in.
-    if (isJarvisSpeaking || window.ClavisEar?.isSpeaking?.()) {
-      clearTimeout(relistenTimer);
+    // Clavis is talking (a proactive line / its sleep line while asleep). The
+    // recognizer hears its voice too, so nothing here is a command — unless it
+    // is sir talking OVER it (a stop word or its name): a real barge-in.
+    if (clavisSpeakingNow()) {
       const v = latestText ? window.ClavisEar?.judge?.(latestText) : null;
       if (v?.accept && v.barge) {
-        interruptClavisSpeech();
-        jarvisAwake = true;
-        clavisFollowUpUntil = 0;
-        clavisCaptureStartAt = Date.now() - 800;
-        // Keep what he said as the start of the command, minus the wake name.
+        // Barge-in sirf awaaz rokta hai. Jagata tabhi hai jab naam liya ho.
         const wake = clavisWakeMatch(latestText);
-        clavisFinalTranscript = (!latest.isFinal || window.ClavisCommands?.isStop?.(latestText)) ? '' : (wake ? wake.remainder : latestText);
-        wakeResultIndex = e.results.length - 1;
-        clavisShowVoicePreview(clavisFinalTranscript || latestText);
-        setJarvisStatus('awake', 'Haan sir, boliye...');
+        interruptClavisSpeech();
+        if (!wake) { setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL); CLAVIS_VS.set('SLEEPING', 'barge while asleep'); return; }
+        clavisWakeUp('word');
+        clavisFreshWake = true;
+        clavisAdoptWakeRecognizer(recognizer, e, e.results.length - 1);
       }
       return;
     }
 
-    if (!jarvisAwake) {
-      // Waiting for wake word
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const t = e.results[i][0].transcript;
-        const wake = clavisWakeMatch(t);
-        // Clavis saying its own name ("Main Clavis hoon") must not wake it.
-        if (wake && window.ClavisEar && window.ClavisEar.msSinceSpoke() < 4000 && !window.ClavisEar.judge(t).accept) continue;
-        if (wake) {
-          jarvisAwake = true;
-          wakeResultIndex = i;
-          clavisFinalTranscript = wake.remainder;
-          clavisFollowUpUntil = 0;
-          clavisCaptureStartAt = Date.now() - 800;
-
-          window.LocalSpeechEngine?.stopInput?.();
-          if (currentPlayingAudio) {
-            currentPlayingAudio.pause();
-            currentPlayingAudio = null;
-          }
-          isJarvisSpeaking = false;
-
-          playWakeChime();
-          setJarvisStatus('awake', 'Haan sir, boliye...');
-          if (!wake.remainder) clavisYawnIfSlept();
-          const remainder = wake.remainder;
-          stopWakeListener(true);
-          clearTimeout(relistenTimer);
-          // Fresh session: the wake recognizer must never also be the command
-          // recognizer, otherwise Chrome can replay partial interim results.
-          window.setTimeout(() => startJarvisVoiceInput({ initialText: remainder, handsFreeCapture: true, awakeCapture: true }), 120);
-          break;
-        }
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const t = e.results[i][0].transcript;
+      const wake = clavisWakeMatch(t);
+      // Clavis saying its own name ("Main Clavis hoon") must not wake it.
+      if (wake && window.ClavisEar && window.ClavisEar.msSinceSpoke() < 4000 && !window.ClavisEar.judge(t).accept) continue;
+      if (!wake && !clavisIsAwake()) continue;
+      if (wake) {
+        clavisWakeUp('word');
+        playWakeChime();
+        setJarvisStatus('awake', 'Haan sir, boliye...');
+        if (!wake.remainder) clavisYawnIfSlept();
       }
-    } else if (!jarvisRecognition) {
-      // Capturing command (after a barge-in, or in the follow-up window)
-      let captured = clavisFinalTranscript;
-      let interim = '';
-
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        if (!e.results[i]) continue;
-        const t = e.results[i][0].transcript;
-        if (e.results[i].isFinal) {
-          // A late final of Clavis's own last sentence is not part of his command.
-          const v = window.ClavisEar?.judge?.(t);
-          if (v && !v.accept && /echo/.test(v.reason)) continue;
-          captured += t + ' ';
-        } else {
-          interim += t;
-        }
-      }
-
-      const fullText = (captured + interim).trim();
-      clavisFinalTranscript = captured.trim();
-      if (fullText && !clavisCaptureStartAt) clavisCaptureStartAt = Date.now() - 800;
-      if (fullText) {
-        clavisShowVoicePreview(fullText);
-        clearTimeout(clavisFollowUpTimer);
-      }
-      const subText = document.getElementById('jarvis-subtitle-text');
-      if (subText && fullText) {
-        subText.textContent = fullText;
-      }
-
-      const openMic = Date.now() < clavisFollowUpUntil;
-      const commit = (value) => {
-        const finalText = clavisCommitCommand(value);
-        clavisFinalTranscript = '';
-        jarvisAwake = false;
-        clavisFollowUpUntil = 0;
-        const since = clavisCaptureStartAt;
-        clavisCaptureStartAt = 0;
-        if (!finalText) return;
-        document.getElementById('jarvis-voice-btn')?.classList.remove('recording');
-        commitJarvisVoiceInput(finalText, { openMic, since, source: 'wake' });
-      };
+      clavisCaptureStartAt = Date.now() - 800;
+      window.LocalSpeechEngine?.stopInput?.();
       clearTimeout(relistenTimer);
-      relistenTimer = setTimeout(() => commit(fullText), clavisPauseFor(fullText, 1500)); // natural pause; longer if he's mid-sentence
-      if (/\b(go for it|that's it|thats it|backseat|done|over)\.?\s*$/i.test(fullText)) {
-        clearTimeout(relistenTimer);
-        commit(fullText);
+      // Clavis Live takes the conversation when a Gemini key exists.
+      if (window.ClavisLive?.isAvailable?.() && !CLAVIS_VS.isSilent()) {
+        const remainder = wake ? wake.remainder : String(t || '').trim();
+        stopWakeListener(true);
+        window.setTimeout(() => startJarvisVoiceInput({ initialText: remainder, handsFreeCapture: true, awakeCapture: true }), 60);
+        return;
       }
+      // Otherwise this very recognizer becomes the command ear — no restart
+      // gap, so "Clavis, Gurgaon ki leads dikhao" in one breath is heard whole.
+      clavisAdoptWakeRecognizer(recognizer, e, i);
+      return;
     }
   };
 
-  wakeRecognition.onerror = (ev) => {
+  recognizer.onerror = (ev) => {
     if (ev.error === 'not-allowed' || ev.error === 'service-not-allowed') {
       showToast('error', 'Mic Blocked', 'Please allow microphone access for hands-free mode.');
       jarvisHandsFree = false;
@@ -2089,76 +2652,111 @@ function startWakeListener() {
     }
   };
 
-  wakeRecognition.onend = () => {
+  recognizer.onend = () => {
+    if (wakeRecognition !== recognizer) return;
+    wakeRunning = false;
     if (!jarvisHandsFree || wakeStopRequested) return;
     clearTimeout(wakeRestartTimer);
-    const recognizer = wakeRecognition;
     wakeRestartTimer = setTimeout(() => {
-      if (!jarvisHandsFree || wakeStopRequested || wakeRecognition !== recognizer || jarvisRecognition) return;
-      try { recognizer.start(); } catch (_) {
-        wakeRestartTimer = setTimeout(() => {
-          if (!jarvisHandsFree || wakeStopRequested || wakeRecognition !== recognizer || jarvisRecognition) return;
-          try { recognizer.start(); } catch (_) {}
-        }, 500);
-      }
-    }, 180);
+      if (!jarvisHandsFree || wakeStopRequested || wakeRecognition !== recognizer) return;
+      try { recognizer.start(); wakeStartedAt = Date.now(); } catch (_) { /* watchdog restarts it */ }
+    }, 60);
   };
 
-  try { wakeRecognition.start(); } catch { /* ignore */ }
+  wakeStartedAt = Date.now();
+  try { recognizer.start(); } catch { /* watchdog restarts it */ }
+}
+
+// The wake recognizer heard "Clavis …": keep it running and make it the
+// command ear from the result that holds the name (the name is stripped at
+// commit). Different wake/command languages → a fresh ear instead.
+function clavisAdoptWakeRecognizer(recognizer, e, index) {
+  wakeRecognition = null;
+  wakeRunning = false;
+  wakeStopRequested = true;
+  clearTimeout(wakeRestartTimer);
+  window.ClavisEar?.tap?.stop?.('wake');
+  CLAVIS_VS.mic.release('wake');
+  if (recognizer.lang !== clavisEarLang()) {
+    const text = String(e.results[index]?.[0]?.transcript || '').trim();
+    const wake = clavisWakeMatch(text);
+    try { recognizer.onend = null; recognizer.onresult = null; recognizer.abort ? recognizer.abort() : recognizer.stop(); } catch (_) {}
+    setTimeout(() => startJarvisVoiceInput({ initialText: wake ? wake.remainder : text, handsFreeCapture: true, awakeCapture: true, forceLegacy: true }), 60);
+    return;
+  }
+  if (clavisEar.rec) stopCommandEar();
+  clavisEarBind(recognizer, { handsFreeCapture: true, awakeCapture: true, persistent: true }, index);
+  clavisEar.running = true;
+  clavisEar.seed = ''; clavisEar.heard = '';
+  setJarvisStatus('awake', 'Haan sir, boliye...');
+  clavisEarResult(e);
 }
 
 function stopWakeListener(keepAwake = false) {
   window.ClavisEar?.tap?.stop?.('wake');
-  if (window.LocalSpeechEngine) window.LocalSpeechEngine.stopInput?.();
+  if (window.LocalSpeechEngine && CLAVIS_VS.mic.owner === 'local') window.LocalSpeechEngine.stopInput?.();
   if (wakeRecognition) {
     wakeStopRequested = true;
     clearTimeout(wakeRestartTimer);
-    try { wakeRecognition.onend = null; wakeRecognition.stop(); } catch {}
+    const r = wakeRecognition;
     wakeRecognition = null;
+    wakeRunning = false;
+    try { r.onend = null; r.onresult = null; r.abort ? r.abort() : r.stop(); } catch {}
   }
-  if (!keepAwake) jarvisAwake = false;
-  const btn = document.getElementById('jarvis-voice-btn');
-  btn?.classList.remove('recording');
+  CLAVIS_VS.mic.release('wake');
+  if (!keepAwake) jarvisAwake = clavisIsAwake();   // mirror only — ClavisWake decides
 }
 
+// After a turn / a Live session / a sleep: make sure the RIGHT recognizer is
+// listening right now (no 700 ms relisten delay any more — the command ear
+// stays open through the reply, so a quick follow-up is never missed).
 function scheduleHandsFreeRelisten() {
   clearTimeout(relistenTimer);
-  relistenTimer = setTimeout(() => {
-    if (jarvisHandsFree && isJarvisSpeaking) {
-      scheduleHandsFreeRelisten();
-    } else if (jarvisHandsFree) {
-      // Like a person in a conversation: for a few seconds after a reply he
-      // can just answer, no "Clavis" needed. Words in this window still pass
-      // ClavisEar (not echo, sounds like a request, his voice if enrolled);
-      // silence or chatter drops back to wake-word listening.
-      // With Voice ID the window is long (only his voice counts); without
-      // it, ClavisEar accepts only a Hindi/Hinglish request in it.
-      const hisVoice = Boolean(window.ClavisEar?.voiceId?.enabled?.());
-      const followUp = localStorage.getItem('clavis_followup_window') !== 'false'
-        && !window.ClavisLive?.isActive?.() && Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
-      const windowMs = hisVoice ? 20000 : 10000;
-      jarvisAwake = followUp;
-      clavisFinalTranscript = '';
-      clavisCaptureStartAt = 0;
-      clavisFollowUpUntil = followUp ? Date.now() + windowMs : 0;
-      clearTimeout(clavisFollowUpTimer);
-      if (followUp) {
-        clavisFollowUpTimer = setTimeout(() => {
-          if (jarvisAwake && !clavisFinalTranscript && Date.now() >= clavisFollowUpUntil) {
-            jarvisAwake = false;
-            clavisFollowUpUntil = 0;
-            window.ClavisEar?.caption?.listening(false);
-            setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
-          }
-        }, windowMs + 100);
-        window.ClavisEar?.caption?.listening(true);
-      }
-      startWakeListener();
-      if (localStorage.getItem('clavis_sound_trigger_enabled') !== 'false') startClavisSoundTriggers();
-      setJarvisStatus(followUp ? 'awake' : 'listening', followUp ? 'Boliye, sir…' : 'Sun raha hoon — bolo "Clavis"');
-    }
-  }, 700);
+  relistenTimer = setTimeout(clavisEnsureListening, 0);
 }
+function clavisShouldListen() {
+  if (localStorage.getItem('clavis_mic_permission_granted') !== 'true') return false;
+  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) return false;
+  if (!clavisIsAwake()) return jarvisHandsFree;
+  // Awake: listen for the conversation (a typed turn opens the mic only in hands-free).
+  return jarvisHandsFree || window.ClavisWake?.state?.().source !== 'typed';
+}
+function clavisMicAlive() {
+  if (window.ClavisLive?.isActive?.()) return true;
+  if (isGroqRecording || window.LocalSpeechEngine?.inputSocket) return true;
+  if (clavisIsAwake()) return clavisEarAlive();
+  return Boolean(wakeRecognition && (wakeRunning || Date.now() - wakeStartedAt < 3000));
+}
+function clavisEnsureListening() {
+  if (clavisIsAwake()) {
+    if (window.ClavisLive?.isActive?.()) return;
+    if (clavisShouldListen() && !clavisMicAlive()) {
+      legacyStartNativeSpeechRecognition({ handsFreeCapture: true, awakeCapture: true, persistent: true, followUp: !clavisFreshWake });
+    }
+    if (clavisEarAlive()) window.ClavisEar?.caption?.listening(true);
+    if (!clavisSpeakingNow() && clavisEar.rec) setJarvisStatus('awake', CLAVIS_VS.isSilent() ? 'Chup hoon — sun raha hoon' : 'Boliye, sir…');
+  } else {
+    if (clavisEar.rec) stopCommandEar();
+    if (jarvisHandsFree && !wakeRecognition) startWakeListener();
+    if (!clavisSpeakingNow()) setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
+  }
+  if (jarvisHandsFree && localStorage.getItem('clavis_sound_trigger_enabled') !== 'false' && !window.ClavisAudioTrigger?.running) startClavisSoundTriggers();
+}
+window.clavisEnsureListening = clavisEnsureListening;
+
+// The watchdog: never a dead mic, never stuck busy (clavis-voice-state.js).
+CLAVIS_VS.configure({
+  shouldListen: () => clavisShouldListen() && !isGroqRecording,
+  alive: clavisMicAlive,
+  revive: () => { console.info('[Clavis voice] mic was not listening — restarting'); clavisEnsureListening(); },
+  busyTurn: () => Boolean(jarvisController) || clavisTurnHeld,
+  speaking: clavisSpeakingNow,
+  debug: () => ({
+    asr: window.ClavisLive?.isActive?.() ? 'Gemini Live' : clavisEar.rec ? `web speech ${clavisEarLang()}${clavisEar.running ? '' : ' (reopening)'}` : wakeRecognition ? `wake ${clavisWakeLang()}` : isGroqRecording ? 'groq' : 'off',
+    llm: jarvisController ? 'generating' : 'idle',
+    tts: clavisSpeakingNow() ? 'speaking' : CLAVIS_VS.isSilent() ? 'silent mode' : 'idle',
+  }),
+});
 
 // Soft two-tone chime so the user knows Jarvis is now listening.
 function playWakeChime() {
@@ -2406,8 +3004,10 @@ async function legacySpeakJarvisTextV1(text) {
     currentPlayingAudio = null;
     window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     if (window.ClavisBargeIn) window.ClavisBargeIn.disarm();
-    if (jarvisAwake) setJarvisStatus('awake', 'Haan sir, boliye...');
-    else setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
+    clavisReleaseSpeech();
+    if (clavisIsAwake()) setJarvisStatus('awake', 'Haan sir, boliye...');
+    else setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
+    if (jarvisHandsFree) scheduleHandsFreeRelisten();
   };
 
   let speechSafetyTimer = setTimeout(() => {
@@ -2595,6 +3195,11 @@ async function legacySpeakJarvisTextV1(text) {
 // implementation. It fixes the old cloud/native race and gives xAI's current
 // expressive TTS first priority when an xAI key is available.
 function stopJarvisSpeech() {
+  clavisReleaseSpeech();
+  // Whoever stops the voice also clears "speaking" (speakJarvisText sets it
+  // again right after when it starts the next line).
+  isJarvisSpeaking = false;
+  window.ClavisEar?.noteSpeakingDone?.();
   try { window.ClavisVoice?.stop?.(); } catch (_) {}
   jarvisSpeechRequestId += 1;
   try { jarvisSpeechAbortController?.abort('speech-cancelled'); } catch (_) {}
@@ -2621,23 +3226,17 @@ function initClavisLocalVoiceControls() {
 // hands-free mode so a normal tap-to-talk session stays predictable.
 function handleClavisBargeIn() {
   if (!interruptClavisSpeech()) return;
-  // He is talking right now, so listen — in every mode, not just hands-free
-  // (before, a tap-to-talk user who interrupted was simply not heard).
-  // In hands-free the running wake recognizer is already hearing him.
-  if (wakeRecognition && jarvisHandsFree) {
-    jarvisAwake = true;
-    clavisFinalTranscript = '';
-    clavisFollowUpUntil = 0;
-    clavisCaptureStartAt = Date.now() - 600;
-    window.ClavisEar?.caption?.listening(true);
-    setJarvisStatus('awake', 'Haan sir, boliye...');
+  // Barge-in sirf awaaz rokta hai — soye hue Clavis ko jagata ya window
+  // badhata nahi (proactive awaaz ke beech TV/koi aur bola to so hi raho).
+  if (!clavisIsAwake()) {
+    CLAVIS_VS.set('SLEEPING', 'barge while asleep');
+    setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
     return;
   }
-  setTimeout(() => {
-    if (!isJarvisSpeaking && !jarvisRecognition && !isGroqRecording) {
-      startJarvisVoiceInput({ handsFreeCapture: true, awakeCapture: true, persistent: false });
-    }
-  }, 60);
+  // The command ear is already open and hearing him; just make sure.
+  window.ClavisEar?.caption?.listening(true);
+  setJarvisStatus('awake', 'Haan sir, boliye...');
+  clavisEnsureListening();
 }
 window.handleClavisBargeIn = handleClavisBargeIn;
 
@@ -2672,8 +3271,9 @@ async function legacySpeakJarvisTextV2(text) {
     isJarvisSpeaking = false;
     window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     window.ClavisBargeIn?.disarm?.();
-    if (jarvisAwake) setJarvisStatus('awake', 'Haan sir, boliye...');
-    else setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
+    clavisReleaseSpeech();
+    if (clavisIsAwake()) setJarvisStatus('awake', 'Haan sir, boliye...');
+    else setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
   };
 
   isJarvisSpeaking = true;
@@ -2798,16 +3398,82 @@ window.stopJarvisSpeech = stopJarvisSpeech;
 // Single production voice path: Google Gemini over the cancellable PCM socket.
 // The old browser/cloud renderers remain named legacy* above so no call site
 // can accidentally reintroduce a second voice persona.
-async function speakJarvisText(text, opts = {}) {
-  const clean = String(text || '')
+// What the voice may say: no [[directives]], no markdown, no links/URLs.
+function clavisSpeakable(text) {
+  return clavisStripSilent(text)
     .replace(/\|\|\|[\s\S]*?\|\|\|/g, '')
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
     .replace(/https?:\/\/\S+/g, '')
     .replace(/[*_#~>`]/g, '')
-    .replace(/^\s*[-*•]\s+/gm, '')
+    .replace(/^\s*([-*•]|\d+[.)])\s+/gm, '')
+    .replace(CLAVIS_EMOJI_RE, '')
     .replace(/\n+/g, '. ')
+    .replace(/([.?!।])\s*\.\s/g, '$1 ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+}
+
+// Marks tts_first_audio when the voice engine actually starts playing.
+function clavisWatchFirstAudio(requestId) {
+  const t0 = Date.now();
+  const iv = setInterval(() => {
+    if (requestId !== jarvisSpeechRequestId || Date.now() - t0 > 15000) { clearInterval(iv); return; }
+    let on = false;
+    try { on = Boolean(window.ClavisVoice?.isSpeaking?.() || window.speechSynthesis?.speaking || (currentPlayingAudio && !currentPlayingAudio.paused)); } catch (_) {}
+    if (on) { window.ClavisVoiceState?.mark?.('tts_first_audio'); clearInterval(iv); }
+  }, 40);
+}
+
+// Speaks a streamed reply sentence by sentence: the first sentence starts
+// while the LLM is still writing; sentences that arrive meanwhile are said
+// together next. A barge-in / new turn aborts `signal` and the queue stops.
+function clavisStreamSpeaker(signal) {
+  const q = [];
+  let pump = null, spoke = false, cut = false;
+  const run = async () => {
+    while (q.length && !signal?.aborted && !cut) {
+      const chunk = q.splice(0, q.length).join(' ');
+      spoke = true;
+      // Cut off (barge-in / "chup" / a new turn) → the rest is not said either.
+      if (await speakJarvisText(chunk, { stream: true }) === false) cut = true;
+    }
+    pump = null;
+  };
+  return {
+    push(sentence) { if (signal?.aborted || cut) return; q.push(sentence); if (!pump) pump = run(); },
+    get spoke() { return spoke; },
+  };
+}
+
+// A tool that takes more than 1.5 s gets a short spoken "Ek second…" (voice
+// turns only, once, and never over something already being said).
+let clavisToolsRunning = 0;
+let clavisAckTimer = null;
+function clavisToolAck(step, source, spoke) {
+  if (step.type === 'tool_start') {
+    clavisToolsRunning++;
+    window.ClavisVoiceState?.set?.('EXECUTING', step.skill || 'tool');
+    if (source !== 'voice' || !jarvisSpeechEnabled || clavisAckTimer || spoke()) return;
+    const ctl = jarvisController;
+    clavisAckTimer = setTimeout(() => {
+      clavisAckTimer = null;
+      if (clavisToolsRunning > 0 && !spoke() && !clavisSpeakingNow() && ctl && ctl === jarvisController && !ctl.signal.aborted && !window.ClavisVoiceState?.isSilent?.()) {
+        const lines = ['Ek second, sir…', 'Bas ek pal, sir…', 'Dekh raha hoon, sir…'];
+        speakJarvisText(lines[Math.floor(Math.random() * lines.length)]);
+      }
+    }, 1500);
+  } else if (step.type === 'tool_result') {
+    clavisToolsRunning = Math.max(0, clavisToolsRunning - 1);
+    if (!clavisToolsRunning) { clearTimeout(clavisAckTimer); clavisAckTimer = null; window.ClavisVoiceState?.set?.('PROCESSING', 'tool done'); }
+  }
+}
+
+async function speakJarvisText(text, opts = {}) {
+  const clean = clavisSpeakable(text);
   if (!clean) return false;
+  // Silent mode ("5 minute chup raho"): listens, shows, never speaks.
+  if (window.ClavisVoiceState?.isSilent?.() && !opts.force) return false;
   // During a Live session there is one voice: Clavis Live says it.
   if (window.ClavisLive?.isActive?.()) return window.ClavisLive.relay(clean);
 
@@ -2817,6 +3483,9 @@ async function speakJarvisText(text, opts = {}) {
   jarvisSpeechAbortController = controller;
   const active = () => requestId === jarvisSpeechRequestId && !controller.signal.aborted;
   isJarvisSpeaking = true;
+  clavisHoldSpeech();   // jaaga ho to bolte waqt window expire na ho
+  if (clavisIsAwake()) window.ClavisVoiceState?.set?.('ASSISTANT_SPEAKING', 'tts');
+  clavisWatchFirstAudio(requestId);
   setJarvisStatus('speaking', clean.slice(0, 48) + (clean.length > 48 ? '...' : ''));
   window.ClavisMind?.noteSpeakingStarted?.(clean);
   window.ClavisEar?.noteSpeaking?.(clean);
@@ -2830,8 +3499,10 @@ async function speakJarvisText(text, opts = {}) {
     jarvisSpeechAbortController = null;
     window.ClavisMind?.noteSpeakingStopped?.(); window.ClavisEar?.noteSpeakingDone?.();
     window.ClavisBargeIn?.disarm?.();
-    if (jarvisAwake) setJarvisStatus('awake', 'Haan sir, boliye...');
-    else setJarvisStatus('online', 'Clavis Ready');
+    clavisReleaseSpeech();   // bol chuka → follow-up window yahin se shuru
+    if (window.ClavisVoiceState?.state?.() === 'ASSISTANT_SPEAKING') window.ClavisVoiceState.rest('spoke');
+    if (clavisIsAwake()) setJarvisStatus('awake', 'Haan sir, boliye...');
+    else setJarvisStatus('idle', CLAVIS_ASLEEP_LABEL);
     if (jarvisHandsFree) scheduleHandsFreeRelisten();
   };
 

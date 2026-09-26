@@ -45,7 +45,7 @@ class ClavisClapProcessor extends AudioWorkletProcessor {
     this.t++;
     if (!this.inImpulse) {
       const ratio = e / (this.bg + 1e-9);
-      if (this.t > this.refractory && ratio > 18 * this.sens && e > 1.5e-4 && peak > 0.045) {
+      if (this.t > this.refractory && ratio > 30 * this.sens && e > 4e-4 && peak > 0.11) {
         this.inImpulse = true;
         this.onset = this.t; this.maxE = e; this.zcSum = zcr; this.blocks = 1;
         return;

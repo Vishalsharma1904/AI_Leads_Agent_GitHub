@@ -1008,9 +1008,18 @@
      own `overflow: hidden`. One class, owned here, cannot disagree
      with itself — and the width is written inline, which outranks
      every stylesheet in the app including the !important ones. */
-  // Keep one canonical peek width. The old 232/236px mismatch made the
-  // labels and the main sheet settle on different frames.
-  var PEEK_W = 232, PEEK_IN = 35, PEEK_OUT = 140;
+  // The old 232/236px mismatch made the labels and the main sheet settle
+  // on different frames. But a hardcoded peek width has the same bug one
+  // level up: the user's real pinned-open width is configurable (the
+  // resizer saves 210-230px, default 220), so peek opening to a fixed
+  // 232 and pinning open then snapping to the *actual* saved width is
+  // exactly the "opens, then jumps left/right" feeling. Peek must always
+  // match whatever width pinning open would use.
+  var PEEK_IN = 35, PEEK_OUT = 140;
+  function peekWidth() {
+    var v = doc.documentElement.style.getPropertyValue('--sidebar-expanded');
+    return (parseFloat(v) || 220) + 'px';
+  }
 
   function installPeek() {
     var rail = doc.getElementById('sidebar');
@@ -1024,14 +1033,12 @@
       on = !!on && collapsed();
       if (rail.classList.contains('au-peek') === on) return;
       rail.classList.toggle('au-peek', on);
-      // The sheet follows the reversible rail motion instead of being
-      // clipped underneath it while the labels arrive.
-      doc.documentElement.style.setProperty('--sidebar-current', on ? PEEK_W + 'px' : '62px');
-      doc.documentElement.style.setProperty('--main-left', on ? PEEK_W + 'px' : '62px');
-      ['width', 'min-width', 'max-width'].forEach(function (p) {
-        if (on) rail.style.setProperty(p, PEEK_W + 'px', 'important');
-        else rail.style.removeProperty(p);
-      });
+      // Peek floats OVER the sheet (like a macOS sidebar) — moving the
+      // sheet re-laid out the whole page on every frame, which was the lag.
+      /* Width comes from CSS only (clavis-manual.css §9) so the rail and
+         the page share one number and one clock — an inline width here
+         used to disagree with the page margin (220 vs 236) = the jump. */
+      ['width', 'min-width', 'max-width'].forEach(function (p) { rail.style.removeProperty(p); });
       /* apple-polish.js places its tooltip once, against whatever
          width the rail had at that instant. Any geometry change
          strands it, so every geometry change clears it. */
@@ -1087,23 +1094,31 @@
     rail.classList.add('has-marker');
 
     var queued = false;
+    // Write only what changed. classList.add() on a class that is already
+    // there still fires a mutation, and the observer below watches the nav
+    // subtree — the marker kept re-scheduling itself every frame (a forced
+    // layout + style recalc 60× a second, forever). That was the idle lag.
+    function on(v) { if (marker.classList.contains('is-on') !== v) marker.classList.toggle('is-on', v); }
     function place() {
       queued = false;
       var active = nav.querySelector('.nav-item.active, .nav-sub-item.active');
-      if (!active || active.offsetParent === null) { marker.classList.remove('is-on'); return; }
+      if (!active || active.offsetParent === null) { on(false); return; }
       var a = active.getBoundingClientRect(), n = nav.getBoundingClientRect();
-      if (!a.height) { marker.classList.remove('is-on'); return; }
-      var h = Math.min(20, a.height - 10);
-      marker.style.height = h + 'px';
-      marker.style.setProperty('--au-marker-y', (a.top - n.top + nav.scrollTop + (a.height - h) / 2) + 'px');
-      marker.classList.add('is-on');
+      if (!a.height) { on(false); return; }
+      var h = Math.min(20, a.height - 10) + 'px';
+      var y = (a.top - n.top + nav.scrollTop + (a.height - parseFloat(h)) / 2) + 'px';
+      if (marker.style.height !== h) marker.style.height = h;
+      if (marker.style.getPropertyValue('--au-marker-y') !== y) marker.style.setProperty('--au-marker-y', y);
+      on(true);
     }
     function schedule() { if (!queued) { queued = true; requestAnimationFrame(place); } }
 
     /* The app swaps `.active` when the view changes; the rail also
        reflows on collapse, on peek and on scroll. All of them move
        the row, so all of them move the marker. */
-    new MutationObserver(schedule).observe(nav, { subtree: true, attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(function (records) {
+      for (var i = 0; i < records.length; i++) if (records[i].target !== marker) { schedule(); return; }
+    }).observe(nav, { subtree: true, attributes: true, attributeFilter: ['class'] });
     new MutationObserver(schedule).observe(rail, { attributes: true, attributeFilter: ['class', 'style'] });
     nav.addEventListener('scroll', schedule, { passive: true });
     global.addEventListener('resize', schedule);
@@ -1292,6 +1307,11 @@
         if (!task || named) return;
         var text = task._text || '';
         if (text.trim().length < 3) return;
+        /* Voice / auto-guessed turn: sirf tab naam do jab wo sach me poora
+           hua — dropped / cancelled / overheard baat header ka title nahi. */
+        var spoken = task.source === 'voice' || task.display === 'voice' || task.auto;
+        if (spoken && task.phase !== 'completed') return;
+        if (task.phase === 'failed' || (task.error && task.error.cancelled)) return;
         named = true;
         set(text);
       });
@@ -1577,9 +1597,7 @@
         if (!rail.classList.contains('collapsed') && rail.classList.contains('au-peek')) {
           fails.push('rail is expanded and peeking at the same time');
         }
-        if (rail.classList.contains('au-peek') && !rail.style.width) {
-          fails.push('peek did not write its own width');
-        }
+
       }
 
       /* All three composers answer to the same owner, and none of

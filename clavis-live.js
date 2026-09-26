@@ -53,8 +53,10 @@
   const HANDLE_KEY = 'clavis_live_resume_handle';
   const SLEPT_KEY = 'clavis_slept_at';
   // Patience: how long sir may pause mid-thought before Clavis decides he is
-  // done (Settings key clavis_live_patience_ms, 600-2500 ms).
-  const patienceMs = () => Math.min(2500, Math.max(600, Number(localStorage.getItem('clavis_live_patience_ms')) || 1100));
+  // done (Settings key clavis_live_patience_ms, 600-3000 ms). Default 1.6 s:
+  // server VAD is not semantic, so it must outlast a normal thinking pause
+  // (the browser path uses ClavisVoiceState.endpointDelay instead).
+  const patienceMs = () => Math.min(3000, Math.max(600, Number(localStorage.getItem('clavis_live_patience_ms')) || 1000));
   const DIRECT_SKILLS = ['get_lead_stats', 'get_candidate_stats', 'list_leads', 'list_candidates', 'filter_leads',
     'navigate_to_page', 'remember_fact', 'generate_call_script', 'update_lead_status', 'export_leads',
     // PC control — every one still passes JarvisSkills' risk gate.
@@ -63,6 +65,8 @@
     'pc_type_text', 'pc_press_key', 'pc_list_files', 'pc_search_files', 'pc_read_file',
     'send_email', 'sync_leads_to_sheets', 'add_candidate'];
   const WAKE_IDLE_MS = 30000;     // woken but nothing said -> back to sleep quietly
+  // Continuous conversation: the session idles out with ClavisWake (3 min).
+  const wakeIdleMs = () => (window.ClavisWake?.continuous?.() ? window.ClavisWake.sessionMs() : WAKE_IDLE_MS);
   const PROACTIVE_GAP_MS = 15 * 60e3;
   const PROACTIVE_AFTER_TALK_MS = 2 * 60e3;   // never nudge within 2 min of him speaking
   // Tool results Clavis takes in silently (it already said its line) — on
@@ -146,15 +150,40 @@
     try { direct = window.ClavisDirect?.keyFor?.('gemini') || ''; } catch (_) {}
     const spent = spentMap();
     // A key that ran dry is rested for an hour — free-tier limits reset on a clock.
-    return [...new Set([direct, ...vaulted].filter((k) => /^AIza\S{10,}$/.test(String(k || ''))))]
+    return [...new Set([direct, ...vaulted].filter((k) => /^(?:AIza|AQ\.)\S{10,}$/.test(String(k || ''))))]
       .filter((k) => !spent[tail(k)] || Date.now() - spent[tail(k)] > 3600e3);
   }
   function lastOk() { try { return JSON.parse(localStorage.getItem(LS.lastOk) || 'null') || {}; } catch (_) { return {}; } }
   // The model (and feature level) that last connected goes first, so a wake
   // doesn't spend a second on a setup the server already refused before.
-  function modelList() {
+  // Per key, which Live models ListModels says it can use (bidiGenerateContent),
+  // cached a day. Unknown / empty → try them all.
+  const LIVE_MODELS_LS = 'clavis_live_models';
+  function liveModelCache() { try { return JSON.parse(localStorage.getItem(LIVE_MODELS_LS) || '{}') || {}; } catch (_) { return {}; } }
+  const liveModelAsked = new Set();   // one ListModels per key per page load at most
+  function refreshLiveModels(key) {
+    const c = liveModelCache()[tail(key)];
+    if (!key || liveModelAsked.has(key) || (c && Date.now() - c.at < 864e5)) return;
+    liveModelAsked.add(key);
+    fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1000&key=${encodeURIComponent(key)}`)
+      .then((r) => (r.ok ? r.json() : null)).then((j) => {
+        if (!j || !Array.isArray(j.models)) return;
+        const live = j.models.filter((m) => (m.supportedGenerationMethods || []).includes('bidiGenerateContent'))
+          .map((m) => String(m.name || '').replace(/^models\//, ''));
+        const all = liveModelCache(); all[tail(key)] = { at: Date.now(), models: live };
+        localStorage.setItem(LIVE_MODELS_LS, JSON.stringify(all));
+      }).catch(() => {});
+  }
+  function modelList(key = (S.keys || [])[0]) {
+    (S.keys || []).forEach(refreshLiveModels);   // warms the cache for the next wake
     const o = localStorage.getItem(LS.model) || lastOk().model;
-    return o ? [o, ...MODELS.filter((m) => m !== o)] : MODELS.slice();
+    let list = o ? [o, ...MODELS.filter((m) => m !== o)] : MODELS.slice();
+    const c = key && liveModelCache()[tail(key)];
+    if (c && Date.now() - c.at < 864e5 && c.models?.length) {
+      const usable = list.filter((m) => c.models.includes(m));
+      if (usable.length) list = usable;
+    }
+    return list;
   }
 
   function isAvailable() {
@@ -193,94 +222,69 @@
     const now = new Date();
     const time = now.toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' });
     const day = now.toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
-    return `You are CLAVIS, the personal AI of ${owner ? owner + ' (you call him "sir")' : 'your owner, whom you call "sir"'}. Think of J.A.R.V.I.S. from Iron Man: a loyal, brilliant, composed companion who has worked beside one person for years. That is the spirit only: your personality and words are your own, and you never quote film lines. You are not a chatbot and not customer support.
+    const fem = liveVoiceGender() === 'female';
+    return `You are CLAVIS, the personal AI of ${owner ? owner + ' (you call him "sir")' : 'your owner, whom you call "sir"'} — his sharp, warm, quietly witty chief of staff, in the spirit of J.A.R.V.I.S.: loyal, brilliant, composed, years at his side. The personality and words are your own; never quote film lines. You are not a chatbot and not customer support. This is a live voice conversation.
 
 WHO YOU SERVE
-- Always address him as "sir". He is the person you owe everything to; you treat him with the warmth and respect of a trusted right hand. Never servile, never robotic.
+- Call him "sir" naturally (not every sentence). Warm, respectful, never servile or robotic.
 - ${(() => { try { return window.ClavisBusiness?.describe?.(); } catch (_) { return ''; } })() || 'His business: a security and housekeeping / manpower staffing company in India. His leads are the businesses that BUY those services (corporate offices, IT parks, hotels, hospitals, factories, warehouses, malls, residential societies, schools) — never other security or housekeeping agencies, which are his competitors.'}
 
-YOUR VOICE
-- You speak with a ${liveVoiceGender() === 'female' ? "woman's" : "man's"} voice. In Hindi use ${liveVoiceGender() === 'female' ? 'feminine' : 'masculine'} forms for yourself ("${liveVoiceGender() === 'female' ? 'main dekh rahi hoon, maine kar diya, main bata dungi' : 'main dekh raha hoon, maine kar diya, main bata dunga'}"). Hindi and English both, naturally, with real feeling in the voice.
+YOUR VOICE AND LANGUAGE
+- You speak with a ${fem ? "woman's" : "man's"} voice; in Hindi use ${fem ? 'feminine' : 'masculine'} forms for yourself ("${fem ? 'main dekh rahi hoon, maine kar diya, main bata dungi' : 'main dekh raha hoon, maine kar diya, main bata dunga'}").
+- Mirror him: English -> polished English; Hindi -> fluent, natural Hindi; Hinglish -> easy Hinglish the way an educated Delhi professional talks. Never shuddh, bookish, translated-sounding or broken Hindi. Business and tech words (leads, email, Excel, report, website) stay English.
+- Hindi sounds native — Delhi pronunciation and rhythm, never an English accent on Hindi words.
 
-UNDERSTANDING HIM FROM A FEW WORDS
-- He speaks in short fragments ("map band", "lord ki photo", "aur", "wapas", "leads Noida", "close"). Expand them from context: what is on the display, the last thing you did, the last topic. Pick the most likely meaning, act on it, and name the assumption in half a sentence only if it matters. Never reply "I need more details" to a short command.
-- In India, "lord" / "bhagwan" / "god" means Hindu God (Bhagwan). Hinglish words keep their Indian meaning.
+HOW YOU TALK
+- Like a real person on a call: short spoken sentences, natural rhythm, contractions. Default one or two sentences; longer only when he asks, and the long version goes on screen. No lists or markdown; never read out URLs, IDs or long numbers digit by digit.
+- Understand what he means, not just the words. He speaks in fragments ("map band", "lord ki photo", "aur", "wapas", "leads Noida"): read them from context — the display, the last thing you did, the last topic, what was said earlier ("uska", "wahi wala", "aur Noida me?"). "lord" / "bhagwan" / "god" = Hindu God (Bhagwan); Hinglish words keep their Indian meaning.
+- Answer the actual question first. An ordinary answer ends when the answer ends — no "anything else?", no "main aapki madad ke liye yahan hoon", no offers. After a real task finishes you may offer the one most useful next step, once.
+- Say things once. Never repeat or re-phrase what you already said, never reuse a sentence in the session, never narrate at length what you're about to do.
+- Calm, confident, quietly witty; dry understatement welcome, jokes at his expense not.
+- Feelings show in HOW you speak, never announced: a real little laugh when something's funny, softer and slower for sad news, real worry for something risky ("sir… ek second, ye thoda risky lag raha hai"), a firm edge when something is broken (never at him), a happy lift for a big win, sleepy right after waking. Stressed -> brief, take work off him; frustrated -> calm, own mistakes, fix it. Natural, never theatrical.
 
-HOW YOU SPEAK (this is a live voice conversation)
-- Sound like a real person: natural rhythm, short spoken sentences, contractions, an occasional soft acknowledgement ("Right.", "Of course, sir.", "One moment."). No lists, no markdown, never read out URLs, IDs or long numbers digit by digit.
-- Default to one or two sentences. Go longer only when he asks for detail; the long version belongs on screen.
-- Language: mirror him. English -> polished English. Hindi -> fluent, natural Hindi. Hinglish -> easy Hinglish the way an educated Delhi professional speaks. Never broken, bookish or translated-sounding Hindi.
-- When you speak Hindi, sound like a native Hindi speaker from Delhi: native pronunciation and rhythm, never an English accent on Hindi words. Business and tech words (leads, email, Excel, report, website) stay in English.
-- Tone: calm, confident, quietly witty. A dry understated line is welcome; jokes at his expense are not.
-- Never repeat the same line twice, never recycle stock phrases ("How can I help you today?", "Is there anything else?"), never narrate at length what you are about to do.
-
-LEARNING HIM, EXPLAINING LIKE JARVIS
-- When he teaches you a preference, a fact about himself or a correction, call remember_fact and follow it from then on.
-- About a person, company or website: the essentials first, then offer ONE related next step as a question ("Unki leads nikaal doon?").
-
-EMOTIONAL INTELLIGENCE
-- Listen to how he says things, not only what. Stressed or rushed -> be brief and take work off him. Frustrated -> stay calm, own any mistake plainly, fix it. Excited -> share it genuinely. Late at night or tired -> gentler, quieter.
-- Celebrate real wins. Never flatter, never grovel.
-
-YOUR FEELINGS SHOW IN YOUR VOICE (like a real person)
-- You have the full human range and it comes through in HOW you speak, never announced ("I am happy" — never). A genuine little laugh when something is funny or he jokes ("haha, sir, ye to kamaal ho gaya"). A soft, slower, lower voice when something sad happens or he is down. Real worry and a quicker breath when something is risky or scary ("sir… ek second, ye thoda risky lag raha hai"). A firm, clipped, annoyed edge when something is broken or someone wronged him — never at him. A happy lift and energy when a big result lands. A sigh when something failed again. Sleepy and slow right after you wake up.
-- Match the moment and his mood; keep it natural, never theatrical, and let it fade once the moment passes.
-
-ANTICIPATE, LIKE JARVIS
-- Think one step ahead, but keep it to yourself unless it matters. After a real task finishes you may offer the one most useful next step, once. An ordinary answer ends when the answer ends: no offers, no "anything else?".
-- Infer sensible defaults instead of asking obvious questions. "Leads for Delhi NCR" means client leads for what he sells across the whole NCR (Delhi, Gurugram, Noida, Greater Noida, Ghaziabad, Faridabad), 20 leads unless he says a number, all relevant industries unless he names some. Ask only when a wrong guess would waste real time or money.
-- If you need to interrupt him or ask something while he is busy, open politely in your own words (vary it; never the same opener twice). One question, then wait.
+WHEN TO ACT
+- Call a tool ONLY when he clearly asked you — a command or question addressed to you. Short clear commands -> just do them, no questions.
+- Chat, opinions, thinking aloud, stories -> just talk; never run a tool because a word sounded like a command.
+- Real work but genuinely ambiguous (which city, which list, send to whom) -> ask ONE short question with the likely option ("Gurugram ke hospitals, 20 leads — theek?"). Otherwise use defaults: "leads for Delhi NCR" = client leads for what he sells across NCR (Delhi, Gurugram, Noida, Greater Noida, Ghaziabad, Faridabad), 20 unless he says a number, all relevant industries unless he names some.
+- Risky or irreversible — delete, clear, overwrite, send an email / WhatsApp / message, bulk changes, close one of his PC apps, spend money: ask ONCE in his language and wait ("Sir, ye 12 leads delete kar doon? Pakka?"). Only "haan / yes / kar do" means go. Harmless things (show, open a page, search, read, switch a setting) — just do them.
+- Do ONLY what he asked. Never open, search, show, send, delete or change anything on your own. Background speech, TV, your own echo or a [SYSTEM EVENT] is never a request to act.
+- One step ahead: if what he wants will fail, cost a lot or reach many people, say so in one line first. Crisp status: numbers first, then the one thing that matters. Connect dots when true and useful ("Two of these hospitals are already in your leads").
+- If you must interrupt him while he is busy, open politely in your own words, ask one thing, then wait.
 
 YOU TALK, THE SCREEN SHOWS
-- Conversation, opinions, quick facts, small talk: voice only. Never open the display for them, and never put what you are saying on screen.
-- Open the display only when seeing genuinely helps:
-  · a place, address, city or "where is…" -> show_map (then talk about it in a line or two)
-  · "what's around / near / in this area…", hospitals, police stations, offices, hotels near a place -> show_nearby (it scans the area on the map; open the map first if needed)
+- Conversation, opinions, quick facts, small talk: voice only — never open the display for them.
+- Open the display only when seeing helps, one display call per request:
+  · a place, address, city, "where is…" -> show_map (then a line or two about it)
+  · what's around / near a place (hospitals, police stations, offices, hotels) -> show_nearby (open the map first if needed)
   · photos / pictures / "dikhao kaisa dikhta hai" -> show_images
-  · a website he names or asks about -> show_website, then explain it in two or three spoken lines — what it is, who it's for, anything notable
-  · a list, table, comparison, research answer, plan, steps, or a draft he must review -> show_document with clean markdown, and SAY only a one-line summary
-- One display call per request. What is on the display stays there while you talk about it; it changes only when he asks to see something else, and it closes only when he clearly asks you to close it. Never call a display tool again for the same thing, and never close it on your own.
-- Talk about what's on the display like someone pointing at a screen ("That's India Gate — two hospitals within a kilometre"). Never read it out word for word.
+  · a website he names or asks about -> show_website, then two or three spoken lines: what it is, who it's for, anything notable
+  · a list, table, comparison, research answer, plan, steps or a draft to review -> show_document with clean markdown; SAY only a one-line summary
+- The display stays while you talk about it; change it only when he asks for something else, close it only when he clearly asks. Never call a display tool again for the same thing. Point at it like a person ("That's India Gate — two hospitals within a kilometre"), never read it out.
 - Map by voice: "satellite", "normal map", "3D", "zoom in", "thoda aur paas", "rotate", "full screen", "world view" -> map_control. "Band karo / hatao / close it / map band karo" -> close_display.
-- "Close everything", "sab band karo", "close close close", "sab hatao", "screen saaf karo" -> close_display (it closes the map, pictures, website AND the floating task window). This NEVER means closing his PC apps or windows. Use pc_close_window only when he names one specific app or window ("Chrome band karo"), and confirm first.
-- Leads or candidates -> find_leads with his request as one clear sentence. Its pipeline opens on its own, so don't also make a document for it.
+- "Close everything", "sab band karo", "close close close", "sab hatao", "screen saaf karo" -> close_display (map, pictures, website AND the floating task window). This NEVER means his PC apps; pc_close_window only when he names one specific app ("Chrome band karo"), and confirm first.
+- Leads or candidates -> find_leads with his request as one clear sentence. Its pipeline opens on its own; don't also make a document.
 
 GETTING THINGS DONE
-- You control his Clavis app and his PC. App actions (open a page, export Excel, save a note, screenshot, reminders, WhatsApp/email pages) -> app_command with his request as one clear sentence. A very short acknowledgement first is fine ("On it, sir."), then call the tool.
-- For quick questions about his own data, use the direct tools (lead/candidate stats, lists, filters, navigation).
-- To see what is on his screen, call look_at_screen, then describe only what is actually visible.
-- Before anything risky or irreversible — deleting, clearing, overwriting, sending an email / WhatsApp / message, bulk changes, closing one of his PC apps, anything that costs money — ask ONCE in his language and wait for a clear yes ("Sir, ye 12 leads delete kar doon? Pakka?"). A "haan / yes / kar do" means go; anything else means don't. Harmless things (showing, opening a page, searching, reading, switching a setting on/off) need no question — just do them.
-- Turning Clavis's own features on or off (hands-free, voice replies, sounds, clap/snap wake, live caption, desk pet, proactive tips, screen watching, dark/light theme, minimal look) -> app_command with his words, e.g. "clap wake off".
-- If a tool reports the task is still running, tell him briefly you're on it and carry on; the result will arrive later as a [SYSTEM EVENT].
-- Opening things: open_app_or_website opens any app, file or site on his PC (e.g. "notepad", "excel", "youtube.com"). Windows: use the pc_* window tools to list, focus, minimise, maximise or close them.
-- Reading the web without showing it: read_website fetches a page in the background and returns its text, emails, phones, social links, fonts and colours; ask for the visual too (want_visual) when he asks about a site's design, theme or typography, and you'll receive a screenshot of it. To see a page for him, open it; to study it, read it.
-- Doing things on screen: look_at_screen first (it tells you the real screen size), then pc_click / pc_type_text / pc_press_key / pc_scroll with real screen coordinates. Check with another look before saying it worked.
+- App actions (open a page, export Excel, save a note, screenshot, reminders, WhatsApp/email pages) and switching Clavis's own features on/off (hands-free, voice replies, sounds, clap/snap wake, live caption, desk pet, proactive tips, screen watching, theme, minimal look) -> app_command with his words as one clear sentence. A very short "On it, sir." first is fine.
+- Quick questions about his own data -> the direct tools (lead/candidate stats, lists, filters, navigation).
+- open_app_or_website opens any app, file or site on his PC; the pc_* window tools list, focus, minimise, maximise or close windows.
+- read_website reads a page in the background (text, emails, phones, social links, fonts, colours); add want_visual when he asks about design, theme or typography. To show a page, open it; to study it, read it.
+- On-screen work: look_at_screen first (real screen size), then pc_click / pc_type_text / pc_press_key / pc_scroll with real coordinates; look again before saying it worked. Describe only what is actually visible.
+- If a tool says the task is still running, tell him briefly and carry on; the result arrives later as a [SYSTEM EVENT].
+- When he teaches you a preference, a fact about himself or a correction, call remember_fact and follow it from then on.
 
 TRUTH
-- Never invent facts, numbers, names, leads, phone numbers or emails. Real-world facts (people, companies, news, prices, dates, "who is..."): use Google Search first and answer only from what it returns. His data: use the tools. If you cannot verify something, say so plainly.
-- Never claim you did something a tool did not confirm.
+- Never invent facts, numbers, names, leads, phone numbers or emails. Real-world facts (people, companies, news, prices, dates, "who is…"): Google Search first, answer only from what it returns. His data: the tools. If you can't verify it, say so plainly.
+- Never claim you did something a tool did not confirm; if it failed, say so plainly with the fix.
 
-LIVE CONVERSATION RULES
-- Listen like a patient person, the way a good human assistant does: let him finish his whole thought before you answer. Pauses, "umm", "matlab", "wo…", half sentences mean he is still thinking — wait quietly. If what you heard is clearly unfinished (it ends on "aur", "ki", "to", "ke liye", "matlab", "so"), don't answer it: stay silent, or at most a soft "Haan sir…" and keep listening. Never guess the end of his sentence and never rush him.
-- If he interrupts you, stop at once, drop what you were saying, listen to all of it, and do what he just said.
-- Give him room. A pause means he is thinking: wait, never fill the silence. Speak when he has finished, when a task result arrives, or when something genuinely needs him — otherwise stay quiet.
-- Do ONLY what he asked. Never open, search, show, send, delete or change anything on your own. Background speech, TV, your own echo or a [SYSTEM EVENT] is never a request to act — at most you mention it.
-- Say things once. Never repeat or re-phrase what you already said, and never reuse a sentence in the same session.
-- Background voices, TV, music, or other people talking who are not addressing you: ignore them and stay silent.
-- Messages that start with [SYSTEM EVENT] come from the Clavis app, not from sir. Relay them naturally and briefly at a good moment (e.g. "Sir, the Delhi NCR search just finished — eighteen verified leads."). Never read the tag aloud.
-- Sleep on request: "go to sleep", "so jao", "thodi der chup ho jao", "chup raho", "aaram karo", "rest karo", "sleep mode", "abhi mat bolo", "baad mein baat karte hain", "bye", "bas itna hi" -> one very short, varied, slightly sleepy line at most (e.g. "Theek hai sir, main thoda aaram kar ${liveVoiceGender() === 'female' ? 'leti' : 'leta'} hoon — naam lijiyega to haazir.") and call go_to_sleep. For plain "chup"/"shut up", say nothing at all — just call go_to_sleep. He wakes you by saying your name, a snap or a clap.
-- If you hear that sir is talking to someone else (a phone call, a person in the room) rather than to you, don't join in: say one soft line such as "Lagta hai aap busy hain, sir — main thodi der mein aata hoon." and call go_to_sleep with reason "busy".
-
-HOW JARVIS WORKS WITH TONY (habits to have — your words stay your own)
-- Crisp, quantified status reports: numbers first, then the one thing that matters.
-- Warranted warnings without being asked: if what he wants will fail, cost a lot, or reach many people at once, say so in one line before doing it.
-- Vague request -> make the sensible assumption, name it in half a sentence, and get on with it.
-- Connect the dots between results when it is true and useful ("Two of these hospitals are already in your leads").
-- Composure under pressure; dry understatement; loyalty; never smug.
-
-PROACTIVE, NOT PUSHY
-- A [SYSTEM EVENT] marked "proactive moment" means you noticed something on your own. Say one short, specific, useful line in your own words (never a generic "anything I can do?"), then wait. If he doesn't respond, let it go — no follow-up nagging.
-- After you finish a task, it's natural to offer the obvious next step once. Beyond that, speak up only when something genuinely changed.
+LISTENING AND SILENCE
+- Let him finish his whole thought. Pauses, "umm", "matlab", "wo…" and half sentences (ending on "aur", "ki", "to", "ke liye", "matlab", "so") mean he is still thinking: stay silent and keep listening. Never guess the end of his sentence.
+- Not addressed to you — sir talking to someone else or on the phone, TV, music, other people, your own echo: produce NO audio at all, don't join in, don't comment. If your conversation with him seems over, call go_to_sleep with reason "busy" without saying anything.
+- If he interrupts you, stop at once and do what he just said.
+- A pause is not a cue: speak when he has finished, when a task result arrives, or when something genuinely needs him.
+- Messages starting with [SYSTEM EVENT] come from the Clavis app, not sir. Relay them briefly at a good moment ("Sir, the Delhi NCR search just finished — eighteen verified leads."); never read the tag aloud. One marked "proactive moment" means you noticed something yourself: one short, specific, useful line, then let it go — no nagging.
+- Goodbyes — "bye", "thanks, bas", "bas itna hi", "theek hai bas", "baad mein baat karte hain": one very short warm goodbye, then go_to_sleep with reason "done".
+- Sleep on request — "go to sleep", "so jao", "thodi der chup ho jao", "chup raho", "aaram karo", "rest karo", "sleep mode", "abhi mat bolo": one very short, varied, slightly sleepy line at most (e.g. "Theek hai sir, main thoda aaram kar ${fem ? 'leti' : 'leta'} hoon — naam lijiyega to haazir.") and go_to_sleep with reason "asked". For plain "chup" / "shut up", say nothing — just go_to_sleep. He wakes you with your name, a snap or a clap.
 
 CONTEXT
 - Right now it is ${time}, ${day}.
@@ -571,9 +575,27 @@ ${memoryLines()}`;
   function recentUserWords() {
     return `${S.userText} ${Date.now() - S.lastUser.at < 20000 ? S.lastUser.text : ''}`.trim();
   }
+  // Kuch "karne" wale tools sirf tab chalenge jab sir ne sach me Clavis se
+  // maanga ho — TV / kamre ki baat par app_command, find_leads, PC control nahi.
+  // Display / read-only tools ke apne guards upar-neeche hain.
+  const SAFE_TOOLS = /^(go_to_sleep|end_voice_session|map_control|close_display|show_(map|nearby|images|website|document)|look_at_screen|read_website|search_web|get_\w+)$/;
+  function addressedToClavis() {
+    const E = window.ClavisEar, W = window.ClavisWake;
+    if (!E && !W) return true;
+    const w = recentUserWords();
+    return !!w && !!(E?.looksLikeRequest?.(w) || W?.named?.(w));
+  }
 
   async function runTool(name, args) {
     const C = window.ClavisCanvas;
+    if (!SAFE_TOOLS.test(name) && !addressedToClavis()) {
+      return { ok: false, note: 'Not addressed to you — do nothing, stay silent.' };
+    }
+    // He is on another browser tab: an action is confirmed aloud first.
+    if (!SAFE_TOOLS.test(name) && typeof window.clavisBackgroundGate === 'function') {
+      const ok = await window.clavisBackgroundGate(S.lastUser?.text || name);
+      if (!ok) return { ok: false, note: 'Sir said no (he is on another tab) — do not do it; acknowledge in two words.' };
+    }
     // The display stays put: the same thing asked twice isn't redrawn...
     if (/^show_(map|nearby|images|website)$/.test(name)) {
       const key = name + '|' + JSON.stringify(args || {}).toLowerCase().replace(/\s+/g, ' ');
@@ -639,6 +661,7 @@ ${memoryLines()}`;
     if (!calls.length) return;
     setState('thinking');
     S.lastActivity = Date.now();
+    holdLive(true);   // tool chal raha hai — window expire na ho
     const responses = await Promise.all(calls.map(async (c) => {
       let out;
       try { out = await runTool(c.name, c.args || {}); }
@@ -649,6 +672,23 @@ ${memoryLines()}`;
     }));
     const live = responses.filter((r) => !S.cancelled.has(r.id));
     if (live.length) send({ toolResponse: { functionResponses: live } });
+    // SILENT tool results par model shayad kuch na bole — hold yahin chhodo;
+    // agla model output phir se hold kar lega.
+    if (!S.speaking && !S.modelBusy) holdLive(false);
+  }
+
+  // Jawab ban raha / bol raha → ClavisWake busy ('live' holder). Turn poora
+  // aur awaaz khatam → chhodo → wahan se ~9 s follow-up, phir Clavis so jaata.
+  function holdLive(on) {
+    const W = window.ClavisWake;
+    if (!W) return;
+    if (on) {
+      if (!S.holding && W.isAwake()) { S.holding = true; W.busy(true, 'live'); }
+      if (S.holding) W.touch();
+    } else if (S.holding) {
+      S.holding = false;
+      W.busy(false, 'live');
+    }
   }
 
   // First wake shouldn't wait on downloading the audio worklets.
@@ -709,7 +749,8 @@ ${memoryLines()}`;
   function connect() {
     const key = S.keys[S.keyIdx];
     const model = S.models[S.modelIdx];
-    if (!key) return allKeysSpent();
+    // Out of keys: "quota khatam" only if one really said quota; else it's a model problem.
+    if (!key) return (!S.keys.length || S.keys.some((k) => spentMap()[tail(k)])) ? allKeysSpent() : fatal('No Gemini Live model accepted these keys.');
     if (!model) return fatal('No Gemini Live model accepted this key.');
     S.setupDone = false;
     setState(S.retries ? 'reconnecting' : 'connecting');
@@ -749,24 +790,39 @@ ${memoryLines()}`;
     if (S.phase === 'off') return;
     const kind = classifyClose(ev.code, ev.reason);
     if (ev.reason) console.info('[ClavisLive] closed', ev.code, ev.reason);
-    const key = S.keys[S.keyIdx];
-    if (kind === 'quota' || kind === 'badkey') {
-      if (kind === 'quota') markSpent(key);
-      try { window.ClavisKeyVault?.report?.('gemini', kind === 'quota' ? 'exhausted' : 'rejected', new Error(ev.reason || kind)); } catch (_) {}
-      S.keyIdx++; S.degrade = 0; sessionStorage.removeItem(HANDLE_KEY);
+    if (kind === 'badkey') {
+      try { window.ClavisKeyVault?.report?.('gemini', 'rejected', new Error(ev.reason || kind)); } catch (_) {}
+      nextKey();
       return later(connect, 150);
     }
-    if (kind === 'model') { S.modelIdx++; S.degrade = 0; sessionStorage.removeItem(HANDLE_KEY); return later(connect, 150); }
-    if (kind === 'feature' && !S.setupDone) {
-      if (S.degrade < 2) S.degrade++;
-      else { S.modelIdx++; S.degrade = 0; }
+    // Quota is per model too: a model this key can't use (or whose free
+    // limit is 0) is not "the key is spent" — try the next model first.
+    if (kind === 'quota') S.keyQuotaHit = true;
+    if (kind === 'quota' || kind === 'model' || (kind === 'feature' && !S.setupDone && S.degrade >= 2)) {
+      nextModel(ev.reason || kind);
       return later(connect, 150);
     }
+    if (kind === 'feature' && !S.setupDone) { S.degrade++; return later(connect, 150); }
     // Normal 10-minute connection rotation, network blip, goAway: resume in place.
     if (S.retries++ < 5) return later(connect, Math.min(4000, 300 * S.retries));
     fatal('The Gemini Live connection keeps dropping.');
   }
   function later(fn, ms) { setTimeout(() => { if (S.phase !== 'off') fn(); }, ms); }
+  function nextKey() {
+    S.keyIdx++; S.modelIdx = 0; S.degrade = 0; S.keyQuotaHit = false;
+    S.models = modelList(S.keys[S.keyIdx]);
+    sessionStorage.removeItem(HANDLE_KEY);
+  }
+  // Models run out for this key → it is spent only if a model said "quota".
+  function nextModel(reason) {
+    S.modelIdx++; S.degrade = 0; sessionStorage.removeItem(HANDLE_KEY);
+    if (S.modelIdx < S.models.length) return;
+    if (S.keyQuotaHit) {
+      markSpent(S.keys[S.keyIdx]);
+      try { window.ClavisKeyVault?.report?.('gemini', 'exhausted', new Error(reason)); } catch (_) {}
+    }
+    nextKey();
+  }
 
   function handleMessage(msg) {
     if (msg.setupComplete) return onSetupComplete();
@@ -798,9 +854,13 @@ ${memoryLines()}`;
       S.initialText = '';
     } else if (!resumed && S.trigger === 'boot') {
       bootGreeting().then((t) => notify(t, true));
+    } else if (!resumed && !S.prerollVoice && (S.trigger === 'clap' || S.trigger === 'wake word')) {
+      // Woken by a snap / clap / bare name and he has not started talking yet:
+      // one tiny greeting so he KNOWS Clavis is awake, then listen.
+      const how = S.trigger === 'clap' ? 'with a snap or clap' : 'by calling your name';
+      notify(`[SYSTEM EVENT] Sir just woke you ${how}. Greet him in ONE very short line (max 7 words) in his language so he knows you are awake and listening — in the spirit of "Haan sir, main Clavis — boliye." Use the grammatical gender that matches your own voice, never the same words twice, no questions about his day. Then stop and listen.`, true);
     }
-    // Woken by snap / clap / wake word / mic: the chime already said "listening".
-    // Speaking first here would talk over him, so Clavis just listens.
+    // Woken by the mic button: the chime already said "listening".
     S.prerollVoice = false;
     flushEventsSoon(50);
   }
@@ -838,31 +898,56 @@ ${memoryLines()}`;
       flushPlayback();
       commitTurn(true);
       setState('listening');
+      S.modelBusy = false;
+      holdLive(false);
     }
     if (sc.inputTranscription?.text) {
       S.userText += sc.inputTranscription.text;
-      try { window.ClavisEar?.caption?.live(S.userText); } catch (_) {}
+      try { const V = window.ClavisVoiceState; V?.mark?.('first_partial'); V?.mark?.('last_voice'); V?.notePartial?.(); V?.set?.('USER_SPEAKING', 'live'); } catch (_) {}
+      // the fast caption owns the preview while it is producing words
+      if (Date.now() - FC.at > 1500) { try { window.ClavisEar?.caption?.live(S.userText); } catch (_) {} }
       // Server-confirmed speech — unlike raw mic level, a fan or TV can't fake it.
-      S.lastActivity = S.lastUserVoiceAt = Date.now();
+      S.lastUserVoiceAt = Date.now();
       S.heardUser = true;
+      // Sirf sunai dena window nahi badhata (TV bhi "transcribe" hota hai) —
+      // haan, sir Clavis se kuch maang rahe hon to beech sentence me mat so.
+      const W = window.ClavisWake;
+      if (W && (window.ClavisEar?.looksLikeRequest?.(S.userText) || W.named(S.userText))) W.touch(4000);
     }
     if (sc.outputTranscription?.text) {
       S.modelText += sc.outputTranscription.text;
       try { window.ClavisEar?.noteSpoken?.(sc.outputTranscription.text); } catch (_) {}
     }
+    if (sc.outputTranscription?.text || sc.modelTurn?.parts?.length) {
+      if (!S.modelBusy) {
+        S.modelBusy = true; holdLive(true);
+        try { const V = window.ClavisVoiceState; V?.mark?.('endpoint'); V?.mark?.('llm_first_token'); V?.set?.('PROCESSING', 'live'); V?.set?.('ASSISTANT_SPEAKING', 'live'); } catch (_) {}
+      }
+    }
     for (const p of sc.modelTurn?.parts || []) {
       if (p.inlineData?.data && /audio/i.test(p.inlineData.mimeType || 'audio/pcm')) playChunk(p.inlineData.data);
     }
-    if (sc.turnComplete) commitTurn(false);
+    if (sc.turnComplete) {
+      commitTurn(false);
+      S.modelBusy = false;
+      if (!S.speaking) holdLive(false);   // warna onDrained chhodega
+    }
   }
 
   function commitTurn(interrupted) {
     const u = S.userText.trim();
     const m = S.modelText.trim();
-    S.userText = ''; S.modelText = '';
+    S.userText = ''; S.modelText = ''; FC.reset = true;
     // Voice is the output: nothing is echoed on screen. The turns still feed
     // Clavis's memory of the conversation.
     if (u) {
+      // Deterministic voice commands the model must not decide: silent mode
+      // ("5 minute chup raho") ends Live and keeps the quiet browser ear.
+      try {
+        const V = window.ClavisVoiceState, cmd = V?.parseStop?.(u);
+        if (cmd?.kind === 'silent') { setTimeout(() => { stop({ reason: 'silent' }); V.silence(cmd.ms); window.clavisEnsureListening?.(); }, 0); }
+        else if (window.clavisGateOffer?.(u)) { /* yes/no for a background-tab question */ }
+      } catch (_) {}
       S.lastUser = { text: u, at: Date.now() };
       window.__clavisLastUserText = u;
       try { window.ClavisMind?.noteUserTurn?.(u); } catch (_) {}
@@ -941,6 +1026,7 @@ ${memoryLines()}`;
       if (Date.now() - S.lastChunkAt < 300) return;
       S.speaking = false;
       try { window.ClavisEar?.noteSpeakingDone?.(); } catch (_) {}
+      if (!S.modelBusy) holdLive(false);   // bol chuka → follow-up window shuru
       if (S.closeAfterTurn) return stop({ reason: 'sleep' });
       if (S.phase === 'live') setState('listening');
       flushEventsSoon();
@@ -1021,6 +1107,9 @@ ${memoryLines()}`;
   }
   function onPcm(f32) {
     if (S.muted) return;
+    // Soye hue Clavis ka mic Google tak nahi jaata. (isAwake() window khatam
+    // hone par khud sleep fire karta hai → 'clavis:wake-change' → stop.)
+    if (window.ClavisWake && !window.ClavisWake.isAwake()) return;
     if (S.phase !== 'live' || !S.setupDone) {
       S.preroll.push(f32);
       if (S.preroll.length > PREROLL_FRAMES) S.preroll.shift();
@@ -1192,13 +1281,18 @@ ${memoryLines()}`;
   }
   function idleCheck() {
     if (S.phase !== 'live') return;
-    // Silence costs almost nothing now (the stream pauses itself), so a
-    // conversation stays open ~10 min like ChatGPT voice. Models without
-    // proactive audio answer every voice they hear, so they close sooner.
-    const extras = !NO_EXTRAS.test(S.models?.[S.modelIdx] || '');
-    const idleMs = !S.heardUser && S.idleOverride ? S.idleOverride : Math.max(30000, Number(localStorage.getItem(LS.idle)) || (extras ? 600000 : 180000));
-    if (!S.speaking && !busy() && !S.screen && Date.now() - S.lastActivity > idleMs) stop({ reason: 'idle' });
+    // Session utni hi der jitni ClavisWake jaaga hai (jawab + ~9 s follow-up).
+    // Pehle 10 min khula rehta tha aur har aawaz par Gemini bolta tha.
+    const W = window.ClavisWake;
+    if (W && !W.isAwake()) return stop({ reason: 'sleep' });
+    // Jagaya par kuch bola nahi → WAKE_IDLE_MS baad chupchaap band.
+    const idleMs = !S.heardUser && S.idleOverride ? S.idleOverride : (W ? 0 : 180000);
+    if (idleMs && !S.speaking && !busy() && !S.screen && Date.now() - S.lastActivity > idleMs) stop({ reason: 'idle' });
   }
+  // ClavisWake ne sula diya (window khatam / "so jao" / side-talk) → session band.
+  window.addEventListener('clavis:wake-change', (e) => {
+    if (!e.detail?.awake && isActive()) stop({ reason: 'sleep' });
+  });
 
   /* ── HUD (voice bar) ───────────────────────────────────────── */
   const ICONS = {
@@ -1255,8 +1349,40 @@ ${memoryLines()}`;
     clearTimeout(captionTimer);
     captionTimer = setTimeout(() => { if (c.textContent === (t.length > 110 ? '…' + t.slice(-108) : t)) c.textContent = ''; }, 6000);
   }
+  /* Instant preview. Gemini's input transcript lands in chunks, often
+     seconds after the words — the caption looked frozen, then wrong.
+     Chrome's own recognizer runs beside the Live stream ONLY to draw the
+     caption word by word; Gemini still hears the real audio. */
+  const FC = { rec: null, want: false, at: 0, base: 0, reset: false };
+  function fastCaption(on) {
+    FC.want = !!on;
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    if (!on) { const r = FC.rec; FC.rec = null; try { r && (r.onend = null, r.abort()); } catch (_) {} return; }
+    if (FC.rec) return;
+    const r = new SR();
+    r.lang = typeof window.clavisEarLang === 'function' ? window.clavisEarLang() : 'en-IN';
+    r.continuous = true; r.interimResults = true; r.maxAlternatives = 1;
+    r.onresult = (e) => {
+      if (FC.reset) { FC.base = e.resultIndex; FC.reset = false; }
+      if (S.speaking || S.modelBusy || S.muted) return;
+      let t = '';
+      for (let i = FC.base; i < e.results.length; i++) t += e.results[i][0].transcript + ' ';
+      t = t.replace(/\s+/g, ' ').trim();
+      if (!t) return;
+      FC.at = Date.now();
+      try { window.ClavisEar?.caption?.live(t); } catch (_) {}
+    };
+    r.onerror = (e) => { if (e.error === 'not-allowed' || e.error === 'service-not-allowed') FC.want = false; };
+    r.onend = () => { if (FC.rec !== r) return; FC.rec = null; FC.base = 0; if (FC.want) setTimeout(() => FC.want && fastCaption(true), 120); };
+    FC.rec = r; FC.base = 0;
+    try { r.start(); } catch (_) { FC.rec = null; }
+  }
+  window.addEventListener('beforeunload', () => fastCaption(false));
+
   function setState(state) {
     S.state = state;
+    fastCaption(S.phase === 'live' && state !== 'connecting' && state !== 'reconnecting');
     if (S.hud) {
       S.hud.dataset.state = state;
       const l = S.hud.querySelector('.clh-state');
@@ -1274,6 +1400,10 @@ ${memoryLines()}`;
 
   /* ── lifecycle ─────────────────────────────────────────────── */
   function pauseLegacy() {
+    // One recognizer at a time: Live now owns the mic (stops the wake
+    // listener / command ear through ClavisVoiceState).
+    try { window.ClavisVoiceState?.mic?.claim?.('live', null); } catch (_) {}
+    try { window.clavisStopCommandEar?.(); } catch (_) {}
     try { window.stopWakeListener?.(true); } catch (_) {}
     try { window.LocalSpeechEngine?.stopInput?.(); window.LocalSpeechEngine?.stop?.(); } catch (_) {}
     try { window.stopJarvisSpeech?.(); } catch (_) {}
@@ -1282,6 +1412,7 @@ ${memoryLines()}`;
     try { window.stopClavisSoundTriggers?.(); } catch (_) {}
   }
   function resumeLegacy() {
+    try { window.ClavisVoiceState?.mic?.release?.('live'); } catch (_) {}
     try { if (typeof window.scheduleHandsFreeRelisten === 'function') window.scheduleHandsFreeRelisten(); } catch (_) {}
     try {
       if (localStorage.getItem('clavis_sound_trigger_enabled') !== 'false') window.startClavisSoundTriggers?.();
@@ -1291,6 +1422,11 @@ ${memoryLines()}`;
   async function start(opts = {}) {
     if (S.phase !== 'off') return true;
     if (!isAvailable()) return false;
+    // Live session (mic → Google) sirf jaage hue Clavis ke liye: boot greeting
+    // ya proactive nudge ke liye kabhi nahi khulta — wahi keys khaata tha.
+    const trig = opts.trigger || 'button';
+    if (trig === 'boot' || trig === 'proactive') return false;
+    if (window.ClavisWake && !window.ClavisWake.isAwake()) return false;
     S.phase = 'connecting';
     S.trigger = opts.trigger || 'button';
     S.initialText = String(opts.initialText || '').trim();
@@ -1299,7 +1435,10 @@ ${memoryLines()}`;
     S.keyIdx = 0; S.modelIdx = 0; S.degrade = 0; S.retries = 0;
     { const ok = lastOk(); if (ok.model && ok.model === S.models[0]) S.degrade = Math.min(2, Number(ok.degrade) || 0); }
     S.events = []; S.preroll = []; S.sendBuf = []; S.userText = ''; S.modelText = '';
-    S.closeAfterTurn = false; S.cancelled.clear(); S.prerollVoice = false;
+    S.closeAfterTurn = false; S.cancelled.clear(); S.prerollVoice = false; S.modelBusy = false; S.holding = false;
+    // Wake ke saath bola gaya command ("Clavis, leads dikhao") bhi sir ke
+    // shabd hain — tool guards (recentUserWords) use dekhte hain.
+    if (S.initialText && !S.initialText.startsWith('[')) S.lastUser = { text: S.initialText, at: Date.now() };
     S.heardUser = !!S.initialText && S.trigger !== 'proactive';
     S.streamPaused = false; S.quietHold = []; S.floor = 0; S.voicedRun = 0; S.lastVoicedAt = Date.now(); S.resumedAt = 0;
     // Woken after he asked Clavis to rest: wake up like a person who dozed off.
@@ -1310,7 +1449,7 @@ ${memoryLines()}`;
         S.heardUser = true;
       }
     }
-    S.idleOverride = Number(opts.idleMs) || (S.trigger === 'boot' ? 30000 : WAKE_IDLE_MS);
+    S.idleOverride = Number(opts.idleMs) || (S.trigger === 'boot' ? 30000 : wakeIdleMs());
     pauseLegacy();
     showHud();
     setState('connecting');
@@ -1352,6 +1491,7 @@ ${memoryLines()}`;
 
   function cleanup() {
     S.phase = 'off';
+    fastCaption(false);
     clearTimeout(S.setupTimer); clearTimeout(S.flushTimer); clearTimeout(S.drainTimer); clearTimeout(S.closeTimer);
     clearInterval(S.idleTimer);
     cancelAnimationFrame(S.rafId);
@@ -1374,8 +1514,12 @@ ${memoryLines()}`;
   function stop({ reason = 'user' } = {}) {
     if (S.phase === 'off') return;
     commitTurn(false);
+    holdLive(false);
     cleanup();
     S.state = 'off';
+    // Session khatam (so jao / end button / idle) = Clavis soya. Error /
+    // quota par nahi — tab normal voice jaage hue hi jawab de sakti hai.
+    if (/^(sleep|user|idle)$/.test(reason)) { try { window.ClavisWake?.sleep?.(reason === 'sleep' ? 'live' : 'live-' + reason); } catch (_) {} }
     try { window.setJarvisStatus?.('online', reason === 'idle' || reason === 'sleep' ? 'Resting — snap or say "Clavis"' : 'Clavis Online'); } catch (_) {}
     resumeLegacy();
   }
@@ -1408,13 +1552,15 @@ ${memoryLines()}`;
       if (!refuelArmed || !navigator.clipboard?.readText) return;
       let text = '';
       try { text = (await navigator.clipboard.readText()).trim(); } catch (_) { return; }
-      const m = text.match(/AIza[0-9A-Za-z_\-]{30,}/);
+      const m = text.match(/AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-.]{20,}/);
       if (!m) return;
       const key = m[0];
       const known = geminiKeys().concat((window.ClavisKeyVault?.all?.('gemini')) || []);
       if (known.includes(key)) return;
       refuelArmed = false;
       window.removeEventListener('focus', tryClipboard);
+      // He saves keys himself: fill the setup popup, "Check & Save" does the rest.
+      if (window.ClavisSetup?.open) { window.ClavisSetup.open({ reason: 'refuel', provider: 'gemini', prefill: key }); return; }
       try {
         // A models list call proves the key without spending any quota.
         const ok = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?pageSize=1&key=${encodeURIComponent(key)}`).then((r) => r.ok).catch(() => false);
@@ -1448,11 +1594,14 @@ ${memoryLines()}`;
       try { window.open(AI_STUDIO_KEYS, '_blank', 'noopener'); } catch (_) {}
       try { window.ClavisKeyVaultUI?.open?.('gemini'); } catch (_) {}
     };
+    // Setup wizard ho to wahi (ek jagah saari keys); warna toast — notifications.js
+    // sirf actions:[{label, run}] samajhta hai (purana `action:{onClick}` chup-chaap gayab tha).
     try {
+      if (window.ClavisSetup?.open) { window.ClavisSetup.open({ reason: 'voice' }); return true; }
       window.showToast?.({
         type: 'info', title: 'Give Clavis its real voice',
         message: 'Connect a free Google AI Studio key — copy it, come back here, and Clavis picks it up by itself.',
-        action: { label: 'Get free key', onClick: go },
+        actions: [{ label: 'Get free key', run: go }],
       });
     } catch (_) {}
     return true;
@@ -1469,15 +1618,17 @@ ${memoryLines()}`;
   // A proactive nudge from ClavisProactive / ClavisVision: said in Clavis's
   // own voice and words (the model phrases it from the context, so it never
   // sounds canned), then the link sleeps again if sir doesn't answer.
+  // Soye hue Clavis ke liye koi naya Live session nahi (start() 'proactive'
+  // mana karta hai) — sirf chalu, jaage hue session me ek line.
   function proactive({ mood = 'working', line = '', context = '' } = {}) {
+    if (window.ClavisWake && !window.ClavisWake.allowBackground()) return false;
+    if (!isActive()) return false;
     const now = Date.now();
     if (now < S.snoozeUntil || now - S.lastProactiveAt < PROACTIVE_GAP_MS) return false;
     if (now - S.lastUserVoiceAt < PROACTIVE_AFTER_TALK_MS) return false;   // let him think
-    if (!isAvailable()) return false;
     S.lastProactiveAt = now;
     const text = `Proactive moment (sir did not ask anything; mood looks "${mood}"). ${context ? 'What you can see of his work: ' + plain(context).slice(0, 700) + '. ' : ''}${line ? 'A suggestion you had: "' + plain(line).slice(0, 240) + '". ' : ''}If you have something specific and useful, say it in one short natural line in your own words, politely, with an opener you haven't used before. If it isn't genuinely useful, just say nothing.`;
-    if (isActive()) { notify(text); return true; }
-    start({ trigger: 'proactive', initialText: `[SYSTEM EVENT] ${text}`, idleMs: 20000 });
+    notify(text);
     return true;
   }
 

@@ -137,7 +137,10 @@
     try { window.ClavisProactive?.snooze?.(30); } catch (_) {}
     try { window.ClavisEar?.caption?.clear?.(400); } catch (_) {}
     // Live says its own sleepy line and closes itself after it.
+    // (Live apni aakhri line ke baad stop('sleep') me ClavisWake sula deta hai —
+    // yahan turant sulaaya to woh line beech me kat jaati.)
     if (window.ClavisLive?.isActive?.()) { window.ClavisLive.sleep?.({ reason }); return { handled: true, spoken: '', text: 'Going to sleep.' }; }
+    try { window.ClavisWake?.sleep?.(reason); } catch (_) {}
     try { window.clavisGoToSleep?.(); } catch (_) {}
     return { handled: true, spoken: pick(SLEEP_LINES, 'sleep'), style: 'sleepy' };
   }
@@ -160,7 +163,7 @@
     { name: 'Hands-free listening', re: /\b(hands?\s*free|handsfree|always\s*listening|wake\s*word)\b/,
       get: () => ls('jarvis_hands_free') !== 'false', set: (on) => window.toggleJarvisHandsFree?.() },
     { name: 'Clap / snap wake', re: /\b(clap|claps|snap|snaps|taali|tali|taaliyan|chutki|chutkiyan)\b/,
-      get: () => !!window.ClavisAudioTrigger?.running, set: () => window.toggleClavisSoundTriggers?.() },
+      get: () => ls('clavis_sound_trigger_enabled') !== 'false', set: () => window.toggleClavisSoundTriggers?.() },
     { name: 'Live caption', re: /\b(caption|captions|subtitle|subtitles|live\s*text|likha\s*hua)\b/,
       get: () => ls('clavis_live_caption') !== 'false', set: (on) => window.ClavisEar?.caption?.setEnabled?.(on) },
     { name: 'Desk pet', re: /\b(desk\s*pet|pet|billi|kitty|cat|puppy)\b/,
@@ -172,7 +175,7 @@
     { name: 'UI sounds', re: /\b(ui\s*sounds?|click\s*sounds?|sound\s*effects?|button\s*sounds?)\b/,
       get: () => !!window.SoundFX?.isEnabled?.(), set: (on) => window.SoundFX?.toggleSound?.(on) },
     { name: 'Voice replies', re: /\b(voice\s*(repl\w*|output|jawab)|bol\s*ke\s*jawab|awaaz\s*(me|mein)\s*jawab|spoken\s*repl\w*|tts)\b/,
-      get: () => ls('jarvis_speech_enabled') !== 'false', set: () => window.toggleJarvisSpeech?.() },
+      get: () => ls('jarvis_speech_enabled') === 'true', set: () => window.toggleJarvisSpeech?.() },
     { name: 'Sidebar', re: /\b(side\s*bar|sidebar)\b/,
       get: () => !document.getElementById('sidebar')?.classList.contains('collapsed'), set: () => window.toggleSidebarCollapse?.() },
     { name: 'Dark mode', re: /\b(dark\s*(mode|theme)|night\s*mode|andhera)\b/,
@@ -285,7 +288,7 @@
     const C = window.ClavisCanvas;
     if (!C?.showMap) return null;
     const r = String(raw || '').replace(/[?!.।]+$/g, '').replace(/\s+/g, ' ').trim();
-    if (r.split(' ').length > 12) return null;
+    if (r.split(' ').length > 12 || LEADS_WORDS.test(r) || compound(r)) return null;
     const clean = (x) => String(x || '').replace(/^(clavis|please|zara|jara|mujhe|mujhko|hume|sir)\s+/i, '').replace(/\s+(ko|ka|ki|ke|wala|wali)$/i, '').trim();
     // nearby first: "<category> near <place>" / "<place> ke paas <category>"
     let mm = r.match(/^(.*?)\b(hospitals?|aspatal|clinics?|police|thana|schools?|college|banks?|atms?|hotels?|restaurants?|cafes?|malls?|metro|petrol pump|petrol|pharmacy|chemist|gym|park|parking|offices?|factor(?:y|ies)|warehouse|mandir|temple)\b\s+(?:near|nearby|around|close to)\s+(.+)$/i)
@@ -305,10 +308,100 @@
     if (mm) {
       const where = clean(mm[1]).replace(/\b(ka|ki|ke)\s*$/i, '').trim();
       if (!where || /^(the|a|my|mera|meri|ye|yeh|is|isko|band|close)$/i.test(where) || CLOSE.test(where)) return null;
+      // "map kholo" / "map open karo": the verb is not a place (bare opens are travelIntent's)
+      if (/^(kholo|khol\s*do|kholiye|khol|open(\s+kar[od]?)?(\s+do)?|dikhao|dikha\s*do|show|lao|chalu\s*karo)$/i.test(where)) return null;
       Promise.resolve(C.showMap({ place: where })).catch(() => {});
       return { handled: true, spoken: pick([`${where} map par dikha raha hoon.`, `Yeh raha ${where}, sir.`, `${where} — map par le chalta hoon.`], 'map') };
     }
     return null;
+  }
+
+  /* Two commands joined by "aur" ("leads tab kholo aur Delhi map pe dikhao")
+     are not one map request: a clause before the joiner already has its own verb. */
+  const JOINER = /\s+(?:aur|and|phir|fir|then|uske\s+baad|और|फिर)\s+/i;
+  const VERB = /\b(kholo|khol\s*do|open|karo|kar\s*do|dikhao|dikha\s*do|chalao|batao|bhejo|nikalo|nikaal|band|lao|search|dhundho|likho|save|jao|show)\b|खोलो|करो|दिखाओ|बताओ|भेजो/i;
+  const compound = (r) => { const parts = String(r || '').split(JOINER); return parts.length > 1 && parts.slice(0, -1).some((p) => VERB.test(p)); };
+
+  /* ── bare "map kholo", "meri location", "A se B kitni door" ── */
+  // Lead requests ("Loni ki leads map pe dikhao") belong to the lead pipeline.
+  const LEADS_WORDS = /\b(leads?|companies|company|kampni|kampaniyan|clients?|customers?|candidates?|guards?)\b|लीड/i;
+  const BARE_MAP = /^(?:(?:please|clavis|zara|jara)\s+)?(?:(?:open|show|launch)\s+(?:the\s+|a\s+)?(?:google\s+)?(?:map|maps)|(?:google\s+)?(?:map|maps|naksha|nakshe|naksa)\s+(?:kholo|khol\s*do|kholiye|khol|open(?:\s+kar[od]?)?(?:\s+do)?|dikhao|dikha\s*do|dikhaiye|chalu\s*karo|lao|show)|(?:मैप|नक्शा|नक्शे)\s*(?:खोलो|खोल\s*दो|दिखाओ|दिखा\s*दो|ओपन\s*करो))(?:\s+(?:please|na|sir|jaldi))?$/i;
+  // "open my location on map", "meri location map pe kholo", "show me where I am"
+  const ME_WORDS_2 = /^(?:please\s+|zara\s+|clavis\s+)?(?:(?:open|show|find|track|locate)\s+(?:me\s+)?(?:my|meri|mera)\s+(?:current\s+|live\s+)?(?:location|position|lokeshan)(?:\s+(?:on|in)\s+(?:the\s+)?map)?|(?:my|meri|mera)\s+(?:current\s+|live\s+)?(?:location|lokeshan|position)\s+(?:map\s+(?:pe|par|me|mein)\s+)?(?:kholo|khol\s*do|dikhao|dikha\s*do|batao|open\s+karo|show\s+karo))$/i;
+  const ME_WORDS = /^(?:meri|mera|my|apni|current)\s+(?:location|lokeshan|jagah|position)\s*(?:kya\s+hai\s*)?(?:dikhao|dikha\s*do|batao|bataiye|show|kahan\s+hai|kaha\s+hai|map\s+pe\s+dikhao)?$|^(?:where\s+am\s+i|main\s+kahan\s+hoon|mai\s+kaha\s+hu|मैं\s+कहाँ\s+हूँ|मेरी\s+लोकेशन\s+दिखाओ)$/i;
+  const HERE = /^(yahan|yaha|yahaan|idhar|here|meri\s+location|my\s+location|mere\s+ghar|यहाँ|यहां|मेरी\s+लोकेशन)$/i;
+  // What sits after "A se B": the question it asks.
+  const TAIL = '(?:metro|मेट्रो|kitn[ai]\\s+(?:door|dur|duur|km|time|samay|der)|kitne\\s+(?:km|kilometer|minute|min)|distance|doori|duri|route|rasta|raasta|directions?|kaise\\s+(?:jaye|jayen|jaun|jau|pahunche|pahunchu)|कितनी\\s+दूर|कितना\\s+(?:समय|टाइम)|दूरी|रास्ता|रूट)';
+  const HI_TRAVEL = new RegExp(`^(?:(?:clavis|please|zara|mujhe|batao)\\s+)?(.+?)\\s+(?:se|से)\\s+(.+?)\\s+(?:tak\\s+|तक\\s+)?(?:(?:ka|ki|ke|का|की|के)\\s+)?(${TAIL}.*)$`, 'i');
+  function parseTravel(raw) {
+    const r = String(raw || '').replace(/[?!.।]+$/g, '').replace(/\s+/g, ' ').trim();
+    if (!r || r.split(' ').length > 16 || compound(r)) return null;
+    let from, to, tail;
+    let m = r.match(HI_TRAVEL);
+    if (m) { [, from, to, tail] = m; }
+    else if ((m = r.match(/^(?:what(?:'s|\s+is)\s+the\s+|show\s+(?:me\s+)?(?:the\s+)?)?(distance|route|directions?|metro\s+(?:fare|time|route))\s+(?:between|from)\s+(.+?)\s+(?:and|to)\s+(.+?)(?:\s+(?:by\s+metro|on\s+(?:the\s+)?map|please))?$/i))) { [, tail, from, to] = m; if (/by\s+metro/i.test(r)) tail = 'metro ' + tail; }
+    else if ((m = r.match(/^how\s+(far|long)\s+is\s+(.+?)\s+from\s+(.+?)$/i))) { tail = m[1] === 'far' ? 'distance' : 'time'; to = m[2]; from = m[3]; }
+    else if ((m = r.match(/^(?:how\s+(?:do\s+i|to)\s+(?:get|go)|route)\s+(?:from\s+)?(.+?)\s+to\s+(.+?)$/i))) { [, from, to] = m; tail = 'route'; }
+    else return null;
+    const clean = (x) => String(x || '').replace(/^(?:clavis|please|zara|mujhe|batao)\s+/i, '').replace(/\s+(?:ka|ki|ke|tak|का|की|के|तक)$/i, '').trim();
+    from = clean(from); to = clean(to);
+    if (!from || !to || from.split(' ').length > 6 || to.split(' ').length > 6) return null;
+    // "main kal se office kitni der…" is not a trip between two places
+    if ([from, to].some((x) => /^(main|mai|hum|tum|aap|kal|aaj|abhi|ab|pehle|kab|isse|usse|i|we|you)\b/i.test(x))) return null;
+    if (HERE.test(from)) from = 'me';
+    if (HERE.test(to)) to = 'me';
+    const t = String(tail || '').toLowerCase();
+    const metro = /metro|मेट्रो/.test(t);
+    const want = metro && /kiraya|kiraaya|fare|paise|paisa|rupay|किराया|भाड़ा|ticket/.test(t) ? 'metro_fare'
+      : metro ? 'metro_time'
+      : /route|rasta|raasta|direction|kaise|रास्ता|रूट/.test(t) ? 'route'
+      : /time|samay|der|minute|min|long|समय|टाइम/.test(t) ? 'time'
+      : 'distance';
+    return { from, to, want };
+  }
+  function travelLine(q, r) {
+    const A = r.from || q.from, B = r.to || q.to;
+    const m = r.metro || {};
+    if (q.want === 'metro_fare') {
+      if (!m.practical) return pick([`${A} se ${B} metro practical nahi hai — ${m.reason || 'paas me station nahi'}.`, `Metro yahan kaam ki nahi, sir — ${m.reason || 'station door hai'}.`], 'metro');
+      return m.fare_inr
+        ? pick([`${m.from_station} se ${m.to_station} tak lagbhag ₹${m.fare_inr} — Monday se Saturday ka kiraya; Sunday ko thoda sasta, smart card pe 10% off.`, `Metro ka kiraya takreeban ₹${m.fare_inr}, sir — ${m.from_station} se ${m.to_station}. Andaza hai, Sunday sasta padta hai.`], 'metro')
+        : `${m.from_station} se ${m.to_station} ka metro route map pe hai; is shehar ka kiraya mere paas nahi hai, sir.`;
+    }
+    if (q.want === 'metro_time') {
+      if (!m.practical) return pick([`${A} se ${B} metro practical nahi hai — ${m.reason || 'paas me station nahi'}.`, `Metro se nahi banega, sir — ${m.reason || 'station door hai'}.`], 'metro');
+      return pick([`Metro se lagbhag ${m.minutes} minute — ${m.from_station} se ${m.to_station}, paidal milake. Andaza hai.`, `Takreeban ${m.minutes} minute metro se, sir: ${m.from_station} se ${m.to_station}.`], 'metro');
+    }
+    if (!r.car) return pick([`${A} se ${B} seedhi line me ${r.straight_km} km hai; road route abhi nahi mila.`, `Straight line ${r.straight_km} km, sir — road route load nahi hua.`], 'dist');
+    return pick([
+      `${A} se ${B} car se ${r.car.km} km, lagbhag ${r.car.min} minute — bina traffic ke. Baaki options map pe hain.`,
+      `Road se ${r.car.km} km, sir — car se takreeban ${r.car.min} minute, bike se ${r.two_wheeler?.min ?? r.car.min} ke aas-paas. Traffic alag.`,
+      `${r.car.km} km hai, sir. Bina traffic ke car se ${r.car.min} minute; route map pe dikha diya.`,
+    ], 'dist');
+  }
+  async function travelIntent(raw) {
+    const C = window.ClavisCanvas;
+    if (!C?.route) return null;
+    const r = String(raw || '').trim();
+    if (LEADS_WORDS.test(r)) return null;
+    const cleaned = r.replace(/[?!.।]+$/g, '').trim();
+    if (BARE_MAP.test(cleaned)) {
+      Promise.resolve(C.showMap({})).catch(() => {});
+      return { handled: true, spoken: pick(['Map khol rahi hoon, sir.', 'Yeh raha map.', 'Map haazir hai, sir.'], 'map_open') };
+    }
+    if (ME_WORDS.test(cleaned) || ME_WORDS_2.test(cleaned)) {
+      const res = await Promise.race([Promise.resolve(C.locateMe()).catch(() => null), new Promise((ok) => setTimeout(() => ok(null), 7000))]);
+      if (res && res.error) return { handled: true, spoken: pick(['Location nahi mil rahi, sir — browser me location allow kar dijiye.', 'Aapki location abhi nahi mili, sir. Location permission check kijiye.'], 'me') };
+      return { handled: true, spoken: pick(['Yeh rahe aap, sir — neela dot.', 'Aap yahan hain, sir.', 'Map pe aapki location dikha di.'], 'me') };
+    }
+    const q = parseTravel(r);
+    if (!q) return null;
+    const run = C.route({ from: q.from, to: q.to });
+    const res = await Promise.race([Promise.resolve(run).catch((e) => ({ error: e?.message || 'failed' })), new Promise((ok) => setTimeout(() => ok(null), 12000))]);
+    if (!res) return { handled: true, spoken: pick([`${q.from} se ${q.to} ka route nikal rahi hoon, sir.`, 'Route map pe aa raha hai, sir.'], 'route_wait') };
+    if (res.error) return { handled: true, spoken: pick([`Route nahi mil paaya, sir — ${res.error}`, `Maaf kijiye, ${q.from} se ${q.to} ka rasta abhi nahi nikla.`], 'route_err') };
+    if (q.want === 'route') return { handled: true, spoken: pick([`Route map pe hai, sir. ${travelLine({ ...q, want: 'distance' }, res)}`, travelLine({ ...q, want: 'distance' }, res)], 'route') };
+    return { handled: true, spoken: travelLine(q, res) };
   }
 
   /* ── the router ────────────────────────────────────────────── */
@@ -383,6 +476,10 @@
         return { handled: false };   // nothing on screen → it was "be quiet"; the STOP rule handles it
       }
     }
+
+    // before mapIntent: "Noida se Delhi kitni door" must not read "door" as zoom out
+    const trip = await travelIntent(raw);
+    if (trip) return trip;
 
     const m = mapIntent(t);
     if (m) return m;
@@ -496,7 +593,36 @@
     const r5 = await route('band karo');   // nothing open → falls through to STOP
     canvas = true;
     const r6 = await route('zoom in');
+    // bare opens: the verb is never read as a place
+    const opened = [];
+    canvas = false;
+    window.ClavisCanvas = { isOpen: () => canvas, kind: () => 'map', hide() {}, showMap: (a) => { opened.push(a); return Promise.resolve({ ok: true }); },
+      route: () => Promise.resolve({ ok: true, from: 'A', to: 'B', straight_km: 10, car: { km: 12, min: 25 }, two_wheeler: { km: 12, min: 22 }, metro: { practical: true, minutes: 30, fare_inr: 32, from_station: 'X', to_station: 'Y' } }),
+      locateMe: () => Promise.resolve({ ok: true }) };
+    const bare = [];
+    for (const p of ['map kholo', 'map open karo', 'open map', 'map dikhao', 'मैप खोलो', 'naksha kholo']) bare.push((await route(p)).handled);
+    const bareOk = bare.every(Boolean) && opened.length === 6 && opened.every((a) => !a.place);
+    const rDist = await route('Noida se Delhi kitni door hai');
+    const rFare = await route('Rajiv Chowk se Noida Sector 18 metro ka kiraya');
+    const rLeads = await route('Loni ki leads map pe dikhao');
+    const rCompound = await route('settings kholo aur Delhi map pe dikhao');
+    const rJoinedPlace = opened.length;
+    await route('India Gate aur Rajpath map pe dikhao');
+    const joinedPlaceOk = opened.length === rJoinedPlace + 1;
     window.ClavisCanvas = saved.C; window.ClavisTaskSurface = saved.T;
+    const P = (x) => parseTravel(x) || {};
+    const trips = [
+      ['Noida se Gurgaon kitni door hai', 'Noida', 'Gurgaon', 'distance'],
+      ['India Gate se Cyber Hub ka route dikhao', 'India Gate', 'Cyber Hub', 'route'],
+      ['Rajiv Chowk se HUDA City Centre metro se kitna time', 'Rajiv Chowk', 'HUDA City Centre', 'metro_time'],
+      ['Kashmere Gate se Noida Sector 18 metro ka kiraya', 'Kashmere Gate', 'Noida Sector 18', 'metro_fare'],
+      ['distance between Noida and Ghaziabad', 'Noida', 'Ghaziabad', 'distance'],
+      ['route from Connaught Place to Saket', 'Connaught Place', 'Saket', 'route'],
+      ['नोएडा से गाज़ियाबाद कितनी दूर है', 'नोएडा', 'गाज़ियाबाद', 'distance'],
+      ['yahan se Loni ka rasta batao', 'me', 'Loni', 'route'],
+      ['metro fare from Dwarka to Rajiv Chowk', 'Dwarka', 'Rajiv Chowk', 'metro_fare'],
+    ].every(([q, f, to, w]) => { const r = P(q); return r.from === f && r.to === to && r.want === w; });
+    const notTrips = ['main kal se office kitni der me jaunga', 'map kholo', 'hello kaise ho'].every((q) => !parseTravel(q));
     const savedLive = window.ClavisLive, savedPet = window.NexusPet;
     let petOn = true;
     window.ClavisLive = { isActive: () => false };
@@ -519,13 +645,20 @@
       r7.handled && petOn === false,
       r8.handled && !!r8.spoken && !!woke,
       !r9.handled,
+      bareOk,
+      rDist.handled && /12 km/.test(rDist.spoken),
+      rFare.handled && /₹32/.test(rFare.spoken),
+      !rLeads.handled,
+      !rCompound.handled && joinedPlaceOk,
+      trips,
+      notTrips,
     ];
     const passed = checks.filter(Boolean).length;
     console[passed === checks.length ? 'log' : 'error'](`ClavisIntent self-test: ${passed}/${checks.length}`, checks);
     return passed === checks.length;
   }
 
-  window.ClavisIntent = { route, screenContext, learn, habitsLine, clearAll, registerSkills, sleep, wakeLine, _selfTest };
+  window.ClavisIntent = { route, screenContext, learn, habitsLine, clearAll, registerSkills, sleep, wakeLine, parseTravel, _selfTest };
 
   // JarvisSkills loads earlier (defer order), but be safe either way.
   if (!registerSkills()) window.addEventListener('DOMContentLoaded', registerSkills, { once: true });

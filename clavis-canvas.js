@@ -32,6 +32,14 @@
   'use strict';
   if (window.ClavisCanvas) return;
 
+  /* Two independent windows built by one factory:
+       'map'  — the map (right side)
+       'peek' — pictures / websites / documents. It sits on the RIGHT, or
+                on the LEFT while the map is open, so the two never stack
+                inside one window or cover each other. */
+  const INST = {};
+  function makeCanvas(SLOT) {
+
   const ML_JS = 'vendor/maplibre/maplibre-gl.js?v=5.24.0';
   const ML_CSS = 'vendor/maplibre/maplibre-gl.css?v=5.24.0';
   const STYLE_URL = {
@@ -44,7 +52,8 @@
   const BACKEND = () => (window.SKYLARK_CONFIG?.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
   const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
   const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)';
-  const OPEN_MS = 720, CLOSE_MS = 520, SWAP_MS = 420, EXPAND_MS = 760;
+  const EASE_FLIP = 'cubic-bezier(0.32, 0.72, 0, 1)';
+  const OPEN_MS = 620, CLOSE_MS = 360, SWAP_MS = 420, EXPAND_MS = 520;
 
   const V = {
     el: null, head: null, body: null, foot: null, kicker: null, title: null, seg: null, backdrop: null,
@@ -52,6 +61,7 @@
     map: null, mapWrap: null, mapStyle: 'map', place: null, pin: null, styleCache: {},
     nearby: null, scanRaf: 0, orbitRaf: 0,
     images: [], lightbox: null,
+    me: null, meMarker: null, pts: [], routeGeo: null, leads: [], leadMarkers: [],
   };
 
   /* ── tiny helpers ───────────────────────────────────────────── */
@@ -79,6 +89,7 @@
   const host = (u) => { try { return new URL(u).hostname.replace(/^www\./, ''); } catch (_) { return String(u || ''); } };
 
   const ICON = {
+    locate: '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="2.5"/></svg>',
     expand: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7"/></svg>',
     collapse: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 14h6v6M20 10h-6V4M10 14l-7 7M14 10l7-7"/></svg>',
     close: '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>',
@@ -91,8 +102,8 @@
   function build() {
     if (V.el) return;
     const el = document.createElement('section');
-    el.id = 'clavis-canvas';
-    el.className = 'ccv';
+    el.id = SLOT === 'map' ? 'clavis-canvas' : 'clavis-peek-canvas';
+    el.className = 'ccv ccv--' + SLOT;
     el.setAttribute('aria-hidden', 'true');
     el.setAttribute('aria-label', 'Clavis display');
     el.innerHTML =
@@ -122,6 +133,9 @@
       const act = e.target.closest('[data-act]')?.dataset.act;
       if (act === 'close') hide();
       else if (act === 'expand') setExpanded(!V.expanded);
+      else if (act === 'locate') locateMe();
+      else if (act === 'route-clear') clearRoute();
+      else if (act === 'dir') routeToLead(Number(e.target.closest('[data-i]')?.dataset.i));
       const st = e.target.closest('[data-style]')?.dataset.style;
       if (st) mapControl({ style: st });
     });
@@ -130,7 +144,62 @@
       if (e.key !== 'Escape' || !V.open || V.lightbox) return;
       if (V.expanded) setExpanded(false); else hide();
     });
-    addEventListener('resize', () => { try { V.map?.resize(); } catch (_) {} });
+    addEventListener('resize', () => { placeWindow(); try { V.map?.resize(); } catch (_) {} }, { passive: true });
+  }
+
+  /* The live voice caption (clavis-ear.js) owns a two-line band at the
+     top right: topbar bottom + 46 px, 2 x 16px/1.45 text. The window
+     always starts below that band (+12 px), card and expanded. */
+  const CAP_BAND = 52, CAP_GAP = 12;
+  function captionTop() {
+    const cap = document.getElementById('clavis-ear-caption');
+    const t = cap ? parseFloat(cap.style.top || getComputedStyle(cap).top) : NaN;
+    if (Number.isFinite(t)) return t;
+    const bar = document.querySelector('.topbar-right') || document.querySelector('.topbar');
+    const r = bar?.getBoundingClientRect?.();
+    let top = r && r.bottom > 0 && r.bottom < 140 ? r.bottom + 46 : 96;
+    document.querySelectorAll('.jarvis-hero-actions, .view.active .view-header-actions, #do-live-time').forEach((el) => {
+      const b = el.getBoundingClientRect();
+      if (b.width && b.height && b.top < top + 44 && b.bottom < 200 && b.right > innerWidth - 520) top = Math.max(top, b.bottom + 14);
+    });
+    return top;
+  }
+  function setVar(name, val) { if (V.el.style.getPropertyValue(name) !== val) V.el.style.setProperty(name, val); }
+  function composerTop() {
+    let t = innerHeight;
+    document.querySelectorAll('.view.active .jarvis-input-container, .view.active .claude-input-container').forEach((b) => {
+      const r = b.getBoundingClientRect();
+      if (r.width && r.height && r.top > innerHeight * 0.45) t = Math.min(t, r.top);
+    });
+    return t;
+  }
+  function placeWindow() {
+    if (!V.el) return;
+    const topPx = Math.round(captionTop() + CAP_BAND + CAP_GAP);
+    setVar('--ccv-top', topPx + 'px');
+    // never reach down over the composer
+    setVar('--ccv-maxh', Math.max(260, Math.round(composerTop() - topPx - 14)) + 'px');
+    const main = document.getElementById('main-content')?.getBoundingClientRect();
+    const mL = main && main.width ? main.left : 0, mW = main && main.width ? main.width : innerWidth;
+    const other = INST[SLOT === 'map' ? 'peek' : 'map'];
+    const both = !!(other && other.isOpen());
+    if (both) setVar('--ccv-w', Math.round(Math.min(560, (mW - 72) / 2)) + 'px');
+    if (V.el.classList.contains('is-paired') !== both) V.el.classList.toggle('is-paired', both);
+    const left = SLOT === 'peek' && both && innerWidth > 720;
+    if (V.el.classList.contains('is-left') !== left) V.el.classList.toggle('is-left', left);
+    setVar('--ccv-left', Math.round(mL + 24) + 'px');
+    if (left) return;
+    // The floating task window (lead preview) also lives at the right edge:
+    // when it is open the card sits to its left, if the screen has room.
+    let right = 28;
+    const surf = document.getElementById('clavis-task-surface');
+    const sr = surf && surf.classList.contains('is-open') ? surf.getBoundingClientRect() : null;
+    if (sr && sr.width && innerWidth > 720) {
+      const want = Math.round(innerWidth - sr.left + 16);
+      if (innerWidth - want - (V.el.offsetWidth || 560) >= 16) right = want;
+    }
+    const r = right + 'px';
+    if (V.el.style.getPropertyValue('--ccv-right') !== r) V.el.style.setProperty('--ccv-right', r);
   }
 
   function setHeader(kind, kicker, title) {
@@ -185,17 +254,39 @@
   }
 
   function openWindow() {
+    placeWindow();
     V.open = true;
     V.el.classList.add('is-open');
     V.el.removeAttribute('aria-hidden');
     try { V.anim?.cancel(); } catch (_) {}
     if (reduced() || !V.el.animate) return;
+    // opacity + transform only: a blur over a live WebGL map dropped frames
+    const dx = V.el.classList.contains('is-left') ? -24 : 24;
     V.anim = V.el.animate([
-      { opacity: 0, transform: 'translateX(28px) scale(0.975)', filter: 'blur(8px)' },
+      { opacity: 0, transform: `translateX(${dx}px) scale(0.97)`, filter: 'blur(6px)' },
       { opacity: 1, transform: 'none', filter: 'blur(0)' },
     ], { duration: OPEN_MS, easing: EASE });
+    siblingReplace();
     V.body.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }],
       { duration: 560, delay: 220, easing: EASE, fill: 'backwards' });
+  }
+
+  /* The other window moves to make room (or takes the room back) with a
+     FLIP glide — transform only. */
+  function siblingReplace() {
+    const o = INST[SLOT === 'map' ? 'peek' : 'map'];
+    if (o && o.isOpen()) o._replace();
+  }
+  function replaceAnimated() {
+    if (!V.el || !V.open || V.expanded) return;
+    const a = V.el.getBoundingClientRect();
+    placeWindow();
+    const b = V.el.getBoundingClientRect();
+    if (reduced() || !V.el.animate || (Math.abs(a.left - b.left) < 2 && Math.abs(a.width - b.width) < 2)) { try { V.map?.resize(); } catch (_) {} return; }
+    V.el.animate([
+      { transformOrigin: '0 0', transform: `translate(${a.left - b.left}px, ${a.top - b.top}px) scale(${a.width / b.width}, ${a.height / b.height})` },
+      { transformOrigin: '0 0', transform: 'none' },
+    ], { duration: 520, easing: EASE_FLIP }).onfinish = () => { try { V.map?.resize(); } catch (_) {} };
   }
 
   function hide() {
@@ -216,36 +307,43 @@
     try { V.anim?.cancel(); } catch (_) {}
     if (reduced() || !V.el.animate) return finish();
     V.backdrop.classList.remove('is-on');
+    const dx = V.el.classList.contains('is-left') ? -18 : 18;
     V.anim = V.el.animate([
-      { opacity: 1, transform: 'none', filter: 'blur(0)' },
-      { opacity: 0, transform: 'translateX(22px) scale(0.98)', filter: 'blur(6px)' },
+      { opacity: 1, transform: 'none' },
+      { opacity: 0, transform: `translateX(${dx}px) scale(0.98)` },
     ], { duration: CLOSE_MS, easing: EASE_IN_OUT, fill: 'forwards' });
-    V.anim.onfinish = () => { finish(); try { V.anim.cancel(); } catch (_) {} };
+    V.anim.onfinish = () => { finish(); try { V.anim.cancel(); } catch (_) {} siblingReplace(); };
   }
 
   /* Card <-> full screen, animated as real geometry so the map re-lays
      itself out every frame instead of stretching a picture of itself. */
   function setExpanded(on) {
     if (!V.open || V.expanded === !!on) return;
+    placeWindow();
     const from = V.el.getBoundingClientRect();
     V.expanded = !!on;
     V.el.classList.toggle('is-expanded', V.expanded);
     V.backdrop.classList.toggle('is-on', V.expanded);
     const btn = V.el.querySelector('[data-act="expand"]');
     if (btn) { btn.innerHTML = V.expanded ? ICON.collapse : ICON.expand; btn.setAttribute('aria-label', V.expanded ? 'Collapse' : 'Expand'); }
-    setMapInteractive(V.expanded);
-    const to = V.el.getBoundingClientRect();
-    if (reduced() || !V.el.animate) { V.map?.resize(); return; }
+    setMapInteractive(true);
+    const side = V.body?.querySelector('.ccv-side');
+    if (side) side.hidden = !(V.expanded && V.nearby && V.nearby.items.length);
     try { V.anim?.cancel(); } catch (_) {}
-    V.anim = V.el.animate([
-      { top: from.top + 'px', left: from.left + 'px', width: from.width + 'px', height: from.height + 'px', right: 'auto', bottom: 'auto' },
-      { top: to.top + 'px', left: to.left + 'px', width: to.width + 'px', height: to.height + 'px', right: 'auto', bottom: 'auto' },
-    ], { duration: EXPAND_MS, easing: EASE });
-    let raf = 0;
-    const tick = () => { try { V.map?.resize(); } catch (_) {} raf = requestAnimationFrame(tick); };
-    if (V.map) tick();
-    const done = () => { cancelAnimationFrame(raf); try { V.map?.resize(); } catch (_) {} };
-    V.anim.onfinish = done; V.anim.oncancel = done;
+    // FLIP: lay out ONCE at the final size, then glide from the old box with
+    // transform only — the compositor does every frame. The map is told
+    // its new size once, when the glide lands (never per frame).
+    const to = V.el.getBoundingClientRect();
+    const land = () => { try { V.map?.resize(); } catch (_) {} };
+    if (reduced() || !V.el.animate || !to.width || !to.height) return land();
+    const sx = from.width / to.width, sy = from.height / to.height;
+    const a = V.el.animate([
+      { transformOrigin: '0 0', transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${sx}, ${sy})` },
+      { transformOrigin: '0 0', transform: 'none' },
+    ], { duration: EXPAND_MS, easing: EASE_FLIP });
+    V.anim = a;
+    a.onfinish = land;
+    a.oncancel = land;
   }
 
   /* ── maps ───────────────────────────────────────────────────── */
@@ -303,13 +401,13 @@
       '<div class="ccv-map">' +
       '  <div class="ccv-map-gl"></div>' +
       '  <div class="ccv-scan" aria-hidden="true"></div>' +
-      '  <button type="button" class="ccv-map-hit" aria-label="Expand map"></button>' +
+      `  <button type="button" class="ccv-ctl ccv-locate" data-act="locate" aria-label="Show my location" title="My location">${ICON.locate}</button>` +
+      '  <div class="ccv-route" hidden></div>' +
       '  <div class="ccv-map-chip" hidden></div>' +
       '  <div class="ccv-map-loading"><span></span></div>' +
       '</div>' +
       '<aside class="ccv-side" hidden></aside>';
     V.mapWrap = V.body.querySelector('.ccv-map');
-    V.mapWrap.querySelector('.ccv-map-hit').addEventListener('click', () => setExpanded(true));
   }
 
   async function ensureMap() {
@@ -326,9 +424,10 @@
     V.map = map;
     map.addControl(new window.maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.on('style.load', () => { reapplyOverlays(); });
+    map.on('click', onMapClick);
     await new Promise((resolve) => { if (map.loaded()) resolve(); else map.once('load', resolve); setTimeout(resolve, 9000); });
     V.mapWrap?.classList.add('is-ready');
-    setMapInteractive(V.expanded);
+    setMapInteractive(true);   // card mode is fully explorable too: drag, scroll-zoom, click pins
     return map;
   }
 
@@ -339,8 +438,6 @@
       try { on ? m[h].enable() : m[h].disable(); } catch (_) {}
     });
     V.mapWrap?.classList.toggle('is-interactive', !!on);
-    const side = V.body?.querySelector('.ccv-side');
-    if (side) side.hidden = !(on && V.nearby && V.nearby.items.length);
   }
 
   function detachMap() {
@@ -348,12 +445,14 @@
     try { V.pin?.remove(); } catch (_) {}
     try { V.map?.remove(); } catch (_) {}
     V.map = null; V.pin = null; V.mapWrap = null; V.nearby = null;
+    V.meMarker = null; V.pts = []; V.routeGeo = null; V.leads = []; V.leadMarkers = [];
   }
 
   async function geocode(query) {
     const q = String(query || '').trim();
     if (!q) throw new Error('No place given.');
     try {
+      await nominatimSlot();
       const r = await getJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&addressdetails=0&accept-language=en&q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } }, 9000);
       if (r && r[0]) {
         const b = r[0].boundingbox ? r[0].boundingbox.map(Number) : null;   // [south, north, west, east]
@@ -405,7 +504,7 @@
 
   async function showMap({ place, query, style, zoom } = {}) {
     const q = String(place || query || '').trim();
-    if (!q) return { error: 'No place given.' };
+    if (!q) return openHere(style);   // bare "map kholo": his location, else the home city
     if (style && ['map', 'satellite', 'dark', '3d'].includes(style)) V.mapStyle = style;
     const wasMap = V.open && V.kind === 'map' && V.map;
     const token = await present('map', 'Map', q, () => { mountMapShell(); });
@@ -446,7 +545,7 @@
     if (!V.place) return;
     const g = `https://www.google.com/maps/search/?api=1&query=${V.place.lat},${V.place.lng}`;
     V.foot.innerHTML =
-      `<span class="ccv-meta">${esc(V.nearby ? `${V.nearby.items.length} ${V.nearby.label} within ${fmtDist(V.nearby.radius)}` : 'Click the map to explore it full-screen')}</span>` +
+      `<span class="ccv-meta">${esc(V.nearby ? `${V.nearby.items.length} ${V.nearby.label} within ${fmtDist(V.nearby.radius)}` : 'Drag to explore · click two points for a route')}</span>` +
       `<a class="ccv-link" href="${esc(g)}" target="_blank" rel="noopener">Google Maps ${ICON.open}</a>`;
   }
 
@@ -584,7 +683,7 @@
         paint: { 'text-color': V.mapStyle === 'satellite' ? '#ffffff' : '#2b2a24', 'text-halo-color': V.mapStyle === 'satellite' ? 'rgba(0,0,0,.7)' : 'rgba(255,255,255,.92)', 'text-halo-width': 1.3 } });
     }
   }
-  function reapplyOverlays() { try { if (V.nearby) addNearbyLayers(); } catch (_) {} }
+  function reapplyOverlays() { try { if (V.nearby) addNearbyLayers(); } catch (_) {} try { if (V.routeGeo) drawRoute(V.routeGeo); } catch (_) {} }
 
   function sweep() {
     const m = V.map, nb = V.nearby;
@@ -667,6 +766,440 @@
       const it = V.nearby.items[Number(li.dataset.i)];
       if (it) V.map.flyTo({ center: [it.lng, it.lat], zoom: 17, pitch: 55, duration: 2200, essential: true });
     }));
+  }
+
+  /* ── where am I, points, routes, leads ─────────────────────── */
+  /* Nominatim's usage policy: at most one request a second. Every call
+     (search, reverse, lead geocoding) waits for its slot here. */
+  let nomiNext = 0;
+  async function nominatimSlot() {
+    const now = Date.now();
+    const wait = Math.max(0, nomiNext - now);
+    nomiNext = Math.max(now, nomiNext) + 1100;
+    if (wait) await sleep(wait);
+  }
+
+  function getPosition(ms = 6000, quiet = false) {
+    return new Promise((resolve) => {
+      const geo = navigator.geolocation;
+      if (!geo) return resolve(null);
+      const ask = () => {
+        let done = false;
+        const t = setTimeout(() => { if (!done) { done = true; resolve(null); } }, ms + 300);
+        geo.getCurrentPosition(
+          (p) => {
+            if (done) return; done = true; clearTimeout(t);
+            const me = { lat: p.coords.latitude, lng: p.coords.longitude, acc: p.coords.accuracy || 0 };
+            try { localStorage.setItem('clavis_last_pos', JSON.stringify({ ...me, at: Date.now() })); } catch (_) {}
+            resolve(me);
+          },
+          () => { if (done) return; done = true; clearTimeout(t); resolve(null); },
+          { enableHighAccuracy: false, timeout: ms, maximumAge: 300000 });
+      };
+      // quiet: only when he already allowed it — never pop a permission prompt
+      if (!quiet) return ask();
+      Promise.resolve(navigator.permissions?.query?.({ name: 'geolocation' }))
+        .then((st) => (st && st.state === 'granted' ? ask() : resolve(null))).catch(() => resolve(null));
+    });
+  }
+
+  function setMe(me) {
+    V.me = me;
+    if (!V.map || !window.maplibregl) return;
+    if (!V.meMarker) {
+      const el = document.createElement('div');
+      el.className = 'ccv-me';
+      el.innerHTML = '<i></i><span></span>';
+      el.title = 'You are here';
+      V.meMarker = new window.maplibregl.Marker({ element: el, anchor: 'center' });
+    }
+    V.meMarker.setLngLat([me.lng, me.lat]).addTo(V.map);
+  }
+  const fromMe = (p) => (V.me && p ? fmtDist(metres([V.me.lng, V.me.lat], [p.lng, p.lat])) : '');
+
+  /* Opens (or keeps) the map window; resolves once the map is ready. */
+  async function openMap(kicker, title) {
+    const wasMap = V.open && V.kind === 'map' && V.map;
+    const token = await present('map', kicker, title, () => { mountMapShell(); });
+    if (!wasMap) await ensureMap();
+    V.body?.querySelector('.ccv-map-loading')?.remove();
+    return token;
+  }
+
+  async function openHere(style) {
+    if (style && ['map', 'satellite', 'dark', '3d'].includes(style)) V.mapStyle = style;
+    let token;
+    try {
+      [token] = await Promise.all([openMap('Map', 'Your area'), getPosition(6000).then((me) => { if (me) V.me = me; return me; })]);
+    } catch (e) { return { error: e.message || 'Map unavailable' }; }
+    if (token !== V.token || !V.map) return { error: 'Display was closed.' };
+    if (V.me) {
+      setMe(V.me);
+      V.place = { name: 'Your location', address: '', lat: V.me.lat, lng: V.me.lng, kind: 'me', bbox: null };
+      V.title.textContent = 'Your location';
+      V.map.flyTo({ center: [V.me.lng, V.me.lat], zoom: 14.5, pitch: 0, bearing: 0, speed: 0.9, essential: true });
+      setChip(`<b>You are here</b><span>Click anywhere for a point; two points give a route</span><em>${V.me.lat.toFixed(4)}°, ${V.me.lng.toFixed(4)}°</em>`);
+      renderMapFoot();
+      return { ok: true, place: 'your location', lat: +V.me.lat.toFixed(5), lng: +V.me.lng.toFixed(5) };
+    }
+    const city = window.SKYLARK_CONFIG?.DEFAULT_CITY || 'Gurugram';
+    const r = await showMap({ place: city });
+    return r.error ? r : { ...r, note: 'Location unavailable, showing the home city.' };
+  }
+
+  async function locateMe() {
+    if (!(V.open && V.kind === 'map' && V.map)) {
+      try { await openMap('Map', 'Your location'); } catch (e) { return { error: e.message || 'Map unavailable' }; }
+    }
+    const me = await getPosition(6000);
+    if (!me) { setChip('<b>Location unavailable</b><span>Allow location access in the browser and try again</span>'); return { error: 'Location not available (permission denied or no signal).' }; }
+    if (!V.map) return { error: 'Display was closed.' };
+    setMe(me);
+    V.map.flyTo({ center: [me.lng, me.lat], zoom: Math.max(V.map.getZoom(), 15), speed: 0.9, essential: true });
+    setChip(`<b>You are here</b><span>accurate to about ${fmtDist(me.acc || 0)}</span><em>${me.lat.toFixed(4)}°, ${me.lng.toFixed(4)}°</em>`);
+    // The first fix is the fast (cached / wifi) one; refine with GPS in the
+    // background and glide the dot if it is meaningfully better.
+    if ((me.acc || 0) > 60 && navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition((p) => {
+        const acc = p.coords.accuracy || 0;
+        if (!V.map || !V.open || acc >= (me.acc || 0) * 0.7) return;
+        const better = { lat: p.coords.latitude, lng: p.coords.longitude, acc };
+        setMe(better);
+        try { localStorage.setItem('clavis_last_pos', JSON.stringify({ ...better, at: Date.now() })); } catch (_) {}
+        V.map.easeTo({ center: [better.lng, better.lat], duration: 900 });
+        setChip(`<b>You are here</b><span>accurate to about ${fmtDist(acc)}</span><em>${better.lat.toFixed(4)}°, ${better.lng.toFixed(4)}°</em>`);
+      }, () => {}, { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 });
+    }
+    return { ok: true, lat: +me.lat.toFixed(5), lng: +me.lng.toFixed(5), accuracy_m: Math.round(me.acc || 0) };
+  }
+
+  async function reverseLabel(p) {
+    try {
+      await nominatimSlot();
+      const r = await getJSON(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&accept-language=en&lat=${p.lat}&lon=${p.lng}`, { headers: { Accept: 'application/json' } }, 8000);
+      if (r && r.display_name) return r.name || r.display_name.split(',').slice(0, 2).join(',').trim();
+    } catch (_) {}
+    try {
+      const f = (await getJSON(`https://photon.komoot.io/reverse?lang=en&lat=${p.lat}&lon=${p.lng}`, {}, 8000))?.features?.[0]?.properties;
+      if (f) return [f.name, f.street, f.city || f.district].filter(Boolean).slice(0, 2).join(', ');
+    } catch (_) {}
+    return '';
+  }
+
+  const ME_RE = /^(me|here|my location|current location|meri location|meri jagah|main|mai|yahan|yaha|yahaan|idhar|mere ghar|यहाँ|यहां|मेरी लोकेशन)$/i;
+  async function resolveEnd(x) {
+    if (x && typeof x === 'object' && !Array.isArray(x)) {
+      const lat = Number(x.lat ?? x.latitude), lng = Number(x.lng ?? x.lon ?? x.longitude);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng, label: x.label || x.name || x.company || '' };
+      x = x.place || x.address || x.name || '';
+    }
+    if (Array.isArray(x) && x.length === 2) return { lng: Number(x[0]), lat: Number(x[1]), label: '' };
+    const q = String(x || '').trim();
+    if (!q) throw new Error('Start or end point missing.');
+    if (ME_RE.test(q)) {
+      const me = V.me || await getPosition(6000);
+      if (!me) throw new Error('Your location is not available.');
+      V.me = me;
+      return { lat: me.lat, lng: me.lng, label: 'Your location', me: true };
+    }
+    const g = await geocode(q);
+    return { lat: g.lat, lng: g.lng, label: g.name };
+  }
+
+  function pointHTML(p) {
+    const d = fromMe(p);
+    return `<b class="ccv-pop-title">${esc(p.label || 'Dropped point')}</b><span class="ccv-pop-addr">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</span>${d ? `<span class="ccv-pop-addr">${esc(d)} from you</span>` : ''}`;
+  }
+  function addPoint(p) {
+    const pt = { lat: p.lat, lng: p.lng, label: p.label || '' };
+    const el = document.createElement('div');
+    el.className = 'ccv-pt';
+    el.textContent = 'AB'[V.pts.length] || '';
+    pt.marker = new window.maplibregl.Marker({ element: el, anchor: 'center' }).setLngLat([pt.lng, pt.lat])
+      .setPopup(new window.maplibregl.Popup({ offset: 16, className: 'ccv-pop', maxWidth: '280px' }).setHTML(pointHTML(pt)))
+      .addTo(V.map);
+    V.pts.push(pt);
+    if (!pt.label) pt.labelP = reverseLabel(pt).then((label) => {
+      pt.label = label || 'Dropped point';
+      try { pt.marker.getPopup()?.setHTML(pointHTML(pt)); } catch (_) {}
+      if (V.pts.length === 1 && V.pts[0] === pt) setChip(`<b>${esc(pt.label)}</b><span>Click a second point for the route</span><em>${pt.lat.toFixed(4)}°, ${pt.lng.toFixed(4)}°</em>`);
+    });
+    return pt;
+  }
+  function onMapClick(e) {
+    const t = e.originalEvent?.target;
+    if (t?.closest?.('.maplibregl-marker, .maplibregl-popup, .ccv-route, .ccv-ctl, .maplibregl-ctrl')) return;
+    // a click that only closes an open popup does nothing else
+    if (V.body?.querySelector('.maplibregl-popup')) return;
+    if (V.pts.length >= 2) clearRoute();
+    const pt = addPoint({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+    if (V.pts.length === 1) setChip(`<b>Point A</b><span>Click a second point for the route</span><em>${pt.lat.toFixed(4)}°, ${pt.lng.toFixed(4)}°</em>`);
+    else route({ from: V.pts[0], to: V.pts[1], _keep: true });
+  }
+
+  function clearRoute() {
+    V.pts.forEach((p) => { try { p.marker.remove(); } catch (_) {} });
+    V.pts = [];
+    V.routeGeo = null;
+    const m = V.map;
+    if (m && m.getStyle()) {
+      ['ccv-route-line', 'ccv-route-casing'].forEach((id) => { try { if (m.getLayer(id)) m.removeLayer(id); } catch (_) {} });
+      try { if (m.getSource('ccv-route')) m.removeSource('ccv-route'); } catch (_) {}
+    }
+    const panel = V.body?.querySelector('.ccv-route');
+    if (panel) { panel.hidden = true; panel.innerHTML = ''; }
+  }
+  function drawRoute(geo) {
+    const m = V.map;
+    if (!m || !geo) return;
+    V.routeGeo = geo;
+    const data = { type: 'Feature', geometry: geo, properties: {} };
+    if (m.getSource('ccv-route')) { m.getSource('ccv-route').setData(data); return; }
+    m.addSource('ccv-route', { type: 'geojson', data });
+    m.addLayer({ id: 'ccv-route-casing', type: 'line', source: 'ccv-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#ffffff', 'line-width': 8, 'line-opacity': 0.9 } });
+    m.addLayer({ id: 'ccv-route-line', type: 'line', source: 'ccv-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#3b6fd8', 'line-width': 4.5 } });
+  }
+
+  /* ── travel maths (pure; see _selfTest) ── */
+  const OSRM = { car: 'routed-car', bike: 'routed-bike', foot: 'routed-foot' };
+  // Two-wheelers average ~15% faster than a car on the same city roads (estimate).
+  const TWO_WHEELER_FACTOR = 1.15;
+  const METRO_KMPH = 34, WALK_KMPH = 4.8, DETOUR = 1.25;
+  /* DMRC fare slabs, effective 25 Aug 2025 (Mon–Sat), by station-to-station km. */
+  function metroFare(km) {
+    const k = Number(km);
+    if (!Number.isFinite(k) || k < 0) return null;
+    return k <= 2 ? 11 : k <= 5 ? 21 : k <= 12 ? 32 : k <= 21 ? 43 : k <= 32 ? 54 : 64;
+  }
+  // DMRC slabs only make sense for Delhi NCR stations.
+  const inDelhiNCR = (p) => !!p && p.lat > 28.2 && p.lat < 28.95 && p.lng > 76.8 && p.lng < 77.65;
+  function metroPlan(from, to, sa, sb) {
+    if (!sa || !sb) return { practical: false, reason: !sa && !sb ? 'no metro station within 2 km of either end' : `no metro station within 2 km of the ${!sa ? 'start' : 'destination'}` };
+    if (sa.name && sa.name === sb.name) return { practical: false, reason: 'the same station is nearest to both ends' };
+    const walk1 = metres([from.lng, from.lat], [sa.lng, sa.lat]) * DETOUR;
+    const walk2 = metres([sb.lng, sb.lat], [to.lng, to.lat]) * DETOUR;
+    const ride = metres([sa.lng, sa.lat], [sb.lng, sb.lat]) * DETOUR;
+    const minutes = (walk1 + walk2) / 1000 / WALK_KMPH * 60 + ride / 1000 / METRO_KMPH * 60;
+    return {
+      practical: true, from_station: sa.name || 'metro station', to_station: sb.name || 'metro station',
+      walk_m: Math.round(walk1 + walk2), ride_km: +(ride / 1000).toFixed(1), minutes: Math.round(minutes),
+      fare_inr: inDelhiNCR(sa) && inDelhiNCR(sb) ? metroFare(ride / 1000) : null, estimate: true,
+    };
+  }
+  const fmtMin = (min) => { const m = Math.max(1, Math.round(min)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`; };
+
+  async function osrm(profile, a, b) {
+    const url = `https://routing.openstreetmap.de/${OSRM[profile]}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
+    const r = await getJSON(url, {}, 15000);
+    const rt = r?.routes?.[0];
+    if (!rt) throw new Error('No route found');
+    return { m: rt.distance, s: rt.duration, geometry: rt.geometry };
+  }
+  async function nearestStation(p) {
+    const ql = `[out:json][timeout:15];(node["station"="subway"](around:2000,${p.lat},${p.lng});node["railway"="station"]["subway"="yes"](around:2000,${p.lat},${p.lng}););out 40;`;
+    const data = await getJSON('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(ql), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 20000);
+    let best = null;
+    (data.elements || []).forEach((e) => {
+      if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon)) return;
+      const d = metres([p.lng, p.lat], [e.lon, e.lat]);
+      if (d <= 2000 && (!best || d < best.d)) best = { d, lat: e.lat, lng: e.lon, name: e.tags?.name || e.tags?.['name:en'] || '' };
+    });
+    return best;
+  }
+
+  async function route({ from, to, mode, _keep } = {}) {
+    let a, b;
+    try {
+      if (!(V.open && V.kind === 'map' && V.map)) await openMap('Route', 'Route');
+      [a, b] = await Promise.all([resolveEnd(from), resolveEnd(to)]);
+    } catch (e) {
+      if (V.map) setChip(`<b>Route unavailable</b><span>${esc(e.message || e)}</span>`);
+      return { error: e.message || String(e) };
+    }
+    if (!V.map) return { error: 'Display was closed.' };
+    const token = V.token;
+    if (!_keep) { clearRoute(); addPoint(a); addPoint(b); }
+    try { V.pin?.remove(); } catch (_) {}
+    V.kicker.textContent = 'Route';
+    V.title.textContent = `${a.label || 'A'} → ${b.label || 'B'}`;
+    const panel = V.body.querySelector('.ccv-route');
+    setChip('');
+    if (panel) { panel.hidden = false; panel.innerHTML = '<p class="ccv-rt-note">Finding the route…</p>'; }
+    const want = /walk|foot|paidal/i.test(mode || '') ? 'foot' : /cycl/i.test(mode || '') ? 'bike' : 'car';
+    const [car, foot, bike, sa, sb] = await Promise.all([
+      osrm('car', a, b).catch(() => null), osrm('foot', a, b).catch(() => null),
+      want === 'bike' ? osrm('bike', a, b).catch(() => null) : null,
+      nearestStation(a).catch(() => undefined), nearestStation(b).catch(() => undefined),
+    ]);
+    if (_keep) {   // clicked points: their names arrive from reverse geocoding
+      await withTimeout(Promise.all(V.pts.map((p) => p.labelP)), 4000).catch(() => {});
+      a.label = V.pts[0]?.label || a.label; b.label = V.pts[1]?.label || b.label;
+      V.title.textContent = `${a.label || 'A'} → ${b.label || 'B'}`;
+    }
+    if (token !== V.token || !V.map) return { error: 'Display was closed.' };
+    const straight = metres([a.lng, a.lat], [b.lng, b.lat]);
+    const shown = (want === 'foot' && foot) || (want === 'bike' && bike) || car || foot;
+    if (shown) drawRoute(shown.geometry);
+    const bb = new window.maplibregl.LngLatBounds([a.lng, a.lat], [a.lng, a.lat]);
+    bb.extend([b.lng, b.lat]);
+    (shown?.geometry?.coordinates || []).forEach((c) => bb.extend(c));
+    V.map.fitBounds(bb, { padding: { top: 60, bottom: 40, left: 300, right: 50 }, maxZoom: 16, duration: 1600, pitch: 0, bearing: 0 });
+    const metro = sa === undefined || sb === undefined ? { practical: false, reason: 'metro stations could not be looked up right now' } : metroPlan(a, b, sa, sb);
+    const km = (x) => +(x.m / 1000).toFixed(1);
+    const out = {
+      ok: true, from: a.label, to: b.label, straight_km: +(straight / 1000).toFixed(1),
+      car: car ? { km: km(car), min: Math.round(car.s / 60) } : null,
+      two_wheeler: car ? { km: km(car), min: Math.round(car.s / 60 / TWO_WHEELER_FACTOR), estimate: true } : null,
+      walk: foot ? { km: km(foot), min: Math.round(foot.s / 60) } : null,
+      bicycle: bike ? { km: km(bike), min: Math.round(bike.s / 60) } : undefined,
+      metro, note: 'Road times are without traffic. Two-wheeler and metro figures are estimates.',
+    };
+    renderRoutePanel(out);
+    return out;
+  }
+
+  function renderRoutePanel(r) {
+    const panel = V.body?.querySelector('.ccv-route');
+    if (!panel) return;
+    const row = (name, tag, val, sub) => `<li><span class="ccv-rt-mode">${esc(name)}${tag ? ` <small>${esc(tag)}</small>` : ''}</span><span class="ccv-rt-val">${val}${sub ? `<small>${sub}</small>` : ''}</span></li>`;
+    const dist = (x) => (x ? `${x.km} km · ${fmtMin(x.min)}` : '<em>unavailable</em>');
+    const m = r.metro || {};
+    const metroVal = m.practical ? `${fmtMin(m.minutes)}${m.fare_inr ? ` · ₹${m.fare_inr}` : ''}` : '<em>not practical</em>';
+    const metroSub = m.practical ? `${esc(m.from_station)} → ${esc(m.to_station)}` : esc(m.reason || '');
+    panel.innerHTML =
+      `<header><b>${esc(r.from || 'A')} → ${esc(r.to || 'B')}</b><button type="button" class="ccv-icon" data-act="route-clear" aria-label="Clear route" title="Clear route">${ICON.close}</button></header>` +
+      '<ul>' + row('Car', '', dist(r.car)) + row('Two-wheeler', 'estimate', dist(r.two_wheeler)) + row('Walk', '', dist(r.walk)) +
+      row('Metro', m.practical ? 'estimate' : '', metroVal, metroSub) + '</ul>' +
+      `<p class="ccv-rt-note">Without traffic · straight line ${r.straight_km} km${m.practical && m.fare_inr ? ' · DMRC Mon–Sat fare; Sundays/holidays may be cheaper, smart card 10% off' : ''}</p>`;
+    panel.hidden = false;
+    if (panel.animate && !reduced()) panel.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EASE });
+  }
+
+  async function distance({ from, to } = {}) {
+    const r = await route({ from, to });
+    if (r.error) return r;
+    return { ok: true, from: r.from, to: r.to, road_km: r.car?.km ?? null, car_min: r.car?.min ?? null, straight_km: r.straight_km, metro: r.metro, note: 'Road distance by car, without traffic.' };
+  }
+
+  /* ── leads on the map ── */
+  const GEO_KEY = 'clavis_geo_cache_v1';
+  const geoCache = (() => { try { return JSON.parse(localStorage.getItem(GEO_KEY) || '{}') || {}; } catch (_) { return {}; } })();
+  function geoRemember(q, v) {
+    geoCache[q] = v;
+    try {
+      const keys = Object.keys(geoCache);
+      if (keys.length > 800) keys.slice(0, keys.length - 800).forEach((k) => delete geoCache[k]);
+      localStorage.setItem(GEO_KEY, JSON.stringify(geoCache));
+    } catch (_) {}
+  }
+  /* Only street-level (or finer) answers count as "where the company is";
+     a city or district centre would be a made-up location. */
+  async function geocodePrecise(q) {
+    try {
+      await nominatimSlot();
+      const r = await getJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=in&accept-language=en&q=${encodeURIComponent(q)}`, { headers: { Accept: 'application/json' } }, 9000);
+      const h = r && r[0];
+      if (h) return Number(h.place_rank || 0) >= 26 ? { lat: Number(h.lat), lng: Number(h.lon) } : null;
+    } catch (_) {}
+    try {
+      const f = (await getJSON(`https://photon.komoot.io/api/?limit=1&lang=en&q=${encodeURIComponent(q)}`, {}, 9000))?.features?.[0];
+      if (f && /^(house|street|other)$/.test(f.properties?.type || '')) return { lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] };
+    } catch (_) {}
+    return null;
+  }
+  async function locateLead(l) {
+    const lat = Number(l.lat ?? l.latitude), lng = Number(l.lng ?? l.longitude ?? l.lon);
+    if (Number.isFinite(lat) && Number.isFinite(lng) && (lat || lng) && Math.abs(lat) <= 90 && Math.abs(lng) <= 180) return { lat, lng };
+    const tries = [[l.company, l.address, l.city], [l.company, l.city], [l.address, l.city]]
+      .map((a) => a.filter(Boolean).join(', ')).filter((q, i, arr) => q.includes(',') && arr.indexOf(q) === i);
+    for (const q of tries) {
+      const key = q.toLowerCase();
+      if (key in geoCache) { if (geoCache[key]) return geoCache[key]; continue; }
+      const hit = await geocodePrecise(q);
+      geoRemember(key, hit);
+      if (hit) return hit;
+    }
+    return null;
+  }
+  /* Pins closer than ~30 m fan out on screen; the real coordinates stay. */
+  function fanOut(items) {
+    const placed = [];
+    items.forEach((it) => {
+      const near = placed.filter((p) => metres([p.lng, p.lat], [it.lng, it.lat]) < 30).length;
+      const a = near * (Math.PI / 3);
+      it.offset = near ? [Math.round(Math.cos(a) * 18), Math.round(Math.sin(a) * 18)] : [0, 0];
+      placed.push(it);
+    });
+    return items;
+  }
+  const telHref = (p) => 'tel:' + String(p).replace(/[^\d+]/g, '');
+  function leadHTML(l, i) {
+    const phones = [...new Set([].concat(l.phones || [], l.phone || [], l.phoneAlt || [], l.phoneAlt2 || []).map((p) => String(p).trim()).filter(Boolean))].slice(0, 4);
+    const web = l.website ? (/^https?:/i.test(l.website) ? l.website : 'https://' + l.website) : '';
+    const g = l.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
+    const d = fromMe(l);
+    return `<b class="ccv-pop-title">${esc(l.company || 'Company')}</b>` +
+      (l.contactPerson ? `<span class="ccv-pop-who">${esc(l.contactPerson)}${l.designation ? ` · ${esc(l.designation)}` : ''}</span>` : '') +
+      (phones.length ? `<span class="ccv-pop-row">${phones.map((p) => `<a href="${esc(telHref(p))}">${esc(p)}</a>`).join(' · ')}</span>` : '') +
+      (l.email ? `<span class="ccv-pop-row"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></span>` : '') +
+      (web ? `<span class="ccv-pop-row"><a href="${esc(web)}" target="_blank" rel="noopener">${esc(host(web))}</a></span>` : '') +
+      (l.address ? `<span class="ccv-pop-addr">${esc(l.address)}</span>` : '') +
+      (d ? `<span class="ccv-pop-addr">${esc(d)} from you</span>` : '') +
+      `<span class="ccv-pop-btns" data-i="${i}"><button type="button" data-act="dir">Directions</button><a href="${esc(g)}" target="_blank" rel="noopener">Google Maps</a></span>`;
+  }
+
+  async function showLeads(leads, { title } = {}) {
+    const list = (Array.isArray(leads) ? leads : []).filter((l) => l && (l.company || l.name));
+    if (!list.length) return { shown: 0, skipped: 0, error: 'No leads given.' };
+    placeWindow();
+    let token;
+    try { token = await openMap('Leads', title || `${list.length} companies`); } catch (e) { return { shown: 0, skipped: list.length, error: e.message || 'Map unavailable' }; }
+    V.leadMarkers.forEach((m) => { try { m.remove(); } catch (_) {} });
+    V.leadMarkers = []; V.leads = [];
+    try { V.pin?.remove(); } catch (_) {}
+    setChip(`<b>Placing ${list.length} companies…</b><span>looking up each address</span>`);
+    if (!V.me) getPosition(4000, true).then((me) => { if (me && V.map) setMe(me); });
+    const items = [], skippedNames = [];
+    for (const raw of list) {
+      const l = { ...raw, company: raw.company || raw.name };
+      const at = await locateLead(l);
+      if (token !== V.token) return { shown: 0, skipped: list.length, error: 'Display was closed.' };
+      if (at) items.push({ ...l, lat: at.lat, lng: at.lng }); else skippedNames.push(l.company);
+    }
+    if (!V.map) return { shown: 0, skipped: list.length, error: 'Display was closed.' };
+    fanOut(items);
+    V.leads = items;
+    items.forEach((l, i) => {
+      const el = document.createElement('div');
+      el.className = 'ccv-lead';
+      el.innerHTML = `<span>${i + 1}</span>`;
+      el.title = l.company;
+      V.leadMarkers.push(new window.maplibregl.Marker({ element: el, anchor: 'center', offset: l.offset })
+        .setLngLat([l.lng, l.lat])
+        .setPopup(new window.maplibregl.Popup({ offset: 14, className: 'ccv-pop', maxWidth: '300px' }).setHTML(leadHTML(l, i)))
+        .addTo(V.map));
+    });
+    if (items.length) {
+      const b = new window.maplibregl.LngLatBounds([items[0].lng, items[0].lat], [items[0].lng, items[0].lat]);
+      items.forEach((l) => b.extend([l.lng, l.lat]));
+      V.map.fitBounds(b, { padding: 60, maxZoom: 15, duration: 1800, pitch: 0, bearing: 0 });
+      V.place = { name: title || 'Leads', address: '', lat: items[0].lat, lng: items[0].lng, kind: 'leads', bbox: null };
+    }
+    setChip(items.length
+      ? `<b>${items.length} ${items.length === 1 ? 'company' : 'companies'} on the map</b><span>${skippedNames.length ? `${skippedNames.length} couldn't be located · ` : ''}tap a pin for contacts</span>`
+      : `<b>None could be located</b><span>no reliable address for these ${list.length}</span>`);
+    renderMapFoot();
+    return { shown: items.length, skipped: skippedNames.length, skippedNames };
+  }
+
+  async function routeToLead(i) {
+    const l = V.leads[i];
+    if (!l) return;
+    const me = V.me || await getPosition(6000);
+    if (!me) { setChip('<b>Where are you?</b><span>Allow location access, or click your start point on the map</span>'); return; }
+    setMe(me);
+    V.body?.querySelectorAll('.maplibregl-popup').forEach((p) => p.remove());
+    route({ from: { lat: me.lat, lng: me.lng, label: 'Your location' }, to: { lat: l.lat, lng: l.lng, label: l.company } });
   }
 
   /* ── images ─────────────────────────────────────────────────── */
@@ -946,7 +1479,8 @@
      two windows never compete for the same answer. */
   function registerSkills() {
     const S = window.JarvisSkills;
-    if (!S?.register || S.has?.('show_map')) return;
+    if (!S?.register) return;
+    const reg = (name, def) => { if (!S.has?.(name)) S.register(name, def); };
     const visual = (fn) => async (params) => {
       const out = await fn(params || {});
       try {
@@ -956,20 +1490,37 @@
       } catch (_) {}
       return out;
     };
-    S.register('show_map', { builtin: true, description: 'Show a place on the map in the Clavis display (fly-in, pin). Use for any "where is / show on map / location" request.', params: { place: 'place name or address', style: 'optional: map, satellite, dark or 3d' }, run: visual(showMap) });
-    S.register('show_nearby', { builtin: true, description: 'On the open map, scan the area and mark every place of one kind (hospital, police, hotel, office, school, bank, mall, metro...).', params: { category: 'what to find, e.g. hospital', place: 'optional place to scan around', radius_m: 'number of metres (default 1500)' }, run: visual(showNearby) });
-    S.register('show_images', { builtin: true, description: 'Search the web for pictures and show them in the Clavis display. The owner is Indian and speaks Hinglish: "lord"/"bhagwan"/"god" alone means the Hindu deities, "shiv ji" is Lord Shiva, etc.', params: { query: 'what to find pictures of, correctly spelled (e.g. "Lord Shiva", "Neem Karoli Baba"); pass the owner\'s own words if unsure' }, run: visual(showImages) });
-    S.register('show_website', { builtin: true, description: 'Show a website in the Clavis display: screenshot plus overview (what it is, fonts, colours, contacts).', params: { url: 'URL or domain', summary: 'optional one-line description' }, run: visual(showWebsite) });
-    S.register('show_map_style', { builtin: true, description: 'Change the open map: style (map/satellite/dark/3d), zoom, or action (zoom_in, zoom_out, rotate, reset, expand).', params: { style: 'optional style', action: 'optional action', zoom: 'number (optional)' }, run: (p) => mapControl(p || {}) });
+    reg('show_map', { builtin: true, description: 'Show a place on the map in the Clavis display (fly-in, pin). Use for any "where is / show on map / location" request.', params: { place: 'place name or address', style: 'optional: map, satellite, dark or 3d' }, run: visual(showMap) });
+    reg('show_nearby', { builtin: true, description: 'On the open map, scan the area and mark every place of one kind (hospital, police, hotel, office, school, bank, mall, metro...).', params: { category: 'what to find, e.g. hospital', place: 'optional place to scan around', radius_m: 'number of metres (default 1500)' }, run: visual(showNearby) });
+    reg('show_images', { builtin: true, description: 'Search the web for pictures and show them in the Clavis display. The owner is Indian and speaks Hinglish: "lord"/"bhagwan"/"god" alone means the Hindu deities, "shiv ji" is Lord Shiva, etc.', params: { query: 'what to find pictures of, correctly spelled (e.g. "Lord Shiva", "Neem Karoli Baba"); pass the owner\'s own words if unsure' }, run: visual((p) => window.ClavisCanvas.showImages(p)) });
+    reg('show_website', { builtin: true, description: 'Show a website in the Clavis display: screenshot plus overview (what it is, fonts, colours, contacts).', params: { url: 'URL or domain', summary: 'optional one-line description' }, run: visual((p) => window.ClavisCanvas.showWebsite(p)) });
+    reg('show_map_style', { builtin: true, description: 'Change the open map: style (map/satellite/dark/3d), zoom, or action (zoom_in, zoom_out, rotate, reset, expand).', params: { style: 'optional style', action: 'optional action', zoom: 'number (optional)' }, run: (p) => mapControl(p || {}) });
+    reg('show_route', { builtin: true, description: 'Show the route between two places on the map with car, two-wheeler (estimate), walking and metro (estimate, DMRC fare) times — without traffic. "A se B ka route", "route from A to B".', params: { from: 'start place (or "me" for his location)', to: 'destination place', mode: 'optional: car | walk | bicycle (which line to draw)' }, run: visual((p) => route(p)) });
+    reg('map_distance', { builtin: true, description: 'How far one place is from another (road km by car + straight line), shown on the map. "A se B kitni door hai".', params: { from: 'start place (or "me")', to: 'destination place' }, run: visual((p) => distance(p)) });
+    reg('locate_me', { builtin: true, description: 'Show his current location on the map (blue dot). "meri location dikhao", "where am I".', params: {}, run: visual(() => locateMe()) });
+    reg('show_leads_on_map', { builtin: true, description: 'Put his saved leads on the map as pins (company, owner, phones, email; tap a pin for directions). Optional city filter and limit.', params: { city: 'optional city / area filter', limit: 'optional max number (default 50)' }, run: visual(async ({ city, limit } = {}) => {
+      let all = [];
+      try { all = (await window.MemoryEngine?.getAllLeads?.()) || []; } catch (_) {}
+      const c = String(city || '').trim().toLowerCase();
+      const picked = all.filter((l) => !c || [l.city, l.location, l.address, l.area].some((v) => String(v || '').toLowerCase().includes(c)))
+        .slice(0, clamp(Number(limit) || 50, 1, 200));
+      if (!picked.length) return { error: c ? `No saved leads in ${city}.` : 'No saved leads yet.' };
+      return showLeads(picked, { title: c ? `Leads · ${city}` : 'Saved leads' });
+    }) });
   }
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', registerSkills, { once: true });
-  else registerSkills();
-  setTimeout(registerSkills, 1500);
+  if (SLOT === 'map') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', registerSkills, { once: true });
+    else registerSkills();
+    setTimeout(registerSkills, 1500);
+  }
 
-  window.ClavisCanvas = {
+  return {
     showMap, mapControl, showNearby, showImages, showWebsite, showDocument,
-    hide, expand: () => setExpanded(true), collapse: () => setExpanded(false),
+    showLeads, route, distance, locateMe, metroFare, metroPlan,
+    hide, expand: () => setExpanded(true), collapse: () => setExpanded(false), _replace: replaceAnimated,
+    isExpanded: () => V.expanded,
     isOpen: () => V.open, kind: () => V.kind, place: () => V.place,
+    map: () => V.map, leads: () => V.leads.map(({ offset, ...l }) => l),
     _selfTest() {
       const c = circle([77.2, 28.6], 1000);
       const ring = c.geometry.coordinates[0];
@@ -979,6 +1530,12 @@
         fmtDist(420) === '420 m' && fmtDist(1500) === '1.5 km' && fmtDist(12000) === '12 km',
         host('https://www.stripe.com/in') === 'stripe.com',
         (CATS[CAT_ALIASES.thana] || [])[1] === 'police stations',
+        // DMRC slabs (25 Aug 2025, Mon–Sat)
+        [[0.5, 11], [2, 11], [2.1, 21], [5, 21], [11.9, 32], [12, 32], [15, 43], [21, 43], [25, 54], [32, 54], [40, 64]].every(([k, f]) => metroFare(k) === f),
+        // metro time = walk + ride at 34 km/h + walk; 10 km straight ride ×1.25 ≈ 22 min, no walk
+        (() => { const s = { lat: 28.6, lng: 77.2, name: 'A' }, e = { lat: 28.6 + 10 / 111.2, lng: 77.2, name: 'B' }; const p = metroPlan(s, e, s, e); return p.practical && Math.abs(p.minutes - 22) <= 1 && p.fare_inr === 43; })(),
+        metroPlan({ lat: 28.6, lng: 77.2 }, { lat: 28.7, lng: 77.2 }, null, { lat: 28.7, lng: 77.2 }).practical === false,
+        fmtMin(45) === '45 min' && fmtMin(135) === '2 h 15 min',
         // photo requests are read the way sir means them (needs clavis-luxe.js; plain pass-through without it)
         window.ClavisLuxe?.understandImageQuery ? understandQuery('shiv ji ki photo').name === 'Lord Shiva' && understandQuery('lord ki photo dikhao').kind === 'group'
           : understandQuery('taj mahal').name === 'taj mahal',
@@ -987,5 +1544,26 @@
       console[passed === ok.length ? 'log' : 'error'](`ClavisCanvas self-test: ${passed}/${ok.length}`);
       return passed === ok.length;
     },
+  };
+  }
+
+  INST.map = makeCanvas('map');
+  INST.peek = makeCanvas('peek');
+  const M = INST.map, P = INST.peek;
+  const front = () => (M.isOpen() ? M : P);
+  window.ClavisCanvas = {
+    // map window
+    showMap: M.showMap, mapControl: M.mapControl, showNearby: M.showNearby, showLeads: M.showLeads,
+    route: M.route, distance: M.distance, locateMe: M.locateMe, metroFare: M.metroFare, metroPlan: M.metroPlan,
+    place: M.place, map: M.map, leads: M.leads,
+    // floating window (pictures / sites / documents)
+    showImages: P.showImages, showWebsite: P.showWebsite, showDocument: P.showDocument,
+    hide() { P.hide(); M.hide(); },
+    hideMap: M.hide, hidePeek: P.hide,
+    expand() { front().expand(); }, collapse() { P.collapse(); M.collapse(); },
+    isOpen: () => M.isOpen() || P.isOpen(),
+    mapOpen: () => M.isOpen(), peekOpen: () => P.isOpen(),
+    kind: () => (M.isOpen() ? M.kind() : P.kind()),
+    _selfTest: M._selfTest,
   };
 })();
