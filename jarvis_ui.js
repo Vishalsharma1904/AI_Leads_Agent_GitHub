@@ -1644,6 +1644,38 @@ async function legacyStartGroqWhisperVoiceInput(options = {}) {
 
 function startJarvisVoiceInput(options = {}) {
   window._clavisLastInputSource = 'voice';
+
+  // Manual button click / shortcut toggle: If already recording/listening, clicking again toggles OFF
+  const isDirectManualTrigger = !options.handsFreeCapture && !options.soundTrigger && !options.initialText;
+  const isCurrentlyRecording = Boolean(
+    isGroqRecording ||
+    window.ClavisLive?.isActive?.() ||
+    (clavisEar.rec && clavisEarAlive()) ||
+    document.getElementById('jarvis-composer-voice-btn')?.classList.contains('recording')
+  );
+
+  if (isDirectManualTrigger && isCurrentlyRecording) {
+    if (clavisEar.heard && clavisEar.heard.trim()) {
+      clavisEarCommit('tap');
+      return;
+    }
+    CLAVIS_VS.setMicEnabled(false, 'manual toggle off');
+    if (window.ClavisLive?.isActive?.()) {
+      try { window.ClavisLive.stop({ reason: 'user' }); } catch (_) {}
+    }
+    stopCommandEar();
+    stopWakeListener();
+    try { window.LocalSpeechEngine?.stopInput?.(); } catch (_) {}
+    try { stopClavisSoundTriggers(); } catch (_) {}
+    try { window.ClavisEar?.caption?.clear?.(); } catch (_) {}
+    document.querySelectorAll('#jarvis-voice-btn, #jarvis-composer-voice-btn').forEach((b) => b.classList.remove('recording'));
+    setJarvisStatus('stopped', 'Mic off');
+    return;
+  }
+
+  // Toggling ON or starting: ensure mic capability is active
+  CLAVIS_VS.setMicEnabled(true, 'start voice input');
+
   // Orb / mic button / keyboard shortcut = sir ne khud bulaya → jaago.
   // (Wake word aur clap/snap apne handler me pehle hi jaga chuke hote hain.)
   if (!options.handsFreeCapture && !options.soundTrigger && !window.ClavisLive?.isActive?.()) clavisWakeUp('tap');
@@ -2121,7 +2153,7 @@ function clavisWordCount(text) {
   return String(text || '').trim().split(/\s+/).filter(Boolean).length;
 }
 
-function commitJarvisVoiceInput(transcript, meta = {}) {
+async function commitJarvisVoiceInput(transcript, meta = {}) {
   const input = document.getElementById('jarvis-input');
   meta = meta || {};
   const heard = clavisCommitCommand(String(transcript || '').trim());
@@ -2205,6 +2237,39 @@ function commitJarvisVoiceInput(transcript, meta = {}) {
   }
   CLAVIS_VS.mark('intent');
   if (clavisVoiceFastPath(finalText)) return;
+
+  // FAST ROUTE (<50ms): Deterministic commands (Open website, open app, stop, mic control)
+  // must NEVER wait for or wake Gemini Live or call cloud LLMs!
+  try {
+    let det = null;
+    if (window.ClavisIntent?.route) {
+      det = await window.ClavisIntent.route(finalText, { source: 'voice' });
+    }
+    if (!det?.handled && window.ClavisCommands?.route) {
+      det = await window.ClavisCommands.route(finalText);
+    }
+    if (det && det.handled) {
+      CLAVIS_VS.mark('speech_to_intent');
+      CLAVIS_VS.mark('tool_started');
+      CLAVIS_VS.mark('tool_finished');
+      window.ClavisEar?.tap?.stop?.('native');
+      window.ClavisEar?.caption?.final(finalText, true);
+      clavisFreshWake = false;
+      window.__clavisLastVoiceAt = Date.now();
+      jarvisVoiceFinalTranscript = '';
+      if (det.spoken && jarvisSpeechEnabled && !CLAVIS_VS.isSilent()) {
+        speakJarvisText(det.spoken);
+      }
+      if (det.text) {
+        appendJarvisBubble('assistant', det.text);
+      }
+      CLAVIS_VS.rest('intent handled');
+      return;
+    }
+  } catch (err) {
+    console.warn('[ClavisVoice] deterministic route error:', err);
+  }
+
   window.ClavisEar?.tap?.stop?.('native');
   window.ClavisEar?.caption?.final(finalText, true);
   // Accepted voice turn: agle turns follow-up hain; task controller isse
@@ -2433,6 +2498,8 @@ function toggleJarvisHandsFree() {
   const settingsToggle = document.getElementById('hands-free-toggle');
   if (settingsToggle) settingsToggle.checked = jarvisHandsFree;
   if (jarvisHandsFree) {
+    window.ClavisVoiceState?.setCapability?.('autoListenEnabled', true, 'handsfree on');
+    window.ClavisVoiceState?.setMicEnabled?.(true, 'handsfree on');
     if (!jarvisSpeechEnabled) {
       jarvisSpeechEnabled = true;
       localStorage.setItem('jarvis_speech_enabled', 'true');
@@ -2457,10 +2524,13 @@ function toggleJarvisHandsFree() {
     localStorage.setItem('clavis_sound_trigger_enabled', localStorage.getItem('clavis_sound_trigger_enabled') || 'true');
     startClavisSoundTriggers();
     setJarvisStatus('listening', 'Sun raha hoon — bolo "Clavis"');
-    appendJarvisBubble('assistant', `<p>Hands-free on hai, sir. ðŸŽ™ï¸ Bas <b>"Clavis"</b>, "Hey buddy" ya saved wake phrase boliye — main sun lunga.</p>`);
+    appendJarvisBubble('assistant', `<p>Hands-free on hai, sir. 🎙️ Bas <b>"Clavis"</b>, "Hey buddy" ya saved wake phrase boliye — main sun lunga.</p>`);
     showToast('success', 'Hands-Free On', 'Bolo "Clavis" — main sun raha hoon.');
   } else {
+    window.ClavisVoiceState?.setCapability?.('autoListenEnabled', false, 'handsfree off');
+    window.ClavisVoiceState?.setMicEnabled?.(false, 'handsfree off');
     stopWakeListener();
+    stopCommandEar();
     stopClavisSoundTriggers();
     window.LocalSpeechEngine?.stopInput?.();
     isJarvisSpeaking = false;
@@ -2468,7 +2538,8 @@ function toggleJarvisHandsFree() {
       currentPlayingAudio.pause();
       currentPlayingAudio = null;
     }
-    setJarvisStatus('online', 'Clavis Online');
+    document.querySelectorAll('#jarvis-voice-btn, #jarvis-composer-voice-btn').forEach((b) => b.classList.remove('recording'));
+    setJarvisStatus('stopped', 'Mic off');
     showToast('info', 'Hands-Free Off', '');
   }
 }
@@ -2715,6 +2786,7 @@ function scheduleHandsFreeRelisten() {
   relistenTimer = setTimeout(clavisEnsureListening, 0);
 }
 function clavisShouldListen() {
+  if (window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
   if (localStorage.getItem('clavis_mic_permission_granted') !== 'true') return false;
   if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) return false;
   if (!clavisIsAwake()) return jarvisHandsFree;
@@ -2728,6 +2800,11 @@ function clavisMicAlive() {
   return Boolean(wakeRecognition && (wakeRunning || Date.now() - wakeStartedAt < 3000));
 }
 function clavisEnsureListening() {
+  if (window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) {
+    if (clavisEar.rec) stopCommandEar();
+    if (wakeRecognition) stopWakeListener();
+    return;
+  }
   if (clavisIsAwake()) {
     if (window.ClavisLive?.isActive?.()) return;
     if (clavisShouldListen() && !clavisMicAlive()) {
@@ -2759,23 +2836,68 @@ CLAVIS_VS.configure({
 });
 
 // Soft two-tone chime so the user knows Jarvis is now listening.
+/* Wake chime — a soft glass bell, not a beep: three rising notes (E·G#·B,
+   a bright major arpeggio), each a sine + quiet octave partial with a 10 ms
+   attack and a long natural decay, through a gentle low-pass and one faint
+   echo. ~0.9 s, quiet enough to sit under speech. One shared AudioContext,
+   so it starts instantly instead of spinning up a new one each wake.
+   The orb answers with a single soft ripple at the same moment. */
+let clavisChimeCtx = null;
 function playWakeChime() {
   try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const now = ctx.currentTime;
-    [ [880, 0], [1320, 0.12] ].forEach(([freq, t]) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.frequency.value = freq;
-      osc.type = 'sine';
-      gain.gain.setValueAtTime(0.0001, now + t);
-      gain.gain.exponentialRampToValueAtTime(0.25, now + t + 0.03);
-      gain.gain.exponentialRampToValueAtTime(0.0001, now + t + 0.18);
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.start(now + t); osc.stop(now + t + 0.2);
+    const orb = document.getElementById('orb-container');
+    const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (orb && orb.offsetWidth && !reduce && orb.animate) {
+      // two soft rings breathe out from the orb, like a held breath let go
+      const r = orb.getBoundingClientRect();
+      [0, 180].forEach((delay) => {
+        const ring = document.createElement('span');
+        ring.className = 'clavis-wake-ring';
+        ring.style.left = Math.round(r.left + r.width / 2) + 'px';
+        ring.style.top = Math.round(r.top + r.height / 2) + 'px';
+        ring.style.width = Math.round(Math.min(r.width, r.height)) + 'px';
+        document.body.appendChild(ring);   // outside the orb, so nothing clips it
+        const a = ring.animate([
+          { transform: 'translate(-50%, -50%) scale(0.72)', opacity: 0.55 },
+          { transform: 'translate(-50%, -50%) scale(1.45)', opacity: 0 },
+        ], { duration: 1100, delay, easing: 'cubic-bezier(.16,1,.3,1)', fill: 'both' });
+        a.onfinish = () => ring.remove();
+      });
+      orb.animate([{ transform: 'scale(1)' }, { transform: 'scale(1.045)' }, { transform: 'scale(1)' }],
+        { duration: 620, easing: 'cubic-bezier(.32,.72,0,1)' });
+    }
+  } catch (_) {}
+  try {
+    if (localStorage.getItem('clavis_wake_chime') === 'false') return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    if (!clavisChimeCtx || clavisChimeCtx.state === 'closed') clavisChimeCtx = new AC({ latencyHint: 'interactive' });
+    const ctx = clavisChimeCtx;
+    if (ctx.state === 'suspended') ctx.resume().catch(() => {});
+    const now = ctx.currentTime + 0.01;
+    const master = ctx.createGain();
+    master.gain.value = 0.16;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass'; lp.frequency.value = 5200; lp.Q.value = 0.4;
+    const echo = ctx.createDelay(0.5); echo.delayTime.value = 0.19;
+    const echoGain = ctx.createGain(); echoGain.gain.value = 0.18;
+    master.connect(lp); lp.connect(ctx.destination);
+    lp.connect(echo); echo.connect(echoGain); echoGain.connect(ctx.destination);
+    [[659.25, 0], [830.61, 0.085], [987.77, 0.17]].forEach(([f, t], i) => {
+      [[1, 1], [2, 0.18]].forEach(([mult, amp]) => {
+        const o = ctx.createOscillator(), g = ctx.createGain();
+        o.type = 'sine';
+        o.frequency.value = f * mult;
+        const peak = amp * (i === 2 ? 0.9 : 0.7);
+        const tail = i === 2 ? 0.95 : 0.55;
+        g.gain.setValueAtTime(0.0001, now + t);
+        g.gain.exponentialRampToValueAtTime(peak, now + t + 0.012);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + t + tail);
+        o.connect(g); g.connect(master);
+        o.start(now + t); o.stop(now + t + tail + 0.05);
+      });
     });
-    setTimeout(() => ctx.close(), 600);
-  } catch { /* audio not available */ }
+  } catch (_) { /* audio not available */ }
 }
 
 // xAI's neural voices are provider voices, so they do not appear in the
@@ -3474,6 +3596,7 @@ async function speakJarvisText(text, opts = {}) {
   if (!clean) return false;
   // Silent mode ("5 minute chup raho"): listens, shows, never speaks.
   if (window.ClavisVoiceState?.isSilent?.() && !opts.force) return false;
+  if (window.ClavisVoiceState && !window.ClavisVoiceState.canSpeak() && !opts.force) return false;
   // During a Live session there is one voice: Clavis Live says it.
   if (window.ClavisLive?.isActive?.()) return window.ClavisLive.relay(clean);
 

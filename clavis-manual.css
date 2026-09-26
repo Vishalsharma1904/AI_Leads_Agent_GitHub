@@ -194,92 +194,126 @@
   box-shadow: none !important;
 }
 
-/* ── 5. Notifications — Claude-calm cards, a soft pile that fans out ──
-   One hairline + one soft shadow (no dark smear under the pile), stroke
-   icons with no tinted tile, serif title. The pile overlap is measured
-   per card by clavis-manual.js (--pile-mb), so cards of any height peek
-   out by the same 8px instead of a fixed -52px guess.                 */
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-card {
-  background: var(--cc-surface, #FFFFFF) !important;
-  border: 0 !important;
-  border-radius: 18px !important;
-  padding: 13px 16px 13px 14px !important;
-  box-shadow: 0 0 0 0.5px rgba(20,20,19,.08), 0 1px 2px rgba(20,20,19,.04), 0 12px 32px -16px rgba(20,20,19,.20) !important;
-  margin-bottom: var(--pile-mb, -52px) !important;
+/* ── 5. Notification cards → cream / olive ──────────────────────── */
+.desktop-notification-card {
+  background: var(--cc-sheet, #FAF9F5) !important;
+  border: 0.5px solid rgba(20,20,19,.09) !important;
+  box-shadow: 0 2px 14px -3px rgba(20,20,19,.10), 0 1px 3px rgba(20,20,19,.04) !important;
   cursor: pointer;
-  transition: transform 560ms cubic-bezier(.32,.72,0,1), translate 560ms cubic-bezier(.32,.72,0,1),
-    scale 560ms cubic-bezier(.32,.72,0,1), margin-bottom 560ms cubic-bezier(.32,.72,0,1),
-    opacity 320ms ease, box-shadow 320ms ease !important;
 }
-/* cards tucked in the pile: barely-there shadow, so nothing smears below */
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-container:not(:hover):not(:focus-within) .desktop-notification-card:not(:first-child) {
-  box-shadow: 0 0 0 0.5px rgba(20,20,19,.07), 0 2px 6px -3px rgba(20,20,19,.10) !important;
+html[data-theme="dark"] .desktop-notification-card {
+  background: #201E1A !important;
+  border-color: rgba(255,255,255,.08) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,.45) !important;
 }
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-container:is(:hover, :focus-within) .desktop-notification-card {
-  margin-bottom: 10px !important;
-  box-shadow: 0 0 0 0.5px rgba(20,20,19,.08), 0 1px 2px rgba(20,20,19,.04), 0 14px 36px -16px rgba(20,20,19,.22) !important;
-}
-/* unfold top to bottom, one after another */
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-container:hover .desktop-notification-card:nth-child(2) { transition-delay: 40ms !important; }
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-container:hover .desktop-notification-card:nth-child(3) { transition-delay: 80ms !important; }
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-container:hover .desktop-notification-card:nth-child(n+4) { transition-delay: 120ms !important; }
-html[data-theme="dark"]:not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-card {
-  background: #22201C !important;
-  box-shadow: 0 0 0 0.5px rgba(255,255,255,.08), 0 14px 36px -16px rgba(0,0,0,.7) !important;
+.desktop-notification-container:hover .desktop-notification-card {
+  box-shadow: 0 4px 18px -3px rgba(20,20,19,.11), 0 1px 4px rgba(20,20,19,.05) !important;
 }
 
-/* stroke icon, no tinted tile */
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-card .desktop-notif-icon-col {
-  width: 22px !important; height: 22px !important;
-  background: transparent !important; border: 0 !important; box-shadow: none !important;
-  color: var(--cc-accent, #2F5233) !important;
-}
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-card .desktop-notif-icon-col svg {
-  width: 17px !important; height: 17px !important; fill: none !important;
-}
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-card .desktop-notif-icon-col svg * {
-  fill: none !important; stroke: currentColor !important; stroke-width: 1.8px !important;
-}
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .notif-error .desktop-notif-icon-col { color: #B5483A !important; }
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .notif-warning .desktop-notif-icon-col { color: #A0701C !important; }
-
-/* type */
+/* Serif title */
 .desktop-notif-title {
   font-family: var(--cc-serif, 'CX Serif', Georgia, serif) !important;
-  font-size: 14px !important;
-  font-weight: 500 !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
   color: var(--cc-ink, #141413) !important;
   letter-spacing: -0.01em !important;
 }
 html[data-theme="dark"] .desktop-notif-title { color: #f4efdf !important; }
-.desktop-notif-body  { color: var(--cc-mute, #6B6A64) !important; font-size: 12.5px !important; line-height: 1.45 !important; }
-.desktop-notif-detail, .desktop-notif-time { color: var(--cc-faint, #9C9A92) !important; }
 
-/* timer hairline: quieter, inset, never looks like a stray line */
-html:not(#n):not(#n):not(#n):not(#n):not(#n) body:not(#n):not(#n):not(#n):not(#n) .desktop-notification-card.ap-timed::after {
-  left: 50px !important; right: 18px !important; bottom: 6px !important; height: 1.5px !important; opacity: .10 !important;
+.desktop-notif-body  { color: var(--cc-mute, #6B6A64) !important; }
+.desktop-notif-detail { color: var(--cc-faint, #9C9A92) !important; }
+.desktop-notif-time  { color: var(--cc-faint, #9C9A92) !important; }
+html[data-theme="dark"] .desktop-notif-body { color: #9a9080 !important; }
+
+/* Close button */
+.desktop-notif-close-btn { color: var(--cc-faint, #9C9A92) !important; }
+.desktop-notif-close-btn:hover {
+  background: rgba(20,20,19,.05) !important;
+  color: var(--cc-ink, #141413) !important;
 }
 
-/* buttons: round, flat */
-.desktop-notif-btn { border-radius: 999px !important; }
+/* Primary action → olive */
 .desktop-notif-btn--primary {
   background: var(--cc-accent, #2F5233) !important;
   border-color: var(--cc-accent, #2F5233) !important;
-  color: #FAF9F5 !important; box-shadow: none !important;
+  color: #FAF9F5 !important;
+  box-shadow: none !important;
 }
-.desktop-notif-btn--primary:hover { background: var(--cc-accent-hover, #264529) !important; transform: none !important; }
+.desktop-notif-btn--primary:hover {
+  background: var(--cc-accent-hover, #264529) !important;
+  border-color: var(--cc-accent-hover, #264529) !important;
+  transform: none !important;
+}
+html[data-theme="dark"] .desktop-notif-btn--primary {
+  background: var(--cc-accent, #2F5233) !important;
+  border-color: var(--cc-accent, #2F5233) !important;
+  color: #FAF9F5 !important;
+}
+html[data-theme="dark"] .desktop-notif-btn--primary:hover {
+  background: var(--cc-accent-hover, #264529) !important;
+}
+
+/* Secondary action → cream */
 .desktop-notif-btn--secondary {
-  background: var(--cc-sunk, #F0EEE6) !important; border-color: transparent !important; color: var(--cc-ink-2, #3D3D3A) !important;
+  background: rgba(20,20,19,.04) !important;
+  border-color: rgba(20,20,19,.10) !important;
+  color: var(--cc-ink-2, #3D3D3A) !important;
 }
+.desktop-notif-btn--secondary:hover {
+  background: rgba(20,20,19,.07) !important;
+  color: var(--cc-ink, #141413) !important;
+}
+html[data-theme="dark"] .desktop-notif-btn--secondary {
+  background: rgba(255,255,255,.05) !important;
+  border-color: rgba(255,255,255,.09) !important;
+  color: #d4cfc6 !important;
+}
+
+/* Progress bar → olive */
 .desktop-notif-progress-bar { background: var(--cc-accent, #2F5233) !important; }
 
-/* ── 6. Tap a card to read it all (actions show when opened) ───────── */
-.desktop-notification-card:not(.is-expanded) .desktop-notif-body {
-  display: -webkit-box !important; -webkit-line-clamp: 2 !important; -webkit-box-orient: vertical !important; overflow: hidden !important;
+/* ── 6. Notification expand / collapse ──────────────────────────── */
+.desktop-notification-card .desktop-notif-body {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  transition: max-height 0.35s cubic-bezier(.16,1,.3,1) !important;
 }
-.desktop-notification-card.has-more:not(.is-expanded) .desktop-notif-actions { display: none !important; }
-.desktop-notification-card.is-expanded .desktop-notif-actions { animation: notif-actions-in 360ms cubic-bezier(.16,1,.3,1) both; }
-@keyframes notif-actions-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.desktop-notification-card .desktop-notif-actions {
+  display: none !important;
+}
+.desktop-notif-expand-hint {
+  display: block;
+  font-size: 10.5px;
+  color: var(--cc-mute, #6B6A64);
+  margin-top: 3px;
+  letter-spacing: -0.01em;
+  user-select: none;
+  transition: opacity 0.15s;
+  font-family: var(--cc-sans, system-ui, sans-serif);
+}
+.desktop-notification-card.is-expanded .desktop-notif-expand-hint {
+  display: none;
+}
+.desktop-notification-card.is-expanded .desktop-notif-body {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  overflow: visible !important;
+}
+.desktop-notification-card.is-expanded .desktop-notif-actions {
+  display: flex !important;
+  animation: notif-actions-in 0.28s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes notif-actions-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes desktopNotifEnter {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(var(--stack-y,0px)) scale(var(--stack-scale,1)); }
+}
 
 /* ── 7. Settings sections — pastel category headers ─────────────── */
 .smodal-section > h3, .smodal-section-title {
@@ -465,29 +499,3 @@ html body .ccv.is-expanded.is-left {
 }
 html body .ccv.is-expanded .ccv-map { height: auto; }
 html body .ccv-backdrop.is-on { z-index: 2147482050; cursor: zoom-out; }
-
-/* ── 12. Peek window: idle greeting + calmer pipeline ────────────── */
-#clavis-task-surface .cts-idle { padding: 6px 2px 4px; animation: cts-idle-in 560ms cubic-bezier(.16,1,.3,1) both; }
-@keyframes cts-idle-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-#clavis-task-surface .cts-idle-title {
-  font-family: var(--cc-serif, 'CX Serif', Georgia, serif) !important;
-  font-size: 24px !important; font-weight: 400 !important; line-height: 1.2 !important;
-  letter-spacing: -0.015em !important; color: var(--cc-ink, #141413) !important; margin: 0 0 8px !important;
-}
-#clavis-task-surface .cts-idle-title em { font-style: italic; color: var(--cc-accent, #2F5233); }
-#clavis-task-surface .cts-idle-sub { font-size: 13px !important; line-height: 1.55 !important; color: var(--cc-mute, #6B6A64) !important; margin: 0 0 16px !important; }
-#clavis-task-surface .cts-idle .cts-prompt-pills { display: flex; flex-direction: column; gap: 6px; }
-#clavis-task-surface .cts-idle .cts-prompt-pill {
-  display: flex; align-items: center; justify-content: space-between; gap: 10px;
-  width: 100%; padding: 10px 14px; border-radius: 12px;
-  background: var(--cc-sunk, #F0EEE6); border: 0; color: var(--cc-ink-2, #3D3D3A);
-  font: 500 13px/1.3 var(--cc-sans, system-ui, sans-serif); text-align: left; cursor: pointer;
-  transition: background-color 180ms ease, transform 180ms cubic-bezier(.32,.72,0,1);
-}
-#clavis-task-surface .cts-idle .cts-prompt-pill:hover { background: rgba(47,82,51,.10); color: var(--cc-accent, #2F5233); }
-#clavis-task-surface .cts-idle .cts-prompt-pill:active { transform: scale(.985); }
-/* pipeline steps: roomier text, straight pencil line */
-#clavis-task-surface .cts-pipe-title { font-size: 13.5px !important; line-height: 1.4 !important; color: var(--cc-ink, #141413); }
-#clavis-task-surface .cts-pipe-step.is-done .cts-pipe-title { color: var(--cc-mute, #6B6A64); }
-#clavis-task-surface .cts-pipe-step { gap: 12px !important; padding: 6px 0 !important; }
-#clavis-task-surface .cts-pencil { color: var(--cc-ink-2, #3D3D3A); }
