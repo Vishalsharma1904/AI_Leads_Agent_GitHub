@@ -43,6 +43,9 @@
   <script src="clavis-appearance.js?v=1.1"></script>
   <!-- Graphics tier (Auto / Smooth / Max) — must run before the orb draws. -->
   <script src="clavis-perf.js?v=1.2"></script>
+  <!-- Wake state (asleep until "Clavis" / Hey Buddy / Hey Clay / snap / clap) — everyone asks this before any LLM call. -->
+  <script src="clavis-wake.js?v=1.1&r=0926"></script>
+  <script src="clavis-voice-state.js?v=1.0&r=0926"></script>
   <script>
     (function() {
       if (window.location.protocol === 'file:') {
@@ -60,7 +63,7 @@
   <link rel="stylesheet" href="plugins.css?v=1.0"/>
   <link rel="stylesheet" href="diagnostics.css?v=1.0"/>
   <link rel="stylesheet" href="notifications.css?v=1.0"/>
-  <link rel="stylesheet" href="apple-polish.css?v=3.0"/>
+  <!-- apple-polish.css is loaded once, further down (it was loaded twice: 160 KB of rules matched twice on every style recalc) -->
     <link rel="stylesheet" href="clavis-polish-fixes.css?v=1.0">
     <link rel="stylesheet" href="clavis-suggestions.css?v=1.0">
   <!-- retired: clavis-sneak-peek.* (fixed agent-pipeline popover) -> clavis-task-surface.* -->
@@ -509,9 +512,9 @@
     <p id="clavis-credential-desc">Choose a provider and paste its key. Your key is verified and stored locally in this browser only — no login, no server. It never leaves your device except to call that provider directly.</p>
     <label class="clavis-key-label" for="clavis-provider-select">AI provider</label>
     <select id="clavis-provider-select" class="clavis-provider-select" onchange="updateClavisProviderHelp(); updateClavisConnectionStatus();">
-      <option value="groq" selected>⚡ Groq (Recommended - 100% Free, Superfast LLaMA 3.3 + Whisper STT)</option>
+      <option value="gemini" selected>✨ Google AI Studio (Gemini 2.0 Flash - Recommended &amp; Free)</option>
+      <option value="groq">⚡ Groq (Fast LLaMA 3.3)</option>
       <option value="openrouter">OpenRouter</option>
-      <option value="gemini">Google AI Studio (Gemini)</option>
       <option value="openai">OpenAI</option>
       <option value="deepseek">DeepSeek</option>
       <option value="mistral">Mistral</option>
@@ -925,7 +928,7 @@
     <div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize sidebar"></div>
 
     <nav class="sidebar-nav relative z-10" id="sidebar-nav-scroll" style="position: relative; z-index: 10;">
-      <div class="nav-section-label">AI ASSISTANT</div>
+      <div class="nav-section-label">AI assistant</div>
       
         <a href="#jarvis" class="nav-item stagger-in" data-view="jarvis" data-tooltip="Clavis AI Studio">
         <!-- Jarvis: neural/brain nodes icon -->
@@ -971,7 +974,7 @@
         <span>Candidate AI</span>
       </a>
 
-      <div class="nav-section-label stagger-in" style="margin-top:14px">LEAD & DATA HUB</div>
+      <div class="nav-section-label stagger-in" style="margin-top:14px">Lead &amp; data hub</div>
 
       <a href="#dashboard" class="nav-item stagger-in" data-view="dashboard" data-tooltip="Dashboard Overview">
         <!-- Dashboard: 2x2 grid squares -->
@@ -1041,7 +1044,7 @@
         </div>
       </div>
 
-      <div class="nav-section-label stagger-in" style="margin-top:14px">AUTOMATION</div>
+      <div class="nav-section-label stagger-in" style="margin-top:14px">Automation</div>
 
       <a href="#agent" class="nav-item stagger-in" data-view="agent" data-tooltip="Run Scraping Agent">
         <!-- Lightning bolt / agent run -->
@@ -1079,7 +1082,7 @@
         <span>Accounts</span>
       </a>
 
-      <div class="nav-section-label stagger-in" style="margin-top:14px">SYSTEM</div>
+      <div class="nav-section-label stagger-in" style="margin-top:14px">System</div>
 
       <a href="#plugins" class="nav-item stagger-in" data-view="plugins" data-tooltip="Plugins & Integrations">
         <!-- Plug icon -->
@@ -3227,19 +3230,19 @@
   <script src="lead-jobs-client.js?v=1.0" defer></script>
   <script src="ai-chat-client.js?v=1.1" defer></script>
   <link rel="stylesheet" href="clavis-keyvault.css?v=1.1">
-  <script src="clavis-keyvault.js?v=1.0" defer></script>
+  <script src="clavis-keyvault.js?v=1.0&r=0926" defer></script>
   <script src="clavis-keyvault-ui.js?v=1.0" defer></script>
   <script src="clavis-direct.js?v=1.4" defer></script>
   <script src="clavis-nano.js?v=1.0" defer></script>
   <script src="clavis-emotional-engine.js?v=1.0" defer></script>
   <script src="google-sheets-client.js?v=1.0" defer></script>
-  <script src="lead-candidate-domain.js?v=1.2" defer></script>
+  <script src="lead-candidate-domain.js?v=1.2&r=0926" defer></script>
   <script src="agent.js?v=1.0" defer></script>
-  <script src="real-scraper.js?v=1.2" defer></script>
+  <script src="real-scraper.js?v=1.2&r=0926" defer></script>
   <script src="clavis-enrichment-engine.js?v=1.0" defer></script>
   <script src="chat.js?v=1.4" defer></script>
-  <script src="jarvis_skills.js?v=1.1" defer></script>
-  <script src="jarvis.js?v=1.7" defer></script>
+  <script src="jarvis_skills.js?v=1.1&r=0926" defer></script>
+  <script src="jarvis.js?v=1.7&r=0926" defer></script>
   <script src="device-account.js?v=1.0" defer></script>
   <script src="button-feedback.js?v=1.0" defer></script>
   <script src="cloud-sync.js?v=1.1" defer></script>
@@ -3274,7 +3277,7 @@
   <link rel="stylesheet" href="jarvis-studio-polish.css?v=1.3">
   <link rel="stylesheet" href="clavis-voice-polish.css?v=1.1">
   <link rel="stylesheet" href="clavis-live.css?v=1.1">
-  <link rel="stylesheet" href="clavis-canvas.css?v=1.3">
+  <link rel="stylesheet" href="clavis-canvas.css?v=1.3&r=0926">
   <link rel="stylesheet" href="clavis-header-declutter.css?v=1.0">
   <link rel="stylesheet" href="clavis-confirm-hud.css?v=2.0">
   <!-- CLAVIS STAGE v2: voice-first Clavis page + floating Task HUD.
@@ -3300,27 +3303,30 @@
   <script src="page-accounts.js?v=1.0" defer></script>
   <script src="candidate-actors.js?v=1.1" defer></script>
   <script src="page-candidates.js?v=1.6" defer></script>
-  <script src="clavis-barge-in.js?v=1.1" defer></script>
-  <script src="clavis-local-speech.js?v=2.3" defer></script>
+  <script src="clavis-barge-in.js?v=1.1&r=0926" defer></script>
+  <script src="clavis-local-speech.js?v=2.3&r=0926" defer></script>
   <script src="clavis-audio-trigger.js?v=2.2" defer></script>
-  <script src="clavis-canvas.js?v=1.4" defer></script>
-  <script src="clavis-live.js?v=3.7" defer></script>
+  <script src="clavis-canvas.js?v=1.4&r=0926" defer></script>
+  <script src="clavis-live.js?v=3.7&r=0926" defer></script>
   <script src="clavis-cognition.js?v=1.0" defer></script>
   <script src="clavis-confirm-hud.js?v=1.0" defer></script>
   <script src="clavis-task-hud.js?v=1.0" defer></script>
   <script src="clavis-mind.js?v=1.1" defer></script>
   <script src="clavis-pc.js?v=1.1" defer></script>
   <script src="clavis-prompt-master.js?v=1.1" defer></script>
-  <script src="clavis-voice-nav.js?v=1.2" defer></script>
-  <script src="clavis-commands.js?v=1.1" defer></script>
+  <script src="clavis-app-map.js?v=1.0&r=0926" defer></script>
+  <script src="clavis-voice-nav.js?v=1.2&r=0926" defer></script>
+  <script src="clavis-commands.js?v=1.1&r=0926" defer></script>
   <script src="clavis-suggestions.js?v=1.1" defer></script>
   <script src="clavis-proactive.js?v=1.2" defer></script>
   <script src="clavis-vision.js?v=1.1" defer></script>
   <script src="clavis-boot-greet.js?v=1.1" defer></script>
-  <script src="clavis-voice.js?v=1.4" defer></script>
-  <script src="jarvis_ui.js?v=1.13" defer></script>
-  <script src="strands-orb.js?v=3.2" defer></script>
+  <script src="clavis-voice.js?v=1.4&r=0926" defer></script>
+  <script src="jarvis_ui.js?v=1.13&r=0926" defer></script>
+  <!-- Clavis orb v4: single-pass WebGL, round by construction (the old strands-orb.js drew a square whenever its glass pass failed). Same window.StrandsOrb API. -->
+  <script src="clavis-orb.js?v=4.0" defer></script>
   <script src="app-shortcuts.js?v=1.0" defer></script>
+  <script src="clavis-manual.js?v=1.0" defer></script>
   <script src="voice_ai.js?v=1.0" defer></script>
   <script src="nexus-enhancements.js?v=2.1" defer></script>
   <script>
@@ -5485,15 +5491,15 @@
   </script>
   <!-- Clavis Studio minimal pass — loaded last so it wins the cascade -->
   <link rel="stylesheet" href="clavis-refine.css?v=2.0">
-  <link rel="stylesheet" href="clavis-task-surface.css?v=2.1">
+  <link rel="stylesheet" href="clavis-task-surface.css?v=2.1&r=0926">
   <link rel="stylesheet" href="clavis-viewport.css?v=3.0">
   <link rel="stylesheet" href="clavis-sidebar.css?v=1.0">
   <link rel="stylesheet" href="clavis-aurora.css?v=10.0">
   <link rel="stylesheet" href="clavis-chat.css?v=2.2">
   <script src="clavis-task-model.js?v=2.0" defer></script>
-  <script src="clavis-task-controller.js?v=2.2" defer></script>
-  <script src="clavis-task-surface.js?v=2.6" defer></script>
-  <script src="clavis-aurora.js?v=8.1" defer></script>
+  <script src="clavis-task-controller.js?v=2.2&r=0926" defer></script>
+  <script src="clavis-task-surface.js?v=2.6&r=0926" defer></script>
+  <script src="clavis-aurora.js?v=8.1&r=0926" defer></script>
   <script src="clavis-chat.js?v=2.2" defer></script>
   <!-- CLAVIS LUXE: theme reveal, rail motion, icons, dark mode, floating-window deep dive + image
        lightbox. Additive only — delete these two lines to return to the previous look. -->
@@ -5505,7 +5511,7 @@
   <link rel="stylesheet" href="clavis-window-refine.css?v=1.1">
   <link rel="stylesheet" href="clavis-composer-iq.css?v=1.2">
   <script src="clavis-pencil.js?v=1.0" defer></script>
-  <script src="clavis-luxe.js?v=2.5" defer></script>
+  <script src="clavis-luxe.js?v=2.5&r=0926" defer></script>
   <script src="clavis-intelligence.js?v=1.2" defer></script>
   <script src="clavis-composer-iq.js?v=1.2" defer></script>
   <script src="clavis-peek-iq.js?v=1.2" defer></script>
@@ -5514,12 +5520,26 @@
        typing speech into the composer, a fast local intent layer (close map /
        close everything / short commands) and PC + website automation.
        clavis-olive.css: rich olive-green buttons. Loaded last to win the cascade. -->
-  <link rel="stylesheet" href="clavis-ear.css?v=1.4">
+  <link rel="stylesheet" href="clavis-ear.css?v=1.4&r=0926">
   <link rel="stylesheet" href="clavis-olive.css?v=1.1">
   <link rel="stylesheet" href="clavis-silk.css?v=1.2">
-  <script src="clavis-ear.js?v=1.4" defer></script>
-  <script src="clavis-intent.js?v=1.5" defer></script>
-  <script src="clavis-automation.js?v=1.1" defer></script>
+  <script src="clavis-ear.js?v=1.4&r=0926" defer></script>
+  <script src="clavis-intent.js?v=1.5&r=0926" defer></script>
+  <script src="clavis-automation.js?v=1.1&r=0926" defer></script>
   <script src="clavis-business.js?v=1.1" defer></script>
+  <!-- CLAVIS SETUP + FINAL POLISH (2026-09-24): guided key setup popup (few clicks,
+       links to free keys, auto-check), and the last-word visual polish layer. -->
+  <link rel="stylesheet" href="clavis-setup.css?v=1.1">
+  <link rel="stylesheet" href="clavis-final.css?v=1.0">
+  <script src="clavis-setup.js?v=1.1&r=0926" defer></script>
+  <!-- CLAVIS × CLAUDE LOOK (2026-09-24): ivory ground, serif headlines, soft white
+       cards, rounded dialogs with one long soft shadow, butter-smooth expo-out
+       motion, and Claude-style hover cards on the sidebar. Loaded last so it
+       wins; delete these two lines to return to the previous look. -->
+  <link rel="stylesheet" href="clavis-claude.css?v=1.0">
+  <link rel="stylesheet" href="clavis-manual.css?v=1.0">
+  <script src="clavis-claude.js?v=1.0" defer></script>
+  <!-- One icon family everywhere: Feather (bundled). Delete to restore the old icons. -->
+  <script src="clavis-icons.js?v=1.0" defer></script>
 </body>
 </html>

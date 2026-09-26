@@ -1,0 +1,406 @@
+/* ============================================================
+ * clavis-manual.css · Voice Guide + Cream Shortcuts + Notification redesign
+ * Loaded after clavis-claude.css — uses --cc-* tokens.
+ * Specificity: standard + !important where shortcuts-history.css wins.
+ * ============================================================ */
+
+/* ── 1. Shortcuts modal — redefine --sm-* vars to cream palette ── */
+#shortcuts-modal {
+  --sm-text: #141413;
+  --sm-muted: #6B6A64;
+  --sm-active-fg: #2F5233;
+  --sm-hover: rgba(20,20,19,.048);
+  --sm-input-bg: #FFFFFF;
+  --sm-field-bg: #F0EEE6;
+  --sm-divider: rgba(20,20,19,.08);
+  background: var(--cc-sheet, #FAF9F5) !important;
+}
+#shortcuts-overlay .settings-modal {
+  background: var(--cc-sheet, #FAF9F5) !important;
+}
+
+/* Search */
+#shortcuts-modal .sc-search {
+  background: #FFFFFF !important;
+  border-color: rgba(20,20,19,.10) !important;
+  color: #141413 !important;
+}
+#shortcuts-modal .sc-search::placeholder { color: #9C9A92 !important; }
+#shortcuts-modal .sc-search:focus {
+  border-color: rgba(47,82,51,.45) !important;
+  box-shadow: 0 0 0 3px rgba(47,82,51,.11) !important;
+}
+#shortcuts-modal .sc-search-icon { color: #9C9A92 !important; }
+#shortcuts-modal .sc-kbd-anywhere {
+  color: #9C9A92 !important;
+  background: #F0EEE6 !important;
+  border-color: rgba(20,20,19,.12) !important;
+  box-shadow: 0 1.5px 0 rgba(20,20,19,.08) !important;
+}
+
+/* Chips */
+#shortcuts-modal .sc-chip {
+  background: #FFFFFF !important;
+  border-color: rgba(20,20,19,.09) !important;
+  color: #6B6A64 !important;
+}
+#shortcuts-modal .sc-chip:hover { background: #F0EEE6 !important; color: #141413 !important; }
+#shortcuts-modal .sc-chip.active {
+  background: rgba(47,82,51,.09) !important;
+  color: #2F5233 !important;
+  border-color: rgba(47,82,51,.22) !important;
+}
+
+/* Section meta */
+#shortcuts-modal .sc-section-label { color: #6B6A64 !important; }
+#shortcuts-modal .sc-section-count {
+  color: #6B6A64 !important;
+  background: #F0EEE6 !important;
+  border-color: rgba(20,20,19,.08) !important;
+}
+
+/* Rows */
+#shortcuts-modal .sc-row:hover { background: rgba(20,20,19,.045) !important; }
+#shortcuts-modal .sc-row-name { color: #141413 !important; }
+#shortcuts-modal .sc-row-desc { color: #6B6A64 !important; }
+#shortcuts-modal .sc-empty  { color: #9C9A92 !important; }
+
+/* KBD keycaps */
+#shortcuts-modal .sc-kbd {
+  color: #3D3D3A !important;
+  background: #F0EEE6 !important;
+  border-color: rgba(20,20,19,.12) !important;
+  box-shadow: 0 1.5px 0 rgba(20,20,19,.08) !important;
+}
+#shortcuts-modal .sc-key-or { color: #9C9A92 !important; }
+
+/* Dividers */
+#shortcuts-modal .sc-toolbar { border-bottom-color: rgba(20,20,19,.07) !important; }
+#shortcuts-modal .sc-footer {
+  border-top-color: rgba(20,20,19,.07) !important;
+  color: #9C9A92 !important;
+}
+#shortcuts-modal .sc-footer b { color: #3D3D3A !important; }
+#shortcuts-modal .sc-footer-hint { color: #9C9A92 !important; }
+
+/* ── 2. Pastel category icon tiles ─────────────────────────────── */
+/* General → warm terracotta */
+#shortcuts-modal .sc-section[data-cat="general"] .sc-section-icon,
+#shortcuts-modal .sc-section[data-cat="general"] .sc-row-icon {
+  background: rgba(195,100,70,.09) !important;
+  border-color: rgba(195,100,70,.20) !important;
+  color: #a84a28 !important;
+}
+/* Navigation → sage */
+#shortcuts-modal .sc-section[data-cat="nav"] .sc-section-icon,
+#shortcuts-modal .sc-section[data-cat="nav"] .sc-row-icon {
+  background: rgba(60,120,80,.09) !important;
+  border-color: rgba(60,120,80,.20) !important;
+  color: #3a6e4a !important;
+}
+/* Clavis AI → soft lavender */
+#shortcuts-modal .sc-section[data-cat="jarvis"] .sc-section-icon,
+#shortcuts-modal .sc-section[data-cat="jarvis"] .sc-row-icon {
+  background: rgba(100,80,160,.08) !important;
+  border-color: rgba(100,80,160,.18) !important;
+  color: #5830a0 !important;
+}
+/* Data → calm blue */
+#shortcuts-modal .sc-section[data-cat="data"] .sc-section-icon,
+#shortcuts-modal .sc-section[data-cat="data"] .sc-row-icon {
+  background: rgba(40,100,160,.08) !important;
+  border-color: rgba(40,100,160,.18) !important;
+  color: #1e5888 !important;
+}
+/* Voice Guide → olive */
+#shortcuts-modal .sc-section[data-cat="manual"] .sc-section-icon,
+#shortcuts-modal .sc-section[data-cat="manual"] .sc-row-icon {
+  background: rgba(47,82,51,.09) !important;
+  border-color: rgba(47,82,51,.20) !important;
+  color: #2F5233 !important;
+}
+
+/* Voice command keycap → italic olive pill */
+#shortcuts-modal .sc-section[data-cat="manual"] .sc-kbd {
+  background: rgba(47,82,51,.07) !important;
+  border-color: rgba(47,82,51,.18) !important;
+  color: #2F5233 !important;
+  box-shadow: none !important;
+  font-style: italic !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.01em !important;
+  max-width: 200px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+  white-space: nowrap !important;
+}
+
+/* ── 3. Voice Guide intro banner (serif quote) ──────────────────── */
+.sc-manual-banner {
+  background: #FFFFFF;
+  border: 0.5px solid rgba(20,20,19,.07);
+  border-radius: 12px;
+  padding: 16px 18px 12px;
+  margin: 0 0 14px;
+}
+.sc-manual-quote {
+  font-family: var(--cc-serif, 'CX Serif', 'Source Serif 4', Georgia, serif);
+  font-size: 14.5px;
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.55;
+  color: #3D3D3A;
+  margin: 0 0 7px;
+}
+.sc-manual-quote::before {
+  content: '\201C';
+  font-size: 22px;
+  line-height: 0;
+  vertical-align: -0.32em;
+  color: #9C9A92;
+  margin-right: 1px;
+}
+.sc-manual-quote::after {
+  content: '\201D';
+  font-size: 22px;
+  line-height: 0;
+  vertical-align: -0.32em;
+  color: #9C9A92;
+  margin-left: 1px;
+}
+.sc-manual-sub {
+  font-size: 11px;
+  color: #9C9A92;
+  letter-spacing: -0.01em;
+  font-family: var(--cc-sans, 'CX Sans', system-ui, sans-serif);
+}
+
+/* ── 4. Topbar Shortcuts button → flat olive ────────────────────── */
+.tb-shortcuts-btn {
+  background: var(--cc-accent, #2F5233) !important;
+  box-shadow: 0 1px 4px rgba(47,82,51,.30) !important;
+  color: var(--cc-on-accent, #FAF9F5) !important;
+}
+.tb-shortcuts-btn::after { display: none !important; }
+.tb-shortcuts-btn:hover {
+  background: var(--cc-accent-hover, #264529) !important;
+  filter: none !important;
+  box-shadow: 0 3px 10px -1px rgba(47,82,51,.42) !important;
+  transform: translateY(-1px) !important;
+}
+.tb-shortcuts-btn:active { transform: scale(0.97) !important; box-shadow: none !important; }
+.tb-shortcuts-btn .tb-cmd-icon {
+  background: rgba(250,249,245,.18) !important;
+  box-shadow: none !important;
+}
+
+/* ── 5. Notification cards → cream / olive ──────────────────────── */
+.desktop-notification-card {
+  background: var(--cc-sheet, #FAF9F5) !important;
+  border: 0.5px solid rgba(20,20,19,.09) !important;
+  box-shadow: 0 2px 14px -3px rgba(20,20,19,.10), 0 1px 3px rgba(20,20,19,.04) !important;
+  cursor: pointer;
+}
+html[data-theme="dark"] .desktop-notification-card {
+  background: #201E1A !important;
+  border-color: rgba(255,255,255,.08) !important;
+  box-shadow: 0 4px 20px rgba(0,0,0,.45) !important;
+}
+.desktop-notification-container:hover .desktop-notification-card {
+  box-shadow: 0 4px 18px -3px rgba(20,20,19,.11), 0 1px 4px rgba(20,20,19,.05) !important;
+}
+
+/* Serif title */
+.desktop-notif-title {
+  font-family: var(--cc-serif, 'CX Serif', Georgia, serif) !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  color: var(--cc-ink, #141413) !important;
+  letter-spacing: -0.01em !important;
+}
+html[data-theme="dark"] .desktop-notif-title { color: #f4efdf !important; }
+
+.desktop-notif-body  { color: var(--cc-mute, #6B6A64) !important; }
+.desktop-notif-detail { color: var(--cc-faint, #9C9A92) !important; }
+.desktop-notif-time  { color: var(--cc-faint, #9C9A92) !important; }
+html[data-theme="dark"] .desktop-notif-body { color: #9a9080 !important; }
+
+/* Close button */
+.desktop-notif-close-btn { color: var(--cc-faint, #9C9A92) !important; }
+.desktop-notif-close-btn:hover {
+  background: rgba(20,20,19,.05) !important;
+  color: var(--cc-ink, #141413) !important;
+}
+
+/* Primary action → olive */
+.desktop-notif-btn--primary {
+  background: var(--cc-accent, #2F5233) !important;
+  border-color: var(--cc-accent, #2F5233) !important;
+  color: #FAF9F5 !important;
+  box-shadow: none !important;
+}
+.desktop-notif-btn--primary:hover {
+  background: var(--cc-accent-hover, #264529) !important;
+  border-color: var(--cc-accent-hover, #264529) !important;
+  transform: none !important;
+}
+html[data-theme="dark"] .desktop-notif-btn--primary {
+  background: var(--cc-accent, #2F5233) !important;
+  border-color: var(--cc-accent, #2F5233) !important;
+  color: #FAF9F5 !important;
+}
+html[data-theme="dark"] .desktop-notif-btn--primary:hover {
+  background: var(--cc-accent-hover, #264529) !important;
+}
+
+/* Secondary action → cream */
+.desktop-notif-btn--secondary {
+  background: rgba(20,20,19,.04) !important;
+  border-color: rgba(20,20,19,.10) !important;
+  color: var(--cc-ink-2, #3D3D3A) !important;
+}
+.desktop-notif-btn--secondary:hover {
+  background: rgba(20,20,19,.07) !important;
+  color: var(--cc-ink, #141413) !important;
+}
+html[data-theme="dark"] .desktop-notif-btn--secondary {
+  background: rgba(255,255,255,.05) !important;
+  border-color: rgba(255,255,255,.09) !important;
+  color: #d4cfc6 !important;
+}
+
+/* Progress bar → olive */
+.desktop-notif-progress-bar { background: var(--cc-accent, #2F5233) !important; }
+
+/* ── 6. Notification expand / collapse ──────────────────────────── */
+.desktop-notification-card .desktop-notif-body {
+  display: -webkit-box !important;
+  -webkit-line-clamp: 2 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
+  transition: max-height 0.35s cubic-bezier(.16,1,.3,1) !important;
+}
+.desktop-notification-card .desktop-notif-actions {
+  display: none !important;
+}
+.desktop-notif-expand-hint {
+  display: block;
+  font-size: 10.5px;
+  color: var(--cc-mute, #6B6A64);
+  margin-top: 3px;
+  letter-spacing: -0.01em;
+  user-select: none;
+  transition: opacity 0.15s;
+  font-family: var(--cc-sans, system-ui, sans-serif);
+}
+.desktop-notification-card.is-expanded .desktop-notif-expand-hint {
+  display: none;
+}
+.desktop-notification-card.is-expanded .desktop-notif-body {
+  display: block !important;
+  -webkit-line-clamp: unset !important;
+  overflow: visible !important;
+}
+.desktop-notification-card.is-expanded .desktop-notif-actions {
+  display: flex !important;
+  animation: notif-actions-in 0.28s cubic-bezier(.16,1,.3,1) both;
+}
+@keyframes notif-actions-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes desktopNotifEnter {
+  0%   { opacity: 0; transform: translateY(14px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(var(--stack-y,0px)) scale(var(--stack-scale,1)); }
+}
+
+/* ── 7. Settings sections — pastel category headers ─────────────── */
+.smodal-section > h3, .smodal-section-title {
+  font-family: var(--cc-serif, 'CX Serif', Georgia, serif);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* ── 8. Voice Command Manual table (injected by clavis-manual.js) ── */
+.sc-manual-section {
+  animation: sc-row-in 0.35s cubic-bezier(.16,1,.3,1) both;
+}
+.sc-manual-wrap { display: flex; flex-direction: column; gap: 14px; }
+.cvm-table { display: flex; flex-direction: column; gap: 10px; }
+
+.cvm-group {
+  background: #FFFFFF;
+  border: 0.5px solid rgba(20,20,19,.07);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.cvm-group-label {
+  font-family: var(--cc-sans, system-ui, sans-serif);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9C9A92;
+  padding: 9px 14px 7px;
+  border-bottom: 0.5px solid rgba(20,20,19,.06);
+}
+.cvm-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 14px;
+  border-bottom: 0.5px solid rgba(20,20,19,.05);
+  cursor: pointer;
+  transition: background 0.13s ease;
+}
+.cvm-row:last-child { border-bottom: none; }
+.cvm-row:hover { background: rgba(47,82,51,.04); }
+.cvm-row:active { background: rgba(47,82,51,.08); }
+
+.cvm-phrase {
+  font-family: var(--cc-serif, 'CX Serif', Georgia, serif);
+  font-size: 13px;
+  font-style: italic;
+  font-weight: 500;
+  color: #2F5233;
+  flex-shrink: 0;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+.cvm-desc {
+  font-family: var(--cc-sans, system-ui, sans-serif);
+  font-size: 11px;
+  color: #6B6A64;
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Dark mode for manual */
+html[data-theme="dark"] .cvm-group {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.06);
+}
+html[data-theme="dark"] .cvm-group-label { color: #6a6660; border-color: rgba(255,255,255,.05); }
+html[data-theme="dark"] .cvm-row { border-color: rgba(255,255,255,.04); }
+html[data-theme="dark"] .cvm-row:hover { background: rgba(47,82,51,.08); }
+html[data-theme="dark"] .cvm-phrase { color: #9aae5b; }
+html[data-theme="dark"] .cvm-desc { color: #8a8680; }
+
+html[data-theme="dark"] .sc-manual-banner {
+  background: rgba(255,255,255,.04);
+  border-color: rgba(255,255,255,.06);
+}
+html[data-theme="dark"] .sc-manual-quote { color: #c9c0a0; }
+html[data-theme="dark"] .sc-manual-sub { color: #6a6660; }
+
+@media (max-width: 480px) {
+  .cvm-row { flex-wrap: wrap; gap: 4px; }
+  .cvm-phrase { max-width: 100%; white-space: normal; }
+}
