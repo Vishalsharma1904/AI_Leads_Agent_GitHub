@@ -13,43 +13,41 @@
   function wireCard(card) {
     if (card._cmWired) return;
     card._cmWired = true;
-
-    // Inject an "expand hint" line below the body if there are actions or detail
-    var body   = card.querySelector('.desktop-notif-body');
-    var detail = card.querySelector('.desktop-notif-detail');
-    var acts   = card.querySelector('.desktop-notif-actions');
-
-    // Only show hint if there's something hidden (actions or long body)
-    if (body || acts) {
-      var hint = document.createElement('span');
-      hint.className = 'desktop-notif-expand-hint';
-      hint.textContent = acts ? 'Tap to expand options' : 'Tap to read more';
-      var insertAfter = detail || body;
-      if (insertAfter) insertAfter.after(hint);
-    }
-
     card.addEventListener('click', function (e) {
-      // Ignore close-button and action-button clicks
-      if (e.target.closest('.desktop-notif-close-btn') ||
-          e.target.closest('.desktop-notif-btn')) return;
+      if (e.target.closest('.desktop-notif-close-btn') || e.target.closest('.desktop-notif-btn') || e.target.closest('a')) return;
       card.classList.toggle('is-expanded');
+      pile(card.parentElement);
+    });
+  }
+
+  /* The pile: each card tucks under the one above it so exactly 8 px of it
+     peeks out, whatever its height (a fixed -52 px overlap showed half a
+     tall card, or a dark smear under a short one). */
+  function pile(box) {
+    if (!box) return;
+    var cards = Array.prototype.filter.call(box.children, function (c) {
+      return c.classList && c.classList.contains('desktop-notification-card') && !c.classList.contains('desktop-notif-exit');
+    });
+    cards.forEach(function (c, i) {
+      var next = cards[i + 1];
+      var v = next ? (-(next.offsetHeight - 8)) + 'px' : '0px';
+      if (c.style.getPropertyValue('--pile-mb') !== v) c.style.setProperty('--pile-mb', v);
     });
   }
 
   function observeNotifications() {
-    // Wire existing cards
     document.querySelectorAll('.desktop-notification-card').forEach(wireCard);
-
-    // Watch for new cards
+    var queued = new Set();
     var obs = new MutationObserver(function (mutations) {
       mutations.forEach(function (m) {
+        if (m.target && m.target.classList && m.target.classList.contains('desktop-notification-container')) queued.add(m.target);
         m.addedNodes.forEach(function (n) {
           if (n.nodeType !== 1) return;
-          if (n.classList && n.classList.contains('desktop-notification-card')) wireCard(n);
-          // In case a container was just added
-          n.querySelectorAll && n.querySelectorAll('.desktop-notification-card').forEach(wireCard);
+          if (n.classList && n.classList.contains('desktop-notification-card')) { wireCard(n); if (n.parentElement) queued.add(n.parentElement); }
+          if (n.querySelectorAll) n.querySelectorAll('.desktop-notification-card').forEach(function (c) { wireCard(c); queued.add(c.parentElement); });
         });
       });
+      if (queued.size) requestAnimationFrame(function () { queued.forEach(pile); queued.clear(); });
     });
     obs.observe(document.body, { childList: true, subtree: true });
   }
@@ -214,6 +212,12 @@
       } else go();
     } catch (_) {}
   }
+
+  /* Peek window greeting: a suggestion pill fills the composer. */
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('#clavis-task-surface [data-fill]');
+    if (b && window.ClavisTaskSurface) window.ClavisTaskSurface.fillComposer(b.getAttribute('data-fill'));
+  });
 
   /* ── Init ────────────────────────────────────────────────── */
   function init() {

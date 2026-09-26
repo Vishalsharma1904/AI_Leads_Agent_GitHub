@@ -3306,8 +3306,8 @@
   <script src="clavis-barge-in.js?v=1.1&r=0926" defer></script>
   <script src="clavis-local-speech.js?v=2.3&r=0926" defer></script>
   <script src="clavis-audio-trigger.js?v=2.3" defer></script>
-  <script src="clavis-canvas.js?v=1.5&r=0926b" defer></script>
-  <script src="clavis-live.js?v=3.8&r=0926b" defer></script>
+  <script src="clavis-canvas.js?v=1.6&r=0926c" defer></script>
+  <script src="clavis-live.js?v=3.9&r=0926c" defer></script>
   <script src="clavis-cognition.js?v=1.0" defer></script>
   <script src="clavis-confirm-hud.js?v=1.0" defer></script>
   <script src="clavis-task-hud.js?v=1.0" defer></script>
@@ -3326,7 +3326,7 @@
   <!-- Clavis orb v4: single-pass WebGL, round by construction (the old strands-orb.js drew a square whenever its glass pass failed). Same window.StrandsOrb API. -->
   <script src="clavis-orb.js?v=4.0" defer></script>
   <script src="app-shortcuts.js?v=1.0" defer></script>
-  <script src="clavis-manual.js?v=1.1" defer></script>
+  <script src="clavis-manual.js?v=1.2" defer></script>
   <script src="voice_ai.js?v=1.0" defer></script>
   <script src="nexus-enhancements.js?v=2.1" defer></script>
   <script>
@@ -4013,7 +4013,7 @@
           <button class="smodal-dot smodal-dot-close" title="Close Settings" onclick="closeSettingsModal()">
             <svg width="6" height="6" viewBox="0 0 8 8" fill="none"><path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
-          <button class="smodal-dot smodal-dot-minimize" title="Toggle Collapse" onclick="toggleSettingsModalCollapse()">
+          <button class="smodal-dot smodal-dot-minimize" title="Hide / show sidebar" onclick="toggleSettingsModalCollapse()">
             <svg width="6" height="2" viewBox="0 0 8 2" fill="none"><path d="M1 1h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
           <button class="smodal-dot smodal-dot-expand" title="Toggle Expand" onclick="toggleSettingsModalExpand()">
@@ -5368,16 +5368,48 @@
       }
     }
 
+    /* Yellow light = hide / show the settings sidebar. The sheet narrows by
+       exactly the sidebar's width while the sidebar slides out to the left —
+       one clock, one curve, the content stays fully readable. (It used to
+       shrink the whole window to a dead title strip.) */
     function toggleSettingsModalCollapse() {
       const modal = document.querySelector('#settings-overlay .settings-modal');
-      if (!modal) return;
-      modal.classList.toggle('minimized');
-      modal.classList.remove('maximized');
+      const nav = modal && modal.querySelector('.smodal-nav');
+      if (!modal || !nav) return;
+      modal.classList.remove('minimized', 'maximized');
+      const on = !modal.classList.contains('nav-collapsed');
+      const W = modal.getBoundingClientRect().width;
+      const navW = on ? nav.getBoundingClientRect().width : (modal._navW || 220);
+      if (on) modal._navW = navW;
+      const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const ms = reduce ? 1 : 560, ease = 'cubic-bezier(.32,.72,0,1)';
+      const set = (n, k, v) => n.style.setProperty(k, v, 'important');
+      set(modal, 'transition', `width ${ms}ms ${ease}, max-width ${ms}ms ${ease}, min-width ${ms}ms ${ease}`);
+      set(nav, 'transition', `margin-left ${ms}ms ${ease}, opacity ${on ? 200 : 360}ms ease ${on ? 0 : 180}ms`);
+      set(modal, 'width', W + 'px'); set(modal, 'max-width', 'none'); set(modal, 'min-width', '0px');
+      void modal.offsetWidth;                       // start from where it is
+      modal.classList.toggle('nav-collapsed', on);
+      set(modal, 'width', Math.round(on ? W - navW : W + navW) + 'px');
+      set(nav, 'margin-left', on ? (-navW) + 'px' : '0px');
+      set(nav, 'opacity', on ? '0' : '1');
+      set(nav, 'pointer-events', on ? 'none' : 'auto');
+      clearTimeout(modal._navT);
+      modal._navT = setTimeout(function () {
+        if (on) return;                              // collapsed keeps its width
+        ['width', 'max-width', 'min-width', 'transition'].forEach((k) => modal.style.removeProperty(k));
+        ['margin-left', 'opacity', 'pointer-events', 'transition'].forEach((k) => nav.style.removeProperty(k));
+      }, ms + 60);
     }
 
     function toggleSettingsModalExpand() {
       const modal = document.querySelector('#settings-overlay .settings-modal');
       if (!modal) return;
+      if (modal.classList.contains('nav-collapsed')) {        // back to the normal layout first
+        const nav = modal.querySelector('.smodal-nav');
+        modal.classList.remove('nav-collapsed'); clearTimeout(modal._navT);
+        ['width', 'max-width', 'min-width', 'transition'].forEach((k) => modal.style.removeProperty(k));
+        if (nav) ['margin-left', 'opacity', 'pointer-events', 'transition'].forEach((k) => nav.style.removeProperty(k));
+      }
       modal.classList.toggle('maximized');
       modal.classList.remove('minimized');
     }
@@ -5498,7 +5530,7 @@
   <link rel="stylesheet" href="clavis-chat.css?v=2.2">
   <script src="clavis-task-model.js?v=2.0" defer></script>
   <script src="clavis-task-controller.js?v=2.2&r=0926" defer></script>
-  <script src="clavis-task-surface.js?v=2.6&r=0926" defer></script>
+  <script src="clavis-task-surface.js?v=2.7&r=0926c" defer></script>
   <script src="clavis-aurora.js?v=8.2&r=0926b" defer></script>
   <script src="clavis-chat.js?v=2.2" defer></script>
   <!-- CLAVIS LUXE: theme reveal, rail motion, icons, dark mode, floating-window deep dive + image
@@ -5510,7 +5542,7 @@
   <link rel="stylesheet" href="clavis-motion.css?v=1.1">
   <link rel="stylesheet" href="clavis-window-refine.css?v=1.1">
   <link rel="stylesheet" href="clavis-composer-iq.css?v=1.2">
-  <script src="clavis-pencil.js?v=1.0" defer></script>
+  <script src="clavis-pencil.js?v=1.1" defer></script>
   <script src="clavis-luxe.js?v=2.5&r=0926" defer></script>
   <script src="clavis-intelligence.js?v=1.2" defer></script>
   <script src="clavis-composer-iq.js?v=1.2" defer></script>
@@ -5537,7 +5569,7 @@
        motion, and Claude-style hover cards on the sidebar. Loaded last so it
        wins; delete these two lines to return to the previous look. -->
   <link rel="stylesheet" href="clavis-claude.css?v=1.0">
-  <link rel="stylesheet" href="clavis-manual.css?v=1.1">
+  <link rel="stylesheet" href="clavis-manual.css?v=1.2">
   <script src="clavis-claude.js?v=1.1" defer></script>
   <!-- One icon family everywhere: Feather (bundled). Delete to restore the old icons. -->
   <script src="clavis-icons.js?v=1.0" defer></script>

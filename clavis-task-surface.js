@@ -276,8 +276,25 @@
     if (geoAnim) { try { geoAnim.cancel(); } catch (e) {} geoAnim = null; }
   }
 
-  /* Already-open window, content just changed: glide both axes to the
-     new box. No jump, no snap back to a fixed width. */
+  /* All geometry motion here is a clip-path reveal + transform + opacity.
+     The window is laid out ONCE at its final size; the clip grows from the
+     old box to the new one. Animating width/height (the old way) re-flowed
+     every line of text on every frame — that was the stutter. */
+  var EASE_APPLE = 'cubic-bezier(0.32, 0.72, 0, 1)';
+
+  // inset() that shows only a w×h box, pinned to the corner the window hangs from
+  function clipBox(w, h, fullW, fullH, radius) {
+    var r = el.getBoundingClientRect();
+    var fromRight = r.left + r.width / 2 > (window.innerWidth || 0) / 2;
+    var dx = Math.max(0, Math.round(fullW - w)), dy = Math.max(0, Math.round(fullH - h));
+    return 'inset(0px ' + (fromRight ? 0 : dx) + 'px ' + dy + 'px ' + (fromRight ? dx : 0) + 'px round ' + radius + ')';
+  }
+  function settle(to) {
+    el.style.width = to.w + 'px';
+    el.style.height = 'auto';
+  }
+
+  /* Already-open window, content just changed: glide to the new box. */
   function smoothResize(mutationFn) {
     if (!el) { if (typeof mutationFn === 'function') mutationFn(); return; }
 
@@ -285,115 +302,90 @@
     if (typeof mutationFn === 'function') mutationFn();
 
     var to = measure();
-    if (reducedMotion() || !el.animate) {
-      el.style.width = to.w + 'px';
-      el.style.height = 'auto';
-      return;
-    }
-
     cancelGeo();
-    el.style.overflow = 'hidden';
-    geoAnim = el.animate(
-      [
-        { width: Math.round(from.width) + 'px', height: Math.round(from.height) + 'px' },
-        { width: to.w + 'px', height: to.h + 'px' }
-      ],
-      { duration: 560, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' }
-    );
+    settle(to);
+    if (reducedMotion() || !el.animate) return;
+    var grows = to.w >= from.width - 1 && to.h >= from.height - 1;
+    geoAnim = grows
+      ? el.animate([
+          { clipPath: clipBox(from.width, from.height, to.w, to.h, '18px') },
+          { clipPath: 'inset(0px 0px 0px 0px round 18px)' }
+        ], { duration: 480, easing: EASE_APPLE })
+      : el.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
     var a = geoAnim;
-    geoAnim.onfinish = function () {
-      if (!el) return;
-      el.style.width = to.w + 'px';
-      el.style.height = 'auto';
-      el.style.overflow = '';
-      try { a.cancel(); } catch (e) {}   // release the forced geometry
-      if (geoAnim === a) geoAnim = null;
-    };
+    geoAnim.onfinish = function () { if (geoAnim === a) geoAnim = null; };
   }
 
   /* ── Open / close ─────────────────────────────────────────
-     ONE animation, used by every route in: a task completing, a task
-     failing, and the Peek Tasks button. It used to differ per path,
-     which is why opening it by hand felt like a different app.
+     ONE animation for every route in (task done, task failed, the Peek
+     Tasks button): a small capsule appears at its corner, then unfurls
+     into the card. Content trails the unfurl by a beat. */
 
-     The shape of it: the window arrives as a small capsule pinned to
-     its corner, holds for a beat so the eye catches it, then unfurls —
-     widening and dropping at the same time — into the finished card.
-     Content fades up slightly behind the unfurl so text never appears
-     squashed inside a half-open box. */
+  // Content fade-outs from the last close. They hold their end state
+  // (opacity 0) until cancelled — left alive, the next open's text
+  // flashed in and then snapped back to invisible.
+  var contentExit = [];
+  function cancelContentExit() {
+    contentExit.forEach(function (x) { try { x.cancel(); } catch (e) {} });
+    contentExit = [];
+  }
 
   function playOpen() {
     if (!el) return;
+    cancelContentExit();
     var to = measure();
-
-    if (reducedMotion() || !el.animate) {
-      el.style.width = to.w + 'px';
-      el.style.height = 'auto';
-      return;
-    }
-
     cancelGeo();
-    el.style.overflow = 'hidden';
+    settle(to);
+    if (reducedMotion() || !el.animate) return;
 
-    var capsuleW = Math.min(236, to.w);
-    var capsuleH = 40;
-
+    var capsule = clipBox(Math.min(236, to.w), 40, to.w, to.h, '999px');
     geoAnim = el.animate(
       [
-        { width: capsuleW + 'px', height: capsuleH + 'px', borderRadius: '999px',
-          opacity: 0, transform: 'translateY(-8px) scale(0.965)', offset: 0 },
-        { width: capsuleW + 'px', height: capsuleH + 'px', borderRadius: '999px',
-          opacity: 1, transform: 'translateY(0) scale(1)', offset: 0.2 },
-        { width: to.w + 'px', height: to.h + 'px', borderRadius: '18px',
-          opacity: 1, transform: 'none', offset: 1 }
+        { clipPath: capsule, opacity: 0, transform: 'translateY(-8px) scale(0.97)', offset: 0 },
+        { clipPath: capsule, opacity: 1, transform: 'none', offset: 0.18 },
+        { clipPath: 'inset(0px 0px 0px 0px round 18px)', opacity: 1, transform: 'none', offset: 1 }
       ],
-      { duration: 780, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' }
+      { duration: 680, easing: EASE_APPLE }
     );
     var opened = geoAnim;
-    geoAnim.onfinish = function () {
-      if (!el) return;
-      el.style.width = to.w + 'px';
-      el.style.height = 'auto';
-      el.style.overflow = '';
-      el.style.borderRadius = '';
-      try { opened.cancel(); } catch (e) {}
-      if (geoAnim === opened) geoAnim = null;
-    };
+    geoAnim.onfinish = function () { if (geoAnim === opened) geoAnim = null; };
 
-    // Content trails the unfurl by a beat — it reads as the card
-    // revealing what it holds, rather than everything arriving at once.
     [bodyEl, footerEl, composerEl].forEach(function (node, i) {
       if (!node || node.hidden) return;
       try {
         node.animate(
-          [ { opacity: 0, transform: 'translateY(7px)' },
-            { opacity: 1, transform: 'none' } ],
-          { duration: 420, delay: 210 + i * 55, easing: 'cubic-bezier(0.22, 1, 0.36, 1)', fill: 'both' }
+          [ { opacity: 0, transform: 'translateY(6px)', filter: 'blur(5px)' },
+            { opacity: 1, transform: 'none', filter: 'blur(0px)' } ],
+          { duration: 420, delay: 180 + i * 50, easing: EASE_APPLE, fill: 'backwards' }
         );
       } catch (e) {}
     });
   }
 
-  /* Exits fold back toward where they came from — unhurried, so the
-     window settles away instead of vanishing. */
+  /* Exits fold back into the capsule, quicker than they arrived. */
   function playClose(done) {
     if (!el || reducedMotion() || !el.animate) { done(); return; }
     cancelGeo();
-    var from = el.getBoundingClientRect();
-    el.style.overflow = 'hidden';
+    var r = el.getBoundingClientRect();
+    cancelContentExit();
+    [bodyEl, footerEl, composerEl].forEach(function (node) {
+      if (!node || node.hidden) return;
+      try {
+        contentExit.push(node.animate([{ opacity: 1, filter: 'blur(0px)' }, { opacity: 0, filter: 'blur(4px)' }],
+          { duration: 220, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }));
+      } catch (e) {}
+    });
     var a = el.animate(
       [
-        { width: Math.round(from.width) + 'px', height: Math.round(from.height) + 'px',
-          opacity: 1, transform: 'none', borderRadius: '18px' },
-        { width: Math.round(Math.min(236, from.width)) + 'px', height: '40px',
-          opacity: 0, transform: 'translateY(-6px) scale(0.97)', borderRadius: '999px' }
+        { clipPath: 'inset(0px 0px 0px 0px round 18px)', opacity: 1, transform: 'none' },
+        { clipPath: clipBox(Math.min(236, r.width), 40, r.width, r.height, '999px'), opacity: 0, transform: 'translateY(-6px) scale(0.97)' }
       ],
-      { duration: 460, easing: 'cubic-bezier(0.65, 0, 0.35, 1)', fill: 'both' }
+      { duration: 340, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }
     );
     a.onfinish = function () {
-      try { a.cancel(); } catch (e) {}
-      if (el) { el.style.overflow = ''; el.style.borderRadius = ''; }
       done();
+      try { a.cancel(); } catch (e) {}
+      cancelContentExit();
     };
   }
 
@@ -1166,116 +1158,30 @@
            stats([['Files', task.metrics.files || null]]) + meter(task);
   });
 
-  /* ── Idle State: Executive Greeting, 4-Stage Track & Agent Cards ─ */
-  register('idle', function (task) {
+  /* ── Idle: just a calm greeting ────────────────────────────
+     Nothing has been asked yet, so nothing is "running" — no fake
+     pipeline, no agent cards. The window fills with real work only
+     once he gives a command (leads → pipeline, photos → pictures…). */
+  register('idle', function () {
     var hour = new Date().getHours();
-    var greeting = 'Good evening';
-    if (hour < 12) greeting = 'Good morning';
-    else if (hour < 17) greeting = 'Good afternoon';
-
+    var greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+    var who = 'sir';
+    try {
+      var n = (localStorage.getItem('clavis_owner_name') || '').trim();
+      if (n) who = n;
+    } catch (e) {}
+    var pill = function (text) {
+      return '<button type="button" class="cts-prompt-pill" data-fill="' + esc(text) + '"><span>' + esc(text) + '</span>' +
+        '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>';
+    };
     return [
-      '<div class="cts-task-banner">',
-      '  <div class="cts-task-eyebrow">Autonomous Agent Pipeline</div>',
-      '  <h3 class="cts-task-title">' + greeting + ', <em>Director</em></h3>',
-      '  <p class="cts-task-subtitle">Clavis autonomous agents are synchronized &amp; standing by to execute.</p>',
-      '  <div class="cts-pipeline-track">',
-      '    <div class="cts-pipe-node-wrap done">',
-      '      <div class="cts-pipe-node"></div>',
-      '      <span class="cts-pipe-node-label">Plan</span>',
-      '    </div>',
-      '    <div class="cts-pipe-node-wrap active">',
-      '      <div class="cts-pipe-node">2</div>',
-      '      <span class="cts-pipe-node-label">Scrape</span>',
-      '    </div>',
-      '    <div class="cts-pipe-node-wrap">',
-      '      <div class="cts-pipe-node">3</div>',
-      '      <span class="cts-pipe-node-label">Enrich</span>',
-      '    </div>',
-      '    <div class="cts-pipe-node-wrap">',
-      '      <div class="cts-pipe-node">4</div>',
-      '      <span class="cts-pipe-node-label">Dispatch</span>',
-      '    </div>',
-      '  </div>',
-      '</div>',
-      '',
-      '<div class="cts-agent-cards-stack">',
-      '  <div class="cts-agent-card active-agent">',
-      '    <div class="cts-agent-top">',
-      '      <div class="cts-agent-meta">',
-      '        <span class="cts-agent-icon">⚡</span>',
-      '        <span class="cts-agent-name">Orchestrator Agent</span>',
-      '      </div>',
-      '      <span class="cts-agent-badge">Active</span>',
-      '    </div>',
-      '    <p class="cts-agent-log">Decomposes objectives into concurrent intelligence work streams.</p>',
-      '    <div class="cts-agent-metrics">',
-      '      <span class="cts-metric-chip">180ms latency</span>',
-      '      <span class="cts-metric-chip">Ready</span>',
-      '    </div>',
-      '  </div>',
-      '',
-      '  <div class="cts-agent-card">',
-      '    <div class="cts-agent-top">',
-      '      <div class="cts-agent-meta">',
-      '        <span class="cts-agent-icon">🌐</span>',
-      '        <span class="cts-agent-name">Web Intelligence Agent</span>',
-      '      </div>',
-      '      <span class="cts-agent-badge">Ready</span>',
-      '    </div>',
-      '    <p class="cts-agent-log">Scans verified registries, Google Maps listings &amp; commercial hubs.</p>',
-      '    <div class="cts-agent-metrics">',
-      '      <span class="cts-metric-chip">Multi-source crawler</span>',
-      '    </div>',
-      '  </div>',
-      '',
-      '  <div class="cts-agent-card">',
-      '    <div class="cts-agent-top">',
-      '      <div class="cts-agent-meta">',
-      '        <span class="cts-agent-icon">🧠</span>',
-      '        <span class="cts-agent-name">Synthesis &amp; Scoring Agent</span>',
-      '      </div>',
-      '      <span class="cts-agent-badge">Standby</span>',
-      '    </div>',
-      '    <p class="cts-agent-log">Multi-point ICP compliance verification &amp; contact extraction.</p>',
-      '    <div class="cts-agent-metrics">',
-      '      <span class="cts-metric-chip">ICP Target &gt;90%</span>',
-      '    </div>',
-      '  </div>',
-      '',
-      '  <div class="cts-agent-card">',
-      '    <div class="cts-agent-top">',
-      '      <div class="cts-agent-meta">',
-      '        <span class="cts-agent-icon">📬</span>',
-      '        <span class="cts-agent-name">Dispatch &amp; Sync Agent</span>',
-      '      </div>',
-      '      <span class="cts-agent-badge">Standby</span>',
-      '    </div>',
-      '    <p class="cts-agent-log">Synchronizes validated entries into Leads Data Hub &amp; Excel sheets.</p>',
-      '    <div class="cts-agent-metrics">',
-      '      <span class="cts-metric-chip">Auto-export ready</span>',
-      '    </div>',
-      '  </div>',
-      '</div>',
-      '',
-      '<div class="cts-prompt-section">',
-      '  <div class="cts-prompt-heading">Suggested Actions</div>',
+      '<div class="cts-idle">',
+      '  <h3 class="cts-idle-title">' + greeting + ', <em>' + esc(who) + '</em></h3>',
+      '  <p class="cts-idle-sub">Kuch bhi boliye ya likhiye — jo kaam chalega, woh yahin dikhega.</p>',
       '  <div class="cts-prompt-pills">',
-      '    <button type="button" class="cts-prompt-pill" onclick="window.ClavisTaskSurface.fillComposer(\'Find high-growth SaaS companies in Bangalore with verified founder contacts\')">',
-      '      <span>Find high-growth SaaS in Bangalore</span>',
-      '      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>',
-      '    </button>',
-      '    <button type="button" class="cts-prompt-pill" onclick="window.ClavisTaskSurface.fillComposer(\'Extract verified phone numbers for manufacturing exporters in Delhi NCR\')">',
-      '      <span>Verified contacts for exporters in Delhi NCR</span>',
-      '      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>',
-      '    </button>',
-      '    <button type="button" class="cts-prompt-pill" onclick="window.ClavisTaskSurface.fillComposer(\'Top 50 healthcare clinics in Mumbai with phone and address\')">',
-      '      <span>Top 50 healthcare clinics in Mumbai</span>',
-      '      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>',
-      '    </button>',
-      '    <button type="button" class="cts-prompt-pill" onclick="window.ClavisTaskSurface.fillComposer(\'Analyze talent pool for senior Python &amp; AI developers in India\')">',
-      '      <span>Analyze Python &amp; AI developer talent pool</span>',
-      '      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M12 5l7 7-7 7"/></svg>',
-      '    </button>',
+           pill('Gurugram ke hotels ki 20 leads nikalo'),
+           pill('Meri location map pe dikhao'),
+           pill('Taj Mahal ki photos dikhao'),
       '  </div>',
       '</div>'
     ].join('\n');
@@ -1373,8 +1279,48 @@
     ];
   }
 
+  /* Leads: the sheet in small — who to ask for, a mobile, an email, where.
+     ~10 rows, then "+N more"; the full set is in Download Excel / CSV. */
+  function leadPreview(rows) {
+    var LIMIT = 10;
+    var dash = '<span style="color:var(--cts-faint);">—</span>';
+    var trs = rows.slice(0, LIMIT).map(function (l) {
+      var phones = [].concat(l.phones || [], l.phone || [], l.phoneAlt || []).map(function (p) { return p && typeof p === 'object' ? p.number : p; }).filter(Boolean);
+      var mobile = phones.filter(function (p) { return /^\+91 [6-9]/.test(String(p)); })[0] || phones[0] || '';
+      var who = l.contactPerson ? esc(l.contactPerson) + (l.designation ? '<br><span style="color:var(--cts-faint);">' + esc(l.designation) + '</span>' : '') : dash;
+      return '<tr>' +
+        '<td title="' + esc(l.company || '') + '"><strong>' + esc(l.company || l.title || 'Company') + '</strong></td>' +
+        '<td>' + who + '</td>' +
+        '<td>' + (mobile ? '<span class="cts-badge-phone">' + esc(mobile) + '</span>' : dash) + '</td>' +
+        '<td title="' + esc(l.email || '') + '">' + (l.email ? esc(l.email) : dash) + '</td>' +
+        '<td>' + esc(l.city || '') + '</td>' +
+      '</tr>';
+    }).join('');
+    var more = rows.length > LIMIT
+      ? '<tr><td colspan="5" style="color:var(--cts-faint);text-align:center;">+' + (rows.length - LIMIT) + ' more in the download</td></tr>' : '';
+    // narrow window: the table scrolls sideways inside its own frame
+    return '<div class="cts-preview-wrap cts-leads-preview" style="overflow-x:auto;overscroll-behavior-x:contain;">' +
+      '<table class="cts-preview-table" style="min-width:560px;">' +
+        '<thead><tr><th>Company</th><th>Authority</th><th>Mobile</th><th>Email</th><th>Area</th></tr></thead>' +
+        '<tbody>' + trs + more + '</tbody>' +
+      '</table>' +
+    '</div>';
+  }
+
+  /* A finished lead run always shows the lead preview table, even when a
+     decorating layer (clavis-aurora.js) swaps the 'leads' body for its own
+     short row list: that list is replaced, everything else it drew stays. */
+  function withLeadPreview(html, task) {
+    var rows = task && task.mode === 'leads' && task.result && Array.isArray(task.result.rows) ? task.result.rows : null;
+    if (!rows || !rows.length || /cts-leads-preview/.test(html)) return html;
+    var table = leadPreview(rows);
+    var swapped = html.replace(/<ul class="cts-rows">[\s\S]*?<\/ul>(\s*<p class="cts-more">[\s\S]*?<\/p>)?/, function () { return table; });
+    return swapped !== html ? swapped : html + table;
+  }
+
   function previewTable(rows, isCandidate) {
     if (!Array.isArray(rows) || !rows.length) return '';
+    if (!isCandidate) return leadPreview(rows);
     var sample = rows.slice(0, 3);
     var head1 = isCandidate ? 'Candidate' : 'Business';
     var head2 = 'Phone';
@@ -1403,6 +1349,8 @@
   }
 
   register('leads', function (task) {
+    var rows = task.result && Array.isArray(task.result.rows) ? task.result.rows : [];
+    if (rows.length) return titleBlock(task) + leadPreview(rows);
     return titleBlock(task) +
            pipeline(getLeadPipelineSteps(task)) +
            stats([
@@ -1483,7 +1431,9 @@
   /* Full-fidelity structured rendering for the floating window:
      Headers, code blocks, lists, bold/italics, and paragraphs. */
   function richText(text, opts) {
+    // Never show a model directive ([[silent]], a stray "]]") as text.
     var t = String(text || '').trim();
+    if (window.ClavisVoiceState && window.ClavisVoiceState.stripDirectives) t = window.ClavisVoiceState.stripDirectives(t);
     if (!t) return '';
     var suppressTables = !!(opts && opts.suppressTables);
 
@@ -1549,7 +1499,11 @@
     return esc(s)
       .replace(/`([^`]+)`/g, '<code>$1</code>')
       .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-      .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+      .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+      // "quoted words" → typographic quotes with a soft highlight (not inside code).
+      .replace(/(<code>[\s\S]*?<\/code>)|(?:&quot;|\u201c)([^<>\n]{1,160}?)(?:&quot;|\u201d)/g, function (m, code, q) {
+        return code || '<q class="cts-quote">\u201c' + q + '\u201d</q>';
+      });
   }
 
   /* GFM pipe-table detection: a header row, a "|---|---|" rule row, then
@@ -1625,7 +1579,7 @@
   }
 
   function headLabel(task) {
-    if (task.phase === 'idle' || task.mode === 'idle') return 'Live Agent Pipeline';
+    if (task.phase === 'idle' || task.mode === 'idle') return 'Clavis';
     if (task.phase === 'failed') return task.error && task.error.cancelled ? 'Stopped' : 'Failed';
     if (task.requiresApproval) return 'Needs you';
     if (task.phase === 'completed') return 'Done';
@@ -1633,16 +1587,7 @@
   }
 
   function actionsFor(task) {
-    if (task.phase === 'idle' || task.mode === 'idle') {
-      return [{
-        id: 'hub',
-        label: 'View in Leads Hub',
-        primary: true,
-        run: function () {
-          if (typeof window.switchTab === 'function') window.switchTab('leads');
-        }
-      }];
-    }
+    if (task.phase === 'idle' || task.mode === 'idle') return [];   // greeting only — nothing to act on yet
     if (task.requiresApproval) {
       return [
         { id: 'approve', label: 'Approve', primary: true, run: function () { Task.resolveApproval(task.id, true); } },
@@ -1651,18 +1596,22 @@
     }
     if (task.phase === 'failed' && !(task.error && task.error.cancelled)) {
       var why = String((task.error && (task.error.message || task.error.code)) || '');
-      // Rate limits and transient provider failures are recoverable; asking
-      // for a new key there is misleading and does not match the error.
-      // Only missing/rejected credentials need the key vault action.
       var rateLimited = /rate limit|too many requests|tokens? per minute|try again in|429/i.test(why);
-    var keyProblem = !rateLimited && /no ai key|credential.*missing|missing.*credential|api key.*missing|missing.*api key|unauthor|invalid.*key|rejected.*key/i.test(why);
-      if (keyProblem && global.ClavisKeyVaultUI) {
-        return [
-          { id: 'key', label: 'Add a key', primary: true, run: function () { global.ClavisKeyVaultUI.open(); } },
-          { id: 'retry', label: 'Retry', run: function () { Task.retry(task.id); } }
-        ];
+      var keyProblem = /no ai key|credential.*missing|missing.*credential|api key.*missing|missing.*api key|unauthor|invalid.*key|rejected.*key/i.test(why);
+      var actions = [];
+      if (rateLimited || keyProblem) {
+        actions.push({
+          id: 'gemini-key',
+          label: '🔑 Connect Google AI Studio (Gemini)',
+          primary: true,
+          run: function () {
+            if (typeof global.openClavisCredentialDialog === 'function') global.openClavisCredentialDialog('gemini');
+            else if (global.ClavisKeyVaultUI) global.ClavisKeyVaultUI.open();
+          }
+        });
       }
-      return [{ id: 'retry', label: 'Retry', primary: true, run: function () { Task.retry(task.id); } }];
+      actions.push({ id: 'retry', label: 'Retry', primary: !actions.length, run: function () { Task.retry(task.id); } });
+      return actions;
     }
     if (task.phase === 'completed') return task.actions || [];
     return [{ id: 'stop', label: 'Stop', run: function () { Task.cancel(task.id); } }];
@@ -1679,7 +1628,7 @@
       if (global.ClavisPencil) {
         // One frame's grace so text has laid out and widths are real.
         requestAnimationFrame(function () {
-          requestAnimationFrame(function () { global.ClavisPencil.scan(root); });
+          requestAnimationFrame(function () { global.ClavisPencil.scan(root, task && task.id); });
         });
       }
     } catch (e) {}
@@ -1710,31 +1659,23 @@
     // The presenter (jarvis_ui.js) decided this turn has something to show.
     if (task.display === 'window') return true;
 
-    // Voice and short spoken turns stay in the orb/audio channel. The store
-    // emits again on completion; ignoring this choice here was reopening the
-    // floating window after every spoken reply.
-    if (task.display === 'voice' || task.source === 'voice') {
-      return task.phase === 'failed';
-    }
+    // Voice turns stay in the orb/audio channel — kabhi auto-show nahi
+    // (failure bhi bol kar batayi jaati hai). Pehle overheard speech se
+    // "Clavis · Thinking… · Stop" panel pop ho jaata tha.
+    if (task.display === 'voice' || task.source === 'voice') return false;
 
-    // On completion: ALWAYS open floating surface with the answer + composer
-    if (task.phase === 'completed') {
-      return true;
-    }
+    // On completion: open floating surface with the answer + composer
+    if (task.phase === 'completed') return true;
 
     // On failure: show error and retry action
-    if (task.phase === 'failed') {
-      return true;
-    }
+    if (task.phase === 'failed') return true;
 
-    // For voice queries: keep closed while understanding/working (Orb speaks/listens)
-    if (task.source === 'voice') {
-      return false;
-    }
-
-    // For text queries from composer: show while working/understanding
+    // Understanding / working: sirf asli typed submission par, ya jab
+    // classifier ko bharosa ho (confidence >= 0.4). Low-confidence guess
+    // wala 'Thinking…' panel nahi.
     if (task.phase === 'working' || task.phase === 'understanding') {
-      return true;
+      var typed = task.source === 'composer' && !task.auto;
+      return typed || Number(task.confidence) >= 0.4;
     }
 
     return false;
@@ -1752,7 +1693,7 @@
     var wantsShow = userPinned || shouldSurfaceShow(task);
     var density = densityFor(task);
     var width = DENSITY[density];
-    var html = cleanHeading((rendererFor(task) || registry.thinking)(task), task);
+    var html = withLeadPreview(cleanHeading((rendererFor(task) || registry.thinking)(task), task), task);
     var acts = actionsFor(task);
     var signature = task.id + '|' + task.phase + '|' + task.mode + '|' + density + '|' + html + '|' + acts.map(function (a) { return a.id; }).join(',');
     // Never closes itself: a turn that has nothing to show leaves whatever
@@ -1923,7 +1864,7 @@
 
   function signatureOf(task) {
     var density = densityFor(task);
-    var html = cleanHeading((rendererFor(task) || registry.thinking)(task), task);
+    var html = withLeadPreview(cleanHeading((rendererFor(task) || registry.thinking)(task), task), task);
     var acts = actionsFor(task);
     return task.id + '|' + task.phase + '|' + task.mode + '|' + density + '|' + html + '|' + acts.map(function (a) { return a.id; }).join(',');
   }

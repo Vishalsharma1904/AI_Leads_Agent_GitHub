@@ -1236,7 +1236,7 @@
     // 1 · several subjects ("lord" → the deities): one labelled picture each
     if (u.group && L?.findImages) {
       const b = await settle(L.findImages(u.raw), 12000, null);
-      if (b?.items?.length) return { items: fromBundle(b, Math.max(n, 9)), name: b.name };
+      if (b?.items?.length) return { items: fromBundle(b, n), name: b.name };   // never more than 6
     }
     // 2 · the backend's web image search — with the understood query, kept on subject
     try {

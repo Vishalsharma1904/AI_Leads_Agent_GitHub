@@ -136,42 +136,13 @@
      runs past the last letter. More control points through a smooth
      quadratic give a gentle, wavy pull — intentionally a little wavy so it
      reads as a hand-drawn line rather than a ruler stroke. */
-  function strokePath(w, h, rnd, pass) {
-    // The two passes sit slightly apart and cross near the middle,
-    // which is what a real double cross-out does — laid exactly on top
-    // of each other they just read as one thick line.
-    var mid = h * (pass ? 0.60 : 0.50);
-    var overshoot = 3 + rnd() * 5;
-    var pts = [];
-    // More points => a smoother, more legibly wavy curve.
-    var n = 9;
-    // A slow ~1.5-cycle wave down the length, offset per pass and per
-    // element seed so the two strokes ripple differently and no two tasks
-    // look identical. Kept small (a gentle wave, not a zig-zag).
-    var wavePhase = rnd() * Math.PI * 2;
-    var waveCycles = 1.4 + rnd() * 0.5;
-    var waveAmp = h * 0.16 * (pass ? 0.82 : 1);
-    for (var i = 0; i <= n; i++) {
-      var t = i / n;
-      var x = -overshoot + t * (w + overshoot * 1.8);
-      // Wander, biased to sag in the middle like a real wrist pivot...
-      var sag = Math.sin(t * Math.PI) * h * 0.07;
-      // ...plus a gentle travelling wave for the wavy look, tapered at the
-      // ends (Math.sin(t*PI)) so the stroke enters and leaves cleanly.
-      var wave = Math.sin(t * Math.PI) * Math.sin(wavePhase + t * Math.PI * waveCycles) * waveAmp;
-      var jitter = (rnd() - 0.5) * h * 0.14;
-      pts.push([x, mid + sag + wave + jitter]);
-    }
-    var d = 'M ' + pts[0][0].toFixed(1) + ' ' + pts[0][1].toFixed(1);
-    for (var j = 1; j < pts.length - 1; j++) {
-      var cx = pts[j][0], cy = pts[j][1];
-      var nx = (pts[j][0] + pts[j + 1][0]) / 2;
-      var ny = (pts[j][1] + pts[j + 1][1]) / 2;
-      d += ' Q ' + cx.toFixed(1) + ' ' + cy.toFixed(1) + ' ' + nx.toFixed(1) + ' ' + ny.toFixed(1);
-    }
-    var last = pts[pts.length - 1];
-    d += ' T ' + last[0].toFixed(1) + ' ' + last[1].toFixed(1);
-    return d;
+  /* One clean, straight pencil line through the middle — a hair of
+     overshoot at both ends so it reads as drawn, not ruled. (The old
+     double wavy scribble looked messy at small sizes.) */
+  function strokePath(w, h, rnd) {
+    var y = Math.round(h * 0.54) + 0.5;
+    var o = 2 + rnd() * 2;
+    return 'M ' + (-o).toFixed(1) + ' ' + y + ' L ' + (w + o).toFixed(1) + ' ' + y;
   }
 
   var uid = 0;
@@ -200,18 +171,8 @@
     svg.setAttribute('viewBox', '0 0 ' + (w + 12) + ' ' + h);
     svg.setAttribute('aria-hidden', 'true');
     svg.innerHTML =
-      '<defs>' +
-      '  <filter id="' + id + '" x="-10%" y="-40%" width="120%" height="180%">' +
-      '    <feTurbulence type="fractalNoise" baseFrequency="0.9 0.55" numOctaves="2" seed="' +
-             Math.floor(rnd() * 90) + '" result="n"/>' +
-      '    <feDisplacementMap in="SourceGraphic" in2="n" scale="1.6" ' +
-             'xChannelSelector="R" yChannelSelector="G"/>' +
-      '  </filter>' +
-      '</defs>' +
-      '<g filter="url(#' + id + ')" fill="none" stroke="currentColor" stroke-linecap="round">' +
-      '  <path class="cts-pencil-p1" d="' + strokePath(w, h, rnd, 0) + '" stroke-width="1.9" opacity="0.9"/>' +
-      '  <path class="cts-pencil-p2" d="' + strokePath(w, h, rnd, 1) + '" stroke-width="1.35" opacity="0.58"/>' +
-      '</g>';
+      '<path class="cts-pencil-p1" d="' + strokePath(w, h, rnd) + '" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" opacity="0.7"/>';
+    void id;
 
     el.appendChild(svg);
 
@@ -224,25 +185,20 @@
     // The second pass starts before the first finishes, which is what
     // a double-strike actually sounds and looks like.
     var p1 = svg.querySelector('.cts-pencil-p1');
-    var p2 = svg.querySelector('.cts-pencil-p2');
-    [p1, p2].forEach(function (p) {
-      var L = p.getTotalLength();
-      p.style.strokeDasharray = L;
-      p.style.strokeDashoffset = L;
-    });
+    // Already crossed off on an earlier paint: show it at once, silently.
+    if (opts.instant) { el.style.opacity = '0.45'; return; }
+    var L = p1.getTotalLength();
+    p1.style.strokeDasharray = L;
+    p1.style.strokeDashoffset = L;
 
     requestAnimationFrame(function () {
       if (p1.animate) {
-        p1.animate([{ strokeDashoffset: p1.getTotalLength() }, { strokeDashoffset: 0 }],
-          { duration: 260, easing: 'cubic-bezier(0.3, 0.05, 0.2, 1)', fill: 'forwards' });
-        p2.animate([{ strokeDashoffset: p2.getTotalLength() }, { strokeDashoffset: 0 }],
-          { duration: 220, delay: 130, easing: 'cubic-bezier(0.4, 0, 0.3, 1)', fill: 'forwards' });
+        p1.animate([{ strokeDashoffset: L }, { strokeDashoffset: 0 }],
+          { duration: 320, easing: 'cubic-bezier(0.3, 0.05, 0.2, 1)', fill: 'forwards' });
       } else {
         p1.style.strokeDashoffset = 0;
-        p2.style.strokeDashoffset = 0;
       }
-      scrape(0.2, opts.volume);
-      setTimeout(function () { scrape(0.13, (opts.volume == null ? 1 : opts.volume) * 0.6); }, 135);
+      scrape(0.24, opts.volume);        // one stroke, one scrape
     });
 
     // The text itself fades back — struck-through work should recede,
@@ -258,7 +214,11 @@
    * and has not been struck yet, staggered so a batch reads as a hand
    * going down the list rather than one simultaneous flash.
    */
-  function scan(root) {
+  // Which steps were already crossed off, per task — a repaint redraws
+  // them instantly and silently; only a step that JUST finished gets the
+  // animated stroke and the pencil sound.
+  var seen = new Set();
+  function scan(root, taskId) {
     if (!root) return 0;
     var targets = root.querySelectorAll(
       '.cts-pipe-step.is-done .cts-pipe-title:not([data-struck]),' +
@@ -266,9 +226,15 @@
       '.cts-agent-card.done-agent .cts-agent-name:not([data-struck]),' +
       '[data-done="1"]:not([data-struck])'
     );
-    Array.prototype.forEach.call(targets, function (t, i) {
-      setTimeout(function () { strike(t, { volume: 0.85 }); }, i * 170);
+    var fresh = 0;
+    Array.prototype.forEach.call(targets, function (t) {
+      var key = (taskId || '') + '|' + (t.textContent || '').trim();
+      if (seen.has(key)) { strike(t, { instant: true }); return; }
+      seen.add(key);
+      var delay = fresh++ * 220;
+      setTimeout(function () { strike(t, { volume: 0.85 }); }, delay);
     });
+    if (seen.size > 400) seen.clear();
     return targets.length;
   }
 
