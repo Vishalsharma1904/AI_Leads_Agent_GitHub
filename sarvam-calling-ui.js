@@ -901,9 +901,11 @@ window.VoiceProvider = (() => {
   }
 
   function select(which) {
-    if (!['toughtongue', 'sarvam', 'omnidimension'].includes(which)) which = 'toughtongue';
+    if (!['toughtongue', 'sarvam', 'omnidimension', 'grok'].includes(which)) which = 'toughtongue';
     const sarvam = which === 'sarvam';
     const omni = which === 'omnidimension';
+    const grok = which === 'grok';
+    if (!grok) window.GrokStudio?.stop?.();
     if (!omni) window.OmniStudio?.stop?.();
     try { localStorage.setItem(LS, which); } catch (_) {}
     const picker = $('vp-provider');
@@ -913,17 +915,19 @@ window.VoiceProvider = (() => {
     if (panel) panel.hidden = !sarvam;
     const omniPanel = $('vp-omnidimension');
     if (omniPanel) omniPanel.hidden = !omni;
+    if ($('vp-grok')) $('vp-grok').hidden = !grok;
     // The Tough Tongue surface and its header buttons step aside together.
     const tt = document.querySelector('#view-voice-ai .tt-grid');
-    if (tt) tt.hidden = sarvam || omni;
+    if (tt) tt.hidden = sarvam || omni || grok;
     const ttStatus = document.querySelector('#view-voice-ai #tt-status');
-    if (ttStatus) ttStatus.hidden = sarvam || omni;
-    document.querySelectorAll('#view-voice-ai [data-vp-tt]').forEach((b) => { b.hidden = sarvam || omni; });
+    if (ttStatus) ttStatus.hidden = sarvam || omni || grok;
+    document.querySelectorAll('#view-voice-ai [data-vp-tt]').forEach((b) => { b.hidden = sarvam || omni || grok; });
     const label = document.querySelector('#view-voice-ai [data-voice-ai-status]');
-    if (label) label.textContent = omni ? 'OmniDimension' : sarvam ? 'Sarvam AI' : 'Tough Tongue AI';
+    if (label) label.textContent = grok ? 'Grok · xAI' : omni ? 'OmniDimension' : sarvam ? 'Sarvam AI' : 'Tough Tongue AI';
 
     if (sarvam) { refresh(); loadPlan(); }
     if (omni) window.OmniStudio?.refresh?.();
+    if (grok) window.GrokStudio?.refresh?.();
     return which;
   }
 

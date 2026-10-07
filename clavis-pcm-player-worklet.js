@@ -5,8 +5,11 @@ class ClavisPcmPlayerProcessor extends AudioWorkletProcessor {
     this.current = null;
     this.offset = 0;
     this.hadAudio = false;
+    this.played = 0;
     this.port.onmessage = (event) => {
       const message = event.data || {};
+      if (message.type === 'reset-position') this.played = 0;
+      if (message.type === 'position') this.port.postMessage({ type: 'position', item_id: message.item_id, played: this.played });
       if (message.type === 'chunk' && message.audio) {
         this.queue.push(new Int16Array(message.audio));
         this.hadAudio = true;
@@ -29,6 +32,7 @@ class ClavisPcmPlayerProcessor extends AudioWorkletProcessor {
         this.offset = 0;
       }
       output[i] = this.current ? this.current[this.offset++] / 32768 : 0;
+      if (this.current) this.played++;
     }
     if (this.hadAudio && !this.current && this.queue.length === 0) {
       this.port.postMessage({ type: 'drained' });

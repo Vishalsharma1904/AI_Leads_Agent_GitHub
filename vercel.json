@@ -6,7 +6,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/:path((?!public-config$)(?!omnidimension$).*)",
+      "source": "/api/:path((?!public-config$)(?!omnidimension$)(?!grok-voice$).*)",
       "destination": "https://REPLACE-WITH-BACKEND-HOST/api/:path*"
     }
   ],
@@ -54,6 +54,10 @@
   "functions": {
     "api/public-config.js": {
       "includeFiles": "public-auth-config.json"
+    },
+    "api/grok-voice.js": {
+      "includeFiles": "{public-auth-config.json,omnidimension-contract.json}",
+      "maxDuration": 40
     },
     "api/omnidimension.js": {
       "includeFiles": "{public-auth-config.json,omnidimension-contract.json}",

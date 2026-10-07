@@ -6,6 +6,7 @@ const http = require('http');
 const https = require('https');
 const handler = require('serve-handler');
 const omniApi = require('./api/omnidimension');
+const grokApi = require('./api/grok-voice');
 const publicConfig = require('./api/public-config');
 // ponytail: local session connections expire on UI-server restart; production
 // uses its persistent Vercel secret. No provider key is saved to a local file.
@@ -59,7 +60,7 @@ const server = http.createServer(async (req, res) => {
   // Inline handlers still exist in this legacy UI; this is containment, not a
   // strict script CSP. Do not claim that it makes the app XSS-proof.
   res.setHeader('Content-Security-Policy', "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'");
-  if (['/api/omnidimension', '/api/public-config'].includes(req.url.split('?')[0])) {
+  if (['/api/omnidimension', '/api/grok-voice', '/api/public-config'].includes(req.url.split('?')[0])) {
     res.setHeader('Content-Type', 'application/json');
     res.status = code => { res.statusCode = code; return res; };
     res.json = value => res.end(JSON.stringify(value));
@@ -72,7 +73,7 @@ const server = http.createServer(async (req, res) => {
         body += chunk.toString();
       }
       req.body = body || undefined;
-      return await omniApi(req, res);
+      return await (req.url.split('?')[0] === '/api/grok-voice' ? grokApi : omniApi)(req, res);
     } catch (_) { if (!res.writableEnded) return res.status(400).json({ detail: 'Could not read request' }); }
     return;
   }

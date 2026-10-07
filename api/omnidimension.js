@@ -100,7 +100,7 @@ async function provider(secret, method, path, body) {
 }
 async function authenticate(req) {
   const token = String(req.headers.authorization || '');
-  if (!/^Bearer [A-Za-z0-9._-]+$/.test(token) || token.length > 10000) throw fail(401, 'Sign in to connect OmniDimension');
+  if (!/^Bearer [A-Za-z0-9._-]+$/.test(token) || token.length > 10000) throw fail(401, 'Sign in to connect your voice service');
   const url = process.env.SUPABASE_URL || defaults.supabase_url;
   const key = process.env.SUPABASE_PUBLISHABLE_KEY || defaults.supabase_publishable_key;
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/.test(url)) throw fail(503, 'Sign-in verification is unavailable');
@@ -152,4 +152,4 @@ module.exports = async function omni(req, res) {
     return reply(200, await provider(secret, op.method, input.path + suffix, body));
   } catch (error) { return reply(error.status || 500, { detail: error.status ? error.message : 'OmniDimension connection failed. No credential details were exposed.' }); }
 };
-module.exports.check = { validate, operation, queryString, needsConfirmation, seal, unseal, clean };
+module.exports.check = { validate, operation, queryString, needsConfirmation, seal, unseal, clean, authenticate };
