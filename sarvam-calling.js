@@ -602,6 +602,7 @@
 
   /** Ek call: dial -> poll -> transcript + recording -> thread save. */
   async function runOne(item) {
+    const ownerUserId = window.SupabaseAuth?.getUser?.()?.id || '';
     q.currentId = item.id;
     setItem(item, { status: 'dialing', error: '' });
 
@@ -622,10 +623,11 @@
       q.currentId = null;
       return item;
     }
+    if (ownerUserId !== (window.SupabaseAuth?.getUser?.()?.id || '')) { q.stopRequested = true; return item; }
     setItem(item, { attemptId });
 
     const thread = {
-      id: attemptId, leadId: item.id,
+      id: attemptId, leadId: item.id, ownerUserId,
       company: item.lead.company || item.lead.name || 'Unknown',
       contactName: item.lead.contactName || '',
       phone: item.lead.phone, email: item.lead.email || '', city: item.lead.city || '',
@@ -760,6 +762,7 @@
 
   /** A demo is exactly one call and never drains the lead queue. */
   async function demoCall(raw) {
+    const ownerUserId = window.SupabaseAuth?.getUser?.()?.id || '';
     const phone = normalizePhone(raw);
     if (!phone) throw new Error('Apna valid mobile number daaliye, jaise +91 ke saath 10 digits.');
     if (phone === normalizePhone(config.agentPhoneNumber)) throw new Error('Caller ID par call nahi kar sakte. Apna receiving mobile number daaliye.');
@@ -770,12 +773,14 @@
     emit('run', { running: true, demo: true });
     try {
       if (!(await hasKey())) throw new Error('Sarvam key connect kijiye; server connection bhi check kijiye.');
+      if (ownerUserId !== (window.SupabaseAuth?.getUser?.()?.id || '')) throw new Error('Account badal gaya. Demo dobara start kijiye.');
       if (useBackend()) await backendReq('/settings', { method: 'PUT', body: {
         org_id: config.orgId, workspace_id: config.workspaceId, app_id: config.appId,
         app_version: Number(config.appVersion) || 1, connection_id: config.connectionId,
         agent_phone_number: config.agentPhoneNumber,
       } });
       const item = { id: 'demo-' + Date.now(), demo: true, lead: { phone, company: 'Demo call', contactName: config.ownerName }, status: 'pending' };
+      if (ownerUserId !== (window.SupabaseAuth?.getUser?.()?.id || '')) throw new Error('Account badal gaya. Demo dobara start kijiye.');
       await runOne(item);
       if (item.error) throw new Error(item.error);
       return item;
