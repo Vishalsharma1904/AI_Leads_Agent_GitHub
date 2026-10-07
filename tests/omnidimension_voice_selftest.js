@@ -1,0 +1,41 @@
+'use strict';
+const assert=require('node:assert/strict'),fs=require('node:fs'),vm=require('node:vm');
+const {validate,operation}=require('../api/omnidimension').check;
+const values={name:'Test assistant',welcome_message:'Namaste',instructions:'Answer about our business.',call_type:'Outgoing',timezone:'Asia/Kolkata',languages:'Hindi, English (India)',model:'',voice_provider:'',voice_id:'',voice_gender:'female',speed:'1',temperature:'0.35',max_duration:'180',variables:'',advanced:'',end_condition:'',end_message:'',stt:'sarvam',stt_language:'hi-IN',silence:'300',interrupt_words:'3'};
+const elements=Object.fromEntries(Object.entries(values).map(([k,value])=>[k,{value,options:[],add(o){this.options.push(o);},dispatchEvent(){}}]));
+for(const input of Object.values(elements)){let text=input.value;Object.defineProperty(input,'value',{get:()=>text,set:v=>{text=String(v);}});}
+for(const k of ['natural_style','tune_audio','noise','greeting_interrupt','interrupt'])elements[k]={checked:true};
+elements.dynamic_greeting={checked:false};
+const ids={};
+const el=id=>ids[id] ||= {value:'',dataset:{},textContent:'',innerHTML:'',pause(){},removeAttribute(){},replaceChildren(){},setAttribute(){}};
+ids['om-agent-form']={elements,reset(){for(const [k,v] of Object.entries(values))elements[k].value=v;}};
+ids['vp-omnidimension']={querySelectorAll:()=>[]};
+const sent=[];
+let agent={id:42,name:'Existing',welcome_message:'Namaste',context_breakdown:[{context_title:'Business',context_body:'Original'},{context_title:'Boundaries',context_body:'Never invent a price'}]};
+const window={SupabaseAuth:{getAccessToken:()=> 'verified-jwt',getUser:()=>({id:'test-user'})},addEventListener(){}};
+const ctx=vm.createContext({window,document:{getElementById:id=>id==='view-voice-ai'?null:el(id),addEventListener(){}},console,Event:class{},Option:class{constructor(text,value){this.text=text;this.value=value;}},fetch:async(url,opts)=>{
+  const body=JSON.parse(opts.body);sent.push(body);
+  return {ok:true,json:async()=>body.path==='/agents/42'&&body.method==='GET'?agent:body.path==='/agents'?{bots:[],total_records:0}:{id:42}};
+}});
+const source=fs.readFileSync('omnidimension-studio.js','utf8').replace('return {refresh,stop};','return {refresh,stop,preset,save,edit};');
+vm.runInContext(source,ctx);
+(async()=>{
+  await window.OmniStudio.preset('natural');
+  assert.equal(elements.speed.value,'1');assert.equal(elements.temperature.value,'0.35');
+  assert.equal(elements.voice_provider.value,'eleven_labs');assert.equal(elements.voice_gender.value,'female');
+  elements.voice_id.value='catalog-female-voice';
+  await window.OmniStudio.save();
+  let saved=sent.find(x=>x.path==='/agents/create').body;
+  validate(saved,operation('POST','/agents/create').schema);
+  assert.equal(saved.voice.provider,'eleven_labs');assert.equal(saved.voice.speech_speed,1);
+  assert.equal(saved.transcriber.provider,'sarvam');assert.equal(saved.transcriber.should_apply_noise_reduction,true);
+  assert.equal(saved.transcriber.interruption_min_words,3);assert.equal(saved.transcriber.silence_timeout_ms,300);
+  assert(saved.context_breakdown.some(s=>s.body.includes('not a fixed script')&&s.body.includes('never pretend to be human')));
+  await window.OmniStudio.edit(42);elements.instructions.value='Updated business';
+  await window.OmniStudio.save();saved=sent.at(-2).body;
+  assert.equal(saved.context_breakdown[1].body,'Never invent a price');
+  assert.equal(saved.transcriber.provider,undefined,'Editing without tuning must preserve the original STT provider');
+  await window.OmniStudio.preset('steady');assert.equal(elements.silence.value,'650');
+  await window.OmniStudio.preset('fast');assert.equal(elements.silence.value,'200');
+  console.log('Voice checks passed: natural female draft, valid provider payload, interruption tuning, original context/provider preservation.');
+})().catch(e=>{console.error(e);process.exitCode=1;});

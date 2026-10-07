@@ -5,6 +5,11 @@
 const http = require('http');
 const https = require('https');
 const handler = require('serve-handler');
+const omniApi = require('./api/omnidimension');
+const publicConfig = require('./api/public-config');
+// ponytail: local session connections expire on UI-server restart; production
+// uses its persistent Vercel secret. No provider key is saved to a local file.
+if (!process.env.OMNIDIM_SESSION_KEY) process.env.OMNIDIM_SESSION_KEY = require('crypto').randomBytes(32).toString('hex');
 
 const PORT = Number(process.env.CLAVIS_UI_PORT || 3000);
 // directoryListing:false => node_modules / backend ki listing kabhi expose na ho.
@@ -45,7 +50,7 @@ function proxySarvam(req, res) {
   req.pipe(upstream);
 }
 
-const server = http.createServer((req, res) => {
+const server = http.createServer(async (req, res) => {
   const host = String(req.headers.host || '').split(':')[0];
   if (!['localhost', '127.0.0.1'].includes(host)) { res.statusCode = 403; return res.end('Invalid host'); }
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -54,6 +59,23 @@ const server = http.createServer((req, res) => {
   // Inline handlers still exist in this legacy UI; this is containment, not a
   // strict script CSP. Do not claim that it makes the app XSS-proof.
   res.setHeader('Content-Security-Policy', "base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'");
+  if (['/api/omnidimension', '/api/public-config'].includes(req.url.split('?')[0])) {
+    res.setHeader('Content-Type', 'application/json');
+    res.status = code => { res.statusCode = code; return res; };
+    res.json = value => res.end(JSON.stringify(value));
+    if (req.url.split('?')[0] === '/api/public-config') return publicConfig(req, res);
+    let bytes = 0, body = '';
+    try {
+      for await (const chunk of req) {
+        bytes += chunk.length;
+        if (bytes > 3 * 1024 * 1024) return res.status(413).json({ detail: 'Request too large. PDF uploads support up to 2 MB.' });
+        body += chunk.toString();
+      }
+      req.body = body || undefined;
+      return await omniApi(req, res);
+    } catch (_) { if (!res.writableEnded) return res.status(400).json({ detail: 'Could not read request' }); }
+    return;
+  }
   if (req.url.split('?')[0] === '/desktop-config.js') {
     res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
     res.setHeader('Cache-Control', 'no-store');

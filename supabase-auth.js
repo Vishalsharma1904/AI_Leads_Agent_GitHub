@@ -53,6 +53,14 @@ window.SupabaseAuth = (() => {
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           config = await response.json();
         } catch (_) {
+          // The local static app can sign in for serverless integrations even
+          // when the separate calling backend is stopped.
+          if (isLocalDev && API_BASE !== '/api') {
+            try {
+              const fallback = await fetch('/api/public-config', { headers: { Accept: 'application/json' } });
+              if (fallback.ok) { config = await fallback.json(); break; }
+            } catch (_) {}
+          }
           if (attempt < 14) await new Promise(resolve => setTimeout(resolve, 1000));
         }
       }

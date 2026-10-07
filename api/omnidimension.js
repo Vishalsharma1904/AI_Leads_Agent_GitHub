@@ -118,7 +118,8 @@ module.exports = async function omni(req, res) {
   try {
     if (!['GET', 'POST', 'DELETE'].includes(req.method)) throw fail(405, 'Method not allowed');
     if (req.method !== 'GET') {
-      const expected = new URL('https://' + req.headers.host).origin;
+      const loopback = !process.env.VERCEL && /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(req.headers.host);
+      const expected = new URL((loopback ? 'http://' : 'https://') + req.headers.host).origin;
       if (req.headers.origin !== expected) throw fail(403, 'Use this connection from your own app');
       if (!String(req.headers['content-type'] || '').startsWith('application/json')) throw fail(415, 'JSON request required');
     }

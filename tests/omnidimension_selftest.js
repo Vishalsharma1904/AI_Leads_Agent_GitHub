@@ -27,7 +27,7 @@ assert(needsConfirmation('POST','/calls/bulk_call/create',{save_as_draft:false})
 assert(needsConfirmation('PUT','/calls/bulk_call/42',{action:'resume'}));
 assert(!needsConfirmation('PUT','/calls/bulk_call/42',{action:'pause'}));
 
-async function invoke({cookie:jar='',body,method='POST',origin='https://app.example',auth='Bearer test-jwt',user='business-a',accept=true}) {
+async function invoke({cookie:jar='',body,method='POST',host='app.example',origin='https://app.example',auth='Bearer test-jwt',user='business-a',accept=true}) {
   const calls=[];
   const saved=global.fetch;
   global.fetch=async(url,opts)=>{
@@ -36,7 +36,7 @@ async function invoke({cookie:jar='',body,method='POST',origin='https://app.exam
     return {ok:true,status:200,json:async()=>({success:true,id:42,organization:{name:'Business A'},balance:{amount:10,currency:'USD'}})};
   };
   const res={headers:{},setHeader(k,v){this.headers[k]=v;},status(n){this.statusCode=n;return this;},json(v){this.data=v;return this;}};
-  try { await handler({method,headers:{host:'app.example',origin,authorization:auth,cookie:jar,'content-type':'application/json'},body},res); } finally {global.fetch=saved;}
+  try { await handler({method,headers:{host,origin,authorization:auth,cookie:jar,'content-type':'application/json'},body},res); } finally {global.fetch=saved;}
   return {res,calls};
 }
 (async()=>{
@@ -57,5 +57,11 @@ async function invoke({cookie:jar='',body,method='POST',origin='https://app.exam
   assert.equal(result.res.statusCode,403);assert.equal(result.calls.length,0);
   result=await invoke({cookie:jar,accept:false,body:{method:'GET',path:'/agents'}});
   assert.equal(result.res.statusCode,401);assert.equal(result.calls.length,1);
+  result=await invoke({host:'localhost:3000',origin:'http://localhost:3000',body:{action:'connect',secret:'valid-key'}});
+  assert.equal(result.res.statusCode,200,'Local UI must accept its same-origin HTTP request');
+  const prior=process.env.VERCEL;process.env.VERCEL='1';
+  result=await invoke({host:'localhost:3000',origin:'http://localhost:3000',body:{action:'connect',secret:'valid-key'}});
+  assert.equal(result.res.statusCode,403,'Production must not allow the development exception');
+  if(prior===undefined)delete process.env.VERCEL;else process.env.VERCEL=prior;
   console.log('OmniDimension checks passed: authenticated account boundary, encrypted cookie, fixed host, validation and charge confirmation.');
 })().catch(e=>{console.error(e);process.exitCode=1;});
