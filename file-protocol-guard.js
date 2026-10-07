@@ -24,6 +24,7 @@
   var UI = 'http://localhost:3000';
   var ENGINE = 'http://localhost:8000';
   var hash = window.location.hash || '#jarvis';
+  var BOOT_T0 = Date.now();   // used to tell a blink-redirect from a real wait
 
   var POLL_MS = 700;          // readiness check interval
   var HINT_AFTER = 12000;     // "kuch nahi hua?" help
@@ -61,6 +62,13 @@
     'body::before{content:"";position:fixed;left:50%;top:42%;width:620px;height:620px;margin:-310px 0 0 -310px;border-radius:50%;background:radial-gradient(closest-side,var(--glow),transparent);pointer-events:none;animation:glow 7s ease-in-out infinite}',
     '@keyframes glow{50%{transform:scale(1.08);opacity:.7}}',
     '.stage{position:relative;width:min(340px,calc(100vw - 32px));display:flex;flex-direction:column;align-items:center;text-align:center}',
+    /* When the servers are already up this page redirects in well under a
+       second, and showing a whole launcher screen for that blink just looked
+       like a second login. The stage now stays hidden for 700ms: a fast
+       redirect shows nothing but the page background, and the launcher only
+       appears when something is actually slow — which is when it is useful. */
+    '.stage,.foot{opacity:0;animation:reveal 200ms var(--ease) 700ms forwards}',
+    '@keyframes reveal{to{opacity:1}}',
     '.in{opacity:0;transform:translateY(8px);filter:blur(4px);animation:in 1.1s var(--ease) forwards;animation-delay:calc(var(--i,0)*90ms + 60ms)}',
     '@keyframes in{to{opacity:1;transform:none;filter:none}}',
 
@@ -359,8 +367,11 @@
     say('Khol raha hoon…');
     aim(1, 1);
     collect().then(migrate).then(function () {
-      document.body.classList.add('leaving');
-      setTimeout(function () { window.location.replace(UI + '/index.html' + hash); }, 420);
+      // Nothing has been revealed yet — go straight through, no fade of a
+      // screen the user never saw.
+      var quick = (Date.now() - BOOT_T0) < 700;
+      if (!quick) document.body.classList.add('leaving');
+      setTimeout(function () { window.location.replace(UI + '/index.html' + hash); }, quick ? 0 : 420);
     });
   }
 
