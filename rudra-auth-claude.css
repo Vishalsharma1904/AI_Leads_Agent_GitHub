@@ -115,8 +115,19 @@
 #auth-screen .ag-auth-progress { margin: 12px 0; color: var(--ra-mute); font-size: 12px; }
 #auth-screen .ag-auth-progress[hidden] { display: none !important; }
 #auth-screen button:disabled { cursor: wait; opacity: .6; }
+#auth-screen.ag-auth-screen #ag-card-title {
+  font-size: 34px !important;
+  line-height: 1.15 !important;
+}
+#auth-screen #ag-auth-form input.ag-input,
+#auth-screen #rudra-auth-language {
+  background: #F8FAF6 !important;
+  color: #243629 !important;
+  border-color: #DDE4D9 !important;
+}
+#auth-screen #ag-auth-form input.ag-input::placeholder { color: #667366 !important; }
 @media (max-width: 560px) {
-  #auth-screen .ag-brand-name { font-size: 27px !important; }
+  #auth-screen.ag-auth-screen #ag-card-title { font-size: 27px !important; }
 }
 
 /* ── Google button ────────────────────────────────────────── */
