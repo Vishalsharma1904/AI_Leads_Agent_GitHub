@@ -35,6 +35,7 @@
 #view-calling .sc-escalated { border-top:1px solid var(--cc-line); padding-top:12px; }
 #view-calling .sc-btn:focus-visible { outline:2px solid var(--cc-accent); outline-offset:3px; }
 @media(max-width:700px) { #view-calling .sc-demo { grid-template-columns:1fr; padding:18px; } #view-calling .sc-demo form { flex-wrap:wrap; } #view-calling .sc-demo .sc-field { flex-basis:100%; } }
+@media(max-width:700px) { #view-calling :is(.sc-demo,.sc-review,.sc-supervision) .sc-btn, #view-calling .sc-demo input { min-height:44px; } }
 
 /* ── layout ─────────────────────────────────────────────── */
 

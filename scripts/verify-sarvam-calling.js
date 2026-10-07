@@ -101,8 +101,8 @@ check('Rudra24 AI skills are registered for voice control',
   ['send_leads_to_calling_agent', 'start_calling', 'calling_status'].every((n) => ui.includes(`'${n}'`)));
 check('customer sits right, agent sits left',
   ui.includes('sc-msg-user') && ui.includes('sc-msg-agent') && ui.includes("me ? 'Customer'"));
-check('the app never plays call audio by itself',
-  ui.includes('preload="none"') && !/new Audio\(/.test(ui) && !/\.play\(\)/.test(ui));
+check('recordings start manually; a rerender resumes only previously playing audio',
+  ui.includes('preload="none"') && !/new Audio\(/.test(ui) && ui.includes('if (playing) audio.play()'));
 
 const serve = read('serve-clavis.js');
 check('same-origin Sarvam proxy exists for the CORS fallback',
