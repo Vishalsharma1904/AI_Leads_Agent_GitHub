@@ -1,5 +1,5 @@
 /**
- * Voice engine for the Clavis chat UI -- speech-to-text and text-to-speech,
+ * Voice engine for the Rudra24 AI chat UI -- speech-to-text and text-to-speech,
  * both via Google Gemini (backend/services/speech/gemini_client.py), through
  * the same worklet/websocket contract this file always used.
  *
@@ -78,19 +78,29 @@
       this.readyReject = null;
       this.sharedStream = null;
       this.healthCache = null;
+      this.healthOkUntil = 0;
       this.healthFailureUntil = 0;
     }
 
+    // Windows par band localhost port ka "connection refused" 1-2 s le leta
+    // tha — har reply us par atakta tha. Ab 700 ms ka timeout; failure 5 min
+    // yaad rehta hai, success 60 s (backend baad me band ho jaye to pata chale).
     async health(force = false) {
-      if (this.healthCache && !force) return this.healthCache;
+      if (this.healthCache && !force && this.healthOkUntil > Date.now()) return this.healthCache;
       if (!force && this.healthFailureUntil > Date.now()) {
         throw new Error('Voice service temporarily unavailable');
       }
+      const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+      const timer = ctl ? setTimeout(() => ctl.abort(), 700) : null;
       try {
-        const response = await fetch(`${backendBase()}${API_HEALTH_PATH}`, { cache: 'no-store' });
+        const token = window.SupabaseAuth?.getAccessToken?.();
+        if (!token) throw new Error('Sign in before using voice.');
+        const response = await fetch(`${backendBase()}${API_HEALTH_PATH}`, { cache: 'no-store', signal: ctl?.signal,
+          headers: { Authorization: 'Bearer ' + token } });
         if (!response.ok) throw new Error(`Voice service returned ${response.status}`);
         this.healthCache = await response.json();
         this.healthFailureUntil = 0;
+        this.healthOkUntil = Date.now() + 60000;
         if (!this.healthCache.tts?.ready) localStatus('Gemini voice not configured', 'loading');
         else localStatus('Gemini voice ready', 'ready');
         return this.healthCache;
@@ -98,9 +108,19 @@
         // A protected/missing speech backend should fall back to browser TTS
         // once, not re-hit the endpoint for every sentence and every
         // proactive greeting. Retry after a quiet cooldown.
-        this.healthFailureUntil = Date.now() + 30000;
+        this.healthCache = null;
+        this.healthOkUntil = 0;
+        this.healthFailureUntil = Date.now() + 5 * 60000;
         throw error;
-      }
+      } finally { if (timer) clearTimeout(timer); }
+    }
+
+    // true = backend voice abhi theek hai (aur TTS configured), false = down /
+    // not configured, null = abhi pata nahi (kabhi check nahi hua / cache purana).
+    healthCached() {
+      if (this.healthFailureUntil > Date.now()) return false;
+      if (this.healthCache && this.healthOkUntil > Date.now()) return this.healthCache.tts?.ready !== false;
+      return null;
     }
 
     isBackendUnavailable() { return this.healthFailureUntil > Date.now(); }
@@ -108,7 +128,7 @@
     async ensureAudioContext() {
       if (!this.audioContext) {
         this.audioContext = new AudioContext({ latencyHint: 'interactive', sampleRate: 24000 });
-        await this.audioContext.audioWorklet.addModule('/clavis-pcm-player-worklet.js?v=3');
+        await window.ClavisWorklet.add(this.audioContext, 'clavis-pcm-player-worklet.js?v=3');
         this.player = new AudioWorkletNode(this.audioContext, 'clavis-pcm-player', { outputChannelCount: [1] });
         this.player.connect(this.audioContext.destination);
         this.player.port.onmessage = (event) => {
@@ -122,6 +142,9 @@
     }
 
     async acquireSharedMicrophone() {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) {
+        throw new Error('Microphone is disabled');
+      }
       if (this.sharedStream?.getTracks?.().some((track) => track.readyState === 'live')) return this.sharedStream;
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser cannot access a microphone.');
       this.sharedStream = await navigator.mediaDevices.getUserMedia({
@@ -136,6 +159,25 @@
       microphoneStatus('Microphone ready · Hands-Free and Clap / Snap can stay on', 'ready');
       window.dispatchEvent(new CustomEvent('clavis:mic-granted'));
       return this.sharedStream;
+    }
+
+    // Voice paths (barge-in, Voice ID, echo tap) get their own processed
+    // stream — echo cancellation + noise suppression + auto gain ON. The raw
+    // shared stream above stays raw for the clap / snap detector. A second
+    // getUserMedia on an already-granted mic never prompts.
+    async acquireVoiceMicrophone() {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) {
+        throw new Error('Microphone is disabled');
+      }
+      if (this.voiceStream?.getTracks?.().some((track) => track.readyState === 'live')) return this.voiceStream;
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser cannot access a microphone.');
+      if (!this._voiceStreamPending) {
+        this._voiceStreamPending = navigator.mediaDevices.getUserMedia({
+          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+          video: false,
+        }).then((s) => { this.voiceStream = s; return s; }).finally(() => { this._voiceStreamPending = null; });
+      }
+      return this._voiceStreamPending;
     }
 
     getSharedMicrophone() { return this.sharedStream; }
@@ -183,7 +225,10 @@
         // voice's quota is spent — the backend has its own key and quota.
         voice: options.voice || localStorage.getItem('clavis_gemini_voice') || 'Kore',
       };
-      socket.onopen = () => socket.send(JSON.stringify({ type: 'start', generation_id: generationId, voice_settings: voiceSettings }));
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ type: 'auth', token: window.SupabaseAuth?.getAccessToken?.() || '' }));
+        socket.send(JSON.stringify({ type: 'start', generation_id: generationId, voice_settings: voiceSettings }));
+      };
       socket.onmessage = (event) => {
         if (typeof event.data === 'string') {
           let payload;
@@ -249,22 +294,24 @@
     }
 
     async startInput(options = {}) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
       if (this.inputSocket) {
         this.stopInput();
         return false;
       }
       await this.ensureAudioContext();
       const stream = await this.acquireSharedMicrophone();
-      await this.audioContext.audioWorklet.addModule('/clavis-mic-capture-worklet.js?v=2');
+      await window.ClavisWorklet.add(this.audioContext, 'clavis-mic-capture-worklet.js?v=2');
       const generationId = options.generationId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       const socket = new WebSocket(websocketUrl(WS_INPUT_PATH));
       socket._generationId = generationId;
       this.inputSocket = socket;
       const ready = new Promise((resolve, reject) => { socket._readyResolve = resolve; socket._readyReject = reject; });
-      socket.onopen = () => socket.send(JSON.stringify({
-        type: 'start', generation_id: generationId,
-        language_hint: options.languageHint || localStorage.getItem('clavis_voice_language') || '',
-      }));
+      socket.onopen = () => {
+        socket.send(JSON.stringify({ type: 'auth', token: window.SupabaseAuth?.getAccessToken?.() || '' }));
+        socket.send(JSON.stringify({ type: 'start', generation_id: generationId,
+          language_hint: options.languageHint || localStorage.getItem('clavis_voice_language') || '' }));
+      };
       socket.onmessage = (event) => {
         let payload;
         try { payload = JSON.parse(event.data); } catch (_) { return; }
@@ -313,9 +360,28 @@
       if (localStorage.getItem(SHARED_STREAM_KEY) === 'true') microphoneStatus('Microphone ready · Hands-Free and Clap / Snap can stay on', 'ready');
       document.querySelectorAll('.jarvis-composer-mic-btn, #jarvis-voice-btn').forEach((el) => el.classList.remove('recording'));
     }
+
+    releaseMicrophone() {
+      this.stopInput();
+      if (this.sharedStream) {
+        try { this.sharedStream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        this.sharedStream = null;
+      }
+      if (this.voiceStream) {
+        try { this.voiceStream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        this.voiceStream = null;
+      }
+      if (this.audioContext && !this.player) {
+        try { this.audioContext.close(); } catch (_) {}
+        this.audioContext = null;
+      }
+    }
   }
 
   window.LocalSpeechEngine = new LocalSpeechEngine();
+  if (typeof window !== 'undefined' && window.ClavisVoiceState?.registerAudioCleanup) {
+    window.ClavisVoiceState.registerAudioCleanup(() => window.LocalSpeechEngine?.releaseMicrophone?.());
+  }
   window.startLocalJarvisVoiceInput = function (options = {}) {
     const btn = document.getElementById('jarvis-composer-voice-btn') || document.getElementById('jarvis-voice-btn');
     const status = document.getElementById('jarvis-composer-status');
@@ -331,7 +397,7 @@
       if (status) status.textContent = 'Mic/voice unavailable — check permission or Gemini API key.';
       microphoneStatus('Microphone unavailable · allow access and retry', 'error');
       localStatus('Voice input unavailable', 'error');
-      console.warn('[Clavis voice]', error);
+      console.warn('[Rudra24 AI voice]', error);
     };
     if (window.LocalSpeechEngine.inputSocket) {
       window.LocalSpeechEngine.stopInput();

@@ -1,24 +1,20 @@
 /**
  * cloud-sync.js
  * High-Performance Cross-Device Cloud Data Synchronization Engine
- * Guarantees strict per-ID data isolation and cross-device synchronization by Email.
+ * Syncs the signed-in user's working data to a Supabase row protected by RLS.
  */
 'use strict';
 
 window.CloudSyncManager = (function () {
-  // Backend API URL detection (works with local uvicorn on :8000, serve on :3000, or same origin)
-  const isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
-  const API_BASE = isLocalDev && window.location.port !== '8000'
-    ? 'http://localhost:8000/api'
-    : '/api';
-
   const ACTIVE_EMAIL_KEY = 'skylark_active_email';
   const LAST_SYNC_KEY = 'skylark_last_cloud_sync';
   const SYNC_STATUS_KEY = 'skylark_sync_status';
-  const SESSION_TOKEN_KEY = 'skylark_session_token';
+  const PENDING_PREFIX = 'skylark_pending_cloud_';
   const SENSITIVE_SETTING = /(api[_-]?key|access[_-]?key|token|secret|password|credential|webhook|proxy)/i;
   let pushDebounceTimer = null;
   let isSyncing = false;
+  let isRestoring = false;
+  let changeVersion = 0;
   // Per-email timestamp guard. restoreCloudBundle() re-invokes the page
   // controllers' init(), which call loadLeads() → pullLatest() again. Without
   // this guard that forms an infinite init⇄pull loop that pins the main thread
@@ -44,44 +40,28 @@ window.CloudSyncManager = (function () {
     return window.SupabaseAuth?.getAccessToken?.() || '';
   }
 
-  // Supabase owns session persistence and refresh. Never copy its tokens into
-  // localStorage/sessionStorage or log them from this module.
-  function saveSessionToken() {}
-
-  function authHeaders(extra = {}) {
-    const token = getSessionToken();
-    return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+  function getActiveEmail() {
+    // Local storage is editable by the browser user; the verified session owns identity.
+    return String(window.SupabaseAuth?.getUser?.()?.email || '').trim().toLowerCase();
   }
 
-  function getActiveEmail() {
-    try {
-      const email = localStorage.getItem(ACTIVE_EMAIL_KEY);
-      // Only return real user emails — never return placeholder/default emails
-      if (email && email.trim() && email.includes('@')
-          && email !== 'default@aileads.ai' && email !== 'demo@aileads.ai') {
-        return email.trim().toLowerCase();
-      }
-      const prof = window.UserProfileManager?.getProfile?.();
-      if (prof && prof.email && prof.email.trim() && prof.email.includes('@')
-          && prof.email !== 'default@aileads.ai' && prof.email !== 'demo@aileads.ai') {
-        return prof.email.trim().toLowerCase();
-      }
-    } catch (_) {}
-    return ''; // Return empty — never pre-fill fake/default email
+  function hasPendingChanges(email) {
+    return localStorage.getItem(PENDING_PREFIX + email) === '1';
+  }
+
+  function setPendingChanges(email, pending) {
+    if (!email) return;
+    if (pending) localStorage.setItem(PENDING_PREFIX + email, '1');
+    else localStorage.removeItem(PENDING_PREFIX + email);
   }
 
   function setActiveEmail(email) {
-    if (email && email.includes('@')) {
+    if (email && email.trim().toLowerCase() === getActiveEmail()) {
       const clean = email.trim().toLowerCase();
       localStorage.setItem(ACTIVE_EMAIL_KEY, clean);
       return clean;
     }
     return '';
-  }
-
-  function getVaultKey(email) {
-    const clean = (email || getActiveEmail()).trim().toLowerCase().replace(/[^a-z0-9]/g, '_');
-    return `skylark_vault_${clean}`;
   }
 
   function updateStatusUI(status, message) {
@@ -98,7 +78,7 @@ window.CloudSyncManager = (function () {
           badge.title = 'Synchronizing changes with cloud storage…';
         } else if (status === 'offline') {
           badge.innerHTML = `<span class="ag-sync-dot ag-sync-off" style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#6b7280; margin-right:6px;"></span><span style="font-size:11px; font-weight:600; color:var(--gray-700, #374151);">Offline Vault</span>`;
-          badge.title = 'Working locally in isolated account vault. Will sync when backend connects.';
+          badge.title = message || 'Cloud sync is unavailable. Changes remain on this device.';
         } else {
           badge.innerHTML = `<span class="ag-sync-dot"></span><span>${status}</span>`;
         }
@@ -111,6 +91,7 @@ window.CloudSyncManager = (function () {
    */
   async function restoreCloudBundle(data, userProfile) {
     if (!data && !userProfile) return;
+    isRestoring = true;
     updateStatusUI('syncing', 'Restoring account data…');
 
     try {
@@ -118,7 +99,9 @@ window.CloudSyncManager = (function () {
       const snapshot = (data && data.full_snapshot) ? data.full_snapshot : (data || {});
 
       // 1. Restore Profile
-      const profToSave = userProfile || snapshot.profile;
+      const profToSave = (userProfile || snapshot.profile)
+        ? { ...(userProfile || snapshot.profile), email }
+        : null;
       if (profToSave && window.UserProfileManager) {
         window.UserProfileManager.saveProfile(profToSave);
       }
@@ -154,36 +137,17 @@ window.CloudSyncManager = (function () {
           const cfg = window.SKYLARK_CONFIG || {};
           Object.assign(cfg, settings);
           window.SKYLARK_CONFIG = cfg;
-          localStorage.setItem('skylark_config_v2', JSON.stringify(cfg));
+          localStorage.setItem('skylark_config_v2', JSON.stringify(settings));
           if (typeof window.populateSettingsUI === 'function') {
             window.populateSettingsUI();
           }
         } catch (_) {}
       }
 
-      // 5. Restore Jarvis Facts
-      const facts = snapshot.jarvis_facts;
-      if (Array.isArray(facts) && window.MemoryEngine) {
-        for (const f of facts) {
-          if (f && f.key && f.value) {
-            try { await window.MemoryEngine.setJarvisFact(f.key, f.value); } catch (_) {}
-          }
-        }
-      }
+      // 5. Replace account-scoped chat, memory, scripts and task records together.
+      await window.MemoryEngine?.replaceCloudCollections?.(snapshot);
 
-      // 6. Save snapshot into isolated local account vault cache
-      try {
-        localStorage.setItem(getVaultKey(email), JSON.stringify({
-          leads,
-          candidates,
-          settings,
-          profile: profToSave,
-          jarvis_facts: facts,
-          timestamp: Date.now()
-        }));
-      } catch (_) {}
-
-      // 7. Refresh UI components
+      // 6. Refresh UI components. IndexedDB remains the offline cache.
       if (typeof window.LeadsCtrl !== 'undefined' && typeof window.LeadsCtrl.init === 'function') {
         window.LeadsCtrl.init();
       }
@@ -205,7 +169,10 @@ window.CloudSyncManager = (function () {
       console.log(`✅ [CloudSync] Account (${email}) successfully synchronized with ${leads.length} leads.`);
     } catch (err) {
       console.warn('⚠️ [CloudSync] Error restoring cloud bundle:', err);
-      updateStatusUI('synced', 'Local cache active');
+      updateStatusUI('offline', 'Cloud data could not be restored');
+      throw err;
+    } finally {
+      isRestoring = false;
     }
   }
 
@@ -214,7 +181,11 @@ window.CloudSyncManager = (function () {
    */
   async function pullLatest(email) {
     const targetEmail = (email || getActiveEmail() || '').trim().toLowerCase();
-    if (!targetEmail || !targetEmail.includes('@')) return null;
+    const authenticatedUser = window.SupabaseAuth?.getUser?.();
+    const client = window.SupabaseAuth?.getClient?.();
+    if (!authenticatedUser?.id || !client || targetEmail !== getActiveEmail()) return null;
+    if (pushDebounceTimer || isSyncing) return null;
+    if (hasPendingChanges(targetEmail) && !await pushNow()) return null;
 
     // ── Re-entrancy guard (prevents init⇄pull infinite loop) ──────────────
     // restoreCloudBundle() calls LeadsCtrl/CandidatesCtrl/DashboardCtrl.init(),
@@ -230,49 +201,23 @@ window.CloudSyncManager = (function () {
 
     updateStatusUI('syncing', 'Checking for updates…');
     try {
-      // On file:// there is no reachable backend — a relative /api fetch
-      // resolves to file:///C:/api/... and fails with a CORS/ERR_FAILED error.
-      // Skip the network call and fall back to the local vault directly.
-      if (window.location.protocol === 'file:') {
-        // file:// has no backend. Stay local and never issue a file:///api fetch.
-        updateStatusUI('offline', 'Local-only mode');
-        const vaultRaw = localStorage.getItem(getVaultKey(targetEmail));
-        if (vaultRaw) {
-          const vaultData = JSON.parse(vaultRaw);
-          await restoreCloudBundle(vaultData, vaultData.profile);
-          return vaultData;
-        }
-        return null;
+      const { data, error } = await client.from('clavis_user_data')
+        .select('payload,updated_at')
+        .eq('user_id', authenticatedUser.id)
+        .maybeSingle();
+      if (error) throw error;
+      if (data?.payload) {
+        await restoreCloudBundle(data.payload, null);
+        window.CRMBridge?.notifyCloud?.();
+        return data.payload;
       }
-      const resp = await fetch(`${API_BASE}/sync/pull?email=${encodeURIComponent(targetEmail)}`, {
-        method: 'GET',
-        headers: authHeaders({ 'Content-Type': 'application/json' })
-      });
-
-      if (resp.ok) {
-        const res = await resp.json();
-        if (res.success && res.data) {
-          await restoreCloudBundle(res.data, res.user);
-          return res.data;
-        }
-      }
+      await pushNow(); // First sign-in seeds only this verified account's local silo.
+      return null;
     } catch (e) {
-      console.log('ℹ️ [CloudSync] Server pull offline, restoring from account vault:', e.message);
+      console.warn('[CloudSync] Cloud read failed:', e.message);
+      updateStatusUI('offline', 'Cloud sync unavailable; local data remains on this device');
+      return null;
     }
-
-    // Fallback: Restore from isolated account vault
-    try {
-      const vaultRaw = localStorage.getItem(getVaultKey(targetEmail));
-      if (vaultRaw) {
-        const vaultData = JSON.parse(vaultRaw);
-        await restoreCloudBundle(vaultData, vaultData.profile);
-        updateStatusUI('synced', `Restored from device vault (${targetEmail})`);
-        return vaultData;
-      }
-    } catch (_) {}
-
-    updateStatusUI('synced', `Ready (${targetEmail})`);
-    return null;
   }
 
   /**
@@ -280,9 +225,13 @@ window.CloudSyncManager = (function () {
    */
   async function pushNow() {
     const email = getActiveEmail();
-    if (!email || !email.includes('@')) return false;
+    const authenticatedUser = window.SupabaseAuth?.getUser?.();
+    const client = window.SupabaseAuth?.getClient?.();
+    if (!authenticatedUser?.id || !client || !email) return false;
     if (isSyncing) return false;
     isSyncing = true;
+    const startedVersion = changeVersion;
+    let saved = false;
 
     updateStatusUI('syncing', 'Saving changes to cloud…');
 
@@ -291,10 +240,22 @@ window.CloudSyncManager = (function () {
       let leads = [];
       let candidates = [];
       let facts = [];
+      let clientChat = [];
+      let candidateChat = [];
+      let jarvisMessages = [];
+      let jarvisScripts = [];
+      let jarvisSkills = [];
+      let jarvisTasks = [];
       if (window.MemoryEngine) {
         try { leads = await window.MemoryEngine.getAllLeads(10000); } catch (_) {}
         try { candidates = await window.MemoryEngine.getAllCandidates(10000); } catch (_) {}
         try { facts = await window.MemoryEngine.getAllJarvisFacts(); } catch (_) {}
+        try { clientChat = await window.MemoryEngine.getClientChatHistory(100000); } catch (_) {}
+        try { candidateChat = await window.MemoryEngine.getCandidateChatHistory(100000); } catch (_) {}
+        try { jarvisMessages = await window.MemoryEngine.getAllJarvisMessages(); } catch (_) {}
+        try { jarvisScripts = await window.MemoryEngine.getAllJarvisScripts(); } catch (_) {}
+        try { jarvisSkills = await window.MemoryEngine.getAllCustomSkills(); } catch (_) {}
+        try { jarvisTasks = await window.MemoryEngine.getAllTaskRuns(100000); } catch (_) {}
       }
       if (!leads || leads.length === 0) {
         leads = window.allLeads || (window.UserStorage ? window.UserStorage.getJSON('allLeads', []) : []);
@@ -309,58 +270,53 @@ window.CloudSyncManager = (function () {
       // 3. Gather profile
       const profile = window.UserProfileManager?.getProfile?.() || {};
 
-      // 4. Save into isolated local vault immediately
+      // 4. Keep the account's working copy in IndexedDB; cloud writes use RLS.
       const bundle = {
         leads: leads || [],
         candidates: candidates || [],
         settings: settings || {},
         profile: profile || {},
         jarvis_facts: facts || [],
+        client_chat: clientChat || [],
+        candidate_chat: candidateChat || [],
+        jarvis_messages: jarvisMessages || [],
+        jarvis_scripts: jarvisScripts || [],
+        jarvis_skills: jarvisSkills || [],
+        jarvis_tasks: jarvisTasks || [],
         timestamp: Date.now()
       };
-      try {
-        localStorage.setItem(getVaultKey(email), JSON.stringify(bundle));
-      } catch (_) {}
-
-      // file:// mode is intentionally offline. The vault above is the
-      // complete local save; do not attempt a file:///api network request.
-      if (window.location.protocol === 'file:') {
-        updateStatusUI('offline', 'Saved locally');
-        return true;
-      }
-
-      // 5. Send payload to Backend SQLite Cloud Database
-      const resp = await fetch(`${API_BASE}/sync/push`, {
-        method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          email,
-          data_type: 'full_snapshot',
-          payload: bundle
-        })
-      });
-
-      if (resp.ok) {
-        localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
-        updateStatusUI('synced', `Synced to cloud at ${new Date().toLocaleTimeString()}`);
-      } else {
-        updateStatusUI('synced', 'Saved to account vault');
-      }
+      const { error } = await client.from('clavis_user_data').upsert({
+        user_id: authenticatedUser.id,
+        payload: bundle,
+        updated_at: new Date().toISOString()
+      }, { onConflict: 'user_id' });
+      if (error) throw error;
+      setPendingChanges(email, changeVersion !== startedVersion);
+      saved = true;
+      localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
+      updateStatusUI('synced', `Saved to ${email} at ${new Date().toLocaleTimeString()}`);
+      return true;
     } catch (e) {
-      console.log('ℹ️ [CloudSync] Cloud push offline (saved to local vault):', e.message);
-      updateStatusUI('synced', 'Saved to account vault');
+      setPendingChanges(email, true);
+      console.warn('[CloudSync] Cloud save failed:', e.message);
+      updateStatusUI('offline', 'Cloud save failed; data remains on this device');
+      return false;
     } finally {
       isSyncing = false;
+      if (saved && hasPendingChanges(email) && !pushDebounceTimer) schedulePush();
     }
-    return true;
   }
 
   /**
    * Debounced push scheduler — triggers automatic push when leads/settings change.
    */
   function schedulePush(delayMs = 1200) {
+    if (isRestoring || !window.SupabaseAuth?.getUser?.()) return;
+    setPendingChanges(getActiveEmail(), true);
+    changeVersion += 1;
     if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
     pushDebounceTimer = setTimeout(() => {
+      pushDebounceTimer = null;
       pushNow();
     }, delayMs);
   }
@@ -369,7 +325,9 @@ window.CloudSyncManager = (function () {
    * Switches active account, purging old in-memory leads and loading target user's silo.
    */
   async function switchAccount(newEmail, profileUpdates = {}) {
-    if (!newEmail || !newEmail.includes('@')) return;
+    if (!newEmail || newEmail.trim().toLowerCase() !== getActiveEmail()) {
+      throw new Error('Sign in to the requested account first.');
+    }
     const cleanEmail = newEmail.trim().toLowerCase();
     const oldEmail = getActiveEmail();
 
@@ -395,13 +353,13 @@ window.CloudSyncManager = (function () {
     // 5. Update profile
     const baseName = cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     const profile = {
+      ...profileUpdates,
       id: uid,
       email: cleanEmail,
       name: profileUpdates.name || baseName,
       company: profileUpdates.company || 'Enterprise',
       phone: profileUpdates.phone || '',
-      role: profileUpdates.role || 'Owner',
-      ...profileUpdates
+      role: profileUpdates.role || 'Owner'
     };
     if (window.UserProfileManager) {
       window.UserProfileManager.saveProfile(profile);
@@ -539,5 +497,3 @@ window.CloudSyncManager = (function () {
     updateStatusUI
   };
 })();
-
-window.CloudSyncManager = CloudSyncManager;

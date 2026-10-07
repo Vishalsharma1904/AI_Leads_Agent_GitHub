@@ -1,7 +1,7 @@
 /* ============================================================
- * CLAVIS STAGE v2 (clavis-stage.css)
+ * RUDRA24 AI STAGE v2 (clavis-stage.css)
  * ------------------------------------------------------------
- * Turns the Clavis AI page from a chat window into a voice-first
+ * Turns the Rudra24 AI page from a chat window into a voice-first
  * ambient surface: the orb becomes the centre of the page, the
  * transcript is off by default (More -> Transcript brings it back),
  * every control collapses into a quiet top-right cluster, and the
@@ -352,7 +352,7 @@
   transform: translateY(0) scale(0.97);
   transition-duration: 100ms !important;
 }
-/* A slow ring breathing out of the button while Clavis is listening. */
+/* A slow ring breathing out of the button while Rudra24 AI is listening. */
 .clavis-stage-v2[data-clavis-state="listening"] #view-jarvis .jarvis-voice-main-btn::after {
   content: '';
   position: absolute;
@@ -368,7 +368,7 @@
 }
 
 /* ============================================================
- * 6. CLAVIS TAB CHAT REMOVAL — Voice/Neural Stage Only
+ * 6. RUDRA24 AI TAB CHAT REMOVAL — Voice/Neural Stage Only
  * All interaction & output happens via the Floating Window
  * (#clavis-task-surface). The Orb stays prominent and full-sized.
  * ============================================================ */

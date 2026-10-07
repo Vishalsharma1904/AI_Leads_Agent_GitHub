@@ -1,0 +1,42 @@
+# Nothing in here is served to the browser. Keeping it out of the deployment
+# is what makes "no keys leak" true rather than hoped-for: backend/.env, the
+# installer, the Electron build and every script stay on your machine.
+backend/
+node_modules/
+electron/
+installer/
+release/
+dist/
+build/
+logs/
+migrations/
+tests/
+scripts/
+src/
+docs/
+marketing/
+exports/
+AndroidApp/
+clavis-bridge/
+frontend/
+__pycache__/
+_rebrand_backup/
+_claude_tmp/
+Claude outputs/
+.claude/
+.git/
+*.py
+*.pyc
+*.bat
+*.ps1
+*.vbs
+*.spec
+*.md
+*.db
+*.sqlite
+.env
+.env.*
+secrets.local.js
+desktop-config.js
+alembic.ini
+package-lock.json

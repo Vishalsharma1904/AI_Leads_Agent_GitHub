@@ -1,8 +1,8 @@
 Option Explicit
 
-' Quiet desktop entry point for Clavis.
+' Quiet desktop entry point for Rudra24 AI.
 ' The batch file still owns startup/readiness logic; this wrapper only hides
-' the console window so Clavis behaves like a regular desktop application.
+' the console window so Rudra24 AI behaves like a regular desktop application.
 Dim shell, projectRoot, command
 Set shell = CreateObject("WScript.Shell")
 projectRoot = CreateObject("Scripting.FileSystemObject").GetParentFolderName(WScript.ScriptFullName)

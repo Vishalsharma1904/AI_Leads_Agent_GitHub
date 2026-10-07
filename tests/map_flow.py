@@ -19,7 +19,14 @@ with sync_playwright() as pw:
     check('intent self-test', page.evaluate('() => window.ClavisIntent._selfTest()'))
 
     # 1. bare "map kholo" opens the map on his location, below the live caption
-    page.evaluate("() => window.ClavisEar.caption.live('do line ka test caption')")
+    page.evaluate("""() => {
+      if (!document.getElementById('clavis-ear-caption')) {
+        const cap = document.createElement('div'); cap.id = 'clavis-ear-caption';
+        Object.assign(cap.style, { position: 'fixed', top: '145px', right: '40px', width: '420px', height: '52px', zIndex: '2147482000' });
+        document.body.appendChild(cap);
+      }
+      window.ClavisEar.caption.live('do line ka test caption');
+    }""")
     r = page.evaluate("() => window.ClavisIntent.route('map kholo')")
     check('"map kholo" handled', r.get('handled'), r.get('spoken'))
     page.wait_for_function("() => document.querySelector('#clavis-canvas .ccv-map.is-ready')", timeout=20000)
@@ -74,22 +81,25 @@ with sync_playwright() as pw:
     page.evaluate("() => document.querySelector('#clavis-canvas .ccv-lead').click()")
     page.wait_for_timeout(500)
     pop = page.evaluate("() => document.querySelector('#clavis-canvas .maplibregl-popup')?.innerText || ''")
-    check('pin popup has contacts + buttons', all(x in pop for x in ['Alpha Facility', 'Rakesh Sharma', 'Director', '98100 22222', 'info@alpha.in', 'Directions', 'Google Maps', 'from you']), pop.replace('\n', ' | '))
+    check('pin popup has contacts + in-app directions', all(x in pop for x in ['Alpha Facility', 'Rakesh Sharma', 'Director', '98100 22222', 'info@alpha.in', 'Directions', 'from you']) and 'Google Maps' not in pop, pop.replace('\n', ' | '))
     page.screenshot(path=str(SHOTS / 'map_2_leads.png'))
 
     # 4. Directions from the popup -> in-app route with the four modes
     page.evaluate("() => document.querySelector('#clavis-canvas .maplibregl-popup [data-act=dir]').click()")
-    page.wait_for_function("() => document.querySelectorAll('#clavis-canvas .ccv-route li').length === 4", timeout=15000)
+    page.wait_for_function("() => document.querySelectorAll('#clavis-canvas .ccv-route ul li').length === 4", timeout=15000)
     check('Directions button draws a route', True)
 
     # 5. route between two named places: 4 modes, estimates labelled, metro fare
     r = page.evaluate("() => window.ClavisCanvas.route({ from: 'Ghaziabad Station', to: 'Loni Border' })")
-    rows = page.evaluate("() => [...document.querySelectorAll('#clavis-canvas .ccv-route li')].map((li) => li.innerText.replace(/\\n/g, ' '))")
-    check('route panel shows Car / Two-wheeler / Walk / Metro', len(rows) == 4 and [x.split(' ')[0] for x in rows] == ['Car', 'Two-wheeler', 'Walk', 'Metro'], rows)
+    rows = page.evaluate("() => [...document.querySelectorAll('#clavis-canvas .ccv-route ul li')].map((li) => li.textContent.trim())")
+    check('route panel shows Car / Two-wheeler / Walk / Metro', len(rows) == 4 and all(row.startswith(name) for row, name in zip(rows, ['Car', 'Two-wheeler', 'Walk', 'Metro'])), rows)
     check('two-wheeler + metro labelled estimate, "without traffic" note', 'estimate' in rows[1] and 'estimate' in rows[3] and 'Without traffic' in page.inner_text('#clavis-canvas .ccv-route'))
     m = r.get('metro') or {}
     fare_ok = page.evaluate(f"() => window.ClavisCanvas.metroFare({m.get('ride_km', 0)})") == m.get('fare_inr')
-    check('route result has car/walk/metro with DMRC fare', r.get('car') and r.get('walk') and m.get('practical') and fare_ok, {k: r.get(k) for k in ('car', 'two_wheeler', 'walk', 'metro')})
+    check('route result has car/walk/metro estimate', r.get('car') and r.get('walk') and m.get('practical') and fare_ok, {k: r.get(k) for k in ('car', 'two_wheeler', 'walk', 'metro')})
+    check('compact trip details float over map', page.evaluate("() => { const map = document.querySelector('#clavis-canvas .ccv-map').getBoundingClientRect(), card = document.querySelector('#clavis-canvas .ccv-route').getBoundingClientRect(); return map.height >= 300 && card.top >= map.top && card.bottom <= map.bottom && !document.querySelector('#clavis-canvas .ccv-foot').offsetHeight; }"))
+    page.evaluate("() => document.querySelector('#clavis-canvas [data-act=route-details]').click()")
+    check('compact trip details expand in place', page.evaluate("() => document.querySelector('#clavis-canvas .ccv-route').classList.contains('is-detailed')"))
     fares = page.evaluate("() => [0, 2, 2.01, 5, 5.5, 12, 12.5, 21, 21.5, 32, 32.5, 60].map((k) => window.ClavisCanvas.metroFare(k))")
     check('fare slabs', fares == [11, 11, 21, 21, 32, 32, 43, 43, 54, 54, 64, 64], fares)
     page.wait_for_timeout(2000)
@@ -97,7 +107,7 @@ with sync_playwright() as pw:
     check('route line drawn', page.evaluate("() => !!window.ClavisCanvas.map().getLayer('ccv-route-line')"))
 
     # 6. route intents (Hinglish + Devanagari) reply with the numbers
-    for q in ['Ghaziabad Station se Loni Border kitni door hai', 'Rajiv Chowk se Noida Sector 18 metro ka kiraya']:
+    for q in ['Ghaziabad Station se Loni Border kitni door hai', 'Rajiv Chowk se Noida Sector 18 metro ka kiraya', 'meri current location se nearest metro station tak route dikhao']:
         rr = page.evaluate(f"() => window.ClavisIntent.route({q!r})")
         check(f'intent: {q}', rr.get('handled') and any(ch.isdigit() for ch in rr.get('spoken', '')), rr.get('spoken'))
 
@@ -109,7 +119,7 @@ with sync_playwright() as pw:
     page.mouse.click(mb['x'] + mb['w'] * 0.7, mb['y'] + mb['h'] * 0.75)
     page.wait_for_timeout(400)
     page.mouse.click(mb['x'] + mb['w'] * 0.85, mb['y'] + mb['h'] * 0.35)
-    page.wait_for_function("() => document.querySelectorAll('#clavis-canvas .ccv-pt').length === 2 && document.querySelectorAll('#clavis-canvas .ccv-route li').length === 4", timeout=15000)
+    page.wait_for_function("() => document.querySelectorAll('#clavis-canvas .ccv-pt').length === 2 && document.querySelectorAll('#clavis-canvas .ccv-route ul li').length === 4", timeout=15000)
     check('two clicks -> points A, B and a route', True)
 
     # 8. expand / collapse: FLIP, no page errors, still below the caption
@@ -121,7 +131,7 @@ with sync_playwright() as pw:
     ex = page.evaluate("() => { const r = document.getElementById('clavis-canvas').getBoundingClientRect(); return { top: r.top, bottom: innerHeight - r.bottom, left: r.left, right: innerWidth - r.right, w: r.width, h: r.height, bd: getComputedStyle(document.querySelector('.ccv-backdrop')).backdropFilter }; }")
     page.screenshot(path=str(SHOTS / 'map_4_expanded.png'))
     check('expand animates with transform', mid not in ('none', ''), mid)
-    check('expanded: centred box, equal margins, grows both ways, no blur', abs(ex['top'] - ex['bottom']) < 3 and abs(ex['left'] - ex['right']) < 3 and ex['top'] >= 20 and ex['w'] > 1000 and ex['h'] > 650 and ex['bd'] in ('none', ''), ex)
+    check('expanded: below caption, wide map, no blur', ex['top'] >= geo['capBottom'] + 10 and abs(ex['left'] - ex['right']) < 3 and ex['w'] > 1000 and ex['h'] > 450 and ex['bd'] in ('none', ''), ex)
     page.evaluate("() => window.ClavisCanvas.collapse()")
     page.wait_for_timeout(150)
     mid2 = page.evaluate("() => { const e = document.getElementById('clavis-canvas'); return { layout: e.offsetWidth, painted: e.getBoundingClientRect().width }; }")

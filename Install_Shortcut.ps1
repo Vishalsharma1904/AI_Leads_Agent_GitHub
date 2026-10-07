@@ -1,5 +1,5 @@
 # Install_Shortcut.ps1
-# Creates a Windows Desktop shortcut for Skylark AI Agent
+# Creates a Windows Desktop + Start Menu shortcut for Rudra24 AI.
 # This runs automatically on first launch from Launch_App.bat
 
 param(
@@ -8,7 +8,7 @@ param(
 )
 
 # ── Setup ──────────────────────────────────────────────────────────────────
-$AppName    = "Clavis"
+$AppName    = "Rudra24 AI"
 $Desktop    = [System.Environment]::GetFolderPath("Desktop")
 $ShortcutPath = Join-Path $Desktop "$AppName.lnk"
 
@@ -21,20 +21,19 @@ if (-not $BatchFile) {
 $AppDir     = [System.IO.Path]::GetFullPath($AppDir.TrimEnd('\').TrimEnd('/'))
 $BatchFile  = [System.IO.Path]::GetFullPath($BatchFile)
 
-# ── Icon: Use SVG or find a suitable icon ──────────────────────────────────
-# We'll use the Windows shell32.dll icon as fallback since SVG can't be used directly
+# ── Icon ───────────────────────────────────────────────────────────────────
+# The real brand icon, not a Windows globe and not Chrome's. A shortcut
+# wearing someone else's icon is the fastest way to look like a script
+# someone left on the desktop rather than an application.
 $IconPath = ""
-
-# Check if there's a .ico file
-$icoFile = Join-Path $AppDir "icon.ico"
-if (Test-Path $icoFile) {
-  $IconPath = $icoFile
-} else {
-  # Use a nice Windows system icon (Internet Explorer / Edge style web app icon)
-  # Shell32 icon 14 = Earth/Globe (good for web app)
-  # Shell32 icon 13 = Web pages
-  $IconPath = "%SystemRoot%\System32\shell32.dll,13"
+foreach ($candidate in @(
+  (Join-Path $AppDir "installer\Rudra24.ico"),
+  (Join-Path $AppDir "installer\Clavis.ico"),
+  (Join-Path $AppDir "icon.ico")
+)) {
+  if (Test-Path -LiteralPath $candidate) { $IconPath = $candidate; break }
 }
+if (-not $IconPath) { $IconPath = "%SystemRoot%\System32\shell32.dll,13" }
 
 Write-Host ""
 Write-Host "  Creating Desktop Shortcut: $ShortcutPath"
@@ -49,24 +48,11 @@ try {
   $Shortcut.Arguments   = "`"$BatchFile`""
   $Shortcut.WorkingDirectory = $AppDir
   $Shortcut.WindowStyle  = 1
-  $Shortcut.Description  = "Launch Skylark AI Lead Generation Agent"
+  $Shortcut.Description  = "Rudra24 AI"
   
   # Set icon
   if ($IconPath -and (Test-Path $IconPath.Split(',')[0])) {
     $Shortcut.IconLocation = $IconPath
-  } else {
-    # Use Chrome icon if available (looks great for web apps)
-    $ChromePaths = @(
-      "$env:PROGRAMFILES\Google\Chrome\Application\chrome.exe",
-      "${env:PROGRAMFILES(X86)}\Google\Chrome\Application\chrome.exe",
-      "$env:LOCALAPPDATA\Google\Chrome\Application\chrome.exe"
-    )
-    foreach ($cp in $ChromePaths) {
-      if (Test-Path $cp) {
-        $Shortcut.IconLocation = "$cp,0"
-        break
-      }
-    }
   }
   
   $Shortcut.Save()
@@ -91,7 +77,7 @@ try {
   $SM.Arguments  = "`"$BatchFile`""
   $SM.WorkingDirectory = $AppDir
   $SM.WindowStyle = 1
-  $SM.Description = "Launch Skylark AI Lead Generation Agent"
+  $SM.Description = "Rudra24 AI"
   if ($IconPath -and (Test-Path $IconPath.Split(',')[0])) {
     $SM.IconLocation = $IconPath
   }

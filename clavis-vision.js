@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS VISION (clavis-vision.js)
+ *  RUDRA24 AI VISION (clavis-vision.js)
  *  The proactive engine (clavis-proactive.js) infers what you're doing
  *  from window TITLES only — it explicitly never looks at screen content.
  *  This module is the opt-in upgrade: it periodically takes a real
@@ -10,7 +10,9 @@
  *  silence and acts: it always speaks as a polite question/offer, never
  *  as a claim of certainty, and never triggers a tool call on its own.
  *
- *  OFF by default. Turning it on requires:
+ *  OFF by default (clavis_vision_enabled must be exactly 'true'), and even
+ *  when ON it only looks while ClavisWake.allowBackground() is true.
+ *  Turning it on requires:
  *    1. the native bridge running (screenshots aren't possible without it
  *       in any privacy-respecting way — no silent webcam/screen capture)
  *    2. a vision-capable AI key connected
@@ -23,7 +25,7 @@
  *    - skips while the tab is hidden or the user is away/idle
  *    - screenshots are analysed in memory and never written to disk or
  *      sent anywhere except the user's own configured AI provider
- *    - a visible "Clavis is watching your screen" indicator whenever a
+ *    - a visible "Rudra24 AI is watching your screen" indicator whenever a
  *      cycle is about to run (see updateVisionIndicator)
  * ============================================================
  */
@@ -40,7 +42,10 @@
 
   const state = { running: false, timer: null, busy: false, lastAt: 0, lastActivity: '' };
 
-  function isEnabled() { return localStorage.getItem(LS_ENABLED) !== 'false'; } // Default ON for proactive awareness
+  // 2026-09: default OFF — har 3 min screenshot + vision call keys kha jaata tha.
+  function isEnabled() { return localStorage.getItem(LS_ENABLED) === 'true'; }
+  // Soye hue Rudra24 AI ke liye background screen reading nahi (ClavisWake).
+  function bgAllowed() { try { return !window.ClavisWake || window.ClavisWake.allowBackground(); } catch (_) { return false; } }
   function intervalMs() {
     const v = Number(localStorage.getItem(LS_INTERVAL));
     return Number.isFinite(v) && v >= MIN_INTERVAL ? v : DEFAULT_INTERVAL;
@@ -79,14 +84,15 @@
   }
 
   async function shouldSkipThisCycle() {
-    if (window.isClavisSpeaking?.() || window.isClavisListening?.()) return 'Clavis busy';
+    if (!bgAllowed()) return 'asleep';
+    if (window.isClavisSpeaking?.() || window.isClavisListening?.()) return 'Rudra24 AI busy';
     if (!window.ClavisPC) return 'ClavisPC missing';
     const up = await window.ClavisPC.ping();
     if (!up) {
       if (document.hidden) return 'tab hidden and bridge not running';
       return 'bridge not running';
     }
-    // With bridge running, Clavis can observe across all desktop windows even when tab is in background!
+    // With bridge running, Rudra24 AI can observe across all desktop windows even when tab is in background!
     if (!window.ClavisDirect?.hasKey?.() || !window.ClavisDirect.supportsVision?.()) return 'no vision-capable key';
     if (!window.ClavisProactive?.canSpeak?.('vision')) return 'proactive budget/etiquette gate closed';
     try {
@@ -99,6 +105,8 @@
 
   async function analyzeOnce({ forceSpeak = false } = {}) {
     if (state.busy) return null;
+    // Screenshot lene se PEHLE hi check — soya hai to kuch mat karo.
+    if (!forceSpeak && !bgAllowed()) return { skipped: 'asleep' };
     state.busy = true;
     updateVisionIndicator(true);
     try {
@@ -109,7 +117,7 @@
       const small = await downscale(dataUrl);
 
       const sys = [
-        'You are Clavis, a proactive AI assistant who can see the user\'s screen once every cycle.',
+        'You are Rudra24 AI, a proactive AI assistant who can see the user\'s screen once every cycle.',
         'You will be shown ONE screenshot. Infer what the user is likely doing, in one short phrase.',
         'Then decide: is there ONE concrete, specific, genuinely useful thing you could offer to help with right now?',
         'Be conservative — most of the time the honest answer is "nothing to offer, they are fine".',
@@ -119,7 +127,9 @@
         'Respond with STRICT JSON only, no markdown fences: {"activity":"...", "suggestion":"... or empty string","ask":true|false,"confidence":0.0-1.0}',
       ].join(' ');
 
+      // forceSpeak = sir ne khud kaha "screen dekho" → foreground; warna background.
       const data = await window.ClavisDirect.complete({
+        ...(forceSpeak ? {} : { background: true, purpose: 'vision' }),
         messages: [
           { role: 'system', content: sys },
           { role: 'user', content: 'Yeh raha screenshot. Bataiye kya kar raha/rahi hoon, aur agar kuch madad ka mauka dikhe to ek chhota sa polite sawal suggest kijiye.' },
@@ -143,7 +153,8 @@
       window.dispatchEvent(new CustomEvent('clavis:vision', { detail: parsed }));
       return parsed;
     } catch (err) {
-      console.warn('[ClavisVision] cycle failed:', err);
+      if (err && err.code === 'asleep') return { skipped: 'asleep' };
+      console.debug('[ClavisVision] cycle failed:', err);
       return { error: err?.message || String(err) };
     } finally {
       state.busy = false;

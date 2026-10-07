@@ -1,7 +1,7 @@
 /* ============================================================
  * clavis-business.js · who the owner SELLS to
  * ------------------------------------------------------------
- * Clavis was written for one seller: a security & housekeeping
+ * Rudra24 AI was written for one seller: a security & housekeeping
  * agency. Whoever gets this app may sell something else — IT
  * services, marketing, catering, solar, HVAC… — so the three things
  * that assumed "security" now ask this module instead:
@@ -28,8 +28,8 @@
   const P = (label, service, buyers, competitors, detect) => ({ label, service, buyers, competitors, detect });
   const PRESETS = {
     security: P('Security & Housekeeping', 'security guards, housekeeping and manpower staffing',
-      ['Corporate Offices', 'IT Companies', 'Hotels', 'Hospitals', 'Manufacturing Companies', 'Shopping Malls', 'Warehouses & Logistics'],
-      'security\\s+(agency|agencies|service|services|solutions|guard|guards|guarding)|guarding|man\\s*power|manpower|housekeeping\\s+services?|facility\\s+management|facilities\\s+management|integrated\\s+facilit|staffing|placement\\s+(agency|agencies|services?)|recruit(ment)?\\s+(agency|agencies|services?|consultan)|cleaning\\s+services?|janitorial|pest\\s+control|detective|surveillance\\s+service|bouncer',
+      ['Corporate Offices', 'IT Companies', 'Hotels', 'Hospitals', 'Manufacturing Companies', 'Shopping Malls', 'Warehouses & Logistics', 'Residential Societies', 'Schools & Universities', 'Banks & Financial Institutions', 'Retail Chains & Supermarkets', 'Restaurants & Event Venues'],
+      'security\\s+(agenc(?:y|ies)|services?|solutions?|guards?|guarding|contractors?)|guarding|man\\s*power|manpower|housekeeping\\s+(agenc(?:y|ies)|services?)|facility\\s+management|facilities\\s+management|integrated\\s+facilit|staffing|placement\\s+(agency|agencies|services?)|recruit(ment)?\\s+(agency|agencies|services?|consultan)|cleaning\\s+services?|janitorial|pest\\s+control|detective|surveillance\\s+service|bouncer',
       /\b(security|guard|housekeeping|manpower)\b/),
     facility: P('Facility Management', 'facility management, cleaning and maintenance',
       ['Corporate Offices', 'IT Parks', 'Hospitals', 'Hotels', 'Shopping Malls', 'Residential Societies', 'Schools'],
@@ -182,7 +182,7 @@
     const row = document.createElement('div');
     row.className = 'smodal-field';
     row.innerHTML = `<div class="smodal-field-left"><label class="smodal-label" for="sm-business-profile">Your business</label>
-      <span class="smodal-hint">What you sell — leads, competitor filtering and Clavis's advice follow it.</span></div>
+      <span class="smodal-hint">What you sell — leads, competitor filtering and Rudra24 AI's advice follow it.</span></div>
       <select id="sm-business-profile" class="smodal-select">${Object.entries(PRESETS).map(([id, x]) => `<option value="${id}">${x.label}</option>`).join('')}<option value="custom">Custom…</option></select>`;
     // Put it at the top of the section the voice picker lives in.
     const section = anchor.parentElement;

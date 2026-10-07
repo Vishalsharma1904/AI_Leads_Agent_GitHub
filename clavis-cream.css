@@ -1,0 +1,222 @@
+/* ============================================================
+ * clavis-cream.css · THE SKIN. Loads after everything else.
+ * ------------------------------------------------------------
+ * One palette and one type ladder for the whole app, taken from the two
+ * references the owner pointed at: Wispr Flow's warm ivory page with a
+ * high-contrast serif display, and Claude's restraint — flat surfaces, a
+ * single accent, hairlines instead of borders, and shadows only on things
+ * that genuinely float.
+ *
+ * It works by re-pointing the --cc-* tokens the rest of the app already
+ * reads. Nothing here restyles a component by hand, so a screen nobody has
+ * touched in months inherits the new skin for free, and Settings →
+ * Appearance still wins because it writes the same tokens later.
+ *
+ * Paper, not white. #FDFBF2 is the page; cards sit a shade lighter so they
+ * lift off it without needing a border. Pure #fff appears nowhere.
+ * ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&display=swap');
+
+:root:not(#x#x#x), html:not(#x#x#x) {
+  /* ---- ground ---- */
+  --cc-sheet:   #FCFAE8;   /* the page */
+  --cc-shell:   #FEFDF5;   /* top bar, sidebar — a shade deeper than the page */
+  --cc-surface: #FFFEF8;   /* cards, dialogs, menus — lifts without a border */
+  --cc-sunk:    #F2EFDC;   /* wells, tags, the user's own bubble */
+
+  /* ---- ink ---- */
+  --cc-ink:   #1C1B12;     /* warm near-black; true black reads cold on cream */
+  --cc-ink-2: #3A3730;
+  --cc-mute:  #6E6A5C;
+  --cc-faint: #9A9585;
+
+  /* ---- hairlines ---- */
+  --cc-line:   rgba(24, 23, 15, .085);
+  --cc-line-2: rgba(24, 23, 15, .14);
+  --cc-line-3: rgba(24, 23, 15, .24);
+
+  /* ---- one accent, flat ---- */
+  --cc-accent:      #0E4D3C;   /* the deep forest from the reference */
+  --cc-on-accent:   #FDFBF2;
+  --cc-accent-soft: rgba(14, 77, 60, .10);
+
+  /* ---- type ----
+     Instrument Serif is the closest free face to the reference display:
+     the same high stroke contrast and narrow set, and it has a real italic,
+     which is what carries those pulled-out phrases. Source Serif 4 is
+     bundled, so it covers the moment before the webfont lands and every
+     offline launch after. */
+  --cc-serif: 'Instrument Serif', 'CX Serif', 'Source Serif 4', Georgia, serif;
+  --cc-sans:  'CX Sans', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+}
+
+:root[data-theme="dark"]:not(#x#x#x), html.dark:not(#x#x#x) {
+  --cc-sheet:   #16150F;
+  --cc-shell:   #1C1B14;
+  --cc-surface: #221F17;
+  --cc-sunk:    #2B2820;
+  --cc-ink:     #F4F1E4;
+  --cc-ink-2:   #D8D3C2;
+  --cc-mute:    #9E9888;
+  --cc-faint:   #716C5E;
+  --cc-line:    rgba(244, 241, 228, .09);
+  --cc-line-2:  rgba(244, 241, 228, .15);
+  --cc-line-3:  rgba(244, 241, 228, .26);
+  --cc-accent:      #6FBF9B;
+  --cc-on-accent:   #10140F;
+  --cc-accent-soft: rgba(111, 191, 155, .14);
+}
+
+/* ---- the page itself ------------------------------------------------- */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body {
+  background: var(--cc-sheet) !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .topbar,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .sidebar,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .lx-rail {
+  background: var(--cc-shell) !important;
+  border-color: var(--cc-line) !important;
+}
+
+/* The display face, used where the reference uses it: the greeting, dialog
+   titles, big numbers. Light weight and tight tracking — at this size a
+   serif only needs 400 to feel substantial. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(h1, h2, .cc-display, .ccv-title, .rf-vhead, .smodal-title, .cts-title) {
+  font-family: var(--cc-serif) !important;
+  font-weight: 400 !important;
+  letter-spacing: -.018em !important;
+  line-height: 1.14 !important;
+}
+/* Instrument Serif runs small for its point size; nudge the big moments up
+   so they match the sans around them optically rather than numerically. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h1 { font-size: clamp(28px, 3.4vw, 46px) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h2 { font-size: clamp(22px, 2.4vw, 32px) !important; }
+/* The reference leans on italic for the phrase it wants you to hear. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(h1, h2) em,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cc-display em { font-style: italic; }
+
+/* ---- surfaces: flat, hairline, no border --------------------------------
+   Claude's restraint is mostly this one rule — a resting card has a
+   hairline and no shadow, and only something genuinely floating gets one. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.card, .lx-card, .panel, .settings-section, .smodal-section) {
+  background: var(--cc-surface) !important;
+  border: 1px solid var(--cc-line) !important;
+  box-shadow: none !important;
+  border-radius: 14px !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.modal, .dialog, [role="dialog"], .smodal) {
+  background: var(--cc-surface) !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: 18px !important;
+  box-shadow: var(--rf-sh-win, 0 24px 60px -18px rgba(24, 23, 15, .26)) !important;
+}
+
+/* inputs: a well sunk into the page, not a box drawn on top of it */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input[type="text"], input[type="password"], input[type="email"], input[type="search"], textarea, select) {
+  background: var(--cc-sunk) !important;
+  border: 1px solid transparent !important;
+  border-radius: 10px !important;
+  color: var(--cc-ink) !important;
+  transition: background-color var(--rf-t2, .24s) var(--rf-ease, ease),
+              border-color var(--rf-t2, .24s) var(--rf-ease, ease),
+              box-shadow var(--rf-t2, .24s) var(--rf-ease, ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input, textarea, select):focus {
+  background: var(--cc-surface) !important;
+  border-color: var(--cc-line-2) !important;
+  box-shadow: 0 0 0 3px var(--cc-accent-soft) !important;
+  outline: none !important;
+}
+
+/* one accent, flat — no gradient, no glow */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.generate-btn, .btn-primary, .primary-btn, .smodal-btn.primary) {
+  background: var(--cc-accent) !important;
+  color: var(--cc-on-accent) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+
+/* ---------- SETUP: fewer lines, smaller controls -----------------------
+ * The dialog was a stack of bordered boxes with a full-size button on each.
+ * In the reference the same information sits on one surface, separated by
+ * hairlines, with controls only as large as the words inside them. Nothing
+ * here is new structure — the cards are just quieter. */
+
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog {
+  background: var(--cc-surface) !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: 20px !important;
+  max-width: 470px !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-heading {
+  font-family: var(--cc-serif) !important;
+  font-weight: 400 !important;
+  font-size: 27px !important;
+  letter-spacing: -.018em !important;
+}
+
+/* one surface, hairline-separated — not a stack of boxes */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-card {
+  background: transparent !important;
+  border: 0 !important;
+  border-top: 1px solid var(--cc-line) !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  padding: 13px 2px !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-card:first-of-type { border-top: 0 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-title { font-size: 13.5px !important; font-weight: 520 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-desc  { font-size: 12px !important; color: var(--cc-mute) !important; }
+
+/* controls sized to their words */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-btn {
+  height: 30px !important;
+  padding: 0 13px !important;
+  font-size: 12.5px !important;
+  font-weight: 490 !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-btn--primary {
+  background: var(--cc-accent) !important;
+  color: var(--cc-on-accent) !important;
+  border: 0 !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-input {
+  height: 34px !important;
+  font-size: 13px !important;
+  border-radius: 9px !important;
+  background: var(--cc-sunk) !important;
+  border: 1px solid transparent !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-input:focus {
+  background: var(--cc-surface) !important;
+  border-color: var(--cc-line-2) !important;
+  box-shadow: 0 0 0 3px var(--cc-accent-soft) !important;
+}
+
+/* the status word carries the state; a pill around it is noise */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-tag {
+  background: transparent !important;
+  border: 0 !important;
+  padding: 0 !important;
+  font-size: 11px !important;
+  color: var(--cc-faint) !important;
+  letter-spacing: .005em !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-tag.is-rec { color: var(--cc-accent) !important; }
+
+/* the drawer for everything that is not one of the three */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-group {
+  border: 0 !important;
+  border-top: 1px solid var(--cc-line) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-groupn {
+  background: var(--cc-sunk) !important;
+  color: var(--cc-mute) !important;
+  font-size: 11px !important;
+}

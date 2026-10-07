@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS COMMANDS (clavis-commands.js)
+ *  RUDRA24 AI COMMANDS (clavis-commands.js)
  *  Bilingual (Hindi/English/Hinglish) intent router. Handles device
  *  commands locally — BEFORE hitting the LLM — so they're instant and
  *  work even without an AI key:
@@ -27,7 +27,7 @@
 (() => {
   const norm = (s) => String(s || '').toLowerCase().replace(/[.!?,]+$/g, '').replace(/\s+/g, ' ').trim();
 
-  const STOP_RE = /\b(shut up|be quiet|stop talking|stop|quiet|chup|chup ho ?jao?|chup ho ja|bas karo?|bas|ruk ja(?:o)?|ruko|band karo?|shaant ho ?ja)\b/i;
+  const STOP_RE = /\b(shut up|be quiet|stop talking|stop it|stop|quiet|enough|khamosh|chup|chup raho|chup ho ?jao?|chup ho ja|bas karo?|bas|ruk ja(?:o)?|ruko|band karo?|shaant ho ?ja)\b/i;
 
   const state = { lastShot: null, muted: false };
 
@@ -40,6 +40,11 @@
   function isStop(text) { const t = norm(text); return STOP_RE.test(t) && !OBJECT_RE.test(t) && !namesApp(t); }
 
   function cancelSpeech() {
+    // ClavisVoice.stop() bumps its generation — sirf speechSynthesis.cancel()
+    // se agla sentence phir bhi bol deta tha.
+    // jarvis_ui's own stop also resets its speaking flag + TTS generation.
+    try { window.stopJarvisSpeech?.(); } catch (_) {}
+    try { window.ClavisVoice?.stop?.(); } catch (_) {}
     try { window.speechSynthesis?.cancel(); } catch (_) {}
     try { if (window.currentPlayingAudio) { window.currentPlayingAudio.pause(); window.currentPlayingAudio = null; } } catch (_) {}
     try { window.ClavisBargeIn?.disarm?.(); } catch (_) {}
@@ -62,7 +67,7 @@
     }
     window.setJarvisStatus?.('thinking', 'Screen dekh raha hoon…');
     const dataUrl = await grabShot();
-    const sys = 'You are Clavis. The user shared a screenshot of their computer screen. Answer their request about it precisely and briefly, in the same language they used (Hinglish/Hindi/English). Read text exactly as shown. Do not invent anything not visible.';
+    const sys = 'Your name is Rudra. The user shared a screenshot of their computer screen. Answer their request about it precisely and briefly, in the same language they used (Hinglish/Hindi/English). Read text exactly as shown. Do not invent anything not visible.';
     const data = await window.ClavisDirect.complete({
       messages: [{ role: 'system', content: sys }, { role: 'user', content: question || 'Screen par kya hai? Batao.' }],
       images: [dataUrl], max_tokens: 900,
@@ -90,13 +95,21 @@
     const t = norm(raw);
     if (!t) return { handled: false };
 
+    // Lead requests belong to the sourcing pipeline, including "map pe dikhao".
+    // Navigation's broad "leads dikhao" rule must not claim a new search.
+    const plan = window.LeadCandidateDomain?.parseRequest?.(raw);
+    if (plan?.workstream === 'leads' && plan.isSearch
+        && !/\b(export|download|sync|stats?|report|summary|count|total|saved|existing|purani|list)\b/i.test(raw)) {
+      return { handled: false };
+    }
+
     // 0) IN-APP NAVIGATION & VERBAL CONTROL (instant, no LLM)
     if (window.ClavisVoiceNav) {
       const navResult = window.ClavisVoiceNav.route(raw);
       if (navResult && navResult.handled) return navResult;
     }
 
-    // 1) STOP — silence Clavis immediately, no LLM, no spoken reply.
+    // 1) STOP — silence Rudra24 AI immediately, no LLM, no spoken reply.
     if (isStop(t) && t.split(' ').length <= 4) {
       cancelSpeech();
       state.muted = true;

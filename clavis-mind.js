@@ -1,8 +1,8 @@
 /**
  * ============================================================
- *  CLAVIS MIND (clavis-mind.js)
+ *  RUDRA24 AI MIND (clavis-mind.js)
  *
- *  Clavis's cognitive core: the layer that decides WHETHER to speak, WHAT is
+ *  Rudra24 AI's cognitive core: the layer that decides WHETHER to speak, WHAT is
  *  worth remembering, and WHEN an unfinished conversation deserves a follow-up
  *  of its own. Ported to plain browser JS from a desktop-assistant cognition
  *  stack (event bus -> situation -> attention -> initiative -> speech), with
@@ -13,21 +13,23 @@
  *    emit(event) -> SituationModel -> AttentionEngine -> InitiativeEngine
  *                -> IGNORE | REMEMBER | OBSERVE | WAIT | ASK | SPEAK | WARN
  *
- *  Two things it gives Clavis that it did not have:
- *    1. MIND VOICE  - after a real exchange goes quiet, Clavis privately checks
+ *  Two things it gives Rudra24 AI that it did not have:
+ *    1. MIND VOICE  - after a real exchange goes quiet, Rudra24 AI privately checks
  *       whether it has one genuinely useful continuation, and says it. Bounded
  *       hard: at most ONE autonomous turn per user turn, energy-budgeted,
  *       repetition-suppressed, and silent the moment the user speaks.
  *    2. ACTIONABLE  - every tool call gets a risk level, high-risk ones need an
- *       explicit confirmation, and results are verified before Clavis claims
+ *       explicit confirmation, and results are verified before Rudra24 AI claims
  *       success.
  *
  *  Everything is off-by-default-safe: if this file fails to load, every caller
- *  uses `?.` and Clavis behaves exactly as before.
+ *  uses `?.` and Rudra24 AI behaves exactly as before.
  *
  *  Switches (localStorage):
- *    clavis_mind_enabled        'false' -> whole module inert
- *    clavis_mind_voice_enabled  'false' -> no autonomous speech (pipeline still runs)
+ *    clavis_mind_enabled        'true'  -> background thought loop runs (default OFF, 2026-09);
+ *                               'false' -> whole module inert
+ *    clavis_mind_voice_enabled  'true'  -> autonomous speech (default OFF, 2026-09)
+ *    Loop also needs ClavisWake.allowBackground() — soye hue Rudra24 AI me LLM nahi.
  *    clavis_mind_confirm_risk   number 0-4, default 3 (risk >= this needs a yes)
  *    clavis_mind_debug          'true'  -> log every decision
  * ============================================================
@@ -41,6 +43,11 @@ window.ClavisMind = (() => {
   const clone = (v) => { try { return structuredClone(v); } catch { return JSON.parse(JSON.stringify(v)); } };
   const norm = (v) => String(v || '').trim().toLowerCase().replace(/\s+/g, ' ');
   const lsBool = (k, dflt) => { const v = localStorage.getItem(k); return v === null ? dflt : v !== 'false'; };
+  // 2026-09: background "mind" loop (random 6-12 s LLM thoughts) aur uski
+  // autonomous voice ab default OFF — sirf localStorage me exactly 'true' ho to.
+  // emit() pipeline (safety / situation) pehle jaisa chalta hai; 'false' pe inert.
+  const loopOn = () => { try { return localStorage.getItem('clavis_mind_enabled') === 'true'; } catch (_) { return false; } };
+  const bgAllowed = () => { try { return !window.ClavisWake || window.ClavisWake.allowBackground(); } catch (_) { return false; } };
   // Number(null) is 0, not NaN — reading an unset key with a bare Number()
   // silently returns 0 instead of the default. For a risk threshold that means
   // "confirm everything", so the empty case is checked explicitly.
@@ -342,7 +349,7 @@ window.ClavisMind = (() => {
 
     // Nothing can guarantee a "finished speaking" signal — a TTS engine can die,
     // a line can be empty, a tab can be backgrounded mid-sentence. Without this
-    // the floor would stay held forever and Clavis would go permanently mute.
+    // the floor would stay held forever and Rudra24 AI would go permanently mute.
     function hold(item) {
       active = item;
       clearTimeout(watchdog);
@@ -400,7 +407,7 @@ window.ClavisMind = (() => {
 
   // ══════════════════════════════════════════════════════════
   //  STRUCTURED MEMORY — typed, confidence-weighted, decaying.
-  //  Complements MemoryEngine (leads/chat rows); this stores what Clavis has
+  //  Complements MemoryEngine (leads/chat rows); this stores what Rudra24 AI has
   //  LEARNED about the owner: preferences, corrections, project facts.
   // ══════════════════════════════════════════════════════════
   const memory = (() => {
@@ -576,8 +583,8 @@ window.ClavisMind = (() => {
     }
 
     /**
-     * The single gate that stops Clavis from becoming a chatterbox: a follow-up
-     * needs a real exchange (user said something AND Clavis replied), the thread
+     * The single gate that stops Rudra24 AI from becoming a chatterbox: a follow-up
+     * needs a real exchange (user said something AND Rudra24 AI replied), the thread
      * still live, at most one autonomous turn, and a silence that is a pause —
      * not the user walking away or deep in another app.
      */
@@ -698,26 +705,26 @@ window.ClavisMind = (() => {
     let lastOpportunityKey = '', lastOpportunityAt = 0;
     const counters = { ticks: 0, thoughts: 0, dropped: 0, spoken: 0, interrupted: 0 };
 
-    // With Clavis Live connected, Live is the one voice and keeps its own
+    // With Rudra24 AI Live connected, Live is the one voice and keeps its own
     // conversation going — a second brain speaking follow-ups on top of it
     // was the "two AIs talking at once" (one of them in broken Hindi).
-    const voiceEnabled = () => lsBool('clavis_mind_voice_enabled', true) && !window.ClavisLive?.isAvailable?.();
+    const voiceEnabled = () => localStorage.getItem('clavis_mind_voice_enabled') === 'true' && !window.ClavisLive?.isAvailable?.();
 
     function buildPrompt(ctx) {
       const memoryLines = ctx.memories.slice(0, 5).map((m) => `- ${m.content.slice(0, 240)}`).join('\n');
       return [
-        "You are Clavis's private internal thought generator. This is an endogenous cognitive cycle — the user did NOT send a new message.",
+        "You are Rudra24 AI's private internal thought generator. This is an endogenous cognitive cycle — the user did NOT send a new message.",
         'Return NO_COGNITION if there is no genuinely useful, novel, contextually relevant continuation or question. Silence is the correct answer most of the time.',
         'Do not produce chain-of-thought. Return only a compact JSON candidate.',
         `Opportunity: ${ctx.reason}`,
         `Topic: ${ctx.thread.topic}`,
         `Last user statement: ${ctx.thread.lastUserStatement || 'none'}`,
-        `Last Clavis statement: ${ctx.thread.lastClavisStatement || 'none'}`,
+        `Last Rudra24 AI statement: ${ctx.thread.lastClavisStatement || 'none'}`,
         `Unresolved points: ${ctx.thread.unresolvedPoints.join(' | ') || 'none'}`,
         `Open questions: ${ctx.thread.openQuestions.join(' | ') || 'none'}`,
         ctx.curiosity ? `Unclear: ${ctx.curiosity.unknown} Context: ${ctx.curiosity.known}` : 'Unclear: none detected',
         `Relevant memories:\n${memoryLines || '- none'}`,
-        'Voice: mirror the conversation. Hindi/Hinglish -> natural conversational Hindi in Devanagari script, with English business words (leads, email, report) in Roman letters; English -> polished English. Never broken or translated-sounding Hindi. Address the user as "sir". One or two short sentences, max ~28 words. No greeting, no emoji, no self-introduction, and never repeat something already said.',
+        'Voice: your name is Rudra, always. ONE LANGUAGE, ONE SCRIPT, SAID ONCE — always Hinglish in Latin script (business words like leads, email, report stay English); plain English only if the conversation is pure English. Never Devanagari, never two scripts in one line, never the same thing twice in two languages.',
         'JSON schema:',
         '{"origin":"curiosity|unfinished_thread|memory|goal|reflection|social","content":"the line to actually say","relevance":0.0,"novelty":0.0,"urgency":0.0,"socialValue":0.0,"confidence":0.0,"suggestedAction":"SPEAK|ASK|WAIT","relatedTopic":"topic"}',
         'Score high only when saying this would genuinely improve the conversation. Never make small talk just because time passed.',
@@ -750,7 +757,9 @@ window.ClavisMind = (() => {
 
     async function generate(ctx) {
       if (!window.ClavisDirect?.complete || !window.ClavisDirect.hasKey?.()) return null;
+      if (!bgAllowed()) return null;
       const data = await window.ClavisDirect.complete({
+        background: true, purpose: 'mind',
         messages: [
           { role: 'system', content: buildPrompt(ctx) },
           { role: 'user', content: 'Produce your candidate now, or NO_COGNITION.' },
@@ -817,7 +826,8 @@ window.ClavisMind = (() => {
     }
 
     async function tick(at = Date.now()) {
-      if (inFlight || !lsBool('clavis_mind_enabled', true)) return;
+      if (inFlight || !loopOn()) return;
+      if (!bgAllowed()) return;   // soya hai → koi background thought nahi
       inFlight = true;
       counters.ticks += 1;
       try {
@@ -842,6 +852,7 @@ window.ClavisMind = (() => {
               const thought = await generate(ctx);
               if (thought) { enqueue(thought); counters.thoughts += 1; debug('thought', thought.origin, thought.content); }
             } catch (e) {
+              if (e && e.code === 'asleep') return;
               // A provider hiccup must not kill cognition — retry this opportunity in ~10s.
               lastOpportunityAt = at - 50000;
               debug('thought generation failed:', e?.message || e);
@@ -879,7 +890,7 @@ window.ClavisMind = (() => {
   // ══════════════════════════════════════════════════════════
   //  ACTIONABLE — tool risk, confirmation, result verification
   //  Every skill gets a risk level; risk >= threshold needs an explicit yes;
-  //  the critic checks the result actually happened before Clavis claims it did.
+  //  the critic checks the result actually happened before Rudra24 AI claims it did.
   // ══════════════════════════════════════════════════════════
   const safety = (() => {
     const READ_ONLY = /^(get|list|read|search|find|show|export|filter|describe|stats)/i;
@@ -951,7 +962,7 @@ window.ClavisMind = (() => {
         .map(([k, v]) => `  ${k}: ${String(v).slice(0, 120)}`).join('\n');
       const confirmFn = window.clavisConfirm || ((msg) => Promise.resolve(window.confirm(msg)));
       const ok = await confirmFn(`Action: ${name}\nRisk level: ${riskLevel}/4${summary ? `\n${summary}` : ''}`, {
-        title: 'Clavis wants to run a high-risk action',
+        title: 'Rudra24 AI wants to run a high-risk action',
         okLabel: 'Allow', cancelLabel: 'Deny', danger: riskLevel >= 4,
       });
       api.emit({ type: 'safety.confirmation_resolved', source: 'tool', importance: 0.4, metadata: { tool: name, approved: ok } });
@@ -1034,7 +1045,7 @@ window.ClavisMind = (() => {
       speech.onUserSpeechStopped();
       speech.observeUserResponse();
     },
-    /** Clavis finished a reply — this is what opens a follow-up opportunity. */
+    /** Rudra24 AI finished a reply — this is what opens a follow-up opportunity. */
     noteClavisTurn(text) {
       api.emit({ type: 'conversation.turn_completed', source: 'clavis', importance: 0.45, metadata: { text: String(text || '') } });
     },
@@ -1046,12 +1057,12 @@ window.ClavisMind = (() => {
       api.emit({ type: 'conversation.clavis_stopped_speaking', source: 'clavis', importance: 0.2, metadata: {} });
       speech.onTurnComplete();
     },
-    /** The owner cut Clavis off — clap, barge-in or "chup". */
+    /** The owner cut Rudra24 AI off — clap, barge-in or "chup". */
     noteInterrupted(remaining) {
       api.emit({ type: 'conversation.user_interrupted_clavis', source: 'user', importance: 0.66, metadata: { interruptedThought: String(remaining || '') } });
       mind.markInterrupted(remaining);
     },
-    /** Explicitly store something the owner told Clavis to remember. */
+    /** Explicitly store something the owner told Rudra24 AI to remember. */
     remember(text, opts = {}) {
       return memory.add({ kind: 'preference', content: text, importance: 0.75, confidence: 0.85, source: 'owner', ...opts });
     },
@@ -1073,8 +1084,9 @@ window.ClavisMind = (() => {
 
     status() {
       return {
-        enabled: lsBool('clavis_mind_enabled', true),
-        voice: lsBool('clavis_mind_voice_enabled', true),
+        enabled: loopOn(),
+        pipeline: lsBool('clavis_mind_enabled', true),
+        voice: localStorage.getItem('clavis_mind_voice_enabled') === 'true',
         situation: situation.get(),
         mind: mind.status(),
         speech: speech.status(),
@@ -1130,7 +1142,7 @@ window.ClavisMind = (() => {
       speech.onTurnComplete();
       speech._reset();
 
-      // Social: energy runs out, so Clavis cannot monologue.
+      // Social: energy runs out, so Rudra24 AI cannot monologue.
       social._reset();
       const thought = { origin: 'unfinished_thread', content: 'x', relatedTopic: 't', relevance: 0.9, novelty: 0.9, urgency: 0.1, socialValue: 0.9, confidence: 0.8, suggestedAction: 'SPEAK' };
       check('first thought speaks', social.evaluate(thought, S, Date.now(), { activeConversation: true }).decision === 'SPEAK');
@@ -1181,7 +1193,7 @@ window.ClavisMind = (() => {
 
   // Boot: memories decay once per session, mind starts if enabled.
   try { memory.decay(); } catch (_) {}
-  const boot = () => { if (lsBool('clavis_mind_enabled', true)) mind.start(); };
+  const boot = () => { if (loopOn()) mind.start(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
 

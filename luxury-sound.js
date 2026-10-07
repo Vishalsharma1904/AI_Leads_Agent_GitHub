@@ -104,9 +104,9 @@
     master.connect(shaper); shaper.connect(comp); comp.connect(ctx.destination);
 
     reverb = ctx.createConvolver();
-    reverb.buffer = makeIR(2.2, 2.8, 0.22);
+    reverb.buffer = makeIR(1.25, 3.2, 0.18);
     reverbGain = ctx.createGain(); reverbGain.gain.value = 1;
-    const wet = ctx.createGain(); wet.gain.value = 0.44;
+    const wet = ctx.createGain(); wet.gain.value = 0.18;
     const wetLP = ctx.createBiquadFilter(); wetLP.type = 'lowpass'; wetLP.frequency.value = 2400;
     reverbGain.connect(reverb); reverb.connect(wetLP); wetLP.connect(wet); wet.connect(master);
 
@@ -120,6 +120,7 @@
   }
 
   const unlock = () => {
+    if (!isEnabled() || getTheme() === 'off') return;
     audioUnlocked = true;
     if (!init()) return;
     if (ctx.state === 'suspended') ctx.resume().catch(() => {});
@@ -224,18 +225,11 @@
       return;
     }
 
-    // Default & Flagship: Ambient — warm wooden/kalimba tap with subtle tactile transient
-    const v = nextVariant('ui', SCALE_AMBIENT.length);
-    const base = SCALE_AMBIENT[v] * rand(0.995, 1.005);
-
-    // Layer 1: Warm fundamental body
-    partial(b, { freq: base,        type: 'sine',     dur: 0.078, gain: 0.22 * rand(0.92, 1.08), attack: 0.007, bend: 0.985 });
-    // Layer 2: Acoustic body undertone (felt depth)
-    partial(b, { freq: base * 0.5,  type: 'triangle', dur: 0.052, gain: 0.038, attack: 0.010 });
-    // Layer 3: Subtle harmonic overtone (hollow wood/glass bloom)
-    partial(b, { freq: base * 2.01, type: 'sine',     dur: 0.038, gain: 0.028, attack: 0.006 });
-    // Layer 4: Soft velvet contact transient (gentle finger pad touch, non-harsh)
-    noise(b,   { dur: 0.022, gain: 0.016, from: 650, to: 260, q: 0.8, attack: 0.004 });
+    // A quiet felt contact with a fixed harmonic tail. No falling pitch / water-drop.
+    const base = 440;
+    partial(b, { freq: base, type: 'sine', dur: .24, gain: .085, attack: .018 });
+    partial(b, { freq: base * 1.5, type: 'sine', dur: .32, gain: .022, attack: .026, delay: .012 });
+    noise(b, { dur: .045, gain: .012, from: 900, to: 900, q: .5, attack: .012 });
   }
 
   // Settings: warm felt-covered marimba tap with 5-note tonal variation
@@ -358,7 +352,7 @@
   let lastPlayTime = 0;
   let lastPlayEvt = '';
 
-  function play(evt, zone) {
+  function play(evt, zone, on = true) {
     if (!isEnabled() || getTheme() === 'off') return;
     // Hover/pointerover is not a trusted user gesture. Do not create or
     // resume Web Audio there; wait until the first real pointer/key gesture.
@@ -379,14 +373,11 @@
     try {
       switch (evt) {
         case 'click':
-          if (zone === 'settings') settingsTap();
-          else if (zone === 'sidebar') sidebarTick();
-          else if (zone === 'composer') composerTick();
-          else uiTick(zone);
+          uiTick(zone);
           break;
         case 'toggle':
           if (zone === 'sidebar') sidebarTick();
-          else settingsToggle(true);
+          else settingsToggle(on);
           break;
         case 'hover':  if (!quiet) sidebarHover(); break;
         case 'success': success(); break;
@@ -447,8 +438,7 @@
     const toggle = t.closest('.smodal-switch, .mac-toggle, input[type="checkbox"], .lx-theme-toggle');
     if (toggle) {
       const input = toggle.querySelector?.('input[type="checkbox"]') || (toggle.type === 'checkbox' ? toggle : null);
-      if (zone === 'settings') settingsToggle(!(input && input.checked));
-      else play('toggle', zone);
+      play('toggle', zone, !(input && input.checked));
       return;
     }
     const btn = t.closest([

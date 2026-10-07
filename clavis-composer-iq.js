@@ -1,7 +1,7 @@
 /* ============================================================
  * clavis-composer-iq.js
  * ------------------------------------------------------------
- * Two upgrades that both composers share — the one in the Clavis
+ * Two upgrades that both composers share — the one in the Rudra24 AI
  * tab and the one inside the floating Peek Task window:
  *
  *   A. Ghost completion.  As you type, the rest of the sentence
@@ -72,7 +72,6 @@
     this.suggestion = '';
     this.basis = '';          // the exact value the suggestion was made for
     this.localTimer = 0;
-    this.modelTimer = 0;
     this.seq = 0;
     this.composing = false;
     this.accepting = false;
@@ -126,15 +125,20 @@
   Ghost.prototype.sync = function () {
     if (!this.mirror) return;
     var input = this.input;
-    var cs = getComputedStyle(input);
+    var cs = this.metrics;
     var m = this.mirror.style;
-    for (var i = 0; i < MIRROR_PROPS.length; i++) {
+    if (!cs) {
+      cs = this.metrics = {};
+      var computed = getComputedStyle(input);
+      MIRROR_PROPS.concat(['color']).forEach(function(p){cs[p]=computed[p];});
+      for (var i = 0; i < MIRROR_PROPS.length; i++) {
       var v = cs[MIRROR_PROPS[i]];
       if (v == null || v === '') continue;
       // 'important': several theme layers pin font-family / features on
       // every div in the composer with !important, which silently beat
       // the plain inline copy and put the mirror in a different font.
-      m.setProperty(kebab(MIRROR_PROPS[i]), v, 'important');
+        m.setProperty(kebab(MIRROR_PROPS[i]), v, 'important');
+      }
     }
     m.left = input.offsetLeft + 'px';
     m.top = input.offsetTop + 'px';
@@ -187,8 +191,9 @@
     if (!this.mirror) return;
     var v = this.input.value || '';
     var g = (this.suggestion && this.basis === v) ? this.suggestion : '';
-    this.typedSpan.textContent = v;
-    this.ghostSpan.textContent = g;
+    var painted = g ? v : '';
+    if (this.typedSpan.textContent !== painted) this.typedSpan.textContent = painted;
+    if (this.ghostSpan.textContent !== g) this.ghostSpan.textContent = g;
     this.mirror.classList.toggle('is-live', !!g);
     if (this.hint) {
       this.hint.classList.toggle('is-live', !!g);
@@ -238,7 +243,6 @@
   Ghost.prototype.think = function () {
     var self = this;
     clearTimeout(this.localTimer);
-    clearTimeout(this.modelTimer);
 
     if (!this.canSuggest()) { this.clear(true); return; }
 
@@ -253,18 +257,6 @@
       if (r && r.text) self.propose(r.text, value, 'local');
     }, 90);
 
-    // Model pass — only once typing actually pauses, so it is one call
-    // per thought, not one per keystroke.
-    this.modelTimer = setTimeout(function () {
-      if (my !== self.seq || self.input.value !== value) return;
-      if (!global.ClavisIQ) return;
-      var r = global.ClavisIQ.complete(value);
-      if (!r || !r.refine) return;
-      r.refine.then(function (text) {
-        if (my !== self.seq || self.input.value !== value) return;
-        if (text) self.propose(text, value, 'model');
-      });
-    }, 460);
   };
 
   /* Tab: the grey becomes real text. The textarea's own glyphs are
@@ -376,7 +368,11 @@
     }, { passive: true });
     input.addEventListener('click', function () { if (!self.canSuggest()) self.clear(true); });
 
-    global.addEventListener('resize', function () { if (self.suggestion) self.sync(); }, { passive: true });
+    function invalidate() { self.metrics = null; if (self.suggestion) self.sync(); }
+    input.addEventListener('composer:size', invalidate);
+    doc.addEventListener('nexus:settingschange', invalidate);
+    global.addEventListener('resize', invalidate, { passive: true });
+    new MutationObserver(invalidate).observe(doc.documentElement, {attributes:true,attributeFilter:['data-theme','data-ui-font','data-rudra-flow']});
   };
 
   /* ══════════════════════════════════════════════════════════
@@ -509,7 +505,9 @@
     // the DOM, and an un-throttled observer here would run thousands of
     // times a minute for no reason.
     var queued = false;
-    new MutationObserver(function () {
+    new MutationObserver(function (records) {
+      var relevant = records.some(function(r){return Array.from(r.addedNodes).some(function(n){return n.nodeType===1 && (n.matches('#clavis-composer-attachment-dock,#jarvis-input,#chat-input,#candidate-ai-input,.cts-composer-input') || n.querySelector('#clavis-composer-attachment-dock,#jarvis-input,#chat-input,#candidate-ai-input,.cts-composer-input'));});});
+      if (!relevant) return;
       if (queued) return;
       queued = true;
       requestAnimationFrame(function () {

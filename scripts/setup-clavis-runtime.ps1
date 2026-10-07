@@ -17,7 +17,8 @@ if ($Upgrade) { & $python -m pip install --upgrade pip }
 $requirements = Join-Path $backend 'requirements.txt'
 if ($SkipHeavySpeech) {
   $temp = Join-Path $env:TEMP 'clavis-core-requirements.txt'
-  Get-Content $requirements | Where-Object { $_ -notmatch '^(torch|kokoro|faster-whisper|silero-vad|onnxruntime)' } | Set-Content $temp
+  # Cloud speech still needs PyAV + faster-whisper's bundled ONNX speech gate.
+  Get-Content $requirements | Where-Object { $_ -notmatch '^(torch|kokoro|silero-vad)' } | Set-Content $temp
   & $python -m pip install -r $temp
   Remove-Item -LiteralPath $temp -Force
 } else {

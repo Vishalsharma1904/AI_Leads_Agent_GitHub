@@ -1,25 +1,25 @@
 /* ============================================================
- * clavis-ear.js · Clavis hears sir — and only sir
+ * clavis-ear.js · Rudra24 AI hears sir — and only sir
  * ------------------------------------------------------------
  * Four small pieces that every voice path shares:
  *
- *  1. SELF-ECHO GUARD. The mic hears Clavis's own reply through
+ *  1. SELF-ECHO GUARD. The mic hears Rudra24 AI's own reply through
  *     the speakers; the recognizer typed it into the composer and
- *     Clavis answered itself. Every transcript is now compared with
- *     what Clavis said in the last few seconds — by sound, not
+ *     Rudra24 AI answered itself. Every transcript is now compared with
+ *     what Rudra24 AI said in the last few seconds — by sound, not
  *     spelling ("लीड्स" and "leads" reduce to the same skeleton
- *     "lds") — and dropped when it is just Clavis's own voice.
+ *     "lds") — and dropped when it is just Rudra24 AI's own voice.
  *
  *  2. VOICE ID (opt-in, beta). Sir reads one line once; a compact
  *     voiceprint (MFCC means + pitch) is kept in localStorage and
  *     slowly adapts to him over time. In open-mic moments (the
  *     follow-up window after a reply) a voice that clearly isn't
- *     his is ignored — unless it says "Clavis", so anyone may still
- *     call Clavis by name. Honest scope: a room-level heuristic that
+ *     his is ignored — unless it says "Rudra", so anyone may still
+ *     call Rudra24 AI by name. Honest scope: a room-level heuristic that
  *     filters TV / background chatter, not a security lock.
  *
  *  3. DOUBLE-TALK DETECTOR, used by barge-in and the Live mic gate:
- *     it learns how loud Clavis's own echo is relative to what is
+ *     it learns how loud Rudra24 AI's own echo is relative to what is
  *     being played, so only a voice ABOVE that echo counts as sir
  *     interrupting. (The old detector learned the floor during the
  *     silent second before speech started, then fired on its own
@@ -115,7 +115,7 @@
     said.speaking = true;
     if (text) said.lastText = String(text);
     // Safety net: a voice engine that never reports "done" must not leave
-    // Clavis deaf. ~85 ms per character is slower than any real voice.
+    // Rudra24 AI deaf. ~85 ms per character is slower than any real voice.
     said.maxUntil = now() + Math.min(90000, Math.max(6000, String(text || '').length * 85 + 5000));
     said.since = now();
     remember(text);
@@ -151,20 +151,38 @@
     said.items.forEach((it) => { if (it.at >= cutoff || said.speaking) it.sk.forEach((s) => pool.add(s)); });
     if (!pool.size) return { score: 0, n: tokens.length, fresh: tokens.length };
     const poolArr = [...pool];
-    let hit = 0;
+    let hit = 0, w = 0, wHit = 0;
     tokens.forEach((t) => {
-      if (pool.has(t) || (t.length >= 3 && poolArr.some((p) => p.length >= 3 && lev1(p, t)))) hit++;
+      // One-letter skeletons ("me", "na", "ki") match almost anything: they
+      // weigh less, so "chrome me naya tab kholo" isn't its echo.
+      const wt = t.length >= 2 ? 1 : 0.4;
+      w += wt;
+      if (pool.has(t) || (t.length >= 3 && poolArr.some((p) => p.length >= 3 && lev1(p, t)))) { hit++; wHit += wt; }
     });
-    return { score: hit / tokens.length, n: tokens.length, fresh: tokens.length - hit };
+    return { score: wHit / w, n: tokens.length, fresh: tokens.length - hit };
   }
 
-  /* ── what counts as "for Clavis" ───────────────────────────── */
-  const NAME_RE = /\b(clavis|klavis|clevis|klevis|clavish|claves|clavice|jarvis|hey buddy|hi pal)\b|क्ल[ेैा]विस|क्लेविज़|जार्विस/i;
+  /* ── what counts as "for Rudra24 AI" ───────────────────────────── */
+  // Naam ki pehchaan ClavisWake karta hai (ek hi list — "Rudra", "Hey Rudra",
+  // "Hey Buddy", "Hey Clay"). Yeh regex sirf fallback hai agar clavis-wake.js
+  // load na ho. "hi pal" hata diya — normal baat-cheet me bhi fire hota tha.
+  const NAME_RE = /\b(clavis|klavis|clevis|klevis|clavish|claves|clavice|hey buddy|hey clay|hey klay)\b|क्ल[ेैा]विस|क्लेविज़/i;
   const ASK_NOW_RE = /\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|bhejo|nikalo|sunao|chahiye|chahie|show me|open|tell me|find|search)\b|करो|दिखाओ|बताओ|चाहिए/i;
   const CONVO_RE = /[\u0900-\u097F]|\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|band|bhejo|nikalo|sunao|chahiye|kya|kaise|kyun|kitn[ae]|kaun|kahan|haan|nahi|theek|acha|accha|aur|wapas|mujhe|mera|meri|humein|leads?)\b/i;
   const STOP_RE = /\b(stop|wait|ruko|ruk ja|ruk jao|bas|bas karo|chup|chup karo|shut up|hold on|one sec|ek (?:min|minute|second)|suno|sunno|listen|nahi nahi|no no|cancel)\b|रुको|बस|चुप|सुनो/i;
   const ASK_RE = /\b(karo|kar do|kardo|kariye|kijiye|karna|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|kholo|khol do|band|hatao|hata do|chalao|chala do|nikalo|nikal do|bhejo|bhej do|likho|likh do|search|find|show|open|close|tell|play|pause|stop|start|call|send|make|create|give|get|find|check|explain|summari[sz]e|translate|remind|set|go|zoom|scroll|type|read|what|what's|whats|which|who|whom|whose|why|how|when|where|kya|kyaa|kaise|kab|kahan|kaha|kitna|kitne|kitni|kaun|kyun|kyu|kis|konsa|kaunsa|can you|could you|would you|will you|please|plz|pls|zara|jara|chahiye|lao|le aao|de do|do na|suno|next|aur|agla|pichla|wapas|haan|han|nahi|nahin|yes|yeah|yep|no|nope|ok|okay|theek|thik|done|sure|bilkul|leads?|map|photo|photos|image|images|website|email|excel|whatsapp)\b|करो|दिखाओ|बताओ|खोलो|बंद|हटाओ|क्या|कैसे|कब|कहाँ|कितने|कौन|क्यों/i;
-  function named(text) { return NAME_RE.test(String(text || '')); }
+  function named(text) {
+    const s = String(text || '');
+    if (window.ClavisWake?.named) { try { return window.ClavisWake.named(s); } catch (_) {} }
+    return NAME_RE.test(s);
+  }
+  // Follow-up window me "conversation" tabhi maana jaata hai jab yeh sach me
+  // Rudra24 AI se kuch maang raha ho (request/question) AUR Hindi/Hinglish ho —
+  // kamre ki baat-cheet ya TV ki English se LLM call nahi honi chahiye.
+  function convoRequest(t) {
+    const n = t.split(/\s+/).filter(Boolean).length;
+    return n >= 2 && n <= 30 && looksLikeRequest(t) && CONVO_RE.test(t);
+  }
   function looksLikeRequest(text) {
     const t = String(text || '').trim();
     if (!t) return false;
@@ -184,31 +202,36 @@
     const gap = msSinceSpoke();
     const e = echo(t, 12000);
 
-    // Clavis is talking (or just stopped — recognizers deliver finals late).
+    // Rudra24 AI is talking (or just stopped — recognizers deliver finals late).
     if (speakingNow || gap < 2600) {
-      if (e.n >= 2 ? e.score >= 0.55 : e.score >= 1) return { accept: false, reason: 'echo', text: t, echo: e };
+      // After it stopped, only a near-exact repeat is its echo: in a live
+      // conversation he reuses its words ("haan, Noida ki bhi dikhao").
+      if (e.n >= 2 ? e.score >= (speakingNow ? 0.55 : 0.8) : e.score >= 1) return { accept: false, reason: 'echo', text: t, echo: e };
       if (STOP_RE.test(t)) return { accept: true, barge: true, reason: 'stop-word', text: t };
       if (byName && e.fresh >= 1) return { accept: true, barge: true, reason: 'named', text: t };
-      // New words over Clavis's voice interrupt it only when they are for
-      // Clavis — a request/question, or (once enrolled) sir's own voice.
-      // A conversation in the room shouldn't cut Clavis off.
+      // New words over Rudra24 AI's voice interrupt it only when they are for
+      // Rudra24 AI — a request/question, or (once enrolled) sir's own voice.
+      // A conversation in the room shouldn't cut Rudra24 AI off.
       // Other new words interrupt only when they are HIS voice (Voice ID) —
-      // a video or people in the room must never cut Clavis off.
+      // a video or people in the room must never cut Rudra24 AI off.
       const his = voiceId.enabled() && voiceId.verdict(ctx.since || now() - 4000).verdict === 'owner';
       if (e.fresh >= 2 && his) return { accept: true, barge: true, reason: 'his-voice', text: t };
       // Sir cutting in with a clear new instruction ("nahi, mujhe Noida ki
       // list chahiye") is heard and done — chatter without a request is not.
       if (e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
-      // Answering right after Clavis finished ("haan, Noida ki bhi dikhao"):
+      // Answering right after Rudra24 AI finished ("haan, Noida ki bhi dikhao"):
       // clearly new words, not an echo, a Hindi/Hinglish request.
-      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && CONVO_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && convoRequest(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      // Continuous session: he answers right after Rudra24 AI stops. Not an echo
+      // (the 0.8 check above) and at least one new word → it's his turn.
+      if (!speakingNow && ctx.session && !voiceId.enabled() && e.n >= 2 && e.fresh >= 1) return { accept: true, barge: false, reason: 'session', text: t };
       return { accept: false, reason: 'unsure-while-speaking', text: t, echo: e };
     }
-    // A recognizer can also deliver Clavis's words many seconds late.
+    // A recognizer can also deliver Rudra24 AI's words many seconds late.
     const late = echo(t, 9000);
     if (late.n >= 3 && late.score >= 0.8) return { accept: false, reason: 'late-echo', text: t, echo: late };
 
-    // Open mic (no "Clavis" said): only his registered voice counts. "Sounds
+    // Open mic (no "Rudra" said): only his registered voice counts. "Sounds
     // like a request" was not enough — "I'm going to go to the next video"
     // from a video in the room passed that test and opened photos.
     if (ctx.openMic && !byName) {
@@ -216,8 +239,14 @@
       // Without Voice ID, the few seconds right after a reply still work like
       // a conversation — but only for a Hindi / Hinglish request, never
       // English chatter from a video ("go to the next video").
-      const words = t.split(/\s+/).filter(Boolean).length;
-      if (v.verdict !== 'owner' && !voiceId.enabled() && words >= 2 && words <= 30 && CONVO_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      if (v.verdict !== 'owner' && !voiceId.enabled() && convoRequest(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
+      // Continuous session (he woke Rudra24 AI and is talking with it): any real
+      // sentence or a request / an answer to Rudra24 AI's question goes on — the
+      // LLM's [[silent]] still filters side talk, the echo guard ran above.
+      if (ctx.session && !voiceId.enabled()) {
+        const n = t.split(/\s+/).filter(Boolean).length;
+        if (n >= 2 || looksLikeRequest(t) || clavisJustAsked()) return { accept: true, barge: false, reason: 'session', text: t };
+      }
       if (v.verdict !== 'owner') return { accept: false, reason: voiceId.enabled() ? 'not-owner' : 'not-addressed', text: t, voice: v };
     }
     return { accept: true, barge: false, reason: 'ok', text: t };
@@ -229,11 +258,13 @@
     users: new Set(), stream: null, ctx: null, an: null, timer: 0, fbuf: null, tbuf: null, mel: null, frames: [],
     floor: 0.006, lastRms: 0, starting: null,
     async ensure() {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
       if (this.an) return true;
       if (this.starting) return this.starting;
       this.starting = (async () => {
         try {
-          this.stream = await (window.LocalSpeechEngine?.acquireSharedMicrophone?.() || navigator.mediaDevices.getUserMedia({
+          if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
+          this.stream = await (window.LocalSpeechEngine?.acquireVoiceMicrophone?.() || navigator.mediaDevices.getUserMedia({
             audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
           }));
           this.ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -254,6 +285,7 @@
       return this.starting;
     },
     async start(tag) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
       // Never ask for the mic just to listen for echo; only reuse a granted one.
       if (lsGet('clavis_mic_permission_granted') !== 'true' && tag !== 'enroll') return false;
       this.users.add(tag);
@@ -265,6 +297,20 @@
     stop(tag) {
       this.users.delete(tag);
       if (!this.users.size && this.timer) { clearInterval(this.timer); this.timer = 0; }
+    },
+    releaseAll() {
+      this.users.clear();
+      if (this.timer) { clearInterval(this.timer); this.timer = 0; }
+      if (this.stream) {
+        try { this.stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
+        this.stream = null;
+      }
+      if (this.ctx) {
+        try { this.ctx.close(); } catch (_) {}
+        this.ctx = null;
+      }
+      this.an = null;
+      this.starting = null;
     },
     level() { return this.lastRms; },
     tick() {
@@ -449,9 +495,12 @@
     };
   }
 
-  /* ── 4. live caption (Siri-style, top right, open text) ────── */
-  const cap = { el: null, line: null, words: [], hideTimer: 0, finalAt: 0 };
-  function capEnabled() { return lsGet(LS.caption) !== 'false'; }
+  /* ── 4. live caption: only inside the signed-in Rudra24 AI view ── */
+  const cap = { el: null, clip: null, line: null, words: [], els: [], text: '', glideT: 0, hideTimer: 0 };
+  function onClavisPage() {
+    return !!window.ClavisVoiceState?.isClavisWorkspace?.();
+  }
+  function capEnabled() { return lsGet(LS.caption) !== 'false' && onClavisPage(); }
   function capEnsure() {
     if (cap.el && document.body.contains(cap.el)) return cap.el;
     const el = document.createElement('div');
@@ -459,80 +508,279 @@
     el.setAttribute('aria-live', 'polite');
     el.setAttribute('role', 'status');
     el.innerHTML = '<span class="ce-dot" aria-hidden="true"></span><div class="ce-clip"><p class="ce-line"></p></div>';
+    // Measure and place it BEFORE it enters the document, so its very first
+    // resolved `top` is the right one. Doing this after the append does not
+    // work even in the same task: measurePlace() reads rectangles, which forces
+    // layout, which resolves the caption at the stylesheet's 96px — and the
+    // 20px correction then animated over 520 ms, sliding the caption upward
+    // underneath the first word as it was being typed in.
+    measurePlace();
+    el.style.top = cachedTop + 'px';
+    el.style.right = cachedRight + 'px';
     document.body.appendChild(el);
     cap.el = el;
+    cap.clip = el.querySelector('.ce-clip');
     cap.line = el.querySelector('.ce-line');
     place();
     return el;
   }
-  function place() {
-    if (!cap.el) return;
+  let placePending = false;
+  let cachedTop = 76;
+  let cachedRight = 20;
+  let lastPlaceMeasure = 0;
+
+  function measurePlace() {
+    const vw = window.innerWidth, vh = window.innerHeight;
     const bar = document.querySelector('.topbar-right') || document.querySelector('.topbar');
     const r = bar?.getBoundingClientRect?.();
-    if (r && r.bottom > 0 && r.bottom < 140) {
-      // ~1 cm below the bar: its frosted blur used to smear the words.
-      let top = r.bottom + 46;
-      // A page's own icon row right under the top bar (the Clavis page has
-      // one): sit below it instead of writing over its buttons.
-      document.querySelectorAll('.jarvis-hero-actions, .view.active .view-header-actions, #do-live-time').forEach((el) => {
+    let top = 76;
+    let right = 20;
+    if (r && r.bottom > 0 && r.bottom < 170) {
+      top = Math.round(r.bottom) + 20;
+      right = Math.max(16, Math.round(vw - r.right));
+    }
+    // Never land on the voice bar, the status pill or the header controls.
+    //
+    // This used to step down only when a row BOTH reached into the caption's
+    // own corner and sat inside a narrow band. On a narrower window the
+    // header stops short of that corner, both tests missed, and the words
+    // landed straight on the toolbar buttons. The rule is simpler now: the
+    // caption goes under the lowest thing in the header band, full stop.
+    ['#clavis-live-hud', '#jarvis-status-pill', '.jarvis-hero-actions',
+      '#view-jarvis.active .jarvis-hero-header', '.clavis-header-brand-wrap',
+      '.view.active .view-header-actions', '#do-live-time'].forEach((sel) => {
+      document.querySelectorAll(sel).forEach((el) => {
         const b = el.getBoundingClientRect();
-        if (b.width && b.height && b.top < top + 44 && b.bottom < 200 && b.right > window.innerWidth - 520) top = Math.max(top, b.bottom + 14);
+        if (!b.width || !b.height) return;
+        if (b.bottom <= 0 || b.top > 320) return;          // not the header band
+        top = Math.max(top, Math.round(b.bottom) + 16);
       });
-      cap.el.style.top = Math.round(top) + 'px';
-      cap.el.style.right = Math.max(12, Math.round(window.innerWidth - r.right)) + 'px';
+    });
+    cachedTop = Math.max(10, Math.min(Math.round(top), vh - 96));
+    cachedRight = Math.max(12, Math.min(right, Math.round(vw * 0.5) - 40));
+    lastPlaceMeasure = Date.now();
+  }
+
+  function place() {
+    if (!cap.el) return;
+    // Enforcement point: place() runs on every render and resize, so a
+    // caption that is already on screen when sir leaves the Rudra24 AI page (or
+    // when the sign-in card comes up) is taken down here too, not only by
+    // the listeners below.
+    if (!onClavisPage()) { dropIfOffPage(); return; }
+    const t = Date.now();
+    if (t - lastPlaceMeasure > 500) measurePlace();
+    if (!placePending) {
+      placePending = true;
+      requestAnimationFrame(() => {
+        placePending = false;
+        if (cap.el) {
+          cap.el.style.top = cachedTop + 'px';
+          cap.el.style.right = cachedRight + 'px';
+        }
+      });
     }
   }
-  window.addEventListener('resize', () => place(), { passive: true });
+  window.addEventListener('resize', () => { lastPlaceMeasure = 0; place(); }, { passive: true });
 
-  // Typed out properly: a capital first letter, "I" in English, and a
-  // closing "?" or "." once the sentence is final.
-  const ASK = /^(kya|kaise|kyun|kyon|kab|kahan|kaun|kitn[ae]|kis|what|why|how|when|where|who|which|is|are|can|could|do|does|will|would|should)\b|\b(kya|na|hai na|kaise|kyun|kahan)$/i;
-  function tidy(text, settled) {
-    let t = String(text || '').replace(/\s+/g, ' ').trim();
-    if (!t) return t;
-    t = t.replace(/(^|\s)i(?=\s|'|$)/g, '$1I');
-    t = t.charAt(0).toUpperCase() + t.slice(1);
-    if (settled && !/[.?!।…]$/.test(t)) t += ASK.test(t) ? '?' : /[\u0900-\u097F]$/.test(t) ? '।' : '.';
-    return t;
+  // Leaving the Rudra24 AI page takes the caption with it, mid-sentence if need
+  // be — otherwise a half-typed line is left hanging over the next page.
+  function dropIfOffPage() {
+    if (!cap.el || onClavisPage()) return;
+    cap.el.classList.remove('is-in', 'is-listening');
+    cap.el.classList.add('is-out');
+    ceReset();
+    lastPlaceMeasure = 0;
   }
+  document.addEventListener('click', () => setTimeout(dropIfOffPage, 60), true);
+  window.addEventListener('clavis:workspace-change', dropIfOffPage);
+  // Backstop for navigation paths that do not emit workspace-change.
+  setInterval(() => { if (cap.el) dropIfOffPage(); }, 1000);
+
+  // Transcript stays verbatim: do not capitalise, punctuate, translate, or
+  // otherwise rewrite words the recognizer heard.
+  function tidy(text) { return String(text || '').replace(/\s+/g, ' ').trim(); }
+
+  /* ── the conveyor ──────────────────────────────────────────────────────
+   * The line never wraps and is anchored to the right gutter, so a word
+   * arriving at the right edge pushes everything already on screen left by
+   * exactly its own width. That movement is the animation sir asked for, and
+   * it is a FLIP: measure where each word is NOW, mutate, measure again, play
+   * the difference back.
+   *
+   * "NOW" is deliberately getBoundingClientRect and not offsetLeft, because a
+   * rect includes a glide that is still in flight. Partials land every 150-300
+   * ms, well inside the 900 ms glide, so interrupting one is the normal case
+   * rather than the edge case — measuring the real on-screen position is what
+   * makes a fast talker read as one continuous drift instead of a stutter.
+   *
+   * The movement is played with the Web Animations API rather than the CSS
+   * transition on .ce-w. A second partial mid-glide REPLACES the running
+   * animation instead of racing it, the base transform stays `none` (so
+   * nothing is left holding an inline style), and the whole thing is composited.
+   *
+   * Characters: only the word being said right now carries per-character
+   * spans — .ce-c, whose typewriter (blur 3px -> 0, entering from the right)
+   * lives in clavis-enterprise.css. Once a word is no longer the live one its
+   * span is flattened back to plain text: the spans stop accumulating, and the
+   * word gets its normal shaping back.
+   *
+   * Devanagari is NOT split per character. क्या is one shaped cluster; four
+   * inline-blocks render it as garbage. Those words blur in whole — the same
+   * gesture, one step coarser. (en-IN writes Hinglish in Roman script, so this
+   * is the uncommon path, but it has to be right when it happens.)
+   * -------------------------------------------------------------------- */
+  const CE_MAXW = 20;          // words kept on the line; older ones are off-screen
+  const CE_STEP = 26;          // ms between characters of one arrival
+  const CE_STEP_CAP = 340;     // …and the most any single arrival may stagger
+  const CE_SHIFT = 900;        // must match --ce-shift in clavis-enterprise.css
+  const CE_GLIDE = 'cubic-bezier(0.16, 1, 0.3, 1)';
+  const CE_DEVA = /[\u0900-\u097F]/;
+  function ceStill() {
+    try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; }
+  }
+  // One word's characters, each with its own delay so the arrival types
+  // itself in left to right. Delay is capped: a whole sentence landing at
+  // once (a seed, or a final that rewrote the line) must not take a minute.
+  function ceChars(word, delay) {
+    const frag = document.createDocumentFragment();
+    const parts = CE_DEVA.test(word) ? [word] : Array.from(word);
+    parts.forEach((ch) => {
+      const s = document.createElement('span');
+      s.className = 'ce-c';
+      s.textContent = ch;
+      s.style.animationDelay = Math.min(delay, CE_STEP_CAP) + 'ms';
+      frag.appendChild(s);
+      delay += CE_STEP;
+    });
+    return { frag, delay };
+  }
+  function ceWord(word, delay) {
+    const el = document.createElement('span');
+    el.className = 'ce-w';
+    el.dataset.w = word;
+    const r = ceChars(word, delay);
+    el.appendChild(r.frag);
+    return { el, delay: r.delay };
+  }
+  function ceReset() {
+    if (cap.line) cap.line.textContent = '';
+    if (cap.line) cap.line.classList.remove('ce-gliding');
+    clearTimeout(cap.glideT);
+    cap.words = []; cap.els = []; cap.text = '';
+  }
+
   function render(text, settled) {
     capEnsure();
-    const next = tidy(text, settled).split(' ').filter(Boolean);
-    // Keep the words that didn't change; only the new tail animates in.
-    let same = 0;
-    const bare = (w) => w.toLowerCase().replace(/[.?!।…]+$/, '');
-    while (same < cap.words.length && same < next.length && bare(cap.words[same].w) === bare(next[same])) same++;
-    // Same word, now with its closing mark: swap the text, don't re-animate.
-    if (same < cap.words.length && same === next.length - 1 && bare(cap.words[same].w) === bare(next[same])) same++;
-    for (let i = 0; i < Math.min(same, cap.words.length); i++) if (cap.words[i].w !== next[i]) { cap.words[i].w = next[i]; cap.words[i].el.textContent = next[i]; }
-    for (let i = cap.words.length - 1; i >= same; i--) { cap.words[i].el.remove(); cap.words.pop(); }
-    for (let i = same; i < next.length; i++) {
-      const s = document.createElement('span');
-      s.className = 'ce-w';
-      s.textContent = next[i];
-      const d = Math.min(0.36, (i - same) * 0.06) + 's';
-      s.style.animationDelay = `${d}, ${d}`;
-      cap.line.appendChild(s);
-      cap.line.appendChild(document.createTextNode(' '));
-      cap.words.push({ w: next[i], el: s });
+    const line = cap.line;
+    // Display Hindi in Roman Hinglish; keep the original for intent/echo checks.
+    const t = tidy(window.ClavisVoice?.toHinglish?.(text, true) || text);
+    if (!t) { ceReset(); cap.el.classList.toggle('is-settled', !!settled); return; }
+    if (t === cap.text) {               // repeated partial: nothing moved
+      cap.el.classList.toggle('is-settled', !!settled);
+      return;
     }
-    // Long speech: only the latest ~18 words (two lines) stay (the mask fades older ones).
-    while (cap.words.length > 18) {
-      const first = cap.words.shift();
-      const sp = first.el.nextSibling;
-      first.el.remove();
-      if (sp && sp.nodeType === 3) sp.remove();
+    cap.text = t;
+    const next = t.split(' ');
+    const cur = cap.words;
+    const els = cap.els;
+    const still = ceStill();
+
+    // FIRST — where each word is on screen, glide included. Keyed by element,
+    // not index, so trimming the left end can't misalign the pairs.
+    const first = new Map();
+    if (!still) els.forEach((el) => first.set(el, el.getBoundingClientRect().left));
+    const isTrans = (a) => typeof CSSTransition !== 'undefined' && a instanceof CSSTransition;
+    els.forEach((el) => el.getAnimations().forEach((a) => { if (!isTrans(a)) a.cancel(); }));
+
+    // How much of the line this partial keeps.
+    let k = 0;
+    while (k < cur.length && k < next.length && cur[k] === next[k]) k++;
+    let delay = 0;
+    // The last word on the line is the one still being said. When the new
+    // partial merely extends it, type the extra characters into the span that
+    // is already there — that, and not a timer, is the typewriter: it runs at
+    // the speed sir actually speaks.
+    if (k === cur.length - 1 && k < next.length && cur[k] && next[k].startsWith(cur[k])) {
+      const r = ceChars(next[k].slice(cur[k].length), 0);
+      els[k].appendChild(r.frag);
+      els[k].dataset.w = next[k];
+      cur[k] = next[k];
+      delay = r.delay;
+      k++;
+    } else {
+      // Everything from k on was a different guess. Drop it; it never settled,
+      // so there is nothing to animate out.
+      for (let i = cur.length - 1; i >= k; i--) { els[i].remove(); els.pop(); cur.pop(); }
     }
+    for (let i = k; i < next.length; i++) {
+      const w = ceWord(next[i], delay);
+      delay = w.delay;
+      line.appendChild(w.el);
+      els.push(w.el); cur.push(next[i]);
+    }
+    // Older words are behind the left fade; keeping them costs layout for
+    // something nobody can see.
+    while (els.length > CE_MAXW) { first.delete(els[0]); els[0].remove(); els.shift(); cur.shift(); }
+
+    // Live word vs spoken words, and flatten what is no longer live. This runs
+    // BEFORE the second measurement on purpose: flattening restores kerning, so
+    // the width shifts a hair, and the glide below absorbs it.
+    const n = els.length;
+    els.forEach((el, i) => {
+      el.classList.toggle('ce-now', i === n - 1);
+      if (i < n - 1 && el.firstElementChild) el.textContent = el.dataset.w;
+    });
     cap.el.classList.toggle('is-settled', !!settled);
+    if (still) return;
+
+    // LAST — read every position first, then write every animation. Reading
+    // and writing in one loop would force a reflow per word.
+    const move = [];
+    els.forEach((el) => {
+      const was = first.get(el);
+      if (was == null) return;                      // new word: it types in, it does not glide
+      const d = was - el.getBoundingClientRect().left;
+      if (Math.abs(d) >= 0.5) move.push([el, d]);
+    });
+    if (!move.length) return;
+    // The arriving word rides the same belt. Left to sit at its final slot it
+    // would be fully drawn while the words it displaces were still catching up,
+    // and the gap in front of it read as a missing space. Carried along, it
+    // comes in from beyond the right edge instead — which is what sir asked
+    // for — and the spacing is rigid at every instant of the glide.
+    const d0 = move[move.length - 1][1];
+    els.forEach((el) => { if (!first.has(el)) move.push([el, d0]); });
+    move.forEach(([el, d]) => el.animate(
+      [{ transform: 'translateX(' + d + 'px)' }, { transform: 'none' }],
+      { duration: CE_SHIFT, easing: CE_GLIDE },
+    ));
+    // .ce-gliding is what clavis-enterprise.css hangs the motion blur on, and
+    // it is only worth a composite layer while something is actually moving.
+    line.classList.add('ce-gliding');
+    clearTimeout(cap.glideT);
+    // Not CE_SHIFT: an expo-out glide spends nearly all of its speed in the
+    // first third, so holding the blur for the whole 900ms left the line
+    // smeared long after it had stopped looking like it was moving — and with
+    // partials every ~180ms the class simply never lifted.
+    cap.glideT = setTimeout(() => line.classList.remove('ce-gliding'), Math.round(CE_SHIFT * 0.34));
   }
   const caption = {
     live(text) {
-      if (!capEnabled()) return;
+      if (!capEnabled()) { this.clear(); return; }
       const t = String(text || '').trim();
       if (!t) return;
-      // Clavis's own words never show up as "what sir said".
-      if (isSpeaking()) { const e = echo(t, 12000); if (e.n >= 2 ? e.score >= 0.55 : e.score >= 1) return; }
+      // Rudra24 AI's own words never show up as "what sir said".
+      // Rudra24 AI's own words never show up as "what sir said" — but a
+      // ONE-word partial is the opening word of the command, and the old
+      // `e.score >= 1` bar for it was trivially met: a single word that
+      // Rudra24 AI happened to use in the last 45 s scores a perfect 1.0, so
+      // the first word of nearly every command was swallowed and the caption
+      // only woke up on word two. One word is not evidence. Wait for the second.
+      if (isSpeaking()) { const e = echo(t, 12000); if (e.n >= 2 && e.score >= 0.55) return; }
       clearTimeout(cap.hideTimer);
+      // Coming back from hidden? The page may have moved under us — re-measure.
+      if (cap.el?.classList.contains('is-out')) lastPlaceMeasure = 0;
       place();
       render(t, false);
       cap.el.classList.remove('is-out', 'is-dropped', 'is-idle');
@@ -540,7 +788,7 @@
       caption._touched = now();
     },
     final(text, accepted = true) {
-      if (!capEnabled()) return;
+      if (!capEnabled()) { this.clear(); return; }
       if (!accepted) {
         if (!cap.el) return;
         cap.el.classList.add('is-dropped');
@@ -552,10 +800,10 @@
       cap.el.classList.remove('is-listening', 'is-dropped', 'is-idle');
       cap.el.classList.add('is-in', 'is-settled');
       clearTimeout(cap.hideTimer);
-      cap.hideTimer = setTimeout(() => this.clear(), 4200);   // long enough to read
+      cap.hideTimer = setTimeout(() => this.clear(), 2600);
     },
     listening(on) {
-      if (!capEnabled()) return;
+      if (!capEnabled()) { this.clear(); return; }
       capEnsure();
       cap.el.classList.toggle('is-listening', !!on);
       if (on && !cap.words.length) cap.el.classList.add('is-in', 'is-idle');
@@ -569,8 +817,7 @@
         cap.el.classList.remove('is-in', 'is-listening', 'is-idle');
         setTimeout(() => {
           if (!cap.el || !cap.el.classList.contains('is-out')) return;
-          cap.line.textContent = '';
-          cap.words = [];
+          ceReset();
           cap.el.classList.remove('is-settled', 'is-dropped');
         }, 520);
       };
@@ -583,7 +830,7 @@
   function enrollSheet() {
     if (document.getElementById('clavis-voiceid-sheet')) return Promise.resolve(null);
     const owner = (() => { try { return window.AuthSystem?.getProfile?.()?.firstName || ''; } catch (_) { return ''; } })();
-    const line = `Clavis, main ${owner || 'aapka owner'} hoon. Meri awaaz yaad rakhna — leads nikalni ho, map dekhna ho ya koi bhi kaam, sirf mere kehne par karna.`;
+    const line = `Rudra24 AI, main ${owner || 'aapka owner'} hoon. Meri awaaz yaad rakhna — leads nikalni ho, map dekhna ho ya koi bhi kaam, sirf mere kehne par karna.`;
     const el = document.createElement('div');
     el.id = 'clavis-voiceid-sheet';
     el.setAttribute('role', 'dialog');
@@ -592,7 +839,7 @@
       <div class="cv-card">
         <div class="cv-ring"><svg viewBox="0 0 44 44" aria-hidden="true"><circle cx="22" cy="22" r="19" class="cv-track"/><circle cx="22" cy="22" r="19" class="cv-fill"/></svg><span class="cv-mic" aria-hidden="true">●</span></div>
         <h3>Voice ID</h3>
-        <p class="cv-sub">Yeh line normal awaaz me padhiye. Clavis aapki awaaz pehchanega aur background ki baaton ko ignore karega.</p>
+        <p class="cv-sub">Yeh line normal awaaz me padhiye. Rudra24 AI aapki awaaz pehchanega aur background ki baaton ko ignore karega.</p>
         <p class="cv-line">“${line.replace(/[<>&]/g, '')}”</p>
         <p class="cv-status" aria-live="polite">Tayyar hone par Start dabaiye.</p>
         <div class="cv-actions"><button type="button" class="cv-cancel">Cancel</button><button type="button" class="cv-start">Start</button></div>
@@ -636,6 +883,7 @@
       skel('leads') === skel(deva2latin('लीड्स')),
       skel('theek') === skel(deva2latin('ठीक')),
       skel('clavis') === skel(deva2latin('क्लेविस')),
+      latestTwoSentences('first. दूसरा वाक्य। third? fourth') === 'third? fourth',
       echo('delhi ncr ki leads nikal raha').score >= 0.8,
       echo('दिल्ली एनसीआर की लीड्स').score >= 0.5,
       judge('theek hai sir delhi ncr ki leads').reason === 'echo',
@@ -646,7 +894,7 @@
     said.speaking = false; said.endedAt = 0; said.items = [];
     checks.push(
       judge('mummy ne khana bana liya', { openMic: true }).accept === false,
-      judge('Clavis mummy ko call karo', { openMic: true }).accept === true,
+      judge('Rudra24 AI mummy ko call karo', { openMic: true }).accept === true,
       judge('map band karo', { openMic: true }).accept === (!voiceId.enabled()),   // a reply in the conversation window
       judge("I'm going to go to the next video", { openMic: true }).accept === false,
       judge('photos dikhao').accept === true,
@@ -672,7 +920,7 @@
     const b = document.getElementById('sm-voiceid-btn');
     if (b) b.textContent = st.enrolled ? 'Re-register voice' : 'Register my voice';
     const h = document.getElementById('sm-voiceid-hint');
-    if (h && st.enrolled) h.textContent = 'Registered — background voices are ignored unless they say “Clavis”.';
+    if (h && st.enrolled) h.textContent = 'Registered — background voices are ignored unless they say “Rudra”.';
     const c = document.getElementById('sm-live-caption-toggle');
     if (c) c.checked = capEnabled();
   }
@@ -692,27 +940,34 @@
       lsSet('clavis_sound_trigger_enabled', 'true');
       try { window.dispatchEvent(new CustomEvent('clavis:mic-granted')); } catch (_) {}
     }
-    try { window.ClavisVision?.setEnabled?.(true); window.ClavisVision?.start?.(); } catch (_) {}
-    try { window.ClavisProactive?.setEnabled?.(true); } catch (_) {}
-    lsSet(CONSENT, JSON.stringify({ at: now(), mic, screen: true, proactive: true }));
+    // Screen-vision aur proactive background AI yahan ON nahi hote — woh
+    // bina "Rudra" bole LLM calls karte the aur keys ghante me khatam.
+    // Sirf wake-word mic + clap/snap; baaki Settings se khud on kar sakte hain.
+    lsSet(CONSENT, JSON.stringify({ at: now(), mic, screen: false, proactive: false }));
     card?.querySelector('.cv-status') && (card.querySelector('.cv-status').textContent = mic
-      ? 'Ho gaya, sir. Ab bas app kholiye aur boliye — main sun rahi hoon.'
+      ? 'Ho gaya, sir. Jab kaam ho, bas "Rudra" boliye, snap ya clap kijiye.'
       : 'Mic browser ne block kiya hai — address bar ke mic icon se allow kar dijiye.');
     setTimeout(() => { card?.classList.remove('is-in'); setTimeout(() => card?.remove(), 320); }, mic ? 1500 : 3200);
   }
   function consentCard() {
+    if (!window.ClavisVoiceState?.isClavisWorkspace?.()) return;
     if (lsGet(CONSENT) || document.getElementById('clavis-voiceid-sheet')) return;
     if (lsGet('clavis_mic_permission_granted') === 'true') { lsSet(CONSENT, JSON.stringify({ at: now(), mic: true, inferred: true })); return; }
     if (location.protocol === 'file:') return;   // the mic can't be kept on file:// pages
+    // Never stack two dialogs: wait until the key-setup / settings dialog is closed.
+    if (document.querySelector('#cx-setup-root.is-open, .settings-overlay.open, .modal-overlay.open')) {
+      setTimeout(() => { try { consentCard(); } catch (_) {} }, 4000);
+      return;
+    }
     const el = document.createElement('div');
     el.id = 'clavis-voiceid-sheet';
     el.setAttribute('role', 'dialog');
-    el.setAttribute('aria-label', 'Clavis permissions');
+    el.setAttribute('aria-label', 'Rudra24 AI permissions');
     el.innerHTML = `
       <div class="cv-card">
-        <h3>Clavis ko ek baar ijazat dijiye</h3>
-        <p class="cv-sub">Sirf pehli baar. Uske baad app kholte hi Clavis sunegi, screen dekh kar madad offer karegi — koi button nahi.</p>
-        <p class="cv-line" style="font-style:normal;text-align:left;line-height:1.9">🎙️ Mic — hands-free, "Clavis" bolte hi<br>🖥️ Screen samajh kar sahi waqt pe suggestions<br>💡 Khud se yaad dilana aur help offer karna</p>
+        <h3>Rudra24 AI ko ek baar ijazat dijiye</h3>
+        <p class="cv-sub">Sirf pehli baar. Rudra24 AI soyi rahegi aur sirf apna naam ("Rudra", "Hey Rudra", "Hey Buddy"), snap ya clap sun kar jaagegi — baaki baatein nahi sunti.</p>
+        <p class="cv-line" style="font-style:normal;text-align:left;line-height:1.9">Mic — sirf wake word ke liye (local, koi AI call nahi)<br>Snap / clap se jagana</p>
         <p class="cv-status" aria-live="polite">Aap Settings me kabhi bhi band kar sakte hain.</p>
         <div class="cv-actions"><button type="button" class="cv-cancel">Baad me</button><button type="button" class="cv-start">Sab allow karein</button></div>
       </div>`;
@@ -722,6 +977,7 @@
     el.querySelector('.cv-start').onclick = (ev) => { ev.currentTarget.disabled = true; grantAll(el); };
   }
   setTimeout(() => { try { consentCard(); } catch (_) {} }, 2600);
+  window.addEventListener('clavis:workspace-change', consentCard);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncUi, { once: true }); else setTimeout(syncUi, 0);
 
   window.ClavisEar = {
@@ -731,4 +987,8 @@
     caption, voiceId, tap, createDoubleTalk,
     _skel: skel, _deva2latin: deva2latin, _selfTest,
   };
+
+  if (typeof window !== 'undefined' && window.ClavisVoiceState?.registerAudioCleanup) {
+    window.ClavisVoiceState.registerAudioCleanup(() => tap.releaseAll());
+  }
 })();

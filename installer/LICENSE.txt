@@ -1,0 +1,59 @@
+RUDRA24 AI — SOFTWARE LICENCE AGREEMENT
+
+Please read this before installing. Installing the software means you accept
+these terms.
+
+1. LICENCE
+Rudra24 Digital grants you a non-exclusive, non-transferable licence to install
+and use Rudra24 AI on computers belonging to your organisation, for as long as
+your subscription is active.
+
+2. WHAT THIS SOFTWARE IS
+Rudra24 AI is a client application. Lead generation, AI replies, voice calling
+and related processing run on Rudra24 Digital's servers. The application needs
+an internet connection to work.
+
+3. YOUR ACCOUNT AND LIMITS
+Access is tied to the account you sign in with. Daily limits on leads and calls
+apply to your account and are enforced on our servers. You agree not to attempt
+to bypass, disable or exceed those limits, and not to share your account
+credentials outside your organisation.
+
+4. WHAT YOU MAY NOT DO
+You may not copy, resell, sublicense, rent or redistribute this software. You
+may not reverse engineer, decompile or disassemble it, or attempt to extract
+API keys, credentials or server configuration from it, except where such a
+restriction is prohibited by law.
+
+5. YOUR DATA
+Leads, contacts, call records and settings you create remain yours. We process
+them to provide the service. You are responsible for ensuring that the contacts
+you upload and the calls you place comply with applicable law, including Indian
+telecom regulations (TRAI/DLT) and data protection rules, and that you hold any
+consent those laws require.
+
+6. THIRD-PARTY SERVICES
+The software connects to third-party services (telephony, AI and data
+providers). Their availability, pricing and terms are outside our control.
+
+7. NO WARRANTY
+The software is provided "as is", without warranty of any kind. We do not
+warrant that it will be uninterrupted or error free, or that any particular
+business result will follow from using it.
+
+8. LIABILITY
+To the extent permitted by law, Rudra24 Digital's total liability arising out of
+or relating to this software is limited to the subscription fees you paid in the
+twelve months before the claim. We are not liable for indirect, incidental or
+consequential losses, including lost profits or lost business.
+
+9. TERMINATION
+This licence ends if your subscription ends or if you breach these terms. On
+termination you must uninstall the software. You may export your data before
+termination.
+
+10. GOVERNING LAW
+This agreement is governed by the laws of India, and the courts at Gurugram,
+Haryana have exclusive jurisdiction.
+
+Contact: Rudra24 Digital

@@ -1,0 +1,40 @@
+'use strict';
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+async function test() {
+  const storage = new Map(), requests = [], tools = [];
+  let answers = [];
+  const w = {addEventListener(){},dispatchEvent(){},SupabaseAuth:{getAccessToken:()=> 'fixture'},NexusAIChat:{complete:async request=>{requests.push(request);return {choices:[{message:{content:answers.shift() || '**Yes, with limits.** Public data availability varies by industry.'}}],model:'mock'};}},JarvisSkills:{describeForPrompt:()=> 'get_lead_stats: read saved lead counts',invoke:async(name)=>{tools.push(name);return {success:true,count:4};}},SKYLARK_CONFIG:{},ClavisMind:{}};
+  const c={window:w,document:{readyState:'loading',addEventListener(){},getElementById(){return null;}},localStorage:{getItem:k=>storage.get(k)||null,setItem:(k,v)=>storage.set(k,v)},console,Date,AbortController,CustomEvent:class{},setTimeout,clearTimeout};
+  vm.createContext(c);
+  vm.runInContext(fs.readFileSync('clavis-request-intent.js','utf8'),c);
+  vm.runInContext(fs.readFileSync('clavis-task-model.js','utf8'),c);
+  vm.runInContext(fs.readFileSync('jarvis.js','utf8'),c);
+  const question='Explain how lead generation works and its limitations.';
+  assert.equal(w.ClavisTaskModel.IntentClassifier.label(question).mode,'thinking');
+  answers=['|||TOOL:{"skill":"generate_leads","params":{"count":20}}|||','**Yes, with limits.** Public business data varies by industry.'];
+  const response=await w.JarvisEngine.sendMessage(question,null,()=>{},null,{source:'composer'});
+  assert.equal(tools.length,0);
+  assert.equal(response.toolsRun.length,0);
+  assert.match(response.text,/Public business data/);
+  assert.equal(requests[0].max_tokens,260);
+  const before=requests.length;
+  await w.JarvisEngine.sendMessage('Explain in more detail: '+question,null,()=>{},null,{source:'composer',answerOnly:true,elaborate:true});
+  assert.equal(requests[before].max_tokens,900);
+  // Saved account counts may use the narrow read-only allowlist.
+  answers=['|||TOOL:{"skill":"get_lead_stats","params":{}}|||','You have four saved leads.'];
+  await w.JarvisEngine.sendMessage('How many saved leads do I have?',null,()=>{},null,{source:'composer'});
+  assert.deepEqual(tools,['get_lead_stats']);
+  answers=['**Coverage varies.** '+Array(130).fill('Public sources differ by industry.').join(' '),'**Coverage varies.** Many industries are supported, but verified contact availability depends on public sources.'];
+  const spoken = [];
+  const compact = await w.JarvisEngine.sendMessage('Explain public lead coverage',null,()=>{},async text=>spoken.push(text),{source:'composer'});
+  assert.ok(compact.text.split(/\s+/).length < 80);
+  assert.deepEqual(spoken,[compact.text]);
+  assert.equal(requests.at(-1).max_tokens,180);
+  const prior=requests.length;
+  const capability=await w.JarvisEngine.sendMessage('Kya ham har ek industry ke liye leads generate kr sakte hain using my AI?',null,null,null,{source:'composer'});
+  assert.equal(capability.modelUsed,'app-capabilities');
+  assert.equal(requests.length,prior);
+  assert.match(capability.text,/guarantee nahi/);
+  console.log('Question mode, forbidden model tools, concise/elaborated budget, read-only account statistics: passed');
+}
+test().catch(e=>{console.error(e);process.exitCode=1;});

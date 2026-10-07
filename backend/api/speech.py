@@ -1,12 +1,9 @@
-"""Speech endpoints for the Clavis browser chat UI.
+"""Speech endpoints for the Rudra24 AI browser chat UI.
 
-Voice engine: Google Gemini (services/speech/gemini_client.py), configured
-with one GEMINI_API_KEY in backend/.env. Kokoro/faster-whisper/Silero are
-NOT used here any more -- they were slow (CPU inference; users saw ~14s
-replies) and the local STT path had a standing bug (raw PCM16 frames were
-handed to a WAV parser with no header, so every transcription threw and was
-silently reported as "Local STT failed"). That bug is fixed below by
-wrapping the buffer in a real WAV before it goes anywhere.
+Browser Groq transcription uses the signed-in account's server vault key.
+Groq uploads pass the installed Silero speech gate before cloud transcription;
+no local Whisper transcription model is loaded. The legacy socket still uses
+Google Gemini and wraps raw PCM16 in a WAV header.
 
 The turn-detection (VAD) and worklet/websocket contract are unchanged from
 before, so jarvis_ui.js / clavis-local-speech.js needed no protocol changes
@@ -20,22 +17,27 @@ is a separate feature nobody asked to change, so it was left alone.
 from __future__ import annotations
 
 import json
+import asyncio
 import logging
 import os
 import re
+import time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
-from api.auth_sync import UserAccount, get_current_user
+from api.auth_sync import UserAccount, get_current_user, authenticate_websocket, get_db
+from api.credentials import get_provider_secret
+from sqlalchemy.orm import Session
+import httpx
 
 from services.speech import gemini_client
-from services.speech.audio import pcm16_to_wav
+from services.speech.audio import pcm16_to_wav, prepare_transcription_wav
 from services.speech.contracts import new_generation_id
 from services.speech.vad import VADTurnTracker, get_vad_engine
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["speech"])
-_WS_ORIGINS = {value.strip() for value in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000").split(",") if value.strip()}
+_WS_ORIGINS = {value.strip() for value in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3210").split(",") if value.strip()}
 
 
 def speech_health() -> dict:
@@ -55,12 +57,65 @@ async def speech_health_endpoint(user: UserAccount = Depends(get_current_user)):
 
 
 @router.post("/api/speech/transcribe")
-async def transcribe_audio(file: UploadFile = File(...), language_hint: str = "", user: UserAccount = Depends(get_current_user)):
-    data = await file.read()
+async def transcribe_audio(file: UploadFile = File(...), language_hint: str = "", provider: str = "groq",
+                           user: UserAccount = Depends(get_current_user), db: Session = Depends(get_db)):
+    data = await file.read(8 * 1024 * 1024 + 1)
     if not data:
         raise HTTPException(status_code=400, detail="audio is required")
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="audio is too large")
+    if provider not in {"groq", "gemini"}:
+        raise HTTPException(status_code=422, detail="Unsupported transcription provider")
+    if provider == "groq":
+        key = get_provider_secret("groq", user, db)
+        if not key:
+            raise HTTPException(status_code=503, detail="Connect Groq in Setup for speech recognition")
+        try:
+            data = await asyncio.to_thread(prepare_transcription_wav, data)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Audio could not be decoded, or exceeded 60 seconds") from None
+        except Exception as exc:
+            logger.warning("Voice audio validation unavailable: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Voice audio validation is unavailable") from None
+        if data is None:
+            return {"text":"", "reason":"no_speech", "language":"", "duration":0, "provider":"groq"}
+        fields = {"model": "whisper-large-v3", "temperature": "0", "response_format": "verbose_json"}
+        language = language_hint.split("-")[0].lower()
+        if language in {"hi", "en"}:
+            fields["language"] = language
+        try:
+            async with httpx.AsyncClient(timeout=20.0) as client:
+                response = await client.post("https://api.groq.com/openai/v1/audio/transcriptions",
+                    headers={"Authorization": f"Bearer {key}"}, data=fields,
+                    files={"file": ("speech.wav", data, "audio/wav")})
+            if response.status_code in {401, 403}:
+                raise HTTPException(status_code=422, detail="Groq rejected the connected key")
+            if response.status_code == 429:
+                raise HTTPException(status_code=429, detail="Groq speech request limit reached. Check the connected provider's allowance in Setup.")
+            response.raise_for_status()
+            result = response.json()
+            if not isinstance(result, dict) or not isinstance(result.get("text", ""), str):
+                raise ValueError("Invalid transcription response")
+            segments = result.get("segments") or []
+            if not isinstance(segments, list) or any(not isinstance(segment, dict) for segment in segments):
+                raise ValueError("Invalid transcription segments")
+            silent = bool(segments) and all(float(segment.get("no_speech_prob", 0)) > .85 for segment in segments)
+            # Reject uncertain/repetitive decoding; never turn it into a command.
+            unclear = any(float(segment.get("avg_logprob", 0)) < -1.5
+                          or float(segment.get("compression_ratio", 0)) > 2.4
+                          or (float(segment.get("no_speech_prob", 0)) > .6
+                              and float(segment.get("avg_logprob", 0)) < -1)
+                          for segment in segments)
+        except HTTPException:
+            raise
+        except (httpx.HTTPError, ValueError, TypeError) as exc:
+            logger.warning("Groq transcription unavailable: %s", type(exc).__name__)
+            raise HTTPException(status_code=503, detail="Groq speech transcription is temporarily unavailable") from None
+        # Whisper can hallucinate a canned transcript for a silent recording.
+        return {"text": "" if silent or unclear else str(result.get("text") or "").strip(),
+                "reason": "no_speech" if silent else "unclear_audio" if unclear else "",
+                "language": result.get("language") or language_hint, "duration": result.get("duration") or 0,
+                "provider": "groq"}
     try:
         text = await gemini_client.transcribe_wav(data, language_hint)
     except Exception as exc:
@@ -71,10 +126,9 @@ async def transcribe_audio(file: UploadFile = File(...), language_hint: str = ""
 
 @router.websocket("/ws/speech/input")
 async def speech_input_socket(websocket: WebSocket):
-    if websocket.headers.get("origin") not in _WS_ORIGINS:
-        await websocket.close(code=1008)
+    claims = await authenticate_websocket(websocket, _WS_ORIGINS)
+    if not claims:
         return
-    await websocket.accept()
     audio = bytearray()
     language_hint = ""
     generation_id = new_generation_id()
@@ -96,15 +150,21 @@ async def speech_input_socket(websocket: WebSocket):
                 "text": text, "language": language_hint, "duration": 0.0,
             })
         except Exception as exc:
-            await websocket.send_json({"type": "error", "generation_id": generation_id, "error": str(exc)})
+            await websocket.send_json({"type": "error", "generation_id": generation_id, "error": "Speech transcription unavailable"})
         audio.clear()
         tracker.reset()
         capturing = False
     try:
         while True:
             message = await websocket.receive()
+            if time.time() >= claims["exp"]:
+                await websocket.close(code=1008)
+                return
             if message.get("bytes") is not None:
                 frame = message["bytes"]
+                if len(frame) > 65536 or len(audio) + len(frame) > 8 * 1024 * 1024:
+                    await websocket.close(code=1009)
+                    return
                 state, active = tracker.feed(frame)
                 if state == "speech_start":
                     audio.clear()
@@ -206,15 +266,17 @@ class _TextToSpeechScheduler:
 
 @router.websocket("/ws/speech/output")
 async def speech_output_socket(websocket: WebSocket):
-    if websocket.headers.get("origin") not in _WS_ORIGINS:
-        await websocket.close(code=1008)
+    claims = await authenticate_websocket(websocket, _WS_ORIGINS)
+    if not claims:
         return
-    await websocket.accept()
     scheduler: Optional[_TextToSpeechScheduler] = None
     socket_closed = False
     try:
         while True:
             message = await websocket.receive_text()
+            if time.time() >= claims["exp"] or len(message) > 16384:
+                await websocket.close(code=1008)
+                return
             payload = json.loads(message)
             message_type = payload.get("type")
             if message_type == "start":
@@ -269,7 +331,7 @@ async def speech_output_socket(websocket: WebSocket):
             scheduler.cancel()
 
 
-async def synthesize_gemini_wav(text: str, voice: str = "") -> bytes:
+async def synthesize_gemini_wav(text: str, voice: str = "", api_key: str = "") -> bytes:
     """One-shot text -> WAV, for the simple /api/tts REST endpoint."""
-    pcm = await gemini_client.synthesize(text, voice)
+    pcm = await gemini_client.synthesize(text, voice, api_key=api_key)
     return pcm16_to_wav(pcm, 24000)

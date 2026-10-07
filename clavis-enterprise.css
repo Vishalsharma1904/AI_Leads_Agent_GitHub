@@ -1,0 +1,535 @@
+/* ============================================================
+ * clavis-enterprise.css · 2026-09-30
+ * ------------------------------------------------------------
+ * Loaded absolutely last, after every other polish sheet.
+ * It does three things and deliberately nothing else:
+ *
+ *   1. HEADER GUARD — the Rudra24 AI toolbar can no longer be
+ *      crowded or written over. The live caption used to land
+ *      on the buttons; clavis-ear.js now measures under the
+ *      whole header band, and these rules keep the row itself
+ *      from collapsing into its own separator.
+ *   2. CAPTION SCOPE — sir's words show on the Rudra24 AI page
+ *      and nowhere else. On Leads / Email / Dashboard: gone.
+ *   3. MOTION — one slow, settled curve for the whole app.
+ *      Nothing snaps; everything eases out long and leaves a
+ *      little faster than it arrives. That is the difference
+ *      between "works" and "feels expensive".
+ *
+ * Everything here animates opacity / transform / colour only, so
+ * it stays on the compositor at 60 fps, and the whole layer
+ * stands down under prefers-reduced-motion.
+ *
+ * The existing sheets (clavis-luxe, clavis-refine, clavis-claude,
+ * clavis-stage) own the LOOK of the header. These rules touch
+ * only what was actually breaking, at a specificity that clears
+ * clavis-luxe's five-id prefix.
+ * ============================================================ */
+
+:root {
+  /* One curve family for the whole product. */
+  --cx-ease:      cubic-bezier(0.22, 1, 0.36, 1);   /* expo-out — the default */
+  --cx-ease-soft: cubic-bezier(0.32, 0.72, 0, 1);   /* long, gentle settle */
+  --cx-ease-in:   cubic-bezier(0.4, 0, 1, 1);       /* leaving */
+
+  --cx-t-press:   130ms;   /* finger down — must stay immediate */
+  --cx-t-fast:    280ms;   /* hover, small state flips */
+  --cx-t-base:    460ms;   /* the normal one */
+  --cx-t-slow:    700ms;   /* panels, sheets, cards */
+  --cx-t-page:    820ms;   /* a whole view changing */
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 1 · HEADER GUARD
+ * ════════════════════════════════════════════════════════════ */
+
+/* The controls are the last thing that should give up room — the
+   title truncates, the buttons do not fold under each other. */
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .jarvis-hero-actions,
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .jarvis-hero-actions--compact {
+  flex: 0 0 auto !important;
+  flex-wrap: nowrap !important;
+  align-items: center !important;
+  white-space: nowrap !important;
+}
+
+/* The divider was collapsing to zero width, letting the two groups
+   of buttons touch and read as one blob. */
+html:not(#_):not(#_) body:not(#_):not(#_) #view-jarvis .jarvis-actions-sep {
+  flex: 0 0 auto !important;
+  width: 1px !important;
+  height: 18px !important;
+  align-self: center !important;
+  margin: 0 6px !important;
+  background: currentColor;
+  opacity: 0.16;
+}
+
+/* The "Set up Rudra24 AI" pill is a guest in this row — it must not stretch it. */
+html:not(#_):not(#_) body:not(#_):not(#_) #cx-setup-pill {
+  flex: 0 0 auto !important;
+  white-space: nowrap !important;
+  max-width: 38vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 2 · LIVE CAPTION — Rudra24 AI page only
+ * ════════════════════════════════════════════════════════════ */
+
+/* clavis-ear.js already refuses to render off the Rudra24 AI page. This is
+   the belt to its braces, and it also clears a caption left on screen
+   by an older cached copy of that script. */
+body:has(#view-jarvis:not(.active)) #clavis-ear-caption {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* When it does move (the header band changing height), it glides. */
+#clavis-ear-caption {
+  transition:
+    opacity   var(--cx-t-slow) var(--cx-ease),
+    transform var(--cx-t-slow) var(--cx-ease),
+    filter    var(--cx-t-slow) var(--cx-ease),
+    top       var(--cx-t-base) var(--cx-ease-soft) !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 3 · MOTION SYSTEM
+ * ════════════════════════════════════════════════════════════ */
+
+/* --- 3a. Everything that already transitions, onto one curve ------- */
+button, a, input, select, textarea,
+.btn, .btn-primary, .btn-secondary, .generate-btn,
+.jarvis-icon-pill, .jarvis-newchat-pill, .jarvis-more-item,
+.nav-item, .sidebar-item, .rail-item, .tab, .chip, .pill,
+.card, .stat-card, .lead-card, .plugin-card,
+.smodal-btn, .smodal-btn-primary, .pg-btn, .cx-setup-pill {
+  transition-duration: var(--cx-t-fast);
+  transition-timing-function: var(--cx-ease);
+}
+
+/* Press is the one thing that must never be slow — a delayed press
+   reads as a dropped tap. */
+button:active, .btn:active, .btn-primary:active, .generate-btn:active,
+.jarvis-icon-pill:active, .jarvis-newchat-pill:active,
+.nav-item:active, .chip:active, .pg-btn:active {
+  transition-duration: var(--cx-t-press) !important;
+  transition-timing-function: var(--cx-ease-in) !important;
+}
+
+/* --- 3b. A view arriving ------------------------------------------ */
+.view.active {
+  animation: cxViewIn var(--cx-t-page) var(--cx-ease) both;
+}
+@keyframes cxViewIn {
+  from { opacity: 0; transform: translateY(9px) scale(0.995); filter: blur(2.5px); }
+  60%  { filter: blur(0); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* Cards arrive just behind their page, so it assembles instead of
+   appearing all at once. */
+.view.active .stat-card,
+.view.active .card,
+.view.active .lead-card {
+  animation: cxRise var(--cx-t-slow) var(--cx-ease) both;
+}
+.view.active .stat-card:nth-child(1), .view.active .card:nth-child(1) { animation-delay: 60ms; }
+.view.active .stat-card:nth-child(2), .view.active .card:nth-child(2) { animation-delay: 110ms; }
+.view.active .stat-card:nth-child(3), .view.active .card:nth-child(3) { animation-delay: 160ms; }
+.view.active .stat-card:nth-child(4), .view.active .card:nth-child(4) { animation-delay: 210ms; }
+.view.active .stat-card:nth-child(n+5), .view.active .card:nth-child(n+5) { animation-delay: 250ms; }
+@keyframes cxRise {
+  from { opacity: 0; transform: translateY(11px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* --- 3c. One hover language, everywhere --------------------------- */
+@media (hover: hover) and (pointer: fine) {
+  .jarvis-icon-pill:hover,
+  .jarvis-newchat-pill:hover,
+  .nav-item:hover,
+  .chip:hover,
+  .btn-primary:hover, .generate-btn:hover, .smodal-btn-primary:hover {
+    transform: translateY(-1px);
+  }
+  .card:hover, .stat-card:hover, .lead-card:hover, .plugin-card:hover {
+    transform: translateY(-2px);
+    transition-duration: var(--cx-t-base);
+  }
+}
+button:active, .btn:active, .btn-primary:active, .generate-btn:active,
+.jarvis-icon-pill:active, .card:active, .stat-card:active {
+  transform: scale(0.978) !important;
+}
+
+/* --- 3d. Panels, sheets and menus --------------------------------- */
+.jarvis-more-panel,
+.clavis-sheet,
+.pg-setup,
+.kv-dialog,
+[role="dialog"] {
+  transition:
+    opacity   var(--cx-t-slow) var(--cx-ease),
+    transform var(--cx-t-slow) var(--cx-ease) !important;
+}
+
+/* --- 3e. Scrolling and focus -------------------------------------- */
+html { scroll-behavior: smooth; }
+:focus-visible {
+  outline: 2px solid var(--olive-500, #6b7f38);
+  outline-offset: 2px;
+  transition: outline-offset var(--cx-t-fast) var(--cx-ease);
+}
+
+/* --- 3f. The orb breathes rather than jumps ----------------------- */
+#orb-container {
+  transition: transform var(--cx-t-slow) var(--cx-ease-soft),
+              opacity   var(--cx-t-slow) var(--cx-ease-soft);
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 4 · THE "ONE STEP AHEAD" CHIP (clavis-ahead.js)
+ * ------------------------------------------------------------
+ * Bottom centre of the Rudra24 AI page. It rises slowly from under
+ * the fold, sits still, and leaves a little faster than it came.
+ * Never modal, never steals focus.
+ * ════════════════════════════════════════════════════════════ */
+
+#clavis-ahead-chip {
+  position: fixed;
+  left: 50%;
+  /* bottom is set by clavis-ahead.js — it rides above the composer's
+     real height instead of sitting on top of it. This is the fallback. */
+  bottom: 118px;
+  z-index: 2147481500;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  max-width: min(520px, calc(100vw - 32px));
+  padding: 7px 8px 7px 16px;
+  border-radius: 14px;
+  font: 500 13.5px/1.25 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--cx-ahead-ink, #1f2a17);
+  background: var(--cx-ahead-bg, rgba(252, 251, 245, 0.93));
+  border: 1px solid rgba(90, 107, 47, 0.18);
+  box-shadow:
+    0 1px 2px rgba(24, 30, 16, 0.06),
+    0 14px 40px -14px rgba(24, 30, 16, 0.34);
+  backdrop-filter: saturate(150%) blur(18px);
+  -webkit-backdrop-filter: saturate(150%) blur(18px);
+
+  opacity: 0;
+  visibility: hidden;
+  transform: translate(-50%, 10px) scale(0.985);
+  filter: blur(3px);
+  transition:
+    opacity    var(--cx-t-base) var(--cx-ease-in),
+    transform  var(--cx-t-base) var(--cx-ease-in),
+    filter     var(--cx-t-base) var(--cx-ease-in),
+    bottom     var(--cx-t-slow) var(--cx-ease-soft),
+    visibility 0s linear var(--cx-t-base);
+}
+#clavis-ahead-chip.is-in {
+  opacity: 1;
+  visibility: visible;
+  transform: translate(-50%, 0) scale(1);
+  filter: blur(0px);
+  transition:
+    opacity   var(--cx-t-slow) var(--cx-ease-soft),
+    transform var(--cx-t-slow) var(--cx-ease-soft),
+    filter    var(--cx-t-slow) var(--cx-ease-soft),
+    bottom    var(--cx-t-slow) var(--cx-ease-soft),
+    visibility 0s;
+}
+
+/* It belongs to Rudra24 AI, like the caption. */
+body:has(#view-jarvis:not(.active)) #clavis-ahead-chip {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
+
+#clavis-ahead-chip .ca-label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#clavis-ahead-chip .ca-go {
+  flex: 0 0 auto;
+  border: 0;
+  cursor: pointer;
+  padding: 7px 13px;
+  border-radius: 9px;
+  font: 560 12.5px/1 inherit;
+  color: var(--olive-700, #46551f);
+  background: transparent;
+  transition: background-color var(--cx-t-fast) var(--cx-ease),
+              transform var(--cx-t-fast) var(--cx-ease);
+}
+#clavis-ahead-chip .ca-go:hover  { background: rgba(90, 107, 47, 0.10); }
+#clavis-ahead-chip .ca-go:active { transform: scale(0.96); transition-duration: var(--cx-t-press); }
+
+#clavis-ahead-chip .ca-no {
+  flex: 0 0 auto;
+  width: 26px; height: 26px;
+  border: 0;
+  cursor: pointer;
+  border-radius: 8px;
+  background: transparent;
+  color: currentColor;
+  opacity: 0.4;
+  font-size: 16px;
+  line-height: 1;
+  transition: opacity var(--cx-t-fast) var(--cx-ease),
+              background-color var(--cx-t-fast) var(--cx-ease);
+}
+#clavis-ahead-chip .ca-no:hover { opacity: 0.9; background: rgba(24, 30, 16, 0.07); }
+
+html[data-theme="dark"] #clavis-ahead-chip {
+  --cx-ahead-ink: #f2efe4;
+  --cx-ahead-bg: rgba(22, 24, 19, 0.9);
+  border-color: rgba(201, 219, 160, 0.16);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 16px 44px -16px rgba(0, 0, 0, 0.7);
+}
+html[data-theme="dark"] #clavis-ahead-chip .ca-no:hover { background: rgba(255, 255, 255, 0.09); }
+
+@media (max-width: 560px) {
+  #clavis-ahead-chip { font-size: 12.5px; padding-left: 13px; }
+  #clavis-ahead-chip .ca-go { padding: 6px 11px; }
+}
+
+/* ════════════════════════════════════════════════════════════
+ * Reduced motion — the whole layer stands down.
+ * ════════════════════════════════════════════════════════════ */
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .view.active,
+  .view.active .stat-card,
+  .view.active .card,
+  .view.active .lead-card { animation: none !important; }
+  #clavis-ahead-chip {
+    transition: opacity 1ms linear, visibility 1ms linear !important;
+    transform: translate(-50%, 0) !important;
+  }
+  #clavis-ahead-chip .ca-dot { animation: none; }
+  @media (hover: hover) {
+    .jarvis-icon-pill:hover, .jarvis-newchat-pill:hover, .nav-item:hover,
+    .chip:hover, .card:hover, .stat-card:hover, .lead-card:hover,
+    .plugin-card:hover, .btn-primary:hover, .generate-btn:hover { transform: none; }
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 5 · THE LIVE CAPTION, SLOWED AND SOFTENED
+ * ------------------------------------------------------------
+ * The mechanism was already right (clavis-ear.js: one node per
+ * word, per-character typing, FLIP glide, two-line clip). What
+ * it lacked was time. Everything here is timing and texture:
+ *
+ *   · each character materialises — rises, unblurs, settles —
+ *     instead of blinking on at full opacity in 200ms;
+ *   · the left glide runs 900ms on a long expo-out, so spoken
+ *     words drift out of the way rather than snapping;
+ *   · a little motion blur rides the glide and only the glide
+ *     (.ce-gliding is added for its duration, then removed);
+ *   · spoken words sit further back so the word being said now
+ *     reads as the only live one.
+ * ════════════════════════════════════════════════════════════ */
+
+#clavis-ear-caption {
+  --ce-shift: 900ms;                                   /* was 580ms */
+  --ce-glide: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Spoken words: further back, so the live word carries the line. */
+#clavis-ear-caption .ce-w {
+  opacity: 0.56;
+  /* An explicit blur(0) base, not `none`: a filter list interpolates
+     function-for-function, and `none` -> blur() is the case engines are
+     least consistent about. */
+  filter: blur(0px);
+  /* filter is quick on purpose: the blur has to be THERE while the word is
+     moving. A 420ms ramp inside a 900ms glide meant it arrived after the
+     movement was half over and read as nothing at all. */
+  transition:
+    transform var(--ce-shift) var(--ce-glide),
+    opacity   640ms var(--cx-ease-soft),
+    filter    140ms linear !important;
+}
+#clavis-ear-caption .ce-w.ce-now { opacity: 1; }
+
+/* The motion blur. It is on the line, not on each word, and only
+   while clavis-ear.js says the line is in flight — a permanent
+   filter would cost a composite layer for nothing. */
+#clavis-ear-caption .ce-line.ce-gliding .ce-w:not(.ce-now) {
+  filter: blur(0.65px);
+}
+#clavis-ear-caption .ce-line.ce-gliding .ce-w.ce-now {
+  filter: blur(0.15px);
+}
+/* Coming out of the glide the blur clears slowly, so the line settles
+   rather than snapping back into focus. */
+#clavis-ear-caption .ce-line:not(.ce-gliding) .ce-w {
+  transition:
+    transform var(--ce-shift) var(--ce-glide),
+    opacity   640ms var(--cx-ease-soft),
+    filter    340ms var(--cx-ease) !important;
+}
+
+/* The typewriter: each character rises out of a soft blur and settles.
+   Slower than the eye needs, which is the point — it should read as
+   Rudra24 AI writing the words down, not as text appearing. */
+#clavis-ear-caption .ce-c {
+  animation: cxCharIn 460ms var(--cx-ease) both !important;
+  display: inline-block;
+  white-space: pre;
+}
+@keyframes cxCharIn {
+  from {
+    opacity: 0;
+    transform: translate3d(0.26em, 0.12em, 0) scale(0.94);
+    filter: blur(3px);
+  }
+  55% { filter: blur(0.4px); }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+
+/* Leaving is soft; arriving is not. The slowness in this caption belongs to
+   the words — the per-character blur and the 900 ms glide below — not to the
+   box they sit in. At var(--cx-t-slow) the opening word of a command was still
+   near-transparent by the time the second word had been typed, which is what
+   "first word dikhta hi nahi" actually was. The movement stays slow. */
+#clavis-ear-caption {
+  transition:
+    opacity   200ms var(--cx-ease),
+    transform var(--cx-t-slow) var(--cx-ease),
+    filter    var(--cx-t-slow) var(--cx-ease),
+    top       520ms var(--cx-ease-soft) !important;
+}
+#clavis-ear-caption.is-out {
+  transition-duration: 150ms !important;
+  filter: none;
+}
+/* Settled: the whole line comes up to full ink together, slowly — the
+   visual full stop on a finished sentence. */
+#clavis-ear-caption.is-settled .ce-w {
+  opacity: 0.86;
+  transition-duration: 760ms, 760ms, 420ms !important;
+}
+#clavis-ear-caption.is-settled .ce-w.ce-now { opacity: 1; }
+
+/* The listening dot breathes a little slower too. */
+#clavis-ear-caption.is-listening .ce-dot {
+  animation-duration: 2.2s !important;
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 6 · THE SIDEBAR — deliberately NOT here
+ * ------------------------------------------------------------
+ * The rail is owned outright by clavis-manual.css §9, at a
+ * nine-id specificity nothing in this file can reach, and for a
+ * good reason: the rail and #main-content must share one
+ * duration or the page slides twice. Overriding one of them from
+ * here would desync them.
+ *
+ * So the slower rail (560ms open / 460ms close), the slower
+ * label fade, and the little motion blur on the labels as they
+ * leave all live in clavis-manual.css §9. Change them there.
+ * ════════════════════════════════════════════════════════════ */
+
+@media (prefers-reduced-motion: reduce) {
+  #clavis-ear-caption .ce-c { animation: none !important; opacity: 1; filter: none; }
+  #clavis-ear-caption .ce-w,
+  #clavis-ear-caption .ce-line.ce-gliding .ce-w,
+  #clavis-ear-caption .ce-line.ce-gliding .ce-w.ce-now { filter: none !important; }
+  #sidebar .nav-item > span,
+  #sidebar .nav-sub-item > span,
+  #sidebar .nav-label-wrap,
+  #sidebar .sidebar-brand-title,
+  #sidebar .logo-text,
+  #sidebar .nav-section-label { filter: none !important; }
+}
+
+
+/* ── The suggestion chip, read as a quiet offer ──────────────
+   It used to sit at a fixed 22px — i.e. on top of the composer —
+   with a pulsing dot and a filled green button, so a suggestion
+   arrived with the weight of an alert. It now rides above the
+   composer (height measured in clavis-ahead.js), carries no dot,
+   and both actions are text. */
+#clavis-ahead-chip {
+  font-weight: 450 !important;
+  letter-spacing: -0.005em;
+  border-color: rgba(90, 107, 47, 0.13) !important;
+  box-shadow:
+    0 0 0 0.5px rgba(24, 30, 16, 0.04),
+    0 1px 2px rgba(24, 30, 16, 0.05),
+    0 10px 28px -10px rgba(24, 30, 16, 0.18),
+    0 28px 56px -22px rgba(24, 30, 16, 0.22) !important;
+  will-change: transform, opacity, filter;
+}
+#clavis-ahead-chip .ca-label { padding-right: 6px; opacity: 0.86; }
+#clavis-ahead-chip .ca-go:active { transform: scale(0.975); }
+html[data-theme="dark"] #clavis-ahead-chip .ca-go { color: var(--olive-200, #cfdca6); }
+html[data-theme="dark"] #clavis-ahead-chip .ca-go:hover { background: rgba(201, 219, 160, 0.12); }
+
+@media (prefers-reduced-motion: reduce) {
+  #clavis-ahead-chip { filter: none !important; transition-duration: 1ms !important; }
+}
+
+/* ════════════════════════════════════════════════════════════
+ * 5 · SIDEBAR — one curve, no bounce, no jitter
+ * The rail animated `width` on cubic-bezier(.34, 1.4, .5, 1) —
+ * an overshoot curve. Width is a layout property, so every frame
+ * re-wrapped the nav labels, and the overshoot made them do it
+ * twice: out past the target, then back. That is the judder.
+ * One settle curve, and labels that cannot re-wrap mid-flight.
+ * ════════════════════════════════════════════════════════════ */
+
+html #sidebar,
+html aside#sidebar,
+html:not(#_):not(#_) #sidebar {
+  transition-property: width, min-width, max-width, background-color, box-shadow !important;
+  transition-duration: var(--cx-t-base) !important;
+  transition-timing-function: var(--cx-ease-soft) !important;
+}
+
+/* A label that re-wraps mid-animation is the other half of the
+   judder — it is clipped by the rail, not reflowed by it. */
+#sidebar .nav-item > span,
+#sidebar .nav-sub-item > span,
+#sidebar .nav-label-wrap,
+#sidebar .sidebar-brand-title,
+#sidebar .logo-text,
+#sidebar .nav-section-label {
+  white-space: nowrap !important;
+  transition: opacity var(--cx-t-base) var(--cx-ease-soft) !important;
+}
+
+/* ── Global jitter guard ────────────────────────────────────
+   Anything that opens or closes gets composited, so a half-pixel
+   never lands on a text baseline. */
+#sidebar,
+.modal.is-open, .modal-card, .sheet, .drawer,
+#clavis-ahead-chip, .cts, .cx-setup-card {
+  backface-visibility: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Overshoot curves read as cheap on a surface this size — they are
+   for a 20px toggle, not a 260px rail or a full-width panel. */
+html #sidebar,
+html .modal-card,
+html .jarvis-input-container {
+  transition-timing-function: var(--cx-ease-soft) !important;
+}

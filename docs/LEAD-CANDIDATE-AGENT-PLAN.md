@@ -1,10 +1,10 @@
-# Clavis Lead + Candidate Agent Plan
+# Rudra24 AI Lead + Candidate Agent Plan
 
 ## Product decision
 
-Clavis should be a provider-agnostic sourcing assistant. The user's requested
+Rudra24 AI should be a provider-agnostic sourcing assistant. The user's requested
 role/service is an input, not a fixed security-industry enum. If the user says
-“get me leads in Gurugram” without naming an industry, Clavis searches all
+“get me leads in Gurugram” without naming an industry, Rudra24 AI searches all
 configured industries and reports the interpretation in the task window. It
 must never invent a phone number, email, website, rating, or company.
 

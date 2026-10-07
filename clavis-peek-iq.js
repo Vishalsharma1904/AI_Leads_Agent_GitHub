@@ -188,7 +188,10 @@
   function think(query, answer, count, subject) {
     if (!IQ()) return;
     var token = ++currentToken;
-    var res = IQ().suggest({ query: query, answer: answer, count: count || 4, subject: subject || '' });
+    // Model-written chips = ek extra LLM call; soye hue Rudra24 AI me sirf local chips.
+    var mayUseModel = true;
+    try { mayUseModel = !window.ClavisWake || window.ClavisWake.allowBackground(); } catch (e) { mayUseModel = false; }
+    var res = IQ().suggest({ query: query, answer: answer, count: count || 4, subject: subject || '', useModel: mayUseModel });
     renderChips(res.chips, res.signal.domain, true);
 
     res.refine.then(function (better) {

@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.orangemantra.com/industries/manufacturing/supply-chain-management",
+  "url": "https://www.orangemantra.com/industries/manufacturing/supply-chain-management/",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "crawlDepth": 1
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": null,
+  "handled_at": null
+}

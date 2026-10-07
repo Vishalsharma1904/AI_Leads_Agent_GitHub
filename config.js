@@ -5,7 +5,7 @@
 
 window.SKYLARK_CONFIG = {
   // ─── PLATFORM BRANDING ─────────────────────────────────────
-  PLATFORM_NAME: 'Clavis',
+  PLATFORM_NAME: 'Rudra24 AI',
   TAGLINE: 'B2B AI Client Acquisition Engine',
   TARGET_SERVICES: ['Security Guards', 'Housekeeping Staff'],
 
@@ -46,6 +46,10 @@ window.SKYLARK_CONFIG = {
   // 🪙🪙🪙 OPENROUTER API KEYS (up to 5) 🪙🪙🪙
   OPENROUTER_API_KEYS: [],
 
+  // Sarvam AI — voice calling agent (asli phone calls). Yeh sirf fallback
+  // hai; asli jagah Key Vault hai (encrypted). Yahan key mat likhiye.
+  SARVAM_API_KEYS: [],
+
   CLAVIS_FREE_MODELS: [
     'meta-llama/llama-3.3-70b-instruct:free',
     'deepseek/deepseek-chat-v3.1:free',
@@ -66,7 +70,12 @@ window.SKYLARK_CONFIG = {
 
   // Outlook Graph is configured in the Email Auto page (stored locally per browser).
   OUTLOOK_CLIENT_ID: '',
-  BACKEND_URL: 'http://localhost:8000',
+  // Desktop build injects its own URL. On a deployed host the backend is
+  // reached same-origin, so vercel.json's /api rewrite proxies it: no CORS,
+  // no mixed content, and the backend's real hostname never reaches the
+  // browser. Only a local dev page talks to localhost:8000 directly.
+  BACKEND_URL: window.CLAVIS_DESKTOP_BACKEND_URL
+    || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? 'http://localhost:8000' : location.origin),
   // Public OAuth configuration is supplied by the backend at runtime.
   // Never load a credentials file into this static application.
   GOOGLE_CLIENT_ID: '',

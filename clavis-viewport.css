@@ -74,9 +74,9 @@ html:not(#_) body:not(#_) #main-content {
   width: calc(100% - var(--sidebar-expanded)) !important;
   max-width: calc(100% - var(--sidebar-expanded)) !important;
 }
-html[data-sidebar-state="collapsed"]:not(#_) body:not(#_) #main-content.main-content,
-html[data-sidebar-state="collapsed"]:not(#_) body:not(#_) #main-content,
-html:has(#sidebar.collapsed):not(#_) body:not(#_) #main-content {
+html.rudra-rail-legacy body #main-content.main-content,
+html.rudra-rail-legacy body #main-content,
+html.rudra-rail-legacy:not(#_) body:not(#_) #main-content {
   margin-left: 64px !important;              /* matches clavis-sidebar.css */
   width: calc(100% - 64px) !important;
   max-width: calc(100% - 64px) !important;

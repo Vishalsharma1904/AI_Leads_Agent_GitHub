@@ -108,11 +108,24 @@ const approvedPostThemeStyles = postThemeStyles.every(file => [
   'clavis-confirm-hud.css', 'clavis-stage.css', 'clavis-task-hud.css', 'apple-polish.css',
   'clavis-refine.css', 'clavis-task-surface.css', 'clavis-viewport.css',
   'clavis-polish-fixes.css', 'clavis-suggestions.css', 'clavis-polish-v3.css',
-  'clavis-sidebar.css', 'clavis-aurora.css', 'clavis-chat.css', 'clavis-luxe.css'
+  'clavis-sidebar.css', 'clavis-aurora.css', 'clavis-chat.css', 'clavis-luxe.css',
+  'clavis-live.css', 'clavis-canvas.css', 'clavis-motion.css', 'clavis-window-refine.css',
+  'clavis-composer-iq.css', 'clavis-ear.css', 'clavis-olive.css', 'clavis-silk.css',
+  'clavis-setup.css', 'clavis-final.css', 'clavis-claude.css', 'clavis-manual.css',
+  'developer-insights.css', 'clavis-voice-refine.css',
+  'sarvam-calling.css', 'clavis-enterprise.css', 'rudra-brand.css', 'connectors.css',
+  'clavis-operator.css', 'rudra-auth-claude.css', 'clavis-task-polish.css',
+  'outreach-pages.css', 'clavis-refined.css', 'clavis-cream.css', 'rudra-readability.css',
+  'rudra-flow.css', 'crm.css', 'crm-business.css', 'crm-insights.css', 'rudra-motion-ui.css',
+  'quiet-entry.css', 'composer-refine.css', 'chat-claude.css', 'app-guide.css'
 ].includes(file));
 check('theme-flow.css loads LAST among base stylesheets',
   themeFlowIndex >= 0 && approvedPostThemeStyles,
   postThemeStyles.length ? 'post-theme styles: ' + postThemeStyles.join(', ') : 'theme-flow is not last');
+
+// Feature overlays must retain the established theme and geometry cascade.
+const cascade = ['theme-flow.css', 'clavis-claude.css', 'clavis-manual.css', 'rudra-flow.css', 'crm.css', 'crm-business.css', 'crm-insights.css'];
+check('theme, geometry and CRM overlays keep their cascade contract', cascade.every((name, i) => styles.includes(name) && (!i || styles.indexOf(name) > styles.indexOf(cascade[i - 1]))));
 
 // ── 5. Duplicate element IDs ──────────────────────────────────────────────
 // getElementById returns only the first match, so a duplicate silently breaks

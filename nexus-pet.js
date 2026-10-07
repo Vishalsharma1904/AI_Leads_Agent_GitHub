@@ -783,6 +783,7 @@
 
   function place() {
     if (!isEnabled() || matchMedia('(prefers-reduced-motion: reduce)').matches) { unmount(); return; }
+    if (pet && host?.isConnected && anchor?.isConnected && anchor.closest('.view')?.classList.contains('active') && !anchor.closest('[hidden]')) return;
     const boxes = [...document.querySelectorAll('.claude-input-container')].filter(b => b.offsetParent !== null);
     if (!boxes.length) return;
     if (pet && anchor === boxes[0] && host?.isConnected) return;

@@ -173,7 +173,7 @@ html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) .smodal-btn-primary[ar
 }
 
 
-/* ── 3 · Composer send buttons (Clavis, Client AI, Candidate AI) ── */
+/* ── 3 · Composer send buttons (Rudra24 AI, Client AI, Candidate AI) ── */
 html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-send-btn,
 html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-chat .claude-send-btn,
 html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-candidate-ai .claude-send-btn,

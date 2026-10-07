@@ -11,9 +11,34 @@ backend/.env.*
 # Local Python/runtime and installer output
 backend/.venv/
 backend/.venv312/
+__pycache__/
+*.py[cod]
+backend/**/__pycache__/
+logs/
 dist/
 build/
+release/
+electron/desktop-config.json
 *.spec
 
 # npm install output
 node_modules/
+
+
+# Rebrand (Clavis -> Rudra24 AI) ke originals
+_rebrand_backup/
+
+# Local packaging verification output
+tests/artifacts/package-verification/
+
+# Claude session scratch (not part of the app)
+_claude_tmp/
+.claude/
+
+# venvs are Windows junctions here, so the trailing-slash form misses them
+backend/.venv
+backend/.venv312
+
+# 238MB and 378MB of run output — never belongs in the repo
+exports/
+tests/artifacts/

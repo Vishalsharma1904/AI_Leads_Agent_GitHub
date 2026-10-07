@@ -1,0 +1,21 @@
+/* perf-fix.css — loaded LAST.
+   Root cause of lag: ~200 stacked stylesheets/scripts with !important overrides,
+   many backdrop-filter layers, and per-element colour transitions on theme change.
+   Fix: during a theme switch, freeze all transitions/animations + blur so the browser
+   restyles once instead of animating thousands of nodes. Class is removed after 1 frame pair. */
+html.theme-switching *,
+html.theme-switching *::before,
+html.theme-switching *::after {
+  transition: none !important;
+  animation-duration: 0s !important;
+  animation-delay: 0s !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Sidebar: no overshoot curve on the rail, contain layout so inner reflow stays local. */
+html:not(#_) body:not(#_) #sidebar.sidebar:not(#__):not(#___) {
+  contain: layout paint style;
+  will-change: width;
+  transition-timing-function: cubic-bezier(.2, 0, 0, 1) !important;
+}

@@ -24,6 +24,8 @@
       this.dedupeWindowMs = 5000;
       this.loadHistory();
       this.initDOM();
+      window.addEventListener('rudra:auth-state', () => this.resetAccount());
+      window.addEventListener('clavis:workspace-change', () => this.resetAccount());
     }
 
     initDOM() {
@@ -56,8 +58,10 @@
     }
 
     loadHistory() {
+      this.owner = window.SupabaseAuth?.getUser?.()?.id || 'signed-out';
+      this.history = [];
       try {
-        const raw = localStorage.getItem('clavis_notification_history');
+        const raw = localStorage.getItem('clavis_notification_history_' + this.owner);
         if (raw) this.history = JSON.parse(raw);
       } catch (_) {
         this.history = [];
@@ -66,8 +70,13 @@
 
     saveHistory() {
       try {
-        localStorage.setItem('clavis_notification_history', JSON.stringify(this.history.slice(0, this.historyLimit)));
+        localStorage.setItem('clavis_notification_history_' + this.owner, JSON.stringify(this.history.slice(0, this.historyLimit)));
       } catch (_) {}
+    }
+
+    resetAccount() {
+      if (this.owner === (window.SupabaseAuth?.getUser?.()?.id || 'signed-out')) return;
+      this.dismissAll(); this.recent.clear(); this._recent = []; this.loadHistory();
     }
 
     getSemanticIcon(type) {
@@ -143,11 +152,12 @@
       if (!this.container) return null;
 
       const opts = this.normalizeArgs(a, b, c);
+      this.resetAccount();
 
       // A reconnecting mic/provider can report the same condition several
       // times in one second. Reusing the existing card prevents notification
       // churn, repeated sound effects, and needless DOM/layout work.
-      const fingerprint = `${opts.type}|${opts.title}|${opts.message}|${opts.detail || ''}`;
+      const fingerprint = opts.eventKey || `${opts.type}|${opts.title}|${opts.message}|${opts.detail || ''}`;
       const now = Date.now();
       const previous = this.recent.get(fingerprint);
       if (previous && now - previous.at < this.dedupeWindowMs) return previous.id;
@@ -163,9 +173,9 @@
       // listeners at once — that was the stack of red cards).
       const sig = [opts.type, opts.title, String(opts.message || '').replace(/[\d.]+/g, '#')].join('|');
       this._recent = (this._recent || []).filter((r) => now - r.t < 12000);
-      if (this._recent.some((r) => r.sig === sig)) return null;
-      if (opts.type === 'error' && this._recent.some((r) => r.type === 'error')) return null;
-      this._recent.push({ sig, t: now, type: opts.type });
+      if (!opts.eventKey && this._recent.some((r) => r.sig === sig)) return null;
+      if (!opts.eventKey && opts.type === 'error' && this._recent.some((r) => r.type === 'error')) return null;
+      if (!opts.eventKey) this._recent.push({ sig, t: now, type: opts.type });
 
       // Play audio feedback if sound engine available
       try {
@@ -253,16 +263,18 @@
       });
 
       // Auto dismiss timer
-      let timer = null;
+      const entry = { id: opts.id, card, timer: null };
       if (opts.timeoutMs > 0) {
-        timer = setTimeout(() => this.dismiss(opts.id), opts.timeoutMs);
+        entry.timer = setTimeout(() => this.dismiss(opts.id), opts.timeoutMs);
         // Pause timer on hover
         card.addEventListener('mouseenter', () => {
-          if (timer) clearTimeout(timer);
+          clearTimeout(entry.timer);
         });
         card.addEventListener('mouseleave', () => {
-          timer = setTimeout(() => this.dismiss(opts.id), 2500);
+          entry.timer = setTimeout(() => this.dismiss(opts.id), 2500);
         });
+        card.addEventListener('focusin', () => clearTimeout(entry.timer));
+        card.addEventListener('focusout', e => { if (!card.contains(e.relatedTarget)) entry.timer = setTimeout(() => this.dismiss(opts.id), 2500); });
       }
 
       // Keep the live stack bounded even when different errors arrive in a
@@ -272,11 +284,10 @@
         const oldest = this.activeNotifications[this.activeNotifications.length - 1];
         if (!oldest) break;
         this.dismiss(oldest.id);
-        break;
       }
 
       // Register active
-      this.activeNotifications.unshift({ id: opts.id, card, timer });
+      this.activeNotifications.unshift(entry);
 
       // Append to container
       this.container.prepend(card);
@@ -292,6 +303,7 @@
       if (idx === -1) return;
 
       const item = this.activeNotifications[idx];
+      this.activeNotifications.splice(idx, 1);
       if (item.timer) clearTimeout(item.timer);
 
       item.card.classList.add('desktop-notif-exit');

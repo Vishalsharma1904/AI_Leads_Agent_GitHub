@@ -1,10 +1,10 @@
-# Clavis AI — Level 1–2 Build Contract
+# Rudra24 AI — Level 1–2 Build Contract
 
 Use this document as the implementation contract for Claude, ChatGPT, or another coding agent. The goal is a real, testable browser voice assistant foundation, not a demo or simulated transcript.
 
 ## Role
 
-You are a senior speech-interface and production JavaScript engineer. Implement only Level 1 and Level 2 in the existing Clavis app. Preserve the existing visual design and existing authenticated backend boundaries. Do not add heavy UI dependencies.
+You are a senior speech-interface and production JavaScript engineer. Implement only Level 1 and Level 2 in the existing Rudra24 AI app. Preserve the existing visual design and existing authenticated backend boundaries. Do not add heavy UI dependencies.
 
 ## Level 1: hearing, wake-up, and voice output
 
@@ -12,7 +12,7 @@ Implement a small explicit state machine:
 
 `disabled → sleeping → waking → listening → processing → speaking → sleeping`
 
-- The assistant must listen for configurable wake phrases, defaulting to `Clavis`, `Hey Clavis`, `Hey buddy`, and `Hi pal`.
+- The assistant must listen for configurable wake phrases, defaulting to `Rudra24 AI`, `Hey Rudra24 AI`, `Hey buddy`, and `Hi pal`.
 - Store wake phrases as a bounded list of 1–8 normalized phrases in the existing settings store. Never execute arbitrary spoken text while sleeping.
 - On wake detection, provide an immediate visual state change and a short, optional two-tone chime. Respect mute and reduced-motion preferences.
 - If the wake phrase and command occur in the same recognition result, preserve the command text after the wake phrase.
@@ -26,7 +26,7 @@ Implement a small explicit state machine:
 
 ## Level 2: natural-language understanding
 
-- Send the complete finalized transcript to the existing authenticated Clavis backend AI endpoint.
+- Send the complete finalized transcript to the existing authenticated Rudra24 AI backend AI endpoint.
 - Never send provider API keys from the browser and never call Groq, OpenRouter, Apify, or Gemini directly from frontend code.
 - Preserve Hinglish, Hindi, and English naturally. Do not translate unless asked.
 - Return a typed intent envelope:

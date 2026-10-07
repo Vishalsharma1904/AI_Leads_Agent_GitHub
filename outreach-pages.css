@@ -1,0 +1,228 @@
+/* Email and WhatsApp share one calm, spacious outreach workspace. */
+#view-email, #view-whatsapp {
+  --outreach-ink: var(--text-primary, #26312a);
+  --outreach-muted: var(--text-secondary, #68746e);
+  --outreach-surface: var(--surface, #fff);
+  --outreach-line: var(--border, #dde4dc);
+  color: var(--outreach-ink);
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: clamp(24px, 3vw, 48px) !important;
+}
+#view-email .view-title, #view-whatsapp .view-title {
+  font-size: clamp(28px, 2.4vw, 36px) !important;
+  line-height: 1.15;
+  letter-spacing: -.03em;
+  margin-bottom: 9px;
+}
+#view-email .email-tab-btn { background: transparent !important; color: var(--outreach-muted) !important; box-shadow: none !important; }
+#view-email .email-tab-btn.email-tab-active { background: #345744 !important; color: #fff !important; }
+#view-email .email-setup-guide, #view-email .email-inbox-panel {
+  background: var(--outreach-surface); border: 1px solid var(--outreach-line);
+  border-radius: 16px; padding: clamp(20px, 2.5vw, 32px); margin: 22px 0 0;
+}
+#view-email .email-setup-guide { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px 30px; align-items: center; }
+#view-email .email-guide-kicker { color: #5d7c63; font-size: 11px; font-weight: 700; letter-spacing: .1em; }
+#view-email .email-setup-guide h2, #view-email .email-inbox-panel h2 { font-size: 21px; letter-spacing: -.025em; margin: 5px 0 8px; }
+#view-email .email-setup-guide p, #view-email .email-inbox-panel p { color: var(--outreach-muted); line-height: 1.6; margin: 0; font-size: 13px; }
+#view-email .email-guide-note, #view-email .email-guide-owner { grid-column: 1 / -1; }
+#view-email .email-guide-owner { font-size: 13px; color: var(--outreach-muted); }
+#view-email .email-guide-owner summary { cursor: pointer; }
+#view-email .email-guide-owner p { margin-top: 10px; max-width: 80ch; }
+#view-email .email-guide-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+#view-email .email-guide-actions button, #view-email .email-inbox-panel button, #view-email .email-inbox-panel input {
+  border: 1px solid var(--outreach-line); border-radius: 9px; padding: 10px 14px;
+  background: var(--outreach-surface); color: var(--outreach-ink); font-size: 13px; cursor: pointer;
+}
+#view-email .email-guide-actions #email-guide-connect, #view-email .email-inbox-panel form button {
+  background: #345744; color: #fff; border-color: #345744;
+}
+#view-email .email-inbox-heading { display: flex; justify-content: space-between; align-items: end; gap: 18px; }
+#view-email #email-inbox-search { display: flex; gap: 8px; align-items: end; flex-wrap: wrap; }
+#view-email #email-inbox-search label { display: block; width: 100%; font-size: 12px; color: var(--outreach-muted); }
+#view-email #email-inbox-query { min-width: 220px; cursor: text; }
+#view-email #email-inbox-status { padding: 20px 0 12px; color: var(--outreach-muted); font-size: 12px; }
+#view-email .email-inbox-grid { display: grid; grid-template-columns: minmax(230px, .8fr) minmax(0, 1.2fr); gap: 18px; }
+#view-email .email-inbox-list { display: grid; align-content: start; gap: 6px; max-height: 520px; overflow: auto; }
+#view-email .email-inbox-row { display: grid; width: 100%; text-align: left; gap: 4px; }
+#view-email .email-inbox-row strong { font-size: 13px; }
+#view-email .email-inbox-row small { color: var(--outreach-muted); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+#view-email .email-inbox-message { min-height: 220px; border: 1px solid var(--outreach-line); border-radius: 10px; padding: 22px; }
+#view-email .email-inbox-message h3 { margin: 0 0 8px; font-size: 19px; }
+#view-email .email-inbox-message pre, #view-email #email-inbox-summary {
+  white-space: pre-wrap; overflow-wrap: anywhere; font-family: inherit; font-size: 13px; line-height: 1.7; margin-top: 20px;
+}
+#view-email #email-inbox-summarize { margin-top: 18px; }
+#view-email #email-sent-badge { background: #64856a !important; }
+#view-email .view-subtitle, #view-whatsapp .view-subtitle {
+  color: var(--outreach-muted);
+  font-size: 14px;
+  line-height: 1.6;
+  max-width: 68ch;
+}
+#view-email .email-layout, #view-whatsapp .email-layout {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) minmax(290px, 340px) !important;
+  align-items: start !important;
+  gap: clamp(22px, 2.4vw, 36px) !important;
+  margin-top: 28px;
+}
+#view-email .gmail-compose-card, #view-whatsapp .gmail-compose-card,
+#view-email .email-sidebar-card, #view-whatsapp .email-sidebar-card {
+  background: var(--outreach-surface) !important;
+  color: var(--outreach-ink) !important;
+  border: 1px solid var(--outreach-line) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 28px rgba(28, 44, 31, .035) !important;
+}
+#view-email .email-sidebar-card, #view-whatsapp .email-sidebar-card {
+  gap: 22px !important;
+  padding: 26px !important;
+}
+#view-email .gmail-header, #view-whatsapp .gmail-header {
+  background: var(--outreach-surface) !important;
+  color: var(--outreach-ink) !important;
+  border-bottom: 1px solid var(--outreach-line) !important;
+  padding: 20px 26px !important;
+  font-size: 15px !important;
+  font-weight: 650 !important;
+}
+#view-email .gmail-body-container, #view-whatsapp .gmail-body-container {
+  padding-inline: 26px !important;
+}
+#view-email .gmail-exact-editor, #view-whatsapp #whatsapp-body {
+  min-height: 280px !important;
+  color: var(--outreach-ink) !important;
+  background: var(--outreach-surface) !important;
+  font-size: 15px !important;
+  line-height: 1.75 !important;
+}
+#view-email input, #view-email select, #view-whatsapp input, #view-whatsapp select,
+#view-whatsapp textarea {
+  color: var(--outreach-ink);
+  background: var(--outreach-surface);
+}
+#view-email .email-sidebar-card input:not([type=range]),
+#view-email .email-sidebar-card select,
+#view-whatsapp .email-sidebar-card input:not([type=range]) {
+  min-height: 44px;
+  padding: 10px 12px !important;
+  border: 1px solid var(--outreach-line) !important;
+  border-radius: 9px !important;
+  font-size: 14px !important;
+  background: var(--outreach-surface) !important;
+}
+#view-email .email-sidebar-card label, #view-whatsapp .email-sidebar-card label {
+  font-size: 12px !important;
+  color: var(--outreach-muted) !important;
+  line-height: 1.5;
+}
+#view-email :is(input, select, button, [contenteditable]):focus-visible,
+#view-whatsapp :is(input, textarea, button):focus-visible {
+  outline: 2px solid #708d70 !important;
+  outline-offset: 2px;
+}
+#view-email #email-send-btn, #view-whatsapp #wa-start-batch-btn,
+#view-whatsapp #wa-open-btn, #view-email #email-connect-btn {
+  background: #345744 !important;
+  color: #fff !important;
+  border: 1px solid #345744 !important;
+  box-shadow: none !important;
+  border-radius: 9px !important;
+  min-height: 46px;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  transition: background .18s ease, border-color .18s ease !important;
+}
+#view-email #email-send-btn:hover, #view-whatsapp #wa-start-batch-btn:hover,
+#view-whatsapp #wa-open-btn:hover, #view-email #email-connect-btn:hover {
+  background: #294738 !important;
+}
+#view-email #email-test-btn, #view-email #email-cancel-btn,
+#view-whatsapp .outreach-queue-actions .btn-secondary,
+#view-email .outreach-account-actions button:not(#email-connect-btn) {
+  background: transparent !important;
+  color: var(--outreach-ink) !important;
+  border: 1px solid var(--outreach-line) !important;
+  box-shadow: none !important;
+  border-radius: 9px !important;
+  min-height: 42px;
+  font-size: 13px !important;
+}
+#view-email .outreach-account {
+  padding: 20px;
+  background: var(--surface-raised, #f8faf8);
+  border: 1px solid var(--outreach-line);
+  border-radius: 12px;
+}
+#view-email .outreach-account h3 { margin: 0 0 8px; font-size: 15px; }
+#view-email .outreach-account p { margin: 0 0 18px; color: var(--outreach-muted); font-size: 13px; line-height: 1.55; }
+#view-email .outreach-account label { display: block; margin-bottom: 7px; }
+#view-email #email-sender-address-input { width: 100%; }
+#view-email .outreach-status { margin-top: 10px; font-size: 12px; line-height: 1.5; color: var(--outreach-muted); }
+#view-email .outreach-account-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 15px; }
+#view-email .outreach-account-actions button { flex: 1 1 120px; padding: 9px 12px; cursor: pointer; }
+#view-email #email-preview-list {
+  max-height: 180px !important;
+  background: var(--surface-raised, #f8faf8) !important;
+  color: var(--outreach-muted) !important;
+  padding: 14px !important;
+  font-size: 12px !important;
+  line-height: 1.55;
+}
+#view-email #email-progress-bar, #view-whatsapp #wa-progress-bar { background: #64856a !important; }
+#view-email .outreach-alternative {
+  margin-top: 34px;
+  padding: 18px 22px;
+  border: 1px solid var(--outreach-line);
+  border-radius: 12px;
+  background: var(--outreach-surface);
+}
+#view-email .outreach-alternative summary { cursor: pointer; font-size: 14px; font-weight: 600; }
+#view-email .outreach-alternative > p { color: var(--outreach-muted); font-size: 13px; margin: 10px 0 20px; }
+#view-email .outreach-alternative .outlook-setup-card { margin: 0; }
+#view-whatsapp #whatsapp-body { border: 1px solid var(--outreach-line) !important; padding: 18px !important; }
+#view-whatsapp #wa-queue-ui { background: var(--surface-raised, #f8faf8) !important; border-color: var(--outreach-line) !important; }
+#view-whatsapp .outreach-queue-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#view-whatsapp .outreach-queue-actions button { min-height: 42px; padding: 8px; cursor: pointer; }
+#view-whatsapp .outreach-consent { display: flex !important; align-items: flex-start; gap: 9px; margin: 10px 0 16px !important; font-size: 12px; line-height: 1.5; cursor: pointer; }
+#view-whatsapp .outreach-consent input { width: 18px; height: 18px; margin: 0; flex: none; accent-color: #345744; }
+#view-whatsapp .outreach-queue-actions button:disabled { cursor: not-allowed; opacity: .45; }
+#view-whatsapp #whatsapp-preview-box { color: var(--outreach-ink) !important; line-height: 1.65; }
+#view-whatsapp .outreach-preview {
+  padding: 18px;
+  border: 1px solid var(--outreach-line);
+  border-radius: 11px;
+  background: var(--surface-raised, #f8faf8);
+}
+#view-whatsapp .outreach-preview strong { font-size: 12px; color: var(--outreach-muted); }
+#view-whatsapp .outreach-preview p { margin: 12px 0 0; font-size: 13px; max-height: 210px; overflow: auto; }
+#view-whatsapp .email-sidebar-card h3, #view-whatsapp .email-sidebar-card h3 span,
+#view-whatsapp #wa-queue-ui, #view-whatsapp #wa-queue-current-lead,
+#view-whatsapp #whatsapp-brochure-status { color: var(--outreach-ink) !important; }
+#view-whatsapp .gmail-body-container > div, #view-whatsapp #wa-queue-ui {
+  background: var(--surface-raised, #f8faf8) !important;
+  border-color: var(--outreach-line) !important;
+}
+#view-whatsapp .gmail-body-container button, #view-whatsapp .gmail-exact-footer button {
+  background: transparent !important;
+  color: var(--outreach-ink) !important;
+  border: 1px solid var(--outreach-line) !important;
+  box-shadow: none !important;
+  border-radius: 9px !important;
+  min-height: 40px;
+}
+@media (max-width: 980px) {
+  #view-email .email-layout, #view-whatsapp .email-layout { grid-template-columns: 1fr !important; }
+  #view-email .email-setup-guide, #view-email .email-inbox-grid { grid-template-columns: 1fr; }
+  #view-email .email-guide-actions { justify-content: flex-start; }
+}
+@media (max-width: 580px) {
+  #view-email, #view-whatsapp { padding: 18px !important; }
+  #view-email .email-sidebar-card, #view-whatsapp .email-sidebar-card { padding: 20px !important; }
+  #view-email .gmail-body-container, #view-whatsapp .gmail-body-container { padding-inline: 18px !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #view-email *, #view-whatsapp * { transition-duration: 0ms !important; }
+}

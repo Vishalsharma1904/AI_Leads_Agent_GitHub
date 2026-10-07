@@ -1,16 +1,16 @@
 {
-  "name": "Clavis AI Lead Agent",
-  "short_name": "Clavis",
+  "name": "Rudra24 AI",
+  "short_name": "Rudra24",
   "description": "Intelligent AI agent for generating leads, sending emails, and voice calling.",
   "start_url": "index.html",
   "display": "standalone",
   "background_color": "#ffffff",
-  "theme_color": "#6366f1",
+  "theme_color": "#102c47",
   "icons": [
     {
-      "src": "icon.svg",
-      "sizes": "192x192 512x512",
-      "type": "image/svg+xml",
+      "src": "assets/rudra24-icon.png",
+      "sizes": "1024x1024",
+      "type": "image/png",
       "purpose": "any maskable"
     }
   ]

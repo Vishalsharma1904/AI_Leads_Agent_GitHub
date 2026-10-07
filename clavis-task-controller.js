@@ -95,37 +95,30 @@
       _onRetry: opts.onRetry || null,
       _text: String(text || '')
     };
+    if (opts.display) task.display = opts.display;
+    // auto = wrapper ne source guess kiya (koi asli typed submission nahi).
+    if (opts.auto) task.auto = true;
+    if (task.source === 'voice') global._clavisLastVoiceTurnAt = Date.now();
     tasks.set(id, task);
     activeId = id;
     emit();
-    refineTitle(id, text);
     return id;
   }
 
-  /** Spelling-clean the heading shown at the top of the panel. Runs after
-   * the instant local title is already on screen (same instant-local +
-   * async-LLM-refine idiom as ClavisIQ's ghost suggestions) and only swaps
-   * it in if the corrected text still classifies at least as confidently —
-   * a bad correction never overwrites a good title with a worse one. */
-  function refineTitle(id, rawText) {
-    if (!global.ClavisIQ || typeof global.ClavisIQ.callModel !== 'function') return;
-    var text = String(rawText || '').trim();
-    if (!text || text.length > 200) return;
-    global.ClavisIQ.callModel([
-      { role: 'system', content: 'Fix only spelling and obvious typos in the user text below. Keep the language (Hindi/Hinglish/English as given), meaning, and word order exactly the same. Reply with just the corrected text and nothing else.' },
-      { role: 'user', content: text }
-    ], { fast: true, temperature: 0, max_tokens: 60 }).then(function (corrected) {
-      var clean = String(corrected || '').trim().replace(/^["']|["']$/g, '');
-      if (!clean || clean.length > 220) return;
-      var t = tasks.get(id);
-      if (!t || t.phase === 'completed' || t.phase === 'failed') return;
-      var reclassified = Model.IntentClassifier.classify(clean);
-      if (reclassified && reclassified.confidence >= t.confidence - 0.05) {
-        t.classification = reclassified;
-        t.title = reclassified.title();
-        emit();
-      }
-    }).catch(function () {});
+  /* Ek hi turn ke liye doosra task mat banao. handleJarvisSend (jarvis_ui)
+     pehle hi task begin kar deta hai (source/display ke saath); phir
+     ClavisCommands.route / JarvisEngine.sendMessage / ChatEngine.sendMessage
+     ke wrappers apna naya 'composer' task bana dete the — wahi low-confidence
+     "Rudra24 AI · Thinking… · Stop" panel pop hota tha. Ab: current task abhi
+     chal raha hai aur (same text hai ya ~1.5 s pehle shuru hua) → wahi lo. */
+  var REUSE_WINDOW_MS = 1500;
+  function normText(t) { return String(t || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
+  function reusable(text) {
+    var t = current();
+    if (!t || t.phase === 'completed' || t.phase === 'failed') return null;
+    var same = normText(t._text) && normText(t._text) === normText(text);
+    var recent = Date.now() - (t.startedAt || 0) <= REUSE_WINDOW_MS;
+    return (same || recent) ? t : null;
   }
 
   function withTask(id, fn) {
@@ -250,9 +243,29 @@
     t.requiresApproval = false;
     t.phase = 'working';
     emit();
-    try { if (approved) req.onApprove && req.onApprove(); else req.onCancel && req.onCancel(); }
+    try { if (approved) req.onApprove && req.onApprove(approved); else req.onCancel && req.onCancel(); }
     catch (e) { console.warn('[ClavisTask] approval handler failed', e); }
     return t;
+  }
+
+  function toggleApprovalOption(id, optionId) {
+    return withTask(id, function (t) {
+      var req = t.approval;
+      if (!t.requiresApproval || !req || !req.multiSelect) return;
+      var option = req.options.find(function (o) { return o.id === optionId; });
+      if (!option) return;
+      var selected = req.selected || [];
+      if (selected.indexOf(optionId) >= 0) selected = selected.filter(function (x) { return x !== optionId; });
+      else if (option.exclusive) selected = [optionId];
+      else selected = selected.filter(function (x) { return !req.options.find(function (o) { return o.id === x && o.exclusive; }); }).concat(optionId);
+      req.selected = selected;
+    });
+  }
+
+  function approvalValues(id) {
+    var req = tasks.get(id || activeId)?.approval;
+    if (!req) return [];
+    return Array.from(new Set((req.options || []).filter(function (o) { return (req.selected || []).indexOf(o.id) >= 0; }).flatMap(function (o) { return o.value || [o.id]; })));
   }
 
   function complete(id, result, actions) {
@@ -283,7 +296,12 @@
   function cancel(id) {
     var t = tasks.get(id || activeId);
     if (!t) return null;
-    try { t._onCancel && t._onCancel(); } catch (e) { console.warn('[ClavisTask] cancel failed', e); }
+    try {
+      if (t._onCancel && t._onCancel() === true) {
+        event(t.id, { type: 'reading', label: 'Stopping search and preparing collected leads' });
+        return t;
+      }
+    } catch (e) { console.warn('[ClavisTask] cancel failed', e); }
     t.phase = 'failed';
     t.endedAt = Date.now();
     t.error = { message: 'Cancelled', code: 'CANCELLED', cancelled: true };
@@ -354,6 +372,10 @@
     var btn = document.getElementById('jarvis-voice-btn');
     if (btn && btn.classList.contains('recording')) return 'voice';
     if (global.jarvisHandsFree) return 'voice';
+    try { if (global.ClavisLive && typeof global.ClavisLive.isActive === 'function' && global.ClavisLive.isActive()) return 'voice'; } catch (e) {}
+    // Abhi-abhi bola gaya turn (jarvis_ui __clavisLastVoiceAt set karta hai; begin() khud _clavisLastVoiceTurnAt).
+    var lastVoice = Math.max(Number(global._clavisLastVoiceTurnAt) || 0, Number(global.__clavisLastVoiceAt) || 0);
+    if (lastVoice && Date.now() - lastVoice <= 4000) return 'voice';
     return 'composer';
   }
 
@@ -364,27 +386,43 @@
     if (wrapped.chatEngine || !engine || typeof engine.sendMessage !== 'function') return false;
     var original = engine.sendMessage.bind(engine);
 
-    engine.sendMessage = function (text, signal) {
+    engine.sendMessage = function (text, signal, options) {
+      if (options?.answerOnly || global.ClavisRequestIntent?.classify(text).answerOnly) return original(text, signal, options);
+      /* The task surface is for work worth watching and cancelling — a lead
+         run, a candidate search. A plain answer already lands in the chat
+         thread, and opening a window for it means the user reads the same
+         reply twice. So no task is opened up front: either one is already
+         running (the caller decided this is a task) or the response itself
+         proves there is real work, and only then is one begun. */
       var id = null;
       try {
         var active = current();
-        if (!active || ['completed', 'failed'].includes(active.phase)) {
-          id = begin(text, {
-            source: 'composer',
-            onCancel: function () { try { global.stopChatGeneration && global.stopChatGeneration(); } catch (e) {} }
-          });
-        } else {
-          id = active.id;
-        }
+        if (active && !['completed', 'failed'].includes(active.phase)) id = active.id;
       } catch (e) {
-        console.warn('[ClavisTask] could not start task surface for ChatEngine', e);
-        return original(text, signal);
+        console.warn('[ClavisTask] could not read the active task for ChatEngine', e);
+        return original(text, signal, options);
       }
 
-      event(id, { type: 'thinking', label: 'Analyzing request' });
+      function ensureTask() {
+        if (id) return id;
+        try {
+          id = begin(text, {
+            source: detectSource(),
+            auto: true,
+            onCancel: function () { try { global.stopChatGeneration && global.stopChatGeneration(); } catch (e) {} }
+          });
+        } catch (e) {
+          console.warn('[ClavisTask] could not start task surface for ChatEngine', e);
+          id = null;
+        }
+        return id;
+      }
+
+      if (id) event(id, { type: 'thinking', label: 'Analyzing request' });
 
       if (signal && typeof signal.addEventListener === 'function') {
         signal.addEventListener('abort', function () {
+          if (!id) return;
           var t = Store.get(id);
           if (t && t.phase !== 'completed') {
             t.phase = 'failed';
@@ -395,14 +433,21 @@
         }, { once: true });
       }
 
-      return Promise.resolve(original(text, signal))
+      return Promise.resolve(original(text, signal, options))
         .then(function (response) {
           try {
-            if (response && response.action && response.action.type === 'generate') {
-              runLeadGeneration(id, response.action, text);
-            } else if (response && response.action && response.action.type === 'candidate_search') {
-              runCandidateGeneration(id, response.action, text);
-            } else {
+            var action = response && response.action;
+            if (action && action.type === 'generate') {
+              ensureTask();
+              // Client AI owns this run through AgentCtrl. Starting a second
+              // RealScraper run here overwrites its callbacks mid-search.
+              if (options?.leadOwner === 'client-chat') event(id, { type: 'reading', label: 'Starting live lead search' });
+              else if (needsLeadScope(action)) askLeadScope(id, action, text);
+              else runLeadGeneration(id, action, text);
+            } else if (action && action.type === 'candidate_search') {
+              ensureTask();
+              runCandidateGeneration(id, action, text);
+            } else if (id) {
               complete(id, buildResult(Store.get(id), response), buildActions(Store.get(id)));
             }
           } catch (e) { console.warn('[ClavisTask] ChatEngine complete failed', e); }
@@ -410,7 +455,8 @@
         })
         .catch(function (err) {
           try {
-            if (err && (err.name === 'AbortError' || err.code === 'AI_CANCELLED')) {
+            if (!id) { /* no surface was opened — the chat reports the error */ }
+            else if (err && (err.name === 'AbortError' || err.code === 'AI_CANCELLED')) {
               var t = Store.get(id);
               if (t) { t.phase = 'failed'; t.error = { message: 'Cancelled', code: 'CANCELLED', cancelled: true }; t.endedAt = Date.now(); emit(); }
             } else {
@@ -430,24 +476,34 @@
     var original = engine.sendMessage.bind(engine);
 
     engine.sendMessage = function (text, signal, onStep, onTextDelta, extra) {
+      if (extra?.source === 'composer' && (extra.answerOnly || global.ClavisAppMap?.guide?.isQuestion(text))) return original(text, signal, onStep, onTextDelta, extra);
       /* This wrapper sits on the reply path. Nothing in here may throw:
          a panel that fails to open is a cosmetic bug, but a throw before
          original() would silently kill every reply in the app. If the
          instrumentation dies, hand the call straight to the engine. */
       var id = null;
+      var reused = false;
       var atts = (extra && extra.attachments) || [];
       var imgs = (extra && extra.images) || (atts ? atts.map(function (a) { return a.dataUrl || a.url; }).filter(Boolean) : []);
       try {
-        id = begin(text, {
-          source: detectSource(),
-          attachments: atts,
-          images: imgs,
-          onCancel: function () { try { global.stopJarvisGeneration && global.stopJarvisGeneration(); } catch (e) {} }
-        });
+        var existing = reusable(text);
+        if (existing) {
+          // Same turn — owner (jarvis_ui) ka task, uska source/display waisa hi rahega.
+          id = existing.id;
+          reused = true;
+        } else {
+          id = begin(text, {
+            source: detectSource(),
+            auto: true,
+            attachments: atts,
+            images: imgs,
+            onCancel: function () { try { global.stopJarvisGeneration && global.stopJarvisGeneration(); } catch (e) {} }
+          });
+        }
         var tObj = Store.get(id);
         if (tObj) {
-          tObj.attachments = atts;
-          tObj.images = imgs;
+          if (atts.length || !tObj.attachments) tObj.attachments = atts;
+          if (imgs.length || !tObj.images) tObj.images = imgs;
         }
       } catch (e) {
         console.warn('[ClavisTask] could not start task surface; running untracked', e);
@@ -477,7 +533,7 @@
         if (typeof onTextDelta === 'function') return onTextDelta(delta);
       };
 
-      if (signal && typeof signal.addEventListener === 'function') {
+      if (!reused && signal && typeof signal.addEventListener === 'function') {
         signal.addEventListener('abort', function () {
           var t = Store.get(id);
           if (t && t.phase !== 'completed') {
@@ -489,13 +545,29 @@
         }, { once: true });
       }
 
+      // Reused task ka owner khud complete/fail karta hai; hum sirf safety net
+      // rakhte hain agar owner ne kuch na kiya ho.
+      function settleLater(fn) {
+        setTimeout(function () {
+          var t = Store.get(id);
+          if (t && t.phase !== 'completed' && t.phase !== 'failed') { try { fn(); } catch (e) {} }
+        }, REUSE_WINDOW_MS);
+      }
+
       return Promise.resolve(original(text, signal, wrappedStep, wrappedDelta, extra))
         .then(function (response) {
-          try { complete(id, buildResult(Store.get(id), response), buildActions(Store.get(id))); }
+          try {
+            var done = function () { complete(id, buildResult(Store.get(id), response), buildActions(Store.get(id))); };
+            if (reused) settleLater(done); else done();
+          }
           catch (e) { console.warn('[ClavisTask] complete failed', e); }
           return response;   // the reply must survive a broken panel
         })
         .catch(function (err) {
+          if (reused) {
+            settleLater(function () { fail(id, err); });
+            throw err;
+          }
           try {
             if (err && (err.name === 'AbortError' || err.code === 'AI_CANCELLED')) {
               var t = Store.get(id);
@@ -524,12 +596,17 @@
       // route() returns {handled:false} for ordinary chat and we don't
       // want a task card flashing for every message.
       var likely = probe.mode === 'system' || probe.intent === 'system_action';
-      var id = likely ? begin(text, { source: detectSource() }) : null;
+      var existing = likely ? reusable(text) : null;
+      var reused = !!existing;
+      var id = existing ? existing.id : (likely ? begin(text, { source: detectSource(), auto: true }) : null);
       if (id) event(id, { type: 'executing', label: 'Preparing action' });
 
       return Promise.resolve(original(text))
         .then(function (res) {
           if (!id) return res;
+          // Owner (jarvis_ui) ka task: result wahi likhega; "not handled" par
+          // task ko clear mat karo — engine abhi usi task par chalega.
+          if (reused) return res;
           if (res && res.handled) {
             // `text` is what belongs on screen (e.g. a website brief); `spoken` is the voice line.
             complete(id, { type: 'text', text: res.text || res.spoken || 'Done' }, []);
@@ -538,7 +615,7 @@
           }
           return res;
         })
-        .catch(function (err) { if (id) fail(id, err); throw err; });
+        .catch(function (err) { if (id && !reused) fail(id, err); throw err; });
     };
     wrapped.commands = true;
     return true;
@@ -573,6 +650,7 @@
 
   function buildActions(task) {
     if (!task) return [];
+    if (global.ClavisRequestIntent?.classify(task._text).answerOnly) return [{ id: 'elaborate-answer', label: 'Elaborate this', run: function () { global.handleJarvisSend?.({ text: 'Explain in more detail: ' + task._text, answerOnly: true, elaborate: true }); } }];
     var actions = [];
     var rawText = (task._text || '').toLowerCase();
     var resultText = (task.result && task.result.text ? task.result.text : '').toLowerCase();
@@ -584,32 +662,52 @@
       /\b(lead|leads|company|companies|excel|sheet|download|export|table|b2b|scrape|database|csv|records)\b/i.test(rawText) ||
       /\b(lead|leads|company|companies|spreadsheet|excel|sheet)\b/i.test(resultText)
     ) {
+      var leadRows = function () {
+        return (task.result && Array.isArray(task.result.rows) && task.result.rows.length)
+          ? task.result.rows
+          : (global.allLeads && global.allLeads.length ? global.allLeads : null);
+      };
+      var hint = function (rows) {
+        var c = Array.from(new Set((rows || []).map(function (r) { return r && r.city; }).filter(Boolean))).slice(0, 3).join('-');
+        return (c || 'clavis') + '-' + (rows ? rows.length : 0);
+      };
       actions.push({
         id: 'download-excel',
-        label: '📥 Download Excel (.xlsx)',
+        label: 'Download Excel',
         primary: true,
         run: function () {
           try {
-            var rows = (task.result && Array.isArray(task.result.rows) && task.result.rows.length)
-              ? task.result.rows
-              : (global.allLeads && global.allLeads.length ? global.allLeads : null);
+            var rows = leadRows();
             if (global.RealScraper && typeof global.RealScraper.exportExcel === 'function' && rows) {
-              global.RealScraper.exportExcel(rows, 'clavis-leads');
+              global.RealScraper.exportExcel(rows, hint(rows));
             } else if (global.LeadsCtrl && typeof global.LeadsCtrl.exportToExcel === 'function') {
               global.LeadsCtrl.exportToExcel();
             } else if (typeof global.exportToExcel === 'function') {
               global.exportToExcel();
-            } else if (global.showToast) {
-              global.showToast('Excel export triggered for current leads.', 'success');
             }
           } catch (e) {
             console.warn('[ClavisTask] Excel export error', e);
           }
         }
       });
+      if (task.result && Array.isArray(task.result.rows) && task.result.rows.length) {
+        actions.push({
+          id: 'download-csv',
+          label: 'Download CSV',
+          run: function () {
+            try { var rows = leadRows(); if (rows && global.RealScraper && global.RealScraper.exportCsv) global.RealScraper.exportCsv(rows, hint(rows)); }
+            catch (e) { console.warn('[ClavisTask] CSV export error', e); }
+          }
+        });
+        actions.push({
+          id: 'show-on-map',
+          label: 'Show on map',
+          run: function () { var rows = leadRows(); leadsToMap(rows, 'Leads'); }
+        });
+      }
       actions.push({
         id: 'open-leads-hub',
-        label: '📊 Open Leads Hub',
+        label: 'Open Leads Hub',
         run: function () { openView('leads'); }
       });
       return actions;
@@ -751,6 +849,8 @@
      try each and fail quietly rather than throwing out of a click. */
   function openView(name) {
     try {
+      if (global.ClavisTaskSurface) global.ClavisTaskSurface.hide();
+      if (global.location.hash !== '#' + name) { global.location.hash = '#' + name; return; }
       if (typeof global.showView === 'function') return global.showView(name);
       if (typeof global.switchView === 'function') return global.switchView(name);
       if (typeof global.navigateTo === 'function') return global.navigateTo(name);
@@ -811,12 +911,63 @@
     }).catch(function () { return null; });
   }
 
+  var WANTS_MAP = /\b(map|maps|naksha|nakshe|naksa|location|locations|lokeshan)\b|मैप|नक्शा|नक्शे|लोकेशन/i;
+
+  function needsLeadScope(action) {
+    return action && Array.isArray(action.industries) && action.industries.some(function (value) {
+      return String(value || '').trim().toUpperCase() === 'ALL';
+    });
+  }
+
+  function askLeadScope(id, action, rawQuery, runner) {
+    var choices = [
+      { id: 'hotels', label: 'Hotels & Hospitality', value: ['Hotels & Hospitality'] },
+      { id: 'healthcare', label: 'Hospitals & Healthcare', value: ['Hospitals & Healthcare'] },
+      { id: 'offices', label: 'Offices & IT Parks', value: ['Corporate Offices', 'IT Companies'] },
+      { id: 'industrial', label: 'Factories, Malls & Warehouses', value: ['Manufacturing Companies', 'Shopping Malls', 'Warehouses & Logistics'] },
+      { id: 'all-buyers', label: 'All industries', value: ['ALL'], exclusive: true }
+    ];
+    requireApproval(id, {
+      title: 'Which buyer companies should I target?',
+      label: 'Select one or more industries, then Start search',
+      detail: 'Location: ' + ((action.cities?.length ? action.cities : global.AgentCtrl?.getDefaults?.().locations || [global.SKYLARK_CONFIG?.DEFAULT_CITY || 'Delhi NCR']).join(', ')) + '. Choose several industries together, or All industries. Start search uses this location.',
+      multiSelect: true,
+      selected: [],
+      options: choices,
+      onApprove: function (selected) {
+        var next = Object.assign({}, action, { industries: Array.isArray(selected) && selected.length ? selected : ['ALL'] });
+        event(id, { type: 'reading', label: 'Starting live lead search for the selected buyer segment' });
+        if (typeof runner === 'function') runner(id, next, rawQuery);
+        else runLeadGeneration(id, next, rawQuery);
+      },
+      onCancel: function () { event(id, { type: 'reading', label: 'Lead search cancelled before sourcing started' }); }
+    });
+  }
+
+  /* Put finished lead rows on the Rudra24 AI map; resolves the placed count. */
+  function leadsToMap(rows, title) {
+    var C = global.ClavisCanvas;
+    if (!C || typeof C.showLeads !== 'function' || !rows || !rows.length) return Promise.resolve(null);
+    return Promise.resolve(C.showLeads(rows, { title: title })).catch(function () { return null; });
+  }
+
   function runLeadGeneration(id, action, rawQuery) {
     if (!global.RealScraper || typeof global.RealScraper.run !== 'function') {
       fail(id, { message: 'Lead search engine is not available in this build.', code: 'NO_SCRAPER' });
       return;
     }
+    if (global.RealScraper.isRunning?.()) {
+      fail(id, { message: 'A lead search is already running. Wait for its result before starting another.', code: 'SCRAPE_BUSY' });
+      return;
+    }
     event(id, { type: 'reading', label: 'Starting live lead search' });
+    // "…aur map pe dikhao": the finished leads also go on the map.
+    var task0 = Store.get(id);
+    if (task0) {
+      task0.showOnMap = WANTS_MAP.test(String(rawQuery || ''));
+      task0.display = 'window';
+      task0._onCancel = function () { global.RealScraper.abort(); return true; };
+    }
 
     function launch(cities) {
       global.RealScraper.setCallbacks({
@@ -825,27 +976,54 @@
           var frac = Math.max(0, Math.min(1, ((step - 1) + (pct || 0) / 100) / 4));
           event(id, { type: 'reading', label: 'Working through the source plan', progress: frac });
         },
-        onStatus: function (d) { event(id, { type: 'reading', label: (d && d.text) || 'Working through the source plan' }); },
+        onStatus: function (d) {
+          if (d && Array.isArray(d.leads)) {
+            var task = Store.get(id);
+            if (task) {
+              task.partialRows = d.leads;
+              task.metrics.leads = d.leads.length;
+            }
+          }
+          var label = (d && d.text) || 'Working through the source plan';
+          if (d && d.count) label = d.count + ' sourced contacts saved. ' + label;
+          var state = String((d && d.status) || '').toLowerCase();
+          var progress = state === 'queued' ? 0.08 : state === 'running' ? 0.28 :
+            (state === 'completed' || state === 'partial') ? 0.94 : undefined;
+          if (d?.phase === 'websites' || d?.phase === 'authority' || /checking company websites|enriching contacts|website|public page/i.test(label)) progress = 0.62;
+          else if (/sourced contacts saved|contact details|ranking/i.test(label)) progress = 0.78;
+          else if (/preparing sourced results|excel|ready/i.test(label)) progress = 0.92;
+          event(id, { type: 'reading', label: label, detail: d && d.status || '', progress: progress });
+        },
         onLead: function () {},
         onComplete: function (summary) {
           var s = summary || {};
           document.dispatchEvent(new CustomEvent('nexus:scrapedone', { detail: {
-            ok: true, leads: s.leads || [], total: s.total, added: s.added, completeContacts: s.completeContacts
+            ok: !!(s.leads && s.leads.length), taskId: id,
+            leads: s.leads || [], total: s.total, requested: s.requested, added: s.added, completeContacts: s.completeContacts,
+            stopped: !!s.stopped
           } }));
         },
         onError: function (message) {
-          fail(id, { message: typeof message === 'string' ? message : 'Lead search failed', code: 'SCRAPE_FAILED' });
+          document.dispatchEvent(new CustomEvent('nexus:scrapedone', { detail: {
+            ok: false, taskId: id, error: typeof message === 'string' ? message : 'Lead search failed'
+          } }));
         }
       });
       global.RealScraper.run({
         industries: action.industries,
         locations: cities,
         serviceTypes: action.serviceType,
-        targetCount: action.count
+        targetCount: action.count,
+        autoExcel: true
       }).catch(function (err) { fail(id, err); });
     }
 
-    if (action.explicitCity || !action.cities || !action.cities.length) { launch(action.cities); return; }
+    if (!action.cities?.length) {
+      var defaults = global.AgentCtrl?.getDefaults?.().locations;
+      var fallback = defaults?.length ? defaults : [global.SKYLARK_CONFIG?.DEFAULT_CITY || 'Delhi NCR'];
+      launch(global.LeadCandidateDomain?.expandLocations(fallback) || fallback); return;
+    }
+    if (action.explicitCity) { launch(action.cities); return; }
     cityFromModel(rawQuery).then(function (city) {
       launch(city ? [city] : action.cities);
     }).catch(function () { launch(action.cities); });
@@ -884,35 +1062,59 @@
     document.addEventListener('nexus:scrapeprogress', function (e) {
       var t = current();
       var d = e.detail || {};
-      if (!t || t.phase === 'completed' || t.phase === 'failed') return;
+      if (!t || t.phase === 'completed' || t.phase === 'failed' || (d.taskId && d.taskId !== t.id)) return;
       event(t.id, { type: 'reading', label: d.label || 'Working through the source plan', progress: typeof d.pct === 'number' ? d.pct / 100 : undefined });
     });
 
     document.addEventListener('nexus:agentstatus', function (e) {
       var t = current();
       var d = e.detail || {};
-      if (!t || t.phase === 'completed' || t.phase === 'failed' || !d.text) return;
+      if (!t || t.phase === 'completed' || t.phase === 'failed' || !d.text || (d.taskId && d.taskId !== t.id)) return;
+      if (Array.isArray(d.leads)) {
+        t.partialRows = d.leads;
+        t.metrics.leads = d.leads.length;
+      }
       event(t.id, { type: d.finished ? 'success' : 'thinking', label: d.text, progress: typeof d.step === 'number' && d.step > 0 ? Math.min(0.98, d.step / 7) : undefined });
     });
 
     document.addEventListener('nexus:scrapedone', function (e) {
       var t = current();
       var d = e.detail || {};
-      if (!t || t.phase === 'completed' || t.phase === 'failed') return;
+      if (!t || t.phase === 'completed' || t.phase === 'failed' || (d.taskId && d.taskId !== t.id)) return;
+      if (d.ok === false) {
+        fail(t.id, { message: d.error || 'No contactable leads found for this search.', code: 'SCRAPE_FAILED' });
+        return;
+      }
       var rows = Array.isArray(d.leads) ? d.leads : [];
       t.intent = Model.INTENT.LEAD_GEN;
       t.mode = 'leads';
       t.metrics.leads = Number(d.total || d.added || rows.length || 0);
       if (d.completeContacts != null) t.metrics.completeContacts = Number(d.completeContacts) || 0;
+      var named = rows.filter(function (r) { return r && r.contactPerson; }).length;
+      var cities = Array.from(new Set(rows.map(function (r) { return r && r.city; }).filter(Boolean)));
       var result = {
         type: 'leads',
         text: d.ok
-          ? `${t.metrics.leads} sourced leads are ready. Excel file has downloaded automatically.`
+          ? `${t.metrics.leads}${d.requested && t.metrics.leads < d.requested ? ` of ${d.requested}` : ''} ${d.stopped ? 'leads collected before Stop' : 'sourced leads are ready'}${cities.length ? ` (${cities.join(', ')})` : ''}${named ? ` — ${named} with a named owner / authority` : ''}. Preview below; download Excel or CSV when you are ready.`
           : (t.metrics.leads ? `${t.metrics.leads} leads found.` : 'No leads found matching criteria.'),
         rows: rows,
         metrics: t.metrics
       };
+      var wantMap = !!t.showOnMap && rows.length > 0;
+      if (wantMap) result.text += ' Placing them on the map…';
       complete(t.id, result, buildActions({ ...t, result: result, metrics: t.metrics, mode: 'leads' }));
+      if (wantMap) {
+        var tid = t.id;
+        leadsToMap(rows, cities.length ? 'Leads · ' + cities.join(', ') : 'Leads').then(function (r) {
+          var task = Store.get(tid);
+          if (!task || !task.result) return;
+          task.result.text = task.result.text.replace(' Placing them on the map…', r
+            ? ` ${r.shown} of ${rows.length} placed on the map${r.skipped ? ` (${r.skipped} had no reliable location)` : ''}.`
+            : ' The map could not be opened.');
+          task.result.mapShown = r ? r.shown : 0;
+          emit();
+        });
+      }
     });
 
     document.addEventListener('nexus:candidateprogress', function (e) {
@@ -945,6 +1147,8 @@
     begin: begin, event: event, toolStart: toolStart, toolResult: toolResult,
     setResult: setResult, complete: complete, fail: fail, cancel: cancel,
     retry: retry, requireApproval: requireApproval, resolveApproval: resolveApproval,
+    toggleApprovalOption: toggleApprovalOption, approvalValues: approvalValues,
+    requestLeadScope: function (id, action, rawQuery, runner) { askLeadScope(id, action, rawQuery, runner); },
     clear: Store.clear, current: current,
     install: install,
 

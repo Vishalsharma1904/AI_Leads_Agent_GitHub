@@ -1,8 +1,8 @@
 {
-  "name": "a.i.-leads-agent",
-  "version": "1.0.0",
-  "description": "Clavis \u2014 B2B Lead Generation Agent for security & housekeeping staffing agencies. Built by Rudra24 Secure Group. Yeh project aapki company ke liye un buyer companies ko dhundhta hai jinhe security guards aur housekeeping staff ki zarurat hoti hai (jaise Hotels, Hospitals, IT Parks, Malls).",
-  "main": "agent.js",
+  "name": "rudra24-ai",
+  "version": "1.0.6",
+  "description": "Rudra24 AI desktop lead generation and assistant app.",
+  "main": "electron/main.js",
   "scripts": {
     "start": "npm run dev",
     "frontend": "node serve-clavis.js",
@@ -11,7 +11,11 @@
     "dev": "concurrently \"npm run frontend\" \"npm run backend\"",
     "build:css": "npx @tailwindcss/cli -i ./src/input.css -o ./styles_tailwind.css",
     "test": "node scripts/run-all-checks.js",
-    "test:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-speech.ps1"
+    "test:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-speech.ps1",
+    "desktop": "electron .",
+    "dist:win": "node electron/prepare-build.js && node scripts/check-installer-contents.js --strict && electron-builder --win nsis",
+    "check:installer": "node scripts/check-installer-contents.js",
+    "build:motion": "node scripts/build-motion-ui.js"
   },
   "keywords": [],
   "author": "",
@@ -20,12 +24,102 @@
     "@tailwindcss/cli": "^4.3.3",
     "autoprefixer": "^10.5.4",
     "concurrently": "^10.0.4",
+    "electron": "^38.0.0",
+    "electron-builder": "^26.0.0",
+    "esbuild": "0.28.2",
     "postcss": "^8.5.25",
     "serve": "^14.2.4",
     "tailwindcss": "^4.3.3"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
-    "ogl": "^1.0.11"
+    "motion": "14.0.0",
+    "ogl": "^1.0.11",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "serve-handler": "^6.1.6"
+  },
+  "build": {
+    "appId": "digital.rudra24.ai",
+    "productName": "Rudra24 AI",
+    "asar": true,
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "*.html",
+      "*.js",
+      "*.css",
+      "*.svg",
+      "*.png",
+      "*.jpg",
+      "manifest.json",
+      "audio/**/*",
+      "assets/**/*",
+      "fonts/**/*",
+      "vendor/maplibre/**/*",
+      "electron/**/*",
+      "clavis-bridge/bridge.js",
+      "!secrets.local.js",
+      "!**/*.map",
+      "!**/*test*.js",
+      "!**/*backup*",
+      "!**/*.env",
+      "!**/*.db",
+      "!**/*.sqlite",
+      "!electron/prepare-build.js",
+      "!**/*.bat",
+      "!**/*.ps1"
+    ],
+    "extraResources": [
+      {
+        "from": "clavis-bridge",
+        "to": "clavis-bridge",
+        "filter": [
+          "*.ps1"
+        ]
+      }
+    ],
+    "win": {
+      "icon": "installer/Rudra24.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker",
+      "artifactName": "Rudra24-AI-Setup-${version}.${ext}"
+    },
+    "electronLanguages": [
+      "en-US",
+      "hi"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Rudra24 AI",
+      "runAfterFinish": true,
+      "deleteAppDataOnUninstall": false,
+      "installerIcon": "installer/Rudra24.ico",
+      "uninstallerIcon": "installer/Rudra24.ico",
+      "installerHeaderIcon": "installer/Rudra24.ico",
+      "uninstallDisplayName": "Rudra24 AI",
+      "license": "installer/LICENSE.txt"
+    },
+    "copyright": "Copyright \u00a9 Rudra24 Digital"
   }
 }

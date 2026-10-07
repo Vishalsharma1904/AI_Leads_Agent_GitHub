@@ -12,6 +12,7 @@ celery
 pydantic
 pydantic-settings
 python-dotenv
+tzdata>=2024.1
 python-multipart
 websockets
 PyJWT
@@ -43,3 +44,4 @@ kokoro>=0.9.4
 faster-whisper>=1.1,<2
 silero-vad>=6,<7
 onnxruntime>=1.17,<2
+composio>=0.24.0

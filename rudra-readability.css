@@ -1,0 +1,66 @@
+/* Semantic ink tokens for every page. Pale accents are surface fills. */
+html[data-theme="light"]:not(#_) {
+  --primary: #31543a !important;
+  --foreground: #202820 !important;
+  --gray-400: #62665f !important;
+  --gray-600: #484e46 !important;
+  --do-t1: #202820 !important;
+  --do-t2: #484e46 !important;
+  --do-t3: #62665f !important;
+  --do-blue: #31543a !important;
+  --lxe-faint: #62665f !important;
+  --lxe-mute: #545b52 !important;
+}
+html[data-theme="dark"]:not(#_) {
+  --primary: #c6d7b7 !important;
+  --foreground: #f0f1eb !important;
+  --gray-400: #b2b7ac !important;
+  --gray-600: #c3c8be !important;
+  --do-t1: #f0f1eb !important;
+  --do-t2: #c3c8be !important;
+  --do-t3: #b2b7ac !important;
+  --do-blue: #c6d7b7 !important;
+  --lxe-faint: #b2b7ac !important;
+  --lxe-mute: #c3c8be !important;
+}
+html[data-theme="light"] body #clavis-task-surface {
+  --cts-panel: #ffffff !important;
+  --cts-text: #202820 !important;
+  --cts-mute: #545b52 !important;
+  --cts-faint: #62665f !important;
+}
+html[data-theme="dark"] body #clavis-task-surface {
+  --cts-panel: #1c1f1b !important;
+  --cts-text: #f0f1eb !important;
+  --cts-mute: #c3c8be !important;
+  --cts-faint: #b2b7ac !important;
+}
+#clavis-ahead-chip .ca-go { white-space: normal; min-height: 36px; }
+#clavis-ahead-chip .ca-label { line-height: 1.5; }
+html:not(#_):not(#_) body:not(#_):not(#_) #view-email small,
+html:not(#_):not(#_) body:not(#_):not(#_) .do-activity-avatar {
+  color: var(--foreground) !important;
+}
+html:not(#_):not(#_) body:not(#_):not(#_) .email-signature-save-status[data-tone="saved"],
+html:not(#_):not(#_) body:not(#_):not(#_) #view-whatsapp .wa-accent-text {
+  color: var(--primary) !important;
+}
+html:not(#_):not(#_) body:not(#_):not(#_) .sc-empty p,
+html:not(#_):not(#_) body:not(#_):not(#_) .progress-status-badge.idle {
+  color: var(--gray-400) !important;
+}
+html:not(#_):not(#_) body:not(#_):not(#_) .pg-stat-value,
+html:not(#_):not(#_) body:not(#_):not(#_) .pg-badge {
+  color: var(--foreground) !important;
+}
+html:not(#_):not(#_) body:not(#_):not(#_) #view-accounts strong {
+  color: var(--foreground) !important;
+}
+@media (max-width: 600px) {
+  html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface {
+    min-width: 0 !important;
+    max-width: calc(100vw - 32px) !important;
+  }
+  #clavis-ahead-chip { flex-wrap: wrap; width: calc(100vw - 48px); }
+  #clavis-ahead-chip .ca-label { flex: 1 1 100%; }
+}

@@ -119,7 +119,7 @@
       lastPointer = { x: e.clientX, y: e.clientY, t: performance.now(), onSwitch: !!sw };
     }, true);
     doc.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' || e.key === ' ') lastPointer.t = -1e9;   // keyboard: use the switch itself
+      if (e.key === 'Enter' || e.key === ' ') lastPointer.t = -1e9;
     }, true);
 
     function visible(r) { return r && r.width > 0 && r.bottom > 0 && r.top < global.innerHeight && r.right > 0 && r.left < global.innerWidth; }
@@ -136,8 +136,6 @@
       return { x: global.innerWidth - 48, y: 24 };
     }
 
-    // Apple spring asymmetric curve: gentle, dense 60+ FPS progression from switch (0-80%),
-    // followed by an ultra-slow, buttery, critically damped glide for the final 20%
     var EASE = 'cubic-bezier(0.18, 0.76, 0.22, 1)';
 
     function run(next, apply, opts) {
@@ -159,16 +157,10 @@
 
       var o = origin();
       var far = Math.hypot(Math.max(o.x, global.innerWidth - o.x), Math.max(o.y, global.innerHeight - o.y)) + 32;
-      // Stately, luxurious Apple duration: ~1650ms total
       var dur = Math.round(clamp(1500 + far * 0.22, 1600, 1920));
 
       if (!doc.startViewTransition) { fallbackWave(next, apply, o, far, dur); return; }
 
-      /* Only pseudo-element rules hang off lx-vt-wave, so adding it is
-         free. lx-theme-busy (transitions off) restyles everything, so it
-         rides along with the theme change inside the update callback —
-         one full style pass instead of three — and comes off only after
-         the reveal has finished moving. */
       root.classList.add('lx-vt-wave');
       busy = true;
       var vt;
@@ -198,12 +190,8 @@
       vt.finished.catch(function () {}).then(settle);
     }
 
-    /* Everything must land in the new colours in the SAME frame the
-       new snapshot is taken. lx-theme-busy outranks every transition rule.
-       We flag __themeTransitioning to postpone non-critical canvas/chart
-       rerenders so the main thread remains 100% free for 120fps wave animation. */
     function swapTheme(apply) {
-      window.__themeTransitioning = true;
+      global.__themeTransitioning = true;
       root.classList.add('lx-theme-busy');
       apply();
       root.classList.remove('theme-transitioning');
@@ -212,13 +200,11 @@
     function settle() {
       root.classList.remove('lx-vt-wave', 'lx-vt-fade');
       busy = false;
-      window.__themeTransitioning = false;
+      global.__themeTransitioning = false;
       doc.dispatchEvent(new CustomEvent('nexus:themechange:settled'));
       setTimeout(function () { if (!busy) root.classList.remove('lx-theme-busy'); }, 90);
     }
 
-    /* No View Transitions: a disc of the new ground grows from the
-       same origin, the theme swaps underneath it, and it dissolves. */
     function fallbackWave(next, apply, o, far, dur) {
       var wave = doc.createElement('div');
       wave.className = 'lx-theme-wave';
@@ -396,7 +382,8 @@
       requestAnimationFrame(function () { if (visible) tipEl.classList.add('is-in'); });
     }
     function hide() {
-      clearTimeout(timer);
+      if (!visible && !target && !timer) return;
+      clearTimeout(timer); timer = 0;
       if (visible) lastHide = performance.now();
       visible = false;
       target = null;
@@ -569,7 +556,11 @@
     rewriteHas();
     localiseMenuOrigin();
     doc.addEventListener('change', function (e) { if (e.target && e.target.closest && e.target.closest('.gender-select-pill')) syncChecked(); }, true);
-    var mo = new MutationObserver(syncHasFlags);
+    var mo = new MutationObserver(function (records) {
+      if (records.some(function (m) {
+        return m.target === rail || m.target === view || m.target.matches?.('.jarvis-side,.jarvis-composer-btn,#settings-modal');
+      })) syncHasFlags();
+    });
     mo.observe(rail, { attributes: true, attributeFilter: ['class'] });
     mo.observe(view, { attributes: true, attributeFilter: ['class'], subtree: true });
     doc.querySelectorAll('.jarvis-composer-btn').forEach(function (b) {
@@ -865,8 +856,6 @@
    * stylesheet now reads one custom property; this is its only
    * writer, and it changes only when the number of lines does.
    * ============================================================ */
-  var TWIN_PROPS = ['font-family', 'font-size', 'font-weight', 'font-style', 'font-stretch', 'letter-spacing', 'line-height',
-    'text-transform', 'text-indent', 'word-spacing', 'word-break', 'overflow-wrap', 'tab-size', 'font-feature-settings', 'font-variation-settings'];
   function installComposerGrow() {
     var found = 0;
     ['jarvis-input', 'chat-input', 'candidate-ai-input'].forEach(function (id) {
@@ -878,62 +867,9 @@
   function growOne(ta) {
     if (ta.__lxGrow) return;
     ta.__lxGrow = true;
-    /* A div, not a textarea: global textarea rules (padding, width,
-       heights, all !important) would otherwise reach the twin too. */
-    var twin = doc.createElement('div');
-    twin.setAttribute('aria-hidden', 'true');
-    doc.body.appendChild(twin);
-    var MIN = 28, MAX = 208, last = -1, lastScroll = null;
-    function pin(el, k, v) { el.style.setProperty(k, v, 'important'); }
-    ['position:fixed', 'left:-10000px', 'top:0', 'visibility:hidden', 'pointer-events:none', 'height:auto', 'min-height:0',
-     'max-height:none', 'padding:0', 'margin:0', 'border:0', 'box-sizing:content-box', 'white-space:pre-wrap',
-     'overflow:hidden', 'transition:none', 'animation:none', 'contain:layout style'].forEach(function (d) {
-      var i = d.indexOf(':'); pin(twin, d.slice(0, i), d.slice(i + 1));
-    });
-
-    function sync() {
-      if (!ta.isConnected || !ta.clientWidth) return;
-      if (!ta.value || !ta.value.trim()) {
-        last = MIN;
-        ta.style.setProperty('--lx-ta-h', MIN + 'px');
-        ta.classList.remove('lx-grow-scroll');
-        return;
-      }
-      var cs = getComputedStyle(ta);
-      TWIN_PROPS.forEach(function (k) { pin(twin, k, cs.getPropertyValue(k)); });
-      var padX = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
-      var padY = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
-      var bdY = cs.boxSizing === 'border-box' ? parseFloat(cs.borderTopWidth) + parseFloat(cs.borderBottomWidth) : 0;
-      pin(twin, 'width', Math.max(1, ta.clientWidth - padX) + 'px');
-      /* a trailing newline is a real line in a textarea, not in a div */
-      twin.textContent = (ta.value || ' ').replace(/\n$/, '\n ');
-      var natural = twin.scrollHeight + padY + bdY;
-      var h = Math.max(MIN, Math.min(MAX, Math.ceil(natural)));
-      if (h !== last) { last = h; ta.style.setProperty('--lx-ta-h', h + 'px'); }
-      var scroll = natural > MAX + 1;
-      if (scroll !== lastScroll) { lastScroll = scroll; ta.classList.toggle('lx-grow-scroll', scroll); }
-    }
-    ta.__lxSync = sync;
     ta.classList.add('lx-grow');
-    ta.addEventListener('input', sync);
-    ta.addEventListener('focus', sync);
-    /* Programmatic changes (send clears it, voice fills it) all go
-       through the app's own grow function, so follow that too. */
-    var appGrow = ta.id === 'jarvis-input' && global.autoGrowJarvisInput;
-    if (typeof appGrow === 'function' && !appGrow.__lx) {
-      var wrapped = function () { var r = appGrow.apply(this, arguments); sync(); return r; };
-      wrapped.__lx = true;
-      global.autoGrowJarvisInput = wrapped;
-    }
-    new MutationObserver(sync).observe(ta, { attributes: true, attributeFilter: ['value'] });
-    if (global.ResizeObserver) {
-      var lastW = 0;
-      new ResizeObserver(function (entries) {
-        var w = Math.round(entries[0].contentRect.width);
-        if (w !== lastW) { lastW = w; sync(); }
-      }).observe(ta);
-    }
-    sync();
+    ta.__lxSync = function () { global.ClavisComposerSizing?.request(ta); };
+    global.ClavisComposerSizing?.attach(ta);
   }
 
   global.resetComposer = function (elOrId) {
@@ -955,14 +891,14 @@
    * 3d · COMPOSER ASSIST — never an empty box
    * ------------------------------------------------------------
    * While the field is empty a quiet hint cycles inside it — each
-   * one a real thing Clavis can do, typed or spoken — and when the
+   * one a real thing Rudra24 AI can do, typed or spoken — and when the
    * owner focuses it, four suggestions rise above the box, chosen
    * from what is actually going on: the last answer, the lead
    * count, the time of day, the theme. One tap does short commands
    * at once; anything that spends credits is only filled in.
    * ============================================================ */
   var HINTS = [
-    'Clavis se kuch bhi puchiye…',
+    'Rudra24 AI se kuch bhi puchiye…',
     'Try: “Gurugram ke hospitals ki 20 leads nikalo”',
     'Try: “Neem Karoli Baba ki photos dikhao”',
     'Try: “Dark mode on karo”',
@@ -1202,6 +1138,12 @@
 
   function openView(name) {
     try {
+      if (name === 'email' && global.EmailCtrl && global.EmailCtrl.setLeadAudience) {
+        var task = global.ClavisTask && global.ClavisTask.current();
+        global.EmailCtrl.setLeadAudience(task && task.result && task.result.rows || []);
+      }
+      if (global.ClavisTaskSurface) global.ClavisTaskSurface.hide();
+      if (global.location.hash !== '#' + name) { global.location.hash = '#' + name; return; }
       if (typeof global.showView === 'function') return global.showView(name);
       if (typeof global.switchView === 'function') return global.switchView(name);
     } catch (e) { console.warn('[ClavisLuxe] view', name, e); }
@@ -1346,14 +1288,13 @@
       return;
     }
     if (btn.dataset.auGo) {
-      btn.classList.add('is-picked');
-      setTimeout(function () { btn.classList.remove('is-picked'); openView(btn.dataset.auGo); }, 260);
+      openView(btn.dataset.auGo);
       return;
     }
     if (kind === 'tool') {
       pickRow(body, btn);
       setTimeout(function () {
-        if (!askClavis(ask)) toast('error', 'Could not send', 'The Clavis composer was not found.');
+        if (!askClavis(ask)) toast('error', 'Could not send', 'The Rudra24 AI composer was not found.');
       }, 320);
       /* A real run repaints the panel with the new task. If nothing
          took over (no brain, a device command, an error toast), put
@@ -1566,7 +1507,7 @@
 
   /* ── Prompt ──────────────────────────────────────────────────── */
   var SYSTEM = [
-    'You are Clavis Deep Dive, a sharp research writer inside a business app used by an Indian security-guard and facility-staffing company.',
+    'You are Rudra24 AI Deep Dive, a sharp research writer inside a business app used by an Indian security-guard and facility-staffing company.',
     'Your job: expand an earlier answer for the ACTION the user tapped. Stay on the same topic.',
     '',
     'OUTPUT: exactly one JSON object and nothing else. No markdown, no code fences, no commentary.',
@@ -1689,7 +1630,7 @@
       return { title: n.title, detail: sentences(n.extract)[0] || n.extract, link: n.link };
     });
     d.note = job.offline
-      ? { text: 'Clavis ka AI brain abhi connect nahi hai, isliye ye basic research hai. AI key connect karte hi poora deep dive — examples, steps aur visuals ke saath — milega.', action: 'Connect AI key', act: 'key' }
+      ? { text: 'Rudra24 AI ka AI brain abhi connect nahi hai, isliye ye basic research hai. AI key connect karte hi poora deep dive — examples, steps aur visuals ke saath — milega.', action: 'Connect AI key', act: 'key' }
       : { text: 'AI se poora jawab nahi aa paya' + (job.error && job.error.message ? ' (' + clip(job.error.message, 80) + ')' : '') + '. Jo mila wo dikha raha hoon.', action: 'Try again', act: 'retry' };
     return d;
   }
@@ -1973,7 +1914,7 @@
   function sendDeepToChat(btn) {
     var job = session && session.job;
     var d = job && job.data;
-    if (!d || typeof global.appendJarvisBubble !== 'function') { toast('info', 'Chat not ready', 'Open Clavis AI once, then try again.'); return; }
+    if (!d || typeof global.appendJarvisBubble !== 'function') { toast('info', 'Chat not ready', 'Open Rudra24 AI once, then try again.'); return; }
     var html = '<p><strong>' + inline(d.title || job.label) + '</strong></p>' + (d.tldr ? '<p>' + inline(d.tldr) + '</p>' : '');
     if (d.draft) html += '<p>' + esc(d.draft).replace(/\n/g, '<br>') + '</p>';
     if (d.points.length) html += '<ul>' + d.points.map(function (p) { return '<li>' + (p.title ? '<b>' + inline(p.title) + '</b> — ' : '') + inline(p.detail) + '</li>'; }).join('') + '</ul>';
@@ -3192,7 +3133,7 @@
   /* ============================================================
    * 5c · SAY IT, IT HAPPENS — pictures and app control by voice/text
    * ------------------------------------------------------------
-   * Everything typed or spoken to Clavis passes ClavisCommands.route
+   * Everything typed or spoken to Rudra24 AI passes ClavisCommands.route
    * first. Plain requests are handled right here, instantly, with no
    * AI round trip: pictures, opening any page, Settings (any section,
    * any switch by its label), theme, sidebar, the task window, new
@@ -3207,7 +3148,7 @@
     ['dashboard', /\b(dashboard|dash\s*board|home\s*page|overview|mukhya\s*page)\b|डैशबोर्ड/i, 'Dashboard'],
     ['leads', /\b(all\s*leads|leads?\s*(?:page|list|database|db|hub|data)|lead\s*list|leads)\b|लीड्स/i, 'All Leads'],
     ['agent', /\b(run\s*agent|agent\s*page|lead\s*gen(?:eration)?|client\s*acquisition|agent)\b/i, 'Run Agent'],
-    ['jarvis', /\b(clavis|jarvis|studio|assistant)\b/i, 'Clavis AI Studio'],
+    ['jarvis', /\b(clavis|jarvis|studio|assistant)\b/i, 'Rudra24 AI Studio'],
     ['chat', /\b(client\s*ai|chat\s*ai|lead\s*chat|chat\s*page)\b/i, 'Client AI'],
     ['voice-ai', /\b(voice\s*(?:ai|calling|dialer)|calling\s*(?:ai|page)|dialer)\b/i, 'Voice Calling AI'],
     ['candidate-ai', /\b(candidate\s*ai|recruit(?:er|ment)?)\b/i, 'Candidate AI'],
@@ -3571,8 +3512,10 @@
       if (openSettings(section)) return finishQuick(text, section ? 'Settings me ' + section.replace(/-/g, ' ') + ' khol diya.' : 'Settings khol diya.');
     }
 
-    /* a page */
-    if (OPEN_RE.test(low) || /\b(page|tab|screen)\b/.test(low)) {
+    /* a page (never a lead SEARCH like "Ghaziabad ki leads nikalo") */
+    var isLeadSearch = false;
+    try { isLeadSearch = Boolean(global.LeadCandidateDomain && global.LeadCandidateDomain.parseRequest(text).isSearch); } catch (_) {}
+    if (!isLeadSearch && (OPEN_RE.test(low) || /\b(page|tab|screen)\b/.test(low))) {
       for (var i = 0; i < PAGES.length; i++) {
         if (PAGES[i][1].test(low) && typeof global.showView === 'function') {
           if (PAGES[i][0] === 'jarvis' && !/\b(page|tab|studio|kholo|open|jao)\b/.test(low)) continue;
@@ -3642,6 +3585,20 @@
     if (b.group) return 'Ye rahi ' + b.name + ' ki ' + n + ' tasveerein — har photo par naam likha hai.';
     return 'Ye rahi ' + b.name + ' ki ' + (n > 1 ? n + ' tasveerein' : 'tasveer') + '.';
   }
+  function readyPictures(b) {
+    if (!b || !b.items || !b.items.length) return Promise.resolve(b);
+    return new Promise(function (resolve, reject) {
+      var remaining = Math.min(3, b.items.length), done = false;
+      var timer = setTimeout(function () { if (!done) { done = true; reject(new Error('Photo previews did not load.')); } }, 4500);
+      b.items.slice(0, 3).forEach(function (item) {
+        var img = new Image();
+        img.referrerPolicy = 'no-referrer';
+        img.onload = function () { if (!done) { done = true; clearTimeout(timer); resolve(b); } };
+        img.onerror = function () { if (!done && --remaining === 0) { done = true; clearTimeout(timer); reject(new Error('Photo previews failed to load.')); } };
+        img.src = item.thumb;
+      });
+    });
+  }
   function pictureAnswer(text, det) {
     var T = global.ClavisTask;
     var id = beginOrReuse(text);
@@ -3658,7 +3615,7 @@
       var disp = who && (who.display || (who.sure && who.title));
       if (id && disp) setTaskTitle(id, who.group ? (who.title || disp + ' — Photos') : String(disp).replace(/\s*\([^)]*\)\s*$/, '') + ' — Photos');
     };
-    return Pictures.find(det.subject, { era: det.era, raw: text, onName: onName }).then(function (b) {
+    return Pictures.find(det.subject, { era: det.era, raw: text, onName: onName }).then(readyPictures).then(function (b) {
       // Sir's rule: 2 to 6 pictures, never a wall of 23.
       b.items = (b.items || []).slice(0, 6);
       var n = b.items.length;
@@ -3666,7 +3623,7 @@
         /* ERA_DECADE lives inside Pictures — referencing it bare here threw,
            turning every empty era search into a failed task */
         var cleanSub = det.subject.replace(Pictures.eraRe, '').trim();
-        return Pictures.find(cleanSub, {}).then(function (b2) {
+        return Pictures.find(cleanSub, {}).then(readyPictures).then(function (b2) {
           if (b2.items.length) { b = b2; b.items = b.items.slice(0, 6); n = b.items.length; }
           if (id) { PicTasks.set(id, { state: 'ready', subject: det.subject, bundle: b, sense: sense }); setTaskTitle(id, b.title); }
           var spoken = n ? spokenFor(b, n) : ('Maine ' + b.name + ' ke baare me jankari fetch kar li hai.');
@@ -3679,7 +3636,7 @@
       if (id) T.complete(id, { type: 'images', text: n ? (b.extract || spoken) : spoken, summary: spoken }, []);
       return { handled: true, spoken: spoken, bubbleHtml: n ? chatGalleryHTML(b) : '' };
     }).catch(function (err) {
-      var msg = 'Abhi tasveerein load ho rahi hain — topic summary ye raha.';
+      var msg = 'Tasveerein abhi load nahi ho paayin. Ek baar phir try kijiye.';
       if (id) { PicTasks.delete(id); try { T.fail(id, err || new Error(msg)); } catch (e) {} }
       return { handled: true, spoken: msg };
     });
@@ -3868,18 +3825,21 @@
     if (!S || !S.register) return false;
     if (S.has && S.has('show_images')) return true;
     S.register('show_images', {
-      description: 'Find REAL photos of a person, place or thing (Wikipedia, Wikimedia Commons, Openverse) and SHOW them to the owner in the Clavis window, where they can tap to enlarge. Use this whenever the owner wants to see pictures, photos, images or tasveer of anything — you CAN show images through this tool, never say you cannot.',
+      description: 'Find REAL photos of a person, place or thing (Wikipedia, Wikimedia Commons, Openverse) and SHOW them to the owner in the Rudra24 AI window, where they can tap to enlarge. Use this whenever the owner wants to see pictures, photos, images or tasveer of anything — you CAN show images through this tool, never say you cannot.',
       params: { query: 'exact name of what to show, in English as titled on Wikipedia (e.g. "Neem Karoli Baba")', era: 'optional: "old" or "recent"' },
       run: function (p) {
         var subject = String((p && p.query) || '').trim();
         if (!subject) throw new Error('query is required');
         var era = p && /old|purani|vintage/i.test(p.era || '') ? 'old' : (p && /recent|latest|new/i.test(p.era || '') ? 'recent' : '');
-        return Pictures.find(subject, { era: era }).then(function (b) {
+        return Pictures.find(subject, { era: era }).then(readyPictures).then(function (b) {
           var t = currentTask();
           if (t) PicTasks.set(t.id, { state: 'ready', subject: subject, bundle: b });
           pendingChatGallery = b.items.length ? b : null;
-          return b.items.length ? ('Showing ' + b.items.length + ' photos of ' + b.name + ' in the Clavis window (' + uniqueSources(b.items).join(', ') + '). Reply in one short line; do not list the photos.')
+          return b.items.length ? ('Showing ' + b.items.length + ' photos of ' + b.name + ' in the Rudra24 AI window (' + uniqueSources(b.items).join(', ') + '). Reply in one short line; do not list the photos.')
             : ('No reliable photos of ' + b.name + ' were found. Say so in one line and suggest the correct spelling.');
+        }).catch(function () {
+          pendingChatGallery = null;
+          return 'Photo previews did not load. Say so briefly and ask the owner to retry.';
         });
       }
     });
@@ -4272,6 +4232,7 @@
     box.__lxImgs = true;
     function scan(node) {
       if (!node || node.nodeType !== 1) return;
+      if (node.matches && node.matches('.chat-message.user')) pendingChatGallery = null;
       var bubbles = node.matches && node.matches('.chat-message.assistant') ? [node] : (node.querySelectorAll ? node.querySelectorAll('.chat-message.assistant') : []);
       Array.prototype.forEach.call(bubbles, function (m) {
         var b = m.querySelector('.chat-bubble');
@@ -4287,6 +4248,7 @@
       });
     }
     new MutationObserver(function (list) {
+      if (!box.children.length) pendingChatGallery = null;
       list.forEach(function (mu) { Array.prototype.forEach.call(mu.addedNodes, scan); });
     }).observe(box, { childList: true });
     scan(box);

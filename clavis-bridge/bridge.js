@@ -1,7 +1,7 @@
 /**
  * ============================================================
- *  CLAVIS LOCAL BRIDGE (clavis-bridge/bridge.js)
- *  A tiny localhost helper that gives Clavis (a browser page) real
+ *  RUDRA24 AI LOCAL BRIDGE (clavis-bridge/bridge.js)
+ *  A tiny localhost helper that gives Rudra24 AI (a browser page) real
  *  OS powers a sandboxed page can never have on its own:
  *    - open an app / file / website          POST /open   {target}
  *    - launch ANY installed app by name       POST /launch {app, names?, exe?, url?}
@@ -26,6 +26,7 @@ const { exec, execFile, spawn } = require('child_process');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const HELPERS_DIR = process.env.CLAVIS_BRIDGE_HELPERS_DIR || __dirname;
 
 const PORT = Number(process.env.CLAVIS_BRIDGE_PORT || 8777);
 const TOKEN = process.env.CLAVIS_BRIDGE_TOKEN || 'clavis-local';
@@ -37,7 +38,7 @@ const PLATFORM = process.platform; // 'win32' | 'darwin' | 'linux'
 const ALLOW_CONTROL = /^(1|true|yes)$/i.test(process.env.CLAVIS_BRIDGE_ALLOW_CONTROL || '');
 // The token is a fixed string, so it can't be what keeps other websites out.
 // The browser always stamps cross-site requests with their Origin: anything
-// from a page that isn't Clavis itself is refused before it can do anything.
+// from a page that isn't Rudra24 AI itself is refused before it can do anything.
 // (No Origin at all = a local script/tool, not a web page — allowed.)
 const ALLOWED_ORIGINS = new Set((process.env.CLAVIS_BRIDGE_ORIGINS || 'http://localhost:3000,http://127.0.0.1:3000')
   .split(',').map((s) => s.trim()).filter(Boolean));
@@ -64,10 +65,23 @@ function readBody(req) {
 }
 
 // ── OS actions ────────────────────────────────────────────
-function openTarget(target) {
+function openTarget(target, browser) {
   return new Promise((resolve, reject) => {
     const t = String(target || '').trim();
     if (!t) return reject(new Error('No target given.'));
+    if (PLATFORM === 'win32' && browser === 'chrome' && /^https:\/\/[a-z0-9.-]+(?:\/|$)/i.test(t)) {
+      const chrome = [
+        path.join(process.env.PROGRAMFILES || '', 'Google/Chrome/Application/chrome.exe'),
+        path.join(process.env['PROGRAMFILES(X86)'] || '', 'Google/Chrome/Application/chrome.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'Google/Chrome/Application/chrome.exe'),
+      ].find((candidate) => fs.existsSync(candidate));
+      if (chrome) {
+        const child = spawn(chrome, [t], { detached: true, stdio: 'ignore', windowsHide: true });
+        child.once('error', reject);
+        child.once('spawn', () => { child.unref(); resolve(); });
+        return;
+      }
+    }
     if (PLATFORM === 'win32') {
       // `start` is a cmd builtin. The empty "" is the window title arg so paths
       // with spaces/quotes are handled. shell:true so the builtin resolves.
@@ -98,7 +112,7 @@ function saveAndOpenNote(text, filename) {
 }
 
 // `start "" "<target>" "<arg>"…` — for a browser opened straight onto a page
-// (and in its own window, so Clavis's window isn't hijacked). Quotes are
+// (and in its own window, so Rudra24 AI's window isn't hijacked). Quotes are
 // stripped from every piece; inside quotes cmd treats & | ^ < > literally.
 function startWithArgs(target, args) {
   return new Promise((resolve, reject) => {
@@ -116,7 +130,7 @@ function startWithArgs(target, args) {
 //     Calculator…) which have no .lnk; launched via shell:AppsFolder, the
 //     same thing the Start menu does.
 // Matching a name against what is actually installed means a missing app
-// is reported as missing (so Clavis can open its web version) instead of
+// is reported as missing (so Rudra24 AI can open its web version) instead of
 // `start` popping a "Windows cannot find…" dialog that blocks until closed.
 const APP_CACHE_MS = 10 * 60 * 1000;
 const JUNK_APP = /uninstall|read ?me|\bhelp\b|documentation|release notes|licen[cs]e|manual|website|what's new|changelog|\bsetup\b|repair/i;
@@ -147,7 +161,7 @@ function scanStartMenu() {
 function listStartApps() {
   return new Promise((resolve) => {
     if (PLATFORM !== 'win32') return resolve([]);
-    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'listapps.ps1')],
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'listapps.ps1')],
       { windowsHide: true, timeout: 20000, maxBuffer: 4 * 1024 * 1024 }, (err, stdout) => {
         if (err) return resolve([]);
         try {
@@ -251,7 +265,7 @@ async function launchApp({ app, names, exe, system, url, newWindow } = {}) {
 function browserUrl(handle) {
   return new Promise((resolve) => {
     if (PLATFORM !== 'win32') return resolve('');
-    const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'browserurl.ps1')];
+    const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'browserurl.ps1')];
     if (/^\d{1,20}$/.test(String(handle || ''))) args.push('-Handle', String(handle));
     execFile('powershell', args, { windowsHide: true, timeout: 15000 }, (err, stdout) => {
       if (err) return resolve('');
@@ -273,7 +287,7 @@ function screenshot(clipboard = true) {
       });
     };
     if (PLATFORM === 'win32') {
-      const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'screenshot.ps1'), '-Out', out];
+      const args = ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'screenshot.ps1'), '-Out', out];
       if (clipboard) args.push('-Clipboard');
       execFile('powershell', args, { windowsHide: true }, (err) => err ? reject(err) : done());
     } else if (PLATFORM === 'darwin') {
@@ -303,7 +317,7 @@ let activeWindowProc = null;
 let activeWindowLatest = { title: '', process: '', idleMs: 0 };
 function ensureActiveWindowLoop() {
   if (activeWindowProc && !activeWindowProc.killed) return;
-  activeWindowProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'activewindow.ps1'), '-Loop', '-IntervalMs', '1000'],
+  activeWindowProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'activewindow.ps1'), '-Loop', '-IntervalMs', '1000'],
     { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] });
   let buf = '';
   activeWindowProc.stdout.on('data', (chunk) => {
@@ -321,7 +335,7 @@ function ensureActiveWindowLoop() {
 }
 
 // Read-only awareness: which window/tab is in front, and how long the user has
-// been idle. This is what lets Clavis be proactive without watching pixels.
+// been idle. This is what lets Rudra24 AI be proactive without watching pixels.
 function activeWindow() {
   return new Promise((resolve, reject) => {
     if (PLATFORM === 'win32') {
@@ -367,7 +381,7 @@ function screenSize() {
     // Cold PowerShell + Add-Type(System.Windows.Forms) startup measured ~7s on
     // a plain build of this machine — a 4s timeout was killing it before it
     // could ever answer. 12s gives real headroom; a warm run is near-instant.
-    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'screensize.ps1')],
+    execFile('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'screensize.ps1')],
       { windowsHide: true, timeout: 12000 }, (err, stdout, stderr) => {
         if (err) return reject(new Error(stderr || 'Could not read screen size.'));
         const [left, top, width, height] = String(stdout).trim().split(',').map(Number);
@@ -392,7 +406,7 @@ function ensurePcControlLoop() {
   if (pcControlProc && !pcControlProc.killed) return pcControlReady;
   pcControlLineBuf = '';
   pcControlPendingResolvers = [];
-  pcControlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'pccontrol.ps1')],
+  pcControlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'pccontrol.ps1')],
     { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   pcControlReady = new Promise((resolveReady) => {
     let readyResolved = false;
@@ -466,7 +480,7 @@ function ensureWindowControlLoop() {
   if (windowControlProc && !windowControlProc.killed) return windowControlReady;
   windowControlLineBuf = '';
   windowControlPendingResolvers = [];
-  windowControlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(__dirname, 'windowcontrol.ps1')],
+  windowControlProc = spawn('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', path.join(HELPERS_DIR, 'windowcontrol.ps1')],
     { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   windowControlReady = new Promise((resolveReady) => {
     let readyResolved = false;
@@ -640,7 +654,7 @@ const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
 
   const origin = req.headers.origin;
-  if (origin && !ALLOWED_ORIGINS.has(origin)) return json(res, 403, { ok: false, error: 'This page is not allowed to use the Clavis bridge.' });
+  if (origin && !ALLOWED_ORIGINS.has(origin)) return json(res, 403, { ok: false, error: 'This page is not allowed to use the Rudra24 AI bridge.' });
 
   // /ping is unauthenticated so the browser can detect the bridge is up.
   if (url.pathname === '/ping') return json(res, 200, { ok: true, platform: PLATFORM, name: 'clavis-bridge', version: 3, controlEnabled: ALLOW_CONTROL, features: FEATURES });
@@ -649,8 +663,8 @@ const server = http.createServer(async (req, res) => {
 
   try {
     if (url.pathname === '/open' && req.method === 'POST') {
-      const { target } = await readBody(req);
-      await openTarget(target);
+      const { target, browser } = await readBody(req);
+      await openTarget(target, browser);
       return json(res, 200, { ok: true, opened: target });
     }
     if (url.pathname === '/launch' && req.method === 'POST') {
@@ -734,11 +748,11 @@ const server = http.createServer(async (req, res) => {
 // `require()` from a test gets the pure helpers below without a server.
 if (require.main === module) {
   server.listen(PORT, '127.0.0.1', () => {
-    console.log(`\n  Clavis bridge running → http://127.0.0.1:${PORT}`);
+    console.log(`\n  Rudra24 AI bridge running → http://127.0.0.1:${PORT}`);
     console.log(`  Platform: ${PLATFORM}   Token: ${TOKEN === 'clavis-local' ? 'clavis-local (default)' : '(custom)'}`);
     console.log('  Endpoints: POST /open, POST /launch, POST /notepad, GET /screenshot, GET /active-window, GET /browser-url, GET /screen-size, GET /apps');
-    console.log(`  Mouse/keyboard control (POST /pc-control): ${ALLOW_CONTROL ? 'ENABLED — Clavis can move the mouse and type on this PC.' : 'off (set CLAVIS_BRIDGE_ALLOW_CONTROL=1 to enable)'}`);
-    console.log('  Keep this window open. Close it to revoke Clavis\'s PC access.\n');
+    console.log(`  Mouse/keyboard control (POST /pc-control): ${ALLOW_CONTROL ? 'ENABLED — Rudra24 AI can move the mouse and type on this PC.' : 'off (set CLAVIS_BRIDGE_ALLOW_CONTROL=1 to enable)'}`);
+    console.log('  Keep this window open. Close it to revoke Rudra24 AI\'s PC access.\n');
     // Warm the installed-app list so the first "excel kholo" is instant.
     if (PLATFORM === 'win32') setTimeout(() => { refreshApps().catch(() => {}); }, 1500);
   });
@@ -749,7 +763,7 @@ if (require.main === module) {
 }
 module.exports = { scoreAppName, findInstalledApp, launchApp, FEATURES, server };
 
-// "Close this window to revoke Clavis's access" must be true for the helper
+// "Close this window to revoke Rudra24 AI's access" must be true for the helper
 // processes too, not just the HTTP server — kill them on any exit path.
 function killHelpers() {
   try { activeWindowProc?.kill(); } catch (_) {}

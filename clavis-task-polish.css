@@ -1,0 +1,386 @@
+/* ============================================================
+ * clavis-task-polish.css · loaded AFTER clavis-task-surface.css
+ * ------------------------------------------------------------
+ * The motion + calm pass on the floating window (2026-10-02).
+ *
+ * Rules kept from the project's 60fps note:
+ *   · only transform / opacity / clip-path / filter are animated
+ *   · nothing animates width, top, left, margin or padding
+ *   · the one exception is the pipeline rail's height, which is a
+ *     2px line with no text in it — it cannot reflow anything
+ *   · every effect has a prefers-reduced-motion off switch
+ * ============================================================ */
+
+/* ── 1. Calm: lower the contrast of everything that is not the answer ──
+   He asked why the window tires the eye. It was the pure-white panel at
+   full contrast against a cream page, plus body text at 100% black.
+   This warms the panel a shade and softens the supporting text. */
+.cts {
+  --cts-panel: #FEFDFB;
+  --cts-sans: "Anthropic Sans", "Inter", "Figtree", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  box-shadow:
+    0 0 0 0.5px rgba(26, 25, 23, .05),
+    0 2px 6px -2px rgba(26, 25, 23, .06),
+    0 18px 48px -14px rgba(26, 25, 23, .17) !important;
+}
+html[data-theme="dark"] .cts,
+body.dark .cts {
+  --cts-panel: #1C1C1A;
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, .06),
+    0 20px 56px -16px rgba(0, 0, 0, .62) !important;
+}
+.cts-live, .cts-pipe-sub, .cts-note { color: var(--cts-mute); }
+
+/* The body's own scrollbar: present, but not a grey slab */
+.cts-body { scrollbar-width: thin; scrollbar-color: transparent transparent; scroll-behavior: smooth; overscroll-behavior: contain; }
+.cts-body::-webkit-scrollbar { width: 9px; }
+.cts-body::-webkit-scrollbar-track { background: transparent; }
+.cts-body::-webkit-scrollbar-thumb {
+  background: transparent; border-radius: 99px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+.cts:hover .cts-body, .cts:focus-within .cts-body { scrollbar-color: var(--cts-line) transparent; }
+.cts:hover .cts-body::-webkit-scrollbar-thumb, .cts:focus-within .cts-body::-webkit-scrollbar-thumb { background: var(--cts-line); background-clip: content-box; }
+.cts-body::-webkit-scrollbar-thumb:hover { background: var(--cts-faint); background-clip: content-box; }
+
+/* ── 2. Typewriter ───────────────────────────────────────────
+   The caret only exists while characters are landing. A caret that
+   blinks forever on a finished sentence is the thing that makes a
+   panel feel restless. */
+[data-tw].is-typing::after {
+  content: "";
+  display: inline-block;
+  width: 1px; height: 1em;
+  margin-left: 1.5px;
+  vertical-align: -0.16em;
+  background: currentColor;
+  opacity: .5;
+  animation: cts-caret 900ms steps(2, end) infinite;
+}
+@keyframes cts-caret { 0%, 55% { opacity: .5; } 56%, 100% { opacity: 0; } }
+
+/* The live line never jumps the layout while it fills out */
+.cts-live { min-height: 1.45em; }
+.cts-pipe-sub { min-height: 1.4em; }
+
+/* ── 3. The lead pipeline ────────────────────────────────────
+   One travelling rail behind the step dots. Its height is a real
+   fraction of real steps (see pipeline() in clavis-task-surface.js),
+   never a percentage that creeps while nothing is happening. */
+.cts-pipeline { padding-left: 1px; }
+.cts-pipe-rail {
+  position: absolute;
+  left: 9px; top: 20px; bottom: 26px;
+  width: 2px;
+  border-radius: 99px;
+  background: linear-gradient(to bottom, var(--cts-ok), color-mix(in srgb, var(--cts-ok) 55%, transparent));
+  opacity: .9;
+  z-index: 1;
+  transform-origin: top center;
+  transform: scaleY(var(--cts-railf, 0));
+  transition: transform 760ms cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+  will-change: transform;
+}
+
+/* the per-step track stays grey; the rail above is the fill */
+.cts-pipe-step.is-done:not(:last-child)::after { background: var(--cts-line-2); opacity: 1; }
+
+/* Steps arrive one after another, not all at once */
+.cts[data-phase] .cts-pipe-step {
+  animation: cts-step-in 460ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  animation-delay: calc(90ms + var(--cts-step, 0) * 55ms);
+}
+@keyframes cts-step-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to   { opacity: 1; transform: none; }
+}
+
+/* The dot in flight: a slow breath, not a strobe */
+.cts-pipe-step.is-active .cts-pipe-num {
+  animation: cts-step-breathe 2.6s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes cts-step-breathe {
+  0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--cts-text) 11%, transparent); }
+  50%      { box-shadow: 0 0 0 7px color-mix(in srgb, var(--cts-text) 2%, transparent); }
+}
+
+/* A finished step draws its tick instead of popping a filled circle */
+.cts-pipe-step.is-done .cts-pipe-num::before {
+  content: "";
+  width: 9px; height: 5px;
+  border-left: 1.6px solid currentColor;
+  border-bottom: 1.6px solid currentColor;
+  transform: rotate(-45deg) translate(0.5px, -1px);
+  animation: cts-tick 360ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+}
+@keyframes cts-tick { from { opacity: 0; transform: rotate(-45deg) translate(0.5px, -1px) scale(.5); } }
+
+/* Pending steps recede rather than shout */
+.cts-pipe-step.is-pending { opacity: .62; transition: opacity 420ms ease; }
+.cts-pipe-step.is-active, .cts-pipe-step.is-done { opacity: 1; }
+
+/* ── 4. The meter: a travelling hairline, not a barber pole ── */
+.cts-meter { border-radius: 99px; overflow: hidden; }
+.cts-meter.cts-meter-idle > i {
+  animation: cts-meter-sweep 1.9s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+@keyframes cts-meter-sweep {
+  0%   { transform: translateX(-100%) scaleX(.35); }
+  55%  { transform: translateX(45%)  scaleX(.6); }
+  100% { transform: translateX(210%) scaleX(.35); }
+}
+
+/* ── 5. The result table ─────────────────────────────────────
+   Rows land in sequence so a finished run reads as results arriving,
+   and the header stays put while the body scrolls sideways. */
+.cts-preview-wrap { border-radius: 10px; }
+.cts-preview-table thead th {
+  position: sticky; top: 0; z-index: 2;
+  background: var(--cts-panel);
+  font-size: 10.5px; letter-spacing: .04em; text-transform: uppercase;
+  color: var(--cts-faint); font-weight: 600;
+}
+.cts-preview-table tbody tr {
+  animation: cts-row-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards;
+  transition: background-color 150ms ease;
+}
+.cts-preview-table tbody tr:nth-child(1) { animation-delay: 60ms; }
+.cts-preview-table tbody tr:nth-child(2) { animation-delay: 110ms; }
+.cts-preview-table tbody tr:nth-child(3) { animation-delay: 160ms; }
+.cts-preview-table tbody tr:nth-child(4) { animation-delay: 210ms; }
+.cts-preview-table tbody tr:nth-child(5) { animation-delay: 260ms; }
+.cts-preview-table tbody tr:nth-child(6) { animation-delay: 310ms; }
+.cts-preview-table tbody tr:hover { background: var(--cts-line-2); }
+@keyframes cts-row-in { from { opacity: 0; transform: translateY(5px); } }
+
+.cts-badge-phone { font-variant-numeric: tabular-nums; letter-spacing: .01em; }
+
+/* leads table scrollbar — same hairline treatment */
+.cts-leads-preview::-webkit-scrollbar { height: 8px; }
+.cts-leads-preview::-webkit-scrollbar-thumb {
+  background: transparent; border-radius: 99px;
+  border: 2px solid transparent; background-clip: content-box;
+}
+.cts:hover .cts-leads-preview::-webkit-scrollbar-thumb,
+.cts:focus-within .cts-leads-preview::-webkit-scrollbar-thumb { background: var(--cts-line); background-clip: content-box; }
+
+/* ── 6. Stats: numbers settle in ─────────────────────────────── */
+.cts-stats > div { animation: cts-step-in 420ms cubic-bezier(0.22, 1, 0.36, 1) backwards; animation-delay: 140ms; }
+.cts-stats dd { font-variant-numeric: tabular-nums; }
+
+/* ── 7. Footer actions: the primary one is the only loud thing ── */
+.cts-act { transition: transform 150ms cubic-bezier(0.22, 1, 0.36, 1), background-color 150ms ease, border-color 150ms ease; }
+.cts-act:active { transform: scale(.975); }
+.cts-foot { gap: 7px; padding: 11px 14px; flex-wrap: wrap; justify-content: flex-start; }
+
+/* ── 8. The header dot breathes with the phase ─────────────── */
+.cts[data-phase="working"] .cts-dot { animation: cts-breathe 2.4s ease-in-out infinite; }
+
+/* ── 9. Off switch ──────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .cts-pipe-step,
+  .cts-preview-table tbody tr,
+  .cts-stats > div,
+  .cts-pipe-step.is-done .cts-pipe-num::before { animation: none !important; }
+  .cts-pipe-step.is-active .cts-pipe-num { animation: none !important; }
+  .cts-meter.cts-meter-idle > i { animation: none !important; }
+  .cts-pipe-rail { transition: none !important; }
+  [data-tw].is-typing::after { display: none; }
+  .cts-body { scroll-behavior: auto; }
+}
+
+/* The source reference uses a restrained lift and a soft shadow increase.
+   Keep that hover treatment on the floating task window alone. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface {
+  transition:
+    opacity var(--cx-t1, 160ms) var(--cx-ease-in, cubic-bezier(.5, 0, .75, 0)),
+    transform var(--cx-t1, 160ms) var(--cx-ease-in, cubic-bezier(.5, 0, .75, 0)),
+    visibility 0s linear var(--cx-t1, 160ms),
+    height var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    width var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    border-radius var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    box-shadow 260ms cubic-bezier(.16, 1, .3, 1),
+    border-color 220ms cubic-bezier(.16, 1, .3, 1),
+    translate 280ms cubic-bezier(.16, 1, .3, 1) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface.is-open {
+  transition:
+    opacity var(--cx-t2, 240ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    transform var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    visibility 0s linear 0s,
+    height var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    width var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    border-radius var(--cx-t3, 420ms) var(--cx-ease-out, cubic-bezier(.25, 1, .5, 1)),
+    box-shadow 280ms cubic-bezier(.16, 1, .3, 1),
+    border-color 220ms cubic-bezier(.16, 1, .3, 1),
+    translate 280ms cubic-bezier(.16, 1, .3, 1) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface.is-open.is-dragging {
+  transition: none !important;
+  translate: none !important;
+}
+@media (hover: hover) and (pointer: fine) {
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface.is-open:not(.is-dragging):hover {
+    translate: 0 -1.5px !important;
+    border-color: rgba(47, 82, 51, .2) !important;
+    box-shadow:
+      0 0 0 1px rgba(47, 82, 51, .07),
+      0 8px 18px -12px rgba(20, 20, 19, .14),
+      0 22px 48px -26px rgba(20, 20, 19, .25) !important;
+  }
+  html[data-theme="dark"]:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface.is-open:not(.is-dragging):hover {
+    border-color: rgba(235, 232, 222, .18) !important;
+    box-shadow:
+      0 0 0 1px rgba(235, 232, 222, .05),
+      0 14px 28px -14px rgba(0, 0, 0, .62),
+      0 30px 60px -28px rgba(0, 0, 0, .78) !important;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface,
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface.is-open {
+    translate: none !important;
+    transition:
+      opacity var(--cx-t1, 160ms) linear,
+      visibility 0s linear var(--cx-t1, 160ms) !important;
+  }
+}
+
+/* ════════════════════════════════════════════════════════════
+   8. The preview table, read left-to-right
+   The wrap already scrolled sideways, but nothing SAID so: a 6px
+   thumb the colour of the hairline, no edge cue, and a panel that
+   never widened to meet a wide table. The matching width logic
+   lives in clavis-task-surface.js (measure()).
+   ════════════════════════════════════════════════════════════ */
+
+.cts-preview-wrap {
+  overflow-x: auto !important;
+  overflow-y: hidden !important;
+  scroll-behavior: smooth;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cts-text) 26%, transparent) transparent;
+  padding-bottom: 2px;
+
+  /* Two-layer background trick: fades painted on the SCROLLER (local)
+     and shadows on the wrap (scroll), so each edge cue appears only
+     while there is more table that way and fades out at either end.
+     No JS, no scroll listener. */
+  background:
+    linear-gradient(to right, var(--cts-panel) 30%, transparent) left center / 44px 100% no-repeat local,
+    linear-gradient(to left,  var(--cts-panel) 30%, transparent) right center / 44px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, color-mix(in srgb, var(--cts-text) 16%, transparent), transparent) left center / 18px 100% no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, color-mix(in srgb, var(--cts-text) 16%, transparent), transparent) right center / 18px 100% no-repeat scroll;
+}
+
+.cts-preview-wrap::-webkit-scrollbar { height: 11px !important; }
+.cts-preview-wrap::-webkit-scrollbar-track { background: transparent !important; }
+.cts-preview-wrap::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--cts-text) 22%, transparent) !important;
+  border: 3px solid transparent !important;
+  border-radius: 999px !important;
+  background-clip: padding-box !important;
+  transition: background-color 200ms ease;
+}
+.cts-preview-wrap:hover::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--cts-text) 36%, transparent) !important;
+}
+.cts-preview-wrap::-webkit-scrollbar-thumb:active {
+  background: color-mix(in srgb, var(--cts-text) 52%, transparent) !important;
+}
+
+/* Columns keep their own width instead of squeezing into the frame —
+   that is what makes sideways scrolling mean something. */
+.cts-preview-table th,
+.cts-preview-table td {
+  white-space: nowrap !important;
+  max-width: 260px !important;
+  overflow: hidden !important;
+  text-overflow: ellipsis !important;
+}
+
+/* The company name stays put while the rest slides under it, so a row
+   never becomes anonymous mid-scroll. */
+.cts-preview-table th:first-child,
+.cts-preview-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--cts-panel);
+  max-width: 230px !important;
+}
+.cts-preview-table th:first-child::after,
+.cts-preview-table td:first-child::after {
+  content: "";
+  position: absolute;
+  inset: 0 -14px 0 auto;
+  width: 14px;
+  pointer-events: none;
+  background: linear-gradient(to right, color-mix(in srgb, var(--cts-text) 9%, transparent), transparent);
+  opacity: 0;
+  transition: opacity 240ms ease;
+}
+.cts-preview-wrap:hover .cts-preview-table th:first-child::after,
+.cts-preview-wrap:hover .cts-preview-table td:first-child::after { opacity: 1; }
+.cts-preview-table tbody tr:hover td:first-child { background: var(--cts-line-2); }
+
+/* Keep contact columns legible inside the scroll frame. Row transforms
+   create stacking contexts above sticky cells, so previews stay still. */
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-wrap {
+  overflow: auto !important;
+  max-height: 288px;
+  scrollbar-width: auto !important;
+  scrollbar-color: #777b73 #eeeee9 !important;
+  scrollbar-gutter: stable;
+  background: var(--cts-panel) !important;
+}
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-wrap::-webkit-scrollbar { height: 12px !important; width: 10px !important; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-wrap::-webkit-scrollbar-track { background: #eeeee9 !important; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-wrap::-webkit-scrollbar-thumb { background: #777b73 !important; border: 2px solid #eeeee9 !important; border-radius: 8px !important; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table { min-width: 1260px !important; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 12px; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table tbody tr { animation: none !important; transform: none !important; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table th,
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table td { padding: 10px 12px; color: var(--cts-text) !important; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table th { background: var(--cts-panel) !important; font-size: 10px; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table th:first-child,
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table td:first-child { width: 200px; background: var(--cts-panel) !important; z-index: 3; box-shadow: 1px 0 0 var(--cts-line); }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-table th:first-child { z-index: 4; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-hint { font-size: 12px; color: var(--cts-mute); margin: 12px 0 6px; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-next { display: flex; flex-direction: row !important; flex-wrap: wrap; gap: 8px; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-next-label { flex-basis: 100%; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-next-btn { flex: 1 1 180px; width: auto; padding: 10px 12px; border: 1px solid var(--cts-line); border-radius: 8px; }
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-preview-wrap:focus-visible,
+html:not(#_):not(#_) body:not(#_):not(#_) #clavis-task-surface .cts-next-btn:focus-visible { outline: 2px solid var(--cts-accent); outline-offset: 2px; }
+html[data-theme="dark"] body #clavis-task-surface .cts-preview-wrap { scrollbar-color: #92988c #2b2e28 !important; }
+html[data-theme="dark"] body #clavis-task-surface .cts-preview-wrap::-webkit-scrollbar-track { background: #2b2e28 !important; }
+html[data-theme="dark"] body #clavis-task-surface .cts-preview-wrap::-webkit-scrollbar-thumb { background: #92988c !important; border-color: #2b2e28 !important; }
+
+/* ── 9. Shadow: deeper, still one light source ──────────────
+   Five falloffs from the same overhead light — a hairline rim, a
+   contact shadow, a mid lift, and two wide soft pools. Layers, not
+   darkness, are what make a panel read as floating. */
+.cts {
+  box-shadow:
+    0 0 0 0.5px rgba(26, 25, 23, .055),
+    0 1px 2px rgba(26, 25, 23, .05),
+    0 6px 14px -4px rgba(26, 25, 23, .09),
+    0 22px 46px -12px rgba(26, 25, 23, .20),
+    0 54px 96px -28px rgba(26, 25, 23, .26) !important;
+  transition-property: box-shadow;
+  transition-duration: 620ms;
+  transition-timing-function: cubic-bezier(.32, .72, 0, 1);
+}
+html[data-theme="dark"] .cts,
+body.dark .cts {
+  box-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, .07),
+    0 1px 2px rgba(0, 0, 0, .5),
+    0 8px 20px -6px rgba(0, 0, 0, .5),
+    0 28px 60px -16px rgba(0, 0, 0, .66),
+    0 64px 110px -32px rgba(0, 0, 0, .74) !important;
+}
+

@@ -2,7 +2,7 @@
  * clavis-intelligence.js  ·  ClavisIQ
  * ------------------------------------------------------------
  * The shared brain behind the floating Peek Task window and the
- * Clavis composer.
+ * Rudra24 AI composer.
  *
  * It does four things, and nothing else:
  *
@@ -775,7 +775,7 @@
         icon: 'link' }; }
     },
 
-    /* ── App-native moves: these do real work in Clavis ── */
+    /* ── App-native moves: these do real work in Rudra24 AI ── */
     MORE_LEADS: {
       base: 1.05,
       ok: function (s) { return s.domain === 'leads'; },
@@ -925,6 +925,9 @@
       temperature: o.temperature == null ? 0.85 : o.temperature,
       max_tokens: o.max_tokens || 240
     };
+    // Suggestion chips jaise background helpers khud ko tag karte hain —
+    // ClavisDirect soye hue Rudra24 AI ke liye inhe network tak jaane hi nahi deta.
+    if (o.purpose) { payload.background = true; payload.purpose = o.purpose; }
     function pick(data) {
       return (data && data.choices && data.choices[0] && data.choices[0].message.content) || '';
     }
@@ -938,7 +941,9 @@
       return global.ClavisDirect.complete(payload).then(pick);
     }
     if (global.NexusAIChat && typeof global.NexusAIChat.complete === 'function') {
-      return global.NexusAIChat.complete(payload).then(pick);
+      if (o.purpose && !bgAllowed()) return Promise.reject(Object.assign(new Error('asleep'), { code: 'asleep' }));
+      var plain = Object.assign({}, payload); delete plain.background; delete plain.purpose;
+      return global.NexusAIChat.complete(plain).then(pick);
     }
     return Promise.reject(new Error('no-ai-client'));
   }
@@ -964,17 +969,23 @@
 
   var LANG_NAME = { en: 'English', hinglish: 'Hinglish (Hindi written in Roman script, mixed with English — the way Indians actually chat)', hi: 'Hindi (Devanagari)' };
 
+  function bgAllowed() {
+    try { return !global.ClavisWake || global.ClavisWake.allowBackground(); } catch (e) { return false; }
+  }
+
   function llmChips(sig, query, answer, count) {
     var key = hash(query + '|' + String(answer || '').slice(0, 600) + '|' + sig.lang + '|' + (count || 4));
     if (llmCache[key]) return Promise.resolve(llmCache[key]);
     if (llmInFlight[key]) return llmInFlight[key];
+    // Soya hai → model-written chips skip; local chips kaafi hain.
+    if (!bgAllowed()) return Promise.resolve(null);
 
     var taste = topKeys(store.moves.used, 3).map(function (id) {
       return MOVES[id] ? id.toLowerCase().replace(/_/g, ' ') : null;
     }).filter(Boolean);
 
     var sys =
-      'You write follow-up suggestion chips for a chat assistant called Clavis.\n' +
+      'You write follow-up suggestion chips for a chat assistant called Rudra24 AI.\n' +
       'Return STRICT JSON only: an array of exactly ' + (count || 4) + ' objects, each {"label": "...", "prompt": "..."}.\n' +
       'label: max 28 characters, no trailing period, reads like a button.\n' +
       'prompt: the full message that will be sent if the user taps it, first person, natural.\n' +
@@ -997,7 +1008,7 @@
 
     var p = callModel(
       [{ role: 'system', content: sys }, { role: 'user', content: user }],
-      { max_tokens: 300, temperature: 0.9 }
+      { max_tokens: 300, temperature: 0.9, purpose: 'chips' }
     ).then(function (text) {
       var chips = parseChipJson(text);
       if (!chips || chips.length < 2) return null;

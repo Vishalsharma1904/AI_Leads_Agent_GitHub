@@ -110,8 +110,8 @@ def patch_jarvis_ui():
     )
     p.replace(
         "mic-unavailable toast wording",
-        "showToast('error', 'Local voice unavailable', 'Start the Clavis backend to use Kokoro voice input.');",
-        "showToast('error', 'Voice unavailable', 'Start the Clavis backend and set GEMINI_API_KEY to use voice input.');",
+        "showToast('error', 'Local voice unavailable', 'Start the Rudra24 AI backend to use Kokoro voice input.');",
+        "showToast('error', 'Voice unavailable', 'Start the Rudra24 AI backend and set GEMINI_API_KEY to use voice input.');",
         marker="set GEMINI_API_KEY to use voice input",
     )
     return p.save()
@@ -140,11 +140,11 @@ def patch_apple_polish_js():
     p = Patcher("apple-polish.js")
     p.replace(
         "browser-voice-picker comment",
-        "      // Clavis uses the local Kokoro inventory; browser voices are not part of\n"
+        "      // Rudra24 AI uses the local Kokoro inventory; browser voices are not part of\n"
         "      // the production path and must never be rendered into settings.",
-        "      // Clavis uses the Gemini voice inventory; browser voices are not part of\n"
+        "      // Rudra24 AI uses the Gemini voice inventory; browser voices are not part of\n"
         "      // the production path and must never be rendered into settings.",
-        marker="Clavis uses the Gemini voice inventory",
+        marker="Rudra24 AI uses the Gemini voice inventory",
     )
     return p.save()
 

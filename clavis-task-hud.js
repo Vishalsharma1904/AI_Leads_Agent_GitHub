@@ -1,7 +1,7 @@
 /**
- * CLAVIS TASK HUD (clavis-task-hud.js)
+ * RUDRA24 AI TASK HUD (clavis-task-hud.js)
  * ==============================================================
- * Turns the Clavis page into a voice-first surface:
+ * Turns the Rudra24 AI page into a voice-first surface:
  *
  *   - adds .clavis-stage-v2 to <html>, which is what every rule in
  *     clavis-stage.css hangs off (so removing the class, or setting
@@ -91,7 +91,7 @@
         '  <div class="ctk-head">',
         '    <span class="ctk-glyph" aria-hidden="true"></span>',
         '    <div class="ctk-titles">',
-        '      <div class="ctk-title">Clavis</div>',
+        '      <div class="ctk-title">Rudra24 AI</div>',
         '      <div class="ctk-sub"></div>',
         '    </div>',
         '    <button type="button" class="ctk-headbtn ctk-stop">Stop</button>',
@@ -140,7 +140,7 @@
     });
   }
 
-  /* The Clavis stage is overflow:hidden + contain:layout, so the card
+  /* The Rudra24 AI stage is overflow:hidden + contain:layout, so the card
      lives on <body> and is positioned against the stage's measured box
      instead of being nested inside it (where it would be clipped). */
   function place() {

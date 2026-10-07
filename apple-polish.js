@@ -1,5 +1,5 @@
 /* =====================================================================
-   APPLE-POLISH  —  interaction & repair layer for Clavis
+   APPLE-POLISH  —  interaction & repair layer for Rudra24 AI
    Loaded BEFORE jarvis_ui.js (its shims must exist first) and does its
    DOM work after the document is ready. Purely additive.
    ===================================================================== */
@@ -135,7 +135,7 @@
 
   if (typeof window.loadJarvisVoices !== 'function') {
     window.loadJarvisVoices = function loadJarvisVoices() {
-      // Clavis uses the Gemini voice inventory; browser voices are not part of
+      // Rudra24 AI uses the Gemini voice inventory; browser voices are not part of
       // the production path and must never be rendered into settings.
       return;
       /* legacy browser voice picker retained below for old cached documents */
@@ -550,13 +550,18 @@
   /* Park un-reachable controls out of the tab order and restore them the
      moment their surface opens. Before this, Tab from the page landed
      straight on the closed Settings modal's window buttons. */
-  function syncInert() {
+  function syncInert(root) {
+    root = root && root.querySelectorAll ? root : document;
+    if (root !== document && !root.isConnected) return;
     var seen = new Set();
+    var retry = false;
     var active = document.activeElement;
     /* Include .ap-inert in the sweep: parking sets tabindex="-1", which
        makes an element stop matching the FOCUSABLE selector — without
        this it could never be un-parked when its surface reopens. */
-    document.querySelectorAll(FOCUSABLE + ',.ap-inert').forEach(function (el) {
+    var controls = Array.from(root.querySelectorAll(FOCUSABLE + ',.ap-inert'));
+    if (root.matches && root.matches(FOCUSABLE + ',.ap-inert')) controls.unshift(root);
+    controls.forEach(function (el) {
       seen.add(el);
       if (el === active) return;               // never park what the user is on
       var hide = unreachable(el);
@@ -564,7 +569,7 @@
          .stagger-in runs opacity 0 -> 1) would otherwise be caught
          mid-flight and parked while they are perfectly usable. */
       if (hide && !parked.has(el)) {
-        if (!el.__apStrike) { el.__apStrike = 1; return; }
+        if (!el.__apStrike) { el.__apStrike = 1; retry = true; return; }
       }
       if (!hide) el.__apStrike = 0;
       if (hide) {
@@ -580,13 +585,14 @@
         parked.delete(el);
       }
     });
-    parked.forEach(function (el) { if (!seen.has(el) || !el.isConnected) parked.delete(el); });
+    parked.forEach(function (el) { if (!el.isConnected) parked.delete(el); });
+    if (retry) setTimeout(function () { syncInert(root); }, 200);
   }
 
 
   /* ---------- 2b2 · Escape closes every popover --------------------
      The Client AI and Candidate AI source pickers bind Escape, but the
-     three Clavis composer dropdowns (add / inspiration / model) never
+     three Rudra24 AI composer dropdowns (add / inspiration / model) never
      did — once open, only an outside click dismissed them. Escape is
      the expected way out of a transient surface.                    */
   var COMPOSER_MENUS = [
@@ -689,7 +695,7 @@
      Memory and Call Scripts rendered as hollow boxes with a heading and
      nothing inside when they had no rows. */
   var SIDE_EMPTY = {
-    'jarvis-facts-list': 'Nothing remembered yet — tell Clavis something to keep.',
+    'jarvis-facts-list': 'Nothing remembered yet — tell Rudra24 AI something to keep.',
     'jarvis-scripts-list': 'No call scripts yet — generate one from Quick Actions.',
     'jarvis-skills-list': 'No skills registered yet.'
   };
@@ -722,7 +728,8 @@
      raised, and only when they are genuinely below the floor. */
   var MIN_PX = 10.5;
   function raiseTinyText(root) {
-    var nodes = (root || document).querySelectorAll('body *:not(svg):not(path):not(script):not(style)');
+    var nodes = Array.from((root || document).querySelectorAll('*:not(svg):not(path):not(script):not(style)'));
+    if (root && root.nodeType === 1) nodes.unshift(root);
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
       if (el.__apSized) continue;
@@ -766,6 +773,10 @@
     return '-0.002em';
   }
   function normaliseGeometry(root) {
+    // Retired: clavis-claude.css now owns radii + tracking through tokens. This
+    // walk read layout and wrote inline styles for every element after each DOM
+    // change (35 forced layouts per window open) — a frame-drop generator.
+    return;
     var nodes = (root || document).querySelectorAll('body *:not(svg):not(path):not(script):not(style)');
     for (var i = 0; i < nodes.length; i++) {
       var el = nodes[i];
@@ -866,7 +877,7 @@
      When the trigger isn't running — hands-free off — the orb simply
      stays on its idle drift, which is the honest behaviour.
 
-     While Clavis is SPEAKING there is no analyser to read at all
+     While Rudra24 AI is SPEAKING there is no analyser to read at all
      (that audio is speechSynthesis, which exposes no signal), so the
      envelope is synthesised from two incommensurable sines: it reads
      as speech rhythm without pretending to be the actual waveform. */
@@ -925,8 +936,9 @@
     orbWarm += (warmTarget - orbWarm) * 0.06;   // palette always drifts
 
     if (orbLevel < 0.002) orbLevel = 0;
-    orb.style.setProperty('--orb-level', orbLevel.toFixed(3));
-    orb.style.setProperty('--orb-warm', orbWarm.toFixed(3));
+    var levelValue = orbLevel.toFixed(3), warmValue = orbWarm.toFixed(3);
+    if (orb.style.getPropertyValue('--orb-level') !== levelValue) orb.style.setProperty('--orb-level', levelValue);
+    if (orb.style.getPropertyValue('--orb-warm') !== warmValue) orb.style.setProperty('--orb-warm', warmValue);
 
     /* Drift speed is a per-STATE value, not a per-frame one. Writing
        animation-duration every frame would restart the blobs' progress
@@ -943,11 +955,12 @@
      another view, reduced motion — and both the rAF loop and the CSS
      animations stop. Four blurred composited layers are the single
      most expensive thing on this screen. */
+  var orbInViewport = true;
   function orbVisible() {
     if (reduced) return false;
     if (document.hidden) return false;
     var v = document.getElementById('view-jarvis');
-    return !!(v && v.classList.contains('active') && v.offsetParent !== null);
+    return !!(v && v.classList.contains('active') && !v.hidden && orbInViewport);
   }
 
   function syncOrbLoop() {
@@ -968,8 +981,10 @@
      during chat rendering and view changes. Coalesce instead, and
      never run while a layout transition is in flight. */
   var maintTimer = null;
+  var maintRoots = new Set();
   var idle = window.requestIdleCallback || function (fn) { return setTimeout(function () { fn({ timeRemaining: function () { return 8; } }); }, 200); };
-  function scheduleMaintenance() {
+  function scheduleMaintenance(root) {
+    if (root && root.nodeType === 1 && !root.matches('.composer-measure')) maintRoots.add(root);
     clearTimeout(maintTimer);
     maintTimer = setTimeout(function () {
       if (document.documentElement.classList.contains('ap-quiet') ||
@@ -978,9 +993,12 @@
         return;
       }
       idle(function () {
-        bindTooltips(document);
-        raiseTinyText(document);
-        normaliseGeometry(document);
+        var batch = Array.from(maintRoots); maintRoots.clear();
+        batch.filter(function (r) { return r.isConnected && !batch.some(function (p) { return p !== r && p.contains(r); }); }).forEach(function (r) {
+          bindTooltips(r);
+          raiseTinyText(r);
+          syncInert(r);
+        });
         watchOrbState();
       });
     }, 240);
@@ -1056,6 +1074,9 @@
 
   /* ---------- boot ------------------------------------------------- */
   ready(function () {
+    // Repair shims load early; repeated initialization must stay harmless.
+    if (window.__apBooted) return;
+    window.__apBooted = true;
     addSkipLink();
     bindTooltips(document);
     syncInert();
@@ -1064,32 +1085,47 @@
     normaliseGeometry(document);
     watchOrbState();
     watchToasts();
+    var orbView = document.getElementById('view-jarvis');
+    if (orbView && window.IntersectionObserver) {
+      new IntersectionObserver(function (entries) {
+        orbInViewport = entries[0].isIntersecting;
+        syncOrbLoop();
+      }).observe(orbView);
+    }
     syncOrbLoop();
     setInterval(syncOrbState, 700);
     setInterval(syncOrbLoop, 900);
     document.addEventListener('visibilitychange', syncOrbLoop);
     window.addEventListener('hashchange', function () { setTimeout(syncOrbLoop, 80); });
-    setInterval(watchToasts, 2000);   // the container is created lazily
-    setInterval(fillSideEmpties, 1500);
-    window.addEventListener('hashchange', function () { scheduleMaintenance(); });
+    window.addEventListener('hashchange', function () { scheduleMaintenance(document.querySelector('.view.active')); });
 
     var mo = new MutationObserver(function (records) {
-      var needTips = false;
       records.forEach(function (r) {
         r.addedNodes && r.addedNodes.forEach && r.addedNodes.forEach(function (n) {
-          if (n.nodeType === 1) needTips = true;
+          if (n.nodeType === 1) {
+            scheduleMaintenance(n);
+            if (n.matches('.desktop-notification-container') || n.querySelector('.desktop-notification-container')) watchToasts();
+          }
         });
+        if (r.type === 'attributes' && r.target.matches('.view,#settings-overlay,.modal-overlay,.cts,.jarvis-side-panel,[role="dialog"]')) {
+          scheduleMaintenance(r.target);
+        }
       });
-      if (needTips) scheduleMaintenance();
     });
     try {
-      mo.observe(document.body, { childList: true, subtree: true });
+      mo.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class','hidden','aria-hidden'] });
     } catch (e) {}
 
     // overlays open/close through many different code paths — poll cheaply
-    setInterval(syncInert, 500);
-    window.addEventListener('hashchange', function () { setTimeout(syncInert, 60); });
-    document.addEventListener('click', function () { setTimeout(syncInert, 120); }, true);
+    // A sweep reads layout + computed style of every focusable control, so
+    // keep it off the hot path: 1.5 s, and never while the tab is hidden.
+    window.addEventListener('hashchange', function () {
+      setTimeout(function () { syncInert(document.querySelector('.view.active')); syncInert(document.getElementById('sidebar')); fillSideEmpties(); }, 60);
+    });
+    document.addEventListener('click', function (event) {
+      var scope = event.target.closest('.view,#settings-overlay,.modal-overlay,#sidebar');
+      if (scope) setTimeout(function () { syncInert(scope); }, 120);
+    }, true);
 
     document.documentElement.classList.add('ap-ready');
   });

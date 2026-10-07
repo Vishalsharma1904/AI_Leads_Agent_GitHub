@@ -1,0 +1,39 @@
+# Hosted cloud voice + lead backend. No torch/Kokoro local synthesis stack.
+# Groq uploads still need PyAV decoding and faster-whisper's bundled ONNX
+# Silero speech gate; no Whisper transcription weights are downloaded.
+# Legacy Exotel local voice requires the full requirements.txt environment.
+
+fastapi
+uvicorn[standard]
+sqlalchemy
+psycopg2-binary
+alembic
+pydantic
+pydantic-settings
+python-dotenv
+tzdata>=2024.1
+python-multipart
+websockets
+# PyJWT verifies Supabase's RS256 tokens through PyJWKClient, which needs the
+# crypto extra — and api/credentials.py encrypts the vault with AES-GCM from
+# the same library. Without it the backend boots and then fails on the first
+# sign-in AND on every saved API key, which is a miserable way to find out.
+PyJWT[crypto]
+cryptography
+bcrypt
+passlib
+httpx
+requests
+
+# services/speech/audio.py imports this at module level, so it stays.
+numpy>=1.26,<3
+scipy>=1.13,<2
+av>=11,<19
+faster-whisper>=1.1,<2
+onnxruntime>=1.17,<2
+
+# Lead generation. These two drive a real browser, which is the whole reason
+# leads come back with phone numbers and e-mail addresses.
+crawlee>=1.10,<2
+playwright>=1.50,<2
+scrapling[fetchers]>=0.2,<1

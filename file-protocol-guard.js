@@ -1,5 +1,5 @@
 /**
- * Clavis file:// launcher  (v2 — 2026-09-24)
+ * Rudra24 AI file:// launcher  (v2 — 2026-09-24)
  *
  * index.html ko seedha double-click karne par origin "file://" hota hai.
  * Chrome us origin ko microphone nahi deta, audio worklets load nahi hote,
@@ -28,8 +28,13 @@
   var POLL_MS = 700;          // readiness check interval
   var HINT_AFTER = 12000;     // "kuch nahi hua?" help
   var RETRY_AFTER = 6000;     // manual Start button (user gesture fallback)
-  var FAIL_AFTER = 90000;     // launcher ne jawab nahi diya
-  var ENGINE_GRACE = 1200;    // UI ready = app kholo; engine background me aata rehta hai (app khud sambhalta hai)
+  var FAIL_AFTER = 90000;     // launcher ne jawab nahi diya (sirf UI ke liye)
+  // AI engine pehli baar python deps + playwright chromium (~300 MB) download
+  // karta hai. 90 sec me "fail" bolna galat tha — wo chal raha hota hai.
+  var ENGINE_SETUP_AFTER = 25000;    // "pehli baar set up ho raha hai"
+  var ENGINE_DOWNLOAD_AFTER = 75000; // "download ho raha hai"
+  var ENGINE_SKIP_AFTER = 150000;    // "engine ke bina kholo" button
+  var ENGINE_GIVEUP_AFTER = 1200000; // 20 min — tab jaake sach me gadbad hai
 
   // ── theme: app ki saved theme > system preference ──────────────────────
   var theme = 'light';
@@ -71,8 +76,8 @@
 
     /* type */
     'h1{margin:22px 0 0;font:400 34px/1 "Instrument Serif","Iowan Old Style","Palatino Linotype",Georgia,serif;letter-spacing:-.01em}',
-    '.status{position:relative;height:22px;width:100%;margin-top:12px;color:var(--mute);font-size:14px}',
-    '.status span{position:absolute;inset:0;transition:opacity .5s var(--ease),transform .5s var(--ease),filter .5s var(--ease)}',
+    '.status{position:relative;min-height:44px;width:100%;margin-top:12px;color:var(--mute);font-size:14px}',
+    '.status span{position:absolute;left:0;right:0;top:0;transition:opacity .5s var(--ease),transform .5s var(--ease),filter .5s var(--ease)}',
     '.status span.out{opacity:0;transform:translateY(-6px);filter:blur(3px)}',
     '.status span.pre{opacity:0;transform:translateY(6px);filter:blur(3px)}',
 
@@ -127,11 +132,11 @@
     '<!doctype html><html lang="hi" data-t="' + theme + '"><head><meta charset="utf-8">' +
     '<meta name="viewport" content="width=device-width,initial-scale=1">' +
     '<meta name="color-scheme" content="light dark">' +
-    '<title>Clavis</title>' +
+    '<title>Rudra24 AI</title>' +
         '<style>' + CSS + '</style></head><body>' +
     '<main class="stage" id="stage" role="status">' +
       '<div class="mark in" style="--i:0"><div class="track"></div><div class="ring"></div><div class="core"></div></div>' +
-      '<h1 class="in" style="--i:1">Clavis</h1>' +
+      '<h1 class="in" style="--i:1">Rudra24 AI</h1>' +
       '<div class="status in" style="--i:2" aria-live="polite"><span id="st">Jaag raha hoon…</span></div>' +
       '<div class="bar in" style="--i:3"><i id="bar"></i><b></b></div>' +
       '<ol class="steps">' +
@@ -140,14 +145,14 @@
         step('engine', 'AI engine', 6) +
       '</ol>' +
       '<div class="fold" id="act"><div><div class="row">' +
-        '<button class="pri" id="start" type="button">Start Clavis</button>' +
+        '<button class="pri" id="start" type="button">Rudra24 AI start karein</button>' +
         '<button class="ghost" id="why" type="button">Kuch nahi hua?</button>' +
       '</div></div></div>' +
       '<div class="fold" id="help"><div><div class="help">' +
         '<p><b>Pehli baar ka setup.</b> Project folder me <b>Start-Clavis.bat</b> ek baar double-click karein — ' +
         'wo launcher register kar deta hai. Uske baad sirf index.html kholna kaafi hai.</p>' +
         '<div class="path"><code id="bat"></code><button class="ghost" id="copy" type="button">Copy</button></div>' +
-        '<p style="margin:10px 0 0">Servers chalu hote hi yeh page khud aage badh jayega.</p>' +
+        '<p style="margin:10px 0 0" id="hnote">Servers chalu hote hi yeh page khud aage badh jayega.</p>' +
       '</div></div></div>' +
     '</main>' +
     '<div class="foot" id="foot"></div>' +
@@ -176,14 +181,25 @@
   function say(text) {
     if (text === curText) return;
     curText = text;
-    var box = $('st').parentNode, old = $('st');
+    var box = $('st').parentNode;
+    var olds = [].slice.call(box.getElementsByTagName('span'));
     var nu = document.createElement('span');
     nu.className = 'pre'; nu.textContent = text;
     box.appendChild(nu);
-    old.id = ''; old.className = 'out';
+    olds.forEach(function (o) {
+      o.id = '';
+      if (o.className === 'out') {                 // pehle se fade ho raha tha
+        if (o.parentNode) o.parentNode.removeChild(o);
+        return;
+      }
+      o.className = 'out';
+      setTimeout(function () { if (o.parentNode) o.parentNode.removeChild(o); }, 600);
+    });
     nu.id = 'st';
-    requestAnimationFrame(function () { requestAnimationFrame(function () { nu.className = ''; }); });
-    setTimeout(function () { if (old.parentNode) old.parentNode.removeChild(old); }, 600);
+    // Purane span ka pending rAF naye ko overwrite na kar de.
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () { if (nu.id === 'st') nu.className = ''; });
+    });
   }
   function foot(html) { $('foot').innerHTML = html || ''; }
 
@@ -228,7 +244,7 @@
     if (!window.fetch) return Promise.resolve(false);
     var ctl = window.AbortController ? new AbortController() : null;
     var t = setTimeout(function () { if (ctl) ctl.abort(); }, 1500);
-    return fetch(ENGINE + '/?probe=' + Date.now(), { mode: 'no-cors', cache: 'no-store', signal: ctl && ctl.signal })
+    return fetch(ENGINE + '/api/public-config?probe=' + Date.now(), { mode: 'no-cors', cache: 'no-store', signal: ctl && ctl.signal })
       .then(function () { return true; }, function () { return false; })
       .then(function (ok) { clearTimeout(t); return ok; });
   }
@@ -297,7 +313,7 @@
     st.launchAt = Date.now();
     mark('launch', 'active', '');
     say('Servers jaga raha hoon…');
-    foot('Chrome <b>“Open Clavis Launcher?”</b> puchhe to <b>Open</b> dabaiye');
+    foot('Chrome <b>“Open Rudra24 Launcher?”</b> puchhe to <b>Open</b> dabaiye');
     aim(0.16, 0.42);
     // Start-Clavis.bat ne register kiya hua clavis:// — servers hidden start
     // karta hai, koi naya window nahi. Top-level navigation chahiye (iframe
@@ -317,7 +333,7 @@
     t0 = Date.now() - 1;
     $('stage').classList.remove('bad');
     openFold('help', false);
-    $('start').textContent = 'Start Clavis';
+    $('start').textContent = 'Rudra24 AI start karein';
   }
 
   function fail() {
@@ -371,11 +387,30 @@
       if (st.ui && st.engine) return finish();
 
       if (st.ui) {
+        var w = now - st.uiAt;
         mark('engine', 'active', '');
-        say('AI engine garam ho raha hai…');
-        if (now - st.uiAt > ENGINE_GRACE) {
-          mark('engine', '', 'background');
-          return finish();   // app khud engine ka wait/offline mode sambhalta hai
+        if (w > ENGINE_GIVEUP_AFTER) {
+          say('AI engine start nahi hua — logs\\backend.log dekhiye');
+        } else if (w > ENGINE_DOWNLOAD_AFTER) {
+          say('Zaroori files download ho rahe hain…');
+        } else if (w > ENGINE_SETUP_AFTER) {
+          say('AI engine pehli baar set up ho raha hai…');
+        } else {
+          say('AI engine garam ho raha hai…');
+        }
+        if (w > ENGINE_SETUP_AFTER && !st.engineNote) {
+          st.engineNote = true;
+          var hn = $('hnote');
+          if (hn) hn.innerHTML = '<b>Pehli baar AI engine set up hota hai</b> — Python packages aur ' +
+            'browser runtime (~300 MB) download hote hain. Isme 5–10 minute lag sakte hain. ' +
+            'Ye window band mat kijiye; engine ready hote hi app khud khul jayega.';
+          openFold('help', true);
+        }
+        if (w > ENGINE_SKIP_AFTER && !st.skipShown) {
+          st.skipShown = true;
+          $('start').textContent = 'AI engine ke bina kholein';
+          $('start').dataset.skip = '1';
+          openFold('act', true);
         }
       } else {
         if (!st.launched) launch(false);
@@ -388,7 +423,12 @@
     });
   }
 
-  $('start').onclick = function () { launch(true); };
+  $('start').onclick = function () {
+    // UI ready hai aur user intezaar nahi karna chahta -> app khol do,
+    // engine background me chalta rahega (AI features baad me jaag jayenge).
+    if (this.dataset.skip === '1' && st.ui) return finish();
+    launch(true);
+  };
   $('why').onclick = function () { openFold('help', !$('help').classList.contains('open')); };
   $('why').setAttribute('aria-controls', 'help');
   $('copy').onclick = function () {

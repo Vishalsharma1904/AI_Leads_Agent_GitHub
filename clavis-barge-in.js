@@ -1,28 +1,28 @@
 /**
  * ============================================================
- *  CLAVIS BARGE-IN (clavis-barge-in.js)
+ *  RUDRA24 AI BARGE-IN (clavis-barge-in.js)
  *  Free, browser-native "stop talking when the user speaks".
  *
- *  The hard part is echo: the mic hears Clavis's own TTS through the
- *  speakers, so a naive detector makes Clavis interrupt ITSELF. We defend
+ *  The hard part is echo: the mic hears Rudra24 AI's own TTS through the
+ *  speakers, so a naive detector makes Rudra24 AI interrupt ITSELF. We defend
  *  against that, all local and free:
  *    1. echoCancellation on the capture stream (browser AEC removes most
  *       of the speaker signal),
  *    2. a DOUBLE-TALK detector (ClavisEar.createDoubleTalk): it learns how
- *       loud the leftover echo is RELATIVE to what Clavis is playing right
+ *       loud the leftover echo is RELATIVE to what Rudra24 AI is playing right
  *       now (ClavisVoice.outputLevel), so only a voice above that echo
  *       counts. v1 learned a fixed floor in the first 320 ms — usually the
  *       silence before the first TTS chunk arrived — then fired on its own
  *       echo, or, with a loud echo, never fired at all.
  *    3. the voice must be periodic (a pitch — claps, clicks and keyboard
  *       noise have none) and sustained for ~220 ms.
- *    4. semantic barge-in lives in jarvis_ui.js: while Clavis talks, the
+ *    4. semantic barge-in lives in jarvis_ui.js: while Rudra24 AI talks, the
  *       wake recognizer's words go through ClavisEar.judge — a stop word
- *       or new words that aren't Clavis's own echo interrupt it too.
+ *       or new words that aren't Rudra24 AI's own echo interrupt it too.
  *
  *  Usage (see jarvis_ui.js speakJarvisText / handleClavisBargeIn):
- *    ClavisBargeIn.arm(onBargeCallback)  // when Clavis starts speaking
- *    ClavisBargeIn.disarm()              // when Clavis stops
+ *    ClavisBargeIn.arm(onBargeCallback)  // when Rudra24 AI starts speaking
+ *    ClavisBargeIn.disarm()              // when Rudra24 AI stops
  *  localStorage: clavis_bargein_enabled ('false' = off),
  *                clavis_bargein_threshold (min RMS, default 0.045 for the
  *                browser voice, which can't be measured).
@@ -34,6 +34,7 @@ window.ClavisBargeIn = (() => {
   let stream = null, ctx = null, analyser = null, buf = null;
   let timer = null, armed = false, onBarge = null, armedAt = 0;
   let voiceFrames = 0, warmFrames = 0, baseline = 0, dt = null;
+  let generation = 0, candidate = null, graphReady = null;
 
   const FRAME_MS       = 30;   // sampling period
   const WARMUP_FRAMES  = 6;    // ~180ms: ignore the click of playback starting
@@ -51,7 +52,10 @@ window.ClavisBargeIn = (() => {
 
   async function ensureGraph() {
     if (analyser) return;
-    stream = await (window.LocalSpeechEngine?.acquireSharedMicrophone?.() || navigator.mediaDevices.getUserMedia({
+    if (graphReady) return graphReady;
+    graphReady = (async () => {
+    // Processed voice stream (AEC + NS + AGC), not the raw clap/snap stream.
+    stream = await (window.LocalSpeechEngine?.acquireVoiceMicrophone?.() || navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
     }));
     ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -61,6 +65,8 @@ window.ClavisBargeIn = (() => {
     analyser.smoothingTimeConstant = 0;
     buf = new Float32Array(analyser.fftSize);
     src.connect(analyser);
+    })().finally(() => { graphReady = null; });
+    return graphReady;
   }
 
   function frame() {
@@ -71,17 +77,19 @@ window.ClavisBargeIn = (() => {
   }
 
   // Cheap periodicity check: is there a pitch between 80 and 400 Hz?
-  function voiced() {
-    const rate = ctx.sampleRate;
-    const minLag = Math.floor(rate / 400), maxLag = Math.min(Math.floor(rate / 80), buf.length - 64);
+  function voiced(samples = buf, rate = ctx.sampleRate) {
+    const minLag = Math.floor(rate / 400), maxLag = Math.min(Math.floor(rate / 80), samples.length - 64);
+    let mean = 0;
+    for (const sample of samples) mean += sample;
+    mean /= samples.length;
     let r0 = 0;
-    for (let i = 0; i < buf.length; i++) r0 += buf[i] * buf[i];
+    for (let i = 0; i < samples.length; i++) r0 += (samples[i] - mean) ** 2;
     if (r0 <= 0) return false;
     let best = 0;
     for (let lag = minLag; lag <= maxLag; lag += 3) {
       let s = 0;
-      for (let i = 0; i + lag < buf.length; i++) s += buf[i] * buf[i + lag];
-      s /= r0 * (buf.length - lag) / buf.length;
+      for (let i = 0; i + lag < samples.length; i++) s += (samples[i] - mean) * (samples[i + lag] - mean);
+      s /= r0 * (samples.length - lag) / samples.length;
       if (s > best) best = s;
     }
     return best > 0.4;
@@ -91,10 +99,36 @@ window.ClavisBargeIn = (() => {
     try { const v = window.ClavisVoice?.outputLevel?.(); return Number.isFinite(v) ? v : null; } catch (_) { return null; }
   }
 
+  function discardCandidate() {
+    const capture = candidate; candidate = null;
+    if (!capture) return;
+    try { if (capture.recorder.state === 'recording') capture.recorder.stop(); } catch (_) {}
+    capture.chunks.length = 0;
+    capture.stream.getTracks().forEach(track => track.stop());
+  }
+
+  function captureCandidate() {
+    if (candidate || !window.ClavisDirect?.providerConfigured?.('groq') || typeof MediaRecorder !== 'function' || !stream?.clone) return;
+    const ownedStream = stream.clone();
+    try {
+      const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(type => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(ownedStream, mimeType ? {mimeType} : undefined);
+      const capture = {stream:ownedStream,recorder,chunks:[],since:Date.now(),owner:window.SupabaseAuth?.getUser?.()?.id};
+      recorder.ondataavailable = event => { if (candidate === capture && event.data.size) capture.chunks.push(event.data); };
+      candidate = capture;
+      recorder.start(200);
+    } catch (_) {
+      candidate = null;
+      ownedStream.getTracks().forEach(track => track.stop());
+    }
+  }
+
   function fire() {
     const cb = onBarge;
+    const capture = candidate; candidate = null;
     disarm();
-    if (typeof cb === 'function') cb();
+    if (typeof cb === 'function') cb(capture);
+    else if (capture) { candidate = capture; discardCandidate(); }
   }
 
   function tick() {
@@ -105,7 +139,7 @@ window.ClavisBargeIn = (() => {
     const out = outputLevel();
     let loud;
     if (out != null && dt) {
-      // Output-referenced: we know how loud Clavis is right now.
+      // Output-referenced: we know how loud Rudra24 AI is right now.
       loud = dt.update(level, out).loud;
     } else {
       // Browser speechSynthesis can't be measured: slow-adapting floor.
@@ -113,32 +147,62 @@ window.ClavisBargeIn = (() => {
       loud = isVoice(level, baseline, floor());
     }
     if (loud && voiced()) {
+      captureCandidate(); // Retain the first words while confirming sustained speech.
       if (++voiceFrames >= VOICE_FRAMES) fire();
     } else {
       voiceFrames = Math.max(0, voiceFrames - (loud ? 0 : 2));
+      if (!voiceFrames) discardCandidate();
     }
   }
 
   async function arm(cb) {
+    if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
     if (localStorage.getItem('clavis_bargein_enabled') === 'false') return false;
     // arm() is safe to call repeatedly: an old interval is always cleared
     // first so two tick() loops never share the same counters.
-    if (timer) { clearInterval(timer); timer = null; }
+    disarm();
+    const current = generation;
     onBarge = cb; voiceFrames = 0; warmFrames = 0; baseline = 0; armedAt = Date.now();
     dt = window.ClavisEar?.createDoubleTalk?.({ margin: 2.4, min: 0.02 }) || null;
     try { await ensureGraph(); }
-    catch (e) { console.warn('[BargeIn] mic unavailable — barge-in off:', e && (e.name || e)); return false; }
+    catch (e) { if (current === generation || !onBarge) cleanup(); console.warn('[BargeIn] mic unavailable — barge-in off:', e && (e.name || e)); return false; }
+    if (current !== generation) { if (!onBarge) cleanup(); return false; }
+    if (window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) { cleanup(); return false; }
     if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (_) {} }
+    if (current !== generation) return false;
     armed = true;
     timer = setInterval(tick, FRAME_MS);
     return true;
   }
 
   function disarm() {
+    generation++;
+    discardCandidate();
     armed = false;
     if (timer) { clearInterval(timer); timer = null; }
     onBarge = null; voiceFrames = 0; warmFrames = 0; baseline = 0; dt = null;
     // Keep stream/ctx alive for instant re-arm; they're idle when not sampling.
+  }
+
+  function cleanup() {
+    disarm();
+    if (stream) {
+      try {
+        const tracks = stream.getTracks ? stream.getTracks() : [];
+        tracks.forEach(t => { try { t.stop(); } catch (_) {} });
+      } catch (_) {}
+      stream = null;
+    }
+    if (ctx) {
+      try { ctx.close(); } catch (_) {}
+      ctx = null;
+    }
+    analyser = null;
+    buf = null;
+  }
+
+  if (typeof window !== 'undefined' && window.ClavisVoiceState?.registerAudioCleanup) {
+    window.ClavisVoiceState.registerAudioCleanup(() => cleanup());
   }
 
   // Runnable check for the pure decision logic — run ClavisBargeIn._selfTest().
@@ -155,5 +219,5 @@ window.ClavisBargeIn = (() => {
     return passed === checks.length;
   }
 
-  return { arm, disarm, computeTrigger, isVoice, _selfTest, _isArmed: () => armed, _armedFor: () => (armed ? Date.now() - armedAt : 0) };
+  return { arm, disarm, cleanup, computeTrigger, isVoice, hasPitch: voiced, _selfTest, _isArmed: () => armed, _armedFor: () => (armed ? Date.now() - armedAt : 0) };
 })();

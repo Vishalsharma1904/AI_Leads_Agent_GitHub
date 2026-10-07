@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.akoode.com",
+  "url": "https://www.akoode.com",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": "https://www.akoode.com/",
+  "handled_at": "2026-10-05 06:48:41.906927+00:00"
+}

@@ -1,0 +1,423 @@
+/* ============================================================
+ * clavis-setup.css  ·  "Rudra24 AI ko setup karein" popup
+ * Minimal, Claude-style: warm cream, hairlines, one flat green,
+ * no gradients, no shadows on controls, no decorative icons.
+ * ============================================================ */
+
+#cx-setup-root {
+  --cxs-green: #3D5A3A;           /* the one green — flat, never shaded */
+  --cxs-bg: #FAF9F5;
+  --cxs-card: #FFFFFF;
+  --cxs-line: #E8E6DC;
+  --cxs-line-2: #D9D6CA;
+  --cxs-text: #141413;
+  --cxs-text-2: #6B6A63;
+  --cxs-text-3: #97958C;
+  --cxs-bad: #B53A2E;
+  --cxs-warn: #8A5A12;
+  --cxs-backdrop: rgba(20, 20, 19, 0.32);
+  --cxs-sans: "Anthropic Sans", "Styrene B", "Söhne", ui-sans-serif, system-ui, -apple-system, "Segoe UI Variable Text", "Segoe UI", Inter, sans-serif;
+  --cxs-serif: "Anthropic Serif", "Copernicus", "Tiempos Headline", "Lora", Georgia, "Times New Roman", serif;
+  --cxs-ease: cubic-bezier(.16, 1, .3, 1);
+
+  position: fixed; inset: 0; z-index: 10080;
+  display: flex; align-items: center; justify-content: center;
+  padding: 24px;
+  font-family: var(--cxs-sans);
+  font-size: 14px; line-height: 1.5;
+  color: var(--cxs-text);
+  -webkit-font-smoothing: antialiased;
+}
+#cx-setup-root[hidden] { display: none !important; }
+html.cx-setup-lock, html.cx-setup-lock body { overscroll-behavior: contain; }
+
+html[data-theme="dark"] #cx-setup-root,
+body.dark #cx-setup-root,
+body.dark-mode #cx-setup-root {
+  --cxs-green: #6E9B68;
+  --cxs-bg: #262624;
+  --cxs-card: #30302E;
+  --cxs-line: #3A3A37;
+  --cxs-line-2: #4A4A46;
+  --cxs-text: #F5F4EE;
+  --cxs-text-2: #B8B6AD;
+  --cxs-text-3: #8A887F;
+  --cxs-bad: #E4786B;
+  --cxs-warn: #D8A860;
+  --cxs-backdrop: rgba(0, 0, 0, 0.5);
+}
+
+/* ── shell ─────────────────────────────────────────────── */
+#cx-setup-root .cx-setup-backdrop {
+  position: absolute; inset: 0;
+  background: var(--cxs-backdrop);
+  opacity: 0; transition: opacity 200ms ease;
+}
+#cx-setup-root .cx-setup-dialog {
+  position: relative;
+  width: min(560px, 100%);
+  max-height: min(720px, calc(100vh - 48px));
+  display: flex; flex-direction: column;
+  background: var(--cxs-bg);
+  border: 1px solid var(--cxs-line);
+  border-radius: 20px;
+  outline: none;
+  opacity: 0; transform: translateY(8px) scale(.985);
+  transition: opacity 260ms var(--cxs-ease), transform 360ms var(--cxs-ease);
+}
+#cx-setup-root.is-open .cx-setup-backdrop { opacity: 1; }
+#cx-setup-root.is-open .cx-setup-dialog { opacity: 1; transform: none; }
+
+#cx-setup-root .cx-setup-top {
+  display: flex; align-items: flex-start; gap: 12px;
+  padding: 28px 28px 8px;
+}
+#cx-setup-root .cx-setup-heading { flex: 1; min-width: 0; }
+#cx-setup-root #cx-setup-title {
+  margin: 0;
+  font-family: var(--cxs-serif) !important;
+  font-size: 26px; font-weight: 400; line-height: 1.2;
+  letter-spacing: -0.01em;
+  color: var(--cxs-text);
+}
+#cx-setup-root #cx-setup-sub { margin: 6px 0 0; font-size: 14px; color: var(--cxs-text-2); }
+#cx-setup-root .cx-setup-x {
+  flex: none; width: 32px; height: 32px; margin: -4px -8px 0 0;
+  display: grid; place-items: center;
+  border: 0; border-radius: 10px; background: transparent;
+  color: var(--cxs-text-2); cursor: pointer;
+}
+#cx-setup-root .cx-setup-x:hover { background: var(--cxs-line); color: var(--cxs-text); }
+
+#cx-setup-root .cx-setup-scroll {
+  overflow: auto; padding: 16px 28px 8px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+
+#cx-setup-root .cx-setup-banner {
+  font-size: 13.5px; color: var(--cxs-text-2);
+  padding: 0 0 4px;
+}
+#cx-setup-root .cx-setup-banner[data-tone="warn"] { color: var(--cxs-warn); }
+#cx-setup-root .cx-setup-banner svg { display: none; }
+
+/* ── cards ─────────────────────────────────────────────── */
+#cx-setup-root .cx-setup-card {
+  background: var(--cxs-card);
+  border: 1px solid var(--cxs-line);
+  border-radius: 14px;
+}
+#cx-setup-root .cx-setup-head {
+  width: 100%;
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px;
+  border: 0; background: transparent; color: inherit;
+  font: inherit; text-align: left; cursor: pointer;
+  border-radius: 14px;
+}
+#cx-setup-root .cx-setup-head--static { cursor: default; }
+#cx-setup-root .cx-setup-titles { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+#cx-setup-root .cx-setup-name { font-size: 15px; font-weight: 500; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+#cx-setup-root .cx-setup-tag { font-size: 12.5px; font-weight: 400; color: var(--cxs-text-3); }
+#cx-setup-root .cx-setup-tag.is-rec { color: var(--cxs-green); }
+#cx-setup-root .cx-setup-desc { font-size: 13.5px; color: var(--cxs-text-2); }
+#cx-setup-root .cx-setup-desc.is-mask { font-family: ui-monospace, "SF Mono", Consolas, monospace; font-size: 12.5px; }
+
+#cx-setup-root .cx-setup-chip { flex: none; font-size: 13px; color: var(--cxs-text-3); }
+#cx-setup-root .cx-setup-chip[data-tone="ok"] { color: var(--cxs-green); font-weight: 500; }
+#cx-setup-root .cx-setup-chip[data-tone="warn"] { color: var(--cxs-warn); }
+#cx-setup-root .cx-setup-chip[data-tone="bad"] { color: var(--cxs-bad); }
+
+#cx-setup-root .cx-setup-chev { flex: none; display: grid; color: var(--cxs-text-3); transition: transform 240ms var(--cxs-ease); }
+#cx-setup-root .cx-setup-head[aria-expanded="true"] .cx-setup-chev { transform: rotate(180deg); }
+
+#cx-setup-root .cx-setup-body[hidden] { display: none; }
+#cx-setup-root .cx-setup-body-in { padding: 2px 16px 16px; display: flex; flex-direction: column; gap: 12px; }
+#cx-setup-root .cx-setup-get { display: flex; flex-direction: column; gap: 6px; }
+#cx-setup-root .cx-setup-mini {
+  margin: 0; padding: 0; list-style: none;
+  display: flex; flex-wrap: wrap; gap: 4px 0;
+  font-size: 13px; color: var(--cxs-text-2);
+  counter-reset: s;
+}
+#cx-setup-root .cx-setup-mini li { counter-increment: s; }
+#cx-setup-root .cx-setup-mini li::before { content: counter(s) ". "; color: var(--cxs-text-3); }
+#cx-setup-root .cx-setup-mini li + li::before { content: "\00a0\00a0·\00a0\00a0" counter(s) ". "; }
+
+/* ── field ─────────────────────────────────────────────── */
+#cx-setup-root .cx-setup-field { display: flex; gap: 8px; }
+#cx-setup-root .cx-setup-inwrap { position: relative; flex: 1; min-width: 0; }
+#cx-setup-root .cx-setup-input {
+  width: 100%; height: 42px; box-sizing: border-box;
+  padding: 0 40px 0 14px;
+  font: inherit; font-size: 14px; color: var(--cxs-text);
+  background: var(--cxs-bg);
+  border: 1px solid var(--cxs-line-2);
+  border-radius: 12px;
+  outline: none; box-shadow: none;
+  transition: border-color 150ms ease;
+}
+#cx-setup-root .cx-setup-input::placeholder { color: var(--cxs-text-3); }
+#cx-setup-root .cx-setup-input:focus { border-color: var(--cxs-green); }
+#cx-setup-root .cx-setup-eye {
+  position: absolute; right: 4px; top: 50%; transform: translateY(-50%);
+  width: 34px; height: 34px; display: grid; place-items: center;
+  border: 0; border-radius: 9px; background: transparent;
+  color: var(--cxs-text-3); cursor: pointer;
+}
+#cx-setup-root .cx-setup-eye:hover { color: var(--cxs-text); }
+
+/* ── buttons: flat, one green, rounded ─────────────────── */
+#cx-setup-root .cx-setup-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: 42px; padding: 0 18px;
+  font: inherit; font-size: 14px; font-weight: 500;
+  border-radius: 12px; border: 1px solid transparent;
+  background: transparent; color: var(--cxs-text);
+  box-shadow: none; background-image: none;
+  cursor: pointer; white-space: nowrap;
+  transition: background-color 150ms ease, border-color 150ms ease, opacity 150ms ease, transform 120ms ease;
+}
+#cx-setup-root .cx-setup-btn:active { transform: scale(.98); }
+#cx-setup-root .cx-setup-btn:focus-visible,
+#cx-setup-root .cx-setup-head:focus-visible,
+#cx-setup-root .cx-setup-x:focus-visible { outline: 2px solid var(--cxs-green); outline-offset: 2px; }
+#cx-setup-root .cx-setup-btn--primary { background: var(--cxs-green); color: #fff; border-color: var(--cxs-green); }
+#cx-setup-root .cx-setup-btn--primary:hover { opacity: .9; }
+#cx-setup-root .cx-setup-btn--ghost,
+#cx-setup-root .cx-setup-btn--soft { border-color: var(--cxs-line-2); background: var(--cxs-card); }
+#cx-setup-root .cx-setup-btn--ghost:hover,
+#cx-setup-root .cx-setup-btn--soft:hover { background: var(--cxs-line); }
+#cx-setup-root .cx-setup-btn--link {
+  align-self: flex-start; height: auto; padding: 0;
+  color: var(--cxs-green); font-weight: 500;
+  text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px;
+}
+#cx-setup-root .cx-setup-btn--link:hover { text-decoration-thickness: 2px; }
+#cx-setup-root .cx-setup-btn[disabled] { opacity: .5; cursor: default; }
+#cx-setup-root .cx-setup-btn svg { display: none; }
+
+#cx-setup-root .cx-setup-btn-spin { display: none; }
+#cx-setup-root .cx-setup-card.is-busy [data-act="save"] .cx-setup-btn-spin {
+  display: inline-block; width: 14px; height: 14px; border-radius: 50%;
+  border: 2px solid rgba(255,255,255,.35); border-top-color: #fff;
+  animation: cx-setup-spin 700ms linear infinite;
+}
+@keyframes cx-setup-spin { to { transform: rotate(360deg); } }
+
+#cx-setup-root .cx-setup-microw { padding: 0 16px 16px; }
+
+/* ── messages: plain text, no boxes ────────────────────── */
+#cx-setup-root .cx-setup-msg { margin: 0; padding: 0 16px 14px; font-size: 13px; color: var(--cxs-text-2); }
+#cx-setup-root .cx-setup-msg[hidden] { display: none; }
+#cx-setup-root .cx-setup-msg[data-tone="bad"] { color: var(--cxs-bad); }
+#cx-setup-root .cx-setup-msg[data-tone="ok"] { color: var(--cxs-green); }
+#cx-setup-root .cx-setup-msg[data-tone="warn"] { color: var(--cxs-warn); }
+#cx-setup-root .cx-setup-msg svg { display: none; }
+
+#cx-setup-root .cx-setup-card.is-shake { animation: cx-setup-shake 360ms ease; }
+@keyframes cx-setup-shake { 20%, 60% { transform: translateX(-3px); } 40%, 80% { transform: translateX(3px); } }
+
+/* ── footer ────────────────────────────────────────────── */
+#cx-setup-root .cx-setup-foot {
+  display: flex; align-items: center; gap: 16px;
+  padding: 16px 28px 24px;
+}
+#cx-setup-root .cx-setup-hint { flex: 1; margin: 0; font-size: 13px; color: var(--cxs-text-2); }
+#cx-setup-root .cx-setup-hint b { font-weight: 500; color: var(--cxs-text); }
+#cx-setup-root .cx-setup-actions { display: flex; gap: 8px; flex: none; }
+
+/* ── the header entry point ────────────────────────────── */
+.cx-setup-pill {
+  display: inline-flex; align-items: center;
+  height: 32px; padding: 0 14px; margin-right: 6px;
+  font-family: "Anthropic Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 13px; font-weight: 500; letter-spacing: 0;
+  color: #3D5A3A; background: transparent;
+  border: 1px solid #D9D6CA; border-radius: 10px;
+  box-shadow: none; background-image: none;
+  cursor: pointer;
+  transition: background-color 150ms ease, border-color 150ms ease;
+}
+.cx-setup-pill:hover { background: #F0EEE6; border-color: #C9C6B9; }
+.cx-setup-pill:focus-visible { outline: 2px solid #3D5A3A; outline-offset: 2px; }
+.cx-setup-pill[hidden] { display: none !important; }
+html[data-theme="dark"] .cx-setup-pill, body.dark .cx-setup-pill { color: #A9C7A4; border-color: #4A4A46; }
+html[data-theme="dark"] .cx-setup-pill:hover, body.dark .cx-setup-pill:hover { background: #30302E; }
+.cx-setup-pill.is-floating { position: fixed; left: 20px; bottom: 20px; z-index: 9000; background: #FAF9F5; }
+
+/* ── small screens: bottom sheet ───────────────────────── */
+@media (max-width: 560px) {
+  #cx-setup-root { padding: 0; align-items: flex-end; }
+  #cx-setup-root .cx-setup-dialog { width: 100%; max-height: 92vh; border-radius: 20px 20px 0 0; border-bottom: 0; }
+  #cx-setup-root .cx-setup-top { padding: 22px 20px 6px; }
+  #cx-setup-root .cx-setup-scroll { padding: 12px 20px 6px; }
+  #cx-setup-root .cx-setup-foot { flex-direction: column; align-items: stretch; padding: 14px 20px 20px; }
+  #cx-setup-root .cx-setup-actions > * { flex: 1; }
+  #cx-setup-root .cx-setup-field { flex-direction: column; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cx-setup-root .cx-setup-dialog, #cx-setup-root .cx-setup-backdrop { transition: opacity 120ms linear !important; transform: none !important; }
+  #cx-setup-root .cx-setup-card.is-shake { animation: none; }
+}
+
+/* ============================================================
+ * v2 — layout pass (2026-10-02)
+ * Smaller rows, one accordion, a real scrollbar, a folded drawer
+ * for the spare providers, and a footer that stops wrapping.
+ * Everything below overrides the block above on purpose.
+ * ============================================================ */
+
+/* ── dialog: narrower, so a 14-provider list reads as a column ── */
+#cx-setup-root { padding: 20px; }
+#cx-setup-root .cx-setup-dialog {
+  width: min(472px, 100%);
+  max-height: min(540px, calc(100vh - 40px));
+  box-shadow: 0 1px 2px rgba(20,20,19,.04), 0 12px 40px -8px rgba(20,20,19,.16);
+}
+
+#cx-setup-root .cx-setup-top { padding: 20px 20px 4px; }
+#cx-setup-root #cx-setup-title { font-family: var(--cxs-sans) !important; font-size: 19px; font-weight: 600; letter-spacing: -.025em; }
+#cx-setup-root #cx-setup-sub { margin-top: 4px; font-size: 12px; }
+
+/* ── the scroll area actually shows it can scroll ───────────── */
+#cx-setup-root .cx-setup-scroll {
+  flex: 1 1 auto; min-height: 0;
+  padding: 12px 20px 14px;
+  gap: 7px;
+  overflow-y: auto !important;
+  overflow-x: hidden;
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: var(--cxs-line-2) transparent;
+}
+#cx-setup-root .cx-setup-scroll::-webkit-scrollbar { display: block !important; width: 10px; }
+#cx-setup-root .cx-setup-scroll::-webkit-scrollbar-track { background: transparent; }
+#cx-setup-root .cx-setup-scroll::-webkit-scrollbar-thumb {
+  background: var(--cxs-line-2); border-radius: 99px;
+  border: 3px solid transparent; background-clip: content-box;
+}
+#cx-setup-root .cx-setup-scroll::-webkit-scrollbar-thumb:hover { background: var(--cxs-text-3); background-clip: content-box; }
+#cx-setup-root .cx-setup-scroll { scrollbar-color: transparent transparent; }
+#cx-setup-root .cx-setup-scroll::-webkit-scrollbar-thumb { background: transparent; }
+#cx-setup-root .cx-setup-scroll:hover,
+#cx-setup-root .cx-setup-scroll:focus-within { scrollbar-color: var(--cxs-line-2) transparent; }
+#cx-setup-root .cx-setup-scroll:hover::-webkit-scrollbar-thumb,
+#cx-setup-root .cx-setup-scroll:focus-within::-webkit-scrollbar-thumb { background: var(--cxs-line-2); background-clip: content-box; }
+
+/* ── card rows: one tidy line of grid, not a stack of blocks ── */
+#cx-setup-root .cx-setup-card { border-radius: 11px; transition: border-color 180ms ease, background-color 180ms ease; }
+#cx-setup-root .cx-setup-card.is-open { border-color: var(--cxs-line-2); }
+#cx-setup-root .cx-setup-card[data-state="live"] { border-color: color-mix(in srgb, var(--cxs-green) 26%, var(--cxs-line)); }
+
+#cx-setup-root .cx-setup-head {
+  display: grid;
+  grid-template-columns: 1fr auto 16px;
+  align-items: center;
+  column-gap: 9px;
+  padding: 8px 12px;
+  border-radius: 11px;
+  min-height: 48px;
+  transition: background-color 150ms ease;
+}
+#cx-setup-root .cx-setup-head:hover { background: color-mix(in srgb, var(--cxs-line) 42%, transparent); }
+#cx-setup-root .cx-setup-head--static:hover { background: transparent; }
+#cx-setup-root .cx-setup-titles { gap: 1px; }
+#cx-setup-root .cx-setup-name { font-size: 12.5px; font-weight: 550; gap: 6px; flex-wrap: nowrap; }
+#cx-setup-root .cx-setup-tag {
+  font-size: 10px; line-height: 15px; letter-spacing: .01em;
+  padding: 0 7px; border-radius: 99px; flex: none;
+  background: var(--cxs-line); color: var(--cxs-text-3);
+}
+#cx-setup-root .cx-setup-tag.is-rec { background: color-mix(in srgb, var(--cxs-green) 14%, transparent); color: var(--cxs-green); }
+#cx-setup-root .cx-setup-desc {
+  font-size: 11.5px; line-height: 1.4;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+#cx-setup-root .cx-setup-chip { font-size: 11px; white-space: nowrap; }
+
+/* the chevron was rendering as a stray mark — pin its box */
+#cx-setup-root .cx-setup-chev { width: 16px; height: 16px; place-items: center; }
+#cx-setup-root .cx-setup-chev svg { display: block; width: 16px; height: 16px; }
+#cx-setup-root .cx-setup-head[aria-expanded="true"] .cx-setup-chev { color: var(--cxs-text-2); }
+#cx-setup-root .cx-setup-head--static .cx-setup-chev { visibility: hidden; }
+
+/* ── disclosure body: JS animates the height, CSS stays out of it ── */
+#cx-setup-root .cx-setup-body { will-change: height; }
+#cx-setup-root .cx-setup-body-in { padding: 0 12px 12px; gap: 8px; }
+#cx-setup-root .cx-setup-mini { font-size: 11px; }
+
+#cx-setup-root .cx-setup-input { height: 34px; border-radius: 8px; font-size: 12px; padding: 0 34px 0 10px; }
+#cx-setup-root .cx-setup-btn { height: 34px; padding: 0 12px; font-size: 12px; border-radius: 8px; }
+#cx-setup-root .cx-setup-btn--link { height: auto; font-size: 11.5px; }
+#cx-setup-root .cx-setup-eye { width: 28px; height: 28px; }
+#cx-setup-root .cx-setup-eye:hover,
+#cx-setup-root .cx-setup-eye:active,
+#cx-setup-root .cx-setup-eye:focus-visible {
+  transform: translateY(-50%) !important;
+  translate: none !important;
+}
+#cx-setup-root .cx-setup-msg { padding: 0 12px 10px; font-size: 11.5px; }
+#cx-setup-root .cx-setup-microw { padding: 0 12px 12px; }
+
+/* ── the folded drawer of spare providers ──────────────────── */
+#cx-setup-root .cx-setup-group { margin-top: 2px; }
+#cx-setup-root .cx-setup-grouphead {
+  width: 100%;
+  display: grid; grid-template-columns: 1fr auto 16px;
+  align-items: center; column-gap: 10px;
+  padding: 8px 12px; min-height: 36px;
+  border: 0; background: transparent; color: var(--cxs-text-2);
+  font: inherit; font-size: 12px; font-weight: 500; text-align: left;
+  border-radius: 10px; cursor: pointer;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+#cx-setup-root .cx-setup-grouphead:hover { background: var(--cxs-line); color: var(--cxs-text); }
+#cx-setup-root .cx-setup-grouphead:focus-visible { outline: 2px solid var(--cxs-green); outline-offset: 2px; }
+#cx-setup-root .cx-setup-grouphead[aria-expanded="true"] .cx-setup-chev { transform: rotate(180deg); }
+#cx-setup-root .cx-setup-groupn {
+  font-size: 11px; line-height: 16px; padding: 0 7px; border-radius: 99px;
+  background: var(--cxs-line); color: var(--cxs-text-3); font-weight: 400;
+}
+#cx-setup-root .cx-setup-groupn[data-tone="ok"] { background: color-mix(in srgb, var(--cxs-green) 14%, transparent); color: var(--cxs-green); }
+#cx-setup-root .cx-setup-grouplist { will-change: height; }
+#cx-setup-root .cx-setup-grouplist-in { display: flex; flex-direction: column; gap: 8px; padding-top: 8px; }
+
+/* ── footer: the hint stopped fighting three buttons ───────── */
+#cx-setup-root .cx-setup-foot {
+  flex-direction: column; align-items: stretch; gap: 7px;
+  padding: 10px 20px 14px;
+  border-top: 1px solid var(--cxs-line);
+}
+#cx-setup-root .cx-setup-hint { flex: none; font-size: 11px; line-height: 1.4; }
+#cx-setup-root .cx-setup-actions { justify-content: flex-end; }
+#cx-setup-root .cx-setup-btn--ghost[data-act="purge-legacy"] {
+  margin-right: auto; border-color: transparent; background: transparent;
+  color: var(--cxs-text-3); font-weight: 400;
+}
+#cx-setup-root .cx-setup-btn--ghost[data-act="purge-legacy"]:hover { color: var(--cxs-bad); background: transparent; }
+
+/* ── entrance: dialog settles, cards trail it ──────────────── */
+#cx-setup-root .cx-setup-dialog { transform: translateY(8px) scale(.985); }
+#cx-setup-root.is-open .cx-setup-card,
+#cx-setup-root.is-open .cx-setup-group { animation: cx-setup-rise 460ms var(--cxs-ease) backwards; animation-delay: calc(60ms + var(--cx-i, 0) * 26ms); }
+@keyframes cx-setup-rise { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+
+#cx-setup-root .cx-setup-spin {
+  display: inline-block; width: 12px; height: 12px; border-radius: 50%; margin-right: 2px;
+  border: 2px solid var(--cxs-line-2); border-top-color: var(--cxs-text-2);
+  animation: cx-setup-spin 700ms linear infinite; vertical-align: -1px;
+}
+
+@media (max-width: 560px) {
+  #cx-setup-root .cx-setup-scroll { padding: 10px 16px 12px; }
+  #cx-setup-root .cx-setup-top { padding: 18px 16px 4px; }
+  #cx-setup-root .cx-setup-foot { padding: 10px 16px 14px; }
+  #cx-setup-root .cx-setup-desc { white-space: normal; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #cx-setup-root.is-open .cx-setup-card,
+  #cx-setup-root.is-open .cx-setup-group { animation: none; }
+}

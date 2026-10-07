@@ -233,10 +233,10 @@ def patch_jarvis_ui():
     p.replace(
         "speakJarvisText catch -> Gemini wording",
         "    setJarvisStatus('unavailable', 'Kokoro unavailable — text mode ready');\n"
-        "    console.warn('[Clavis local Kokoro]', error);",
+        "    console.warn('[Rudra24 AI local Kokoro]', error);",
         "    setJarvisStatus('unavailable', 'Voice unavailable — text mode ready');\n"
-        "    console.warn('[Clavis voice]', error);",
-        marker="'[Clavis voice]'",
+        "    console.warn('[Rudra24 AI voice]', error);",
+        marker="'[Rudra24 AI voice]'",
     )
     return p.save()
 

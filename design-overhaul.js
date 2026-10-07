@@ -7,15 +7,17 @@
     const next = theme === 'light' ? 'light' : 'dark';
     const html = document.documentElement;
 
-    // Smooth transition class for 200ms
-    html.classList.add('theme-transitioning');
     clearTimeout(themeTimer);
-    themeTimer = setTimeout(() => {
-      html.classList.remove('theme-transitioning');
-    }, 220);
+    // PERF: switch instantly with all transitions + backdrop-filter frozen (perf-fix.css),
+    // then release after two frames. Animating ~thousands of nodes caused the lag.
+    html.classList.add('theme-switching');
+    html.classList.remove('theme-transitioning');
 
     html.setAttribute('data-theme', next);
     localStorage.setItem('skylark-theme', next);
+    requestAnimationFrame(() => requestAnimationFrame(() => {
+      themeTimer = setTimeout(() => html.classList.remove('theme-switching'), 60);
+    }));
 
     const btn = document.getElementById('mark-bennett-theme-btn');
     if (btn) {
@@ -31,7 +33,7 @@
     document.dispatchEvent(new CustomEvent('themechange', { detail: { theme: next, manual: !!options.manual } }));
 
     try {
-      if (window.SoundFX && typeof window.SoundFX.playToggle === 'function') {
+      if (options.manual && window.SoundFX && typeof window.SoundFX.playToggle === 'function') {
         window.SoundFX.playToggle();
       }
     } catch (_) {}

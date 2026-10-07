@@ -1,7 +1,9 @@
 /* Small progressive-enhancement layer for modal semantics and keyboard use. */
 (function () {
   'use strict';
-  const selector = '[role="dialog"], .settings-overlay, .mac-settings-overlay';
+  // Popovers manage their own visibility and focus. Marking one inert during
+  // its opening animation leaves a visible menu that cannot be clicked.
+  const selector = '[role="dialog"]:not([popover]), .settings-overlay, .mac-settings-overlay';
   const focusable = 'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
   let activeDialog = null;
 
@@ -14,6 +16,9 @@
   // app impossible to type in, and left closed dialogs non-inert.
   function isDialogVisible(dialog) {
     if (dialog.hidden) return false;
+    // Settings owns its state and focus. Opacity starts at zero during its
+    // entrance, so it cannot be used to decide whether controls are inert.
+    if (dialog.id === 'settings-overlay') return dialog.classList.contains('open');
     const cs = getComputedStyle(dialog);
     if (cs.display === 'none' || cs.visibility === 'hidden') return false;
     if (parseFloat(cs.opacity) < 0.02) return false;
@@ -57,7 +62,7 @@
     requestAnimationFrame(runSync);
   }
   function onKeydown(event) {
-    if (!activeDialog) return;
+    if (!activeDialog || activeDialog.id === 'settings-overlay') return; // Settings owns its nested picker and focus handling.
     if (event.key === 'Escape') {
       const close = activeDialog.querySelector('[aria-label*="Close" i], .mac-dialog-btn.cancel');
       if (close) { event.preventDefault(); close.click(); }
@@ -88,6 +93,12 @@
       }
     }).observe(document.body, { subtree: true, attributes: true, attributeFilter: ['style', 'class', 'hidden'] });
     document.addEventListener('keydown', onKeydown, true);
+    // A dialog is judged on the frame its class flips — when its fade has only
+    // just started (opacity ~0). Without a second look it stayed inert=true after
+    // opening: Settings / History looked open but ignored every click.
+    const settle = (e) => { const t = e.target; if (t && t.nodeType === 1 && t.matches(selector)) syncAll(); };
+    document.addEventListener('transitionend', settle, true);
+    document.addEventListener('animationend', settle, true);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init, { once: true });
   else init();

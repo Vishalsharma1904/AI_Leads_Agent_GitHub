@@ -13,6 +13,7 @@
     const root = document.documentElement;
     const resizer = document.getElementById('sidebar-resizer');
     if (!sidebar) return;
+    let transitionTimer;
 
     const desktop = matchMedia('(min-width: 769px)');
     const clamp = value => {
@@ -39,7 +40,11 @@
       const width = clamp(value);
       root.style.setProperty('--sidebar-expanded', `${width}px`);
       root.style.setProperty('--sidebar-width', `${width}px`);
-      root.style.setProperty('--sidebar-current', `${width}px`);
+      /* --sidebar-current / --main-left were custom properties on :root, so
+         every write re-styled the whole document (2886 elements, measured) —
+         once per toggle and once per RESIZER FRAME. Nothing reads --main-left
+         at all, and the rail's width is now written inline by the spring in
+         rudra-motion-ui.js. */
       if (persist) localStorage.setItem('do-sidebar-width', String(width));
       document.getElementById('sm-sidebar-w-val')?.replaceChildren(String(width));
       return width;
@@ -47,33 +52,35 @@
 
     function setCollapsed(collapsed, animate = true) {
       if (!desktop.matches) {
-        if (animate) sidebar.classList.toggle('mobile-open');
-        else sidebar.classList.remove('mobile-open');
+        sidebar.classList.toggle('mobile-open', !collapsed && animate);
         root.dataset.sidebarState = 'mobile';
+        const mobileButton = document.querySelector('.mobile-sidebar-trigger');
+        mobileButton?.setAttribute('aria-expanded', String(!collapsed && animate));
+        mobileButton?.setAttribute('aria-label', !collapsed && animate ? 'Close navigation' : 'Open navigation');
         return;
       }
-      root.classList.toggle('sidebar-animating', animate);
+      clearTimeout(transitionTimer);
+      /* .sidebar-animating drove `html.sidebar-animating body *` in
+         apple-polish.css — a universal selector, so adding and removing it
+         cost two full-document restyles per toggle. It existed to calm blur
+         while the whole page re-laid-out every frame; the spring now moves
+         two elements, so there is nothing left to calm. */
       sidebar.classList.toggle('collapsed', collapsed);
+      if (!collapsed) sidebar.classList.remove('au-peek');
       sidebar.classList.remove('mobile-open');
       root.dataset.sidebarState = collapsed ? 'collapsed' : 'expanded';
       // Explicitly sync CSS variable so main-content margin-left transitions correctly
-      const targetWidth = collapsed ? '64px' : (root.style.getPropertyValue('--sidebar-expanded') || '220px');
-      root.style.setProperty('--sidebar-current', targetWidth);
-      root.style.setProperty('--main-left', targetWidth);
       localStorage.setItem('lx-sidebar-collapsed', String(collapsed));
+      document.querySelector('.mac-close')?.setAttribute('aria-pressed', String(!collapsed));
       document.dispatchEvent(new CustomEvent('nexus:sidebarchange', { detail: { collapsed } }));
-      setTimeout(() => root.classList.remove('sidebar-animating'), 340);
     }
 
-    function toggle() { setCollapsed(!sidebar.classList.contains('collapsed')); }
+    function toggle() { setCollapsed(desktop.matches ? !sidebar.classList.contains('collapsed') : sidebar.classList.contains('mobile-open')); }
     applyExpandedWidth(savedWidth(), false);
     // Collapsed by default — the rail opens on demand, giving the app more room.
     const storedCollapsed = localStorage.getItem('lx-sidebar-collapsed');
     setCollapsed(storedCollapsed === null ? true : storedCollapsed === 'true', false);
 
-    document.querySelector('.mac-close')?.addEventListener('click', toggle);
-    document.querySelector('.mac-minimize')?.addEventListener('click', () => setCollapsed(true));
-    document.querySelector('.mac-maximize')?.addEventListener('click', () => setCollapsed(false));
     window.luxSidebarToggle = toggle;
     window.toggleSidebarCollapse = toggle;
     window.SidebarController = { toggle, collapse: () => setCollapsed(true), expand: () => setCollapsed(false), setWidth: applyExpandedWidth };
@@ -444,6 +451,13 @@
     if (!textarea) return;
     box.__lxCaretBound = true;
 
+    // theme-flow.css keeps native carets and hides beam/dust on both composers.
+    // Their shared sizing owner replaces this layer's synchronous auto-grow.
+    if (textarea.id === 'chat-input' || textarea.id === 'candidate-ai-input') {
+      window.ClavisComposerSizing?.attach(textarea);
+      return;
+    }
+
     ensureHoverGlow(box);
 
     // Mouse-hover glow — tracks cursor position for ambient light
@@ -500,17 +514,19 @@
     requestAnimationFrame(refresh);
   }
 
-  function scan() {
-    document.querySelectorAll('.claude-input-container').forEach(attachToBox);
+  function scan(root = document) {
+    const box = root.closest?.('.claude-input-container');
+    if (box) attachToBox(box);
+    root.querySelectorAll?.('.claude-input-container').forEach(attachToBox);
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scan);
+    document.addEventListener('DOMContentLoaded', () => scan());
   } else {
     scan();
   }
   // Re-scan on DOM changes
-  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => { if (n.nodeType === 1) scan(n); }))).observe(document.body, { childList: true, subtree: true });
 })();
 
 
@@ -760,21 +776,22 @@
   }
 
   // ── Scan / apply ─────────────────────────────────────────
-  function scan() {
-    document.querySelectorAll('.claude-input-container').forEach(box => {
-      // Dropdowns inside
+  function scan(root = document) {
+    const boxes = new Set(root.querySelectorAll?.('.claude-input-container') || []);
+    const parent = root.closest?.('.claude-input-container');
+    if (parent) boxes.add(parent);
+    boxes.forEach(box => {
       box.querySelectorAll('.custom-dropdown').forEach(initDropdown);
-      // Drag drop + folder icon
       initDragDrop(box);
     });
   }
 
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', scan);
+    document.addEventListener('DOMContentLoaded', () => scan());
   } else {
     scan();
   }
-  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => { if (n.nodeType === 1) scan(n); }))).observe(document.body, { childList: true, subtree: true });
 })();
 
 
@@ -832,11 +849,15 @@
 // Centralized live appearance preferences.
 (function LuxuryAppearanceSettings() {
   const KEY = 'lx-appearance-v1';
-  const defaults = { uiScale: 100, density: 'comfortable', motion: 'full', radius: 14, shadow: 55, glowRadius: 320, blackLevel: 96, sidebarWidth: Number.parseInt(localStorage.getItem('do-sidebar-width'), 10) || 215 };
-  const read = () => { try { return { ...defaults, ...JSON.parse(localStorage.getItem(KEY) || '{}') }; } catch (_) { return { ...defaults }; } };
+  const defaults = { uiScale: 100, density: 'comfortable', motion: 'full', radius: 14, shadow: 55, glowRadius: 320, blackLevel: 96, sidebarWidth: 220 };
+  const read = () => {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) {}
+    return { ...defaults, ...saved, sidebarWidth: Number.parseInt(localStorage.getItem('do-sidebar-width'), 10) || saved.sidebarWidth || 220 };
+  };
   let state = read();
 
-  function apply() {
+  function apply(persistSidebar = false) {
     const root = document.documentElement;
     root.style.setProperty('--ui-scale', String(state.uiScale / 100));
     root.style.setProperty('--lx-radius', `${state.radius}px`);
@@ -848,12 +869,16 @@
     root.style.setProperty('--lx-dark-bg', `rgb(${darkChannel} ${darkChannel} ${darkChannel})`);
     root.dataset.density = state.density;
     root.dataset.motion = state.motion;
-    window.SidebarController?.setWidth(state.sidebarWidth, false);
+    state.sidebarWidth = window.SidebarController?.setWidth(state.sidebarWidth, persistSidebar) || state.sidebarWidth;
   }
 
   function sync() {
     const values = { 'sm-ui-scale': state.uiScale, 'sm-density': state.density, 'sm-motion': state.motion, 'sm-radius': state.radius, 'sm-shadow': state.shadow, 'sm-glow-radius': state.glowRadius, 'sm-black-level': state.blackLevel, 'sm-sidebar-width': state.sidebarWidth };
     Object.entries(values).forEach(([id, value]) => { const el = document.getElementById(id); if (el) el.value = value; });
+    const motionToggle = document.getElementById('sm-reduce-motion');
+    if (motionToggle) motionToggle.checked = state.motion !== 'full';
+    const densityToggle = document.getElementById('sm-compact');
+    if (densityToggle) densityToggle.checked = state.density === 'compact';
     ['ui-scale','radius','shadow','glow-radius','black-level','sidebar-w'].forEach(name => {
       const label = document.getElementById(`sm-${name}-val`);
       const source = document.getElementById(name === 'sidebar-w' ? 'sm-sidebar-width' : `sm-${name}`);
@@ -865,11 +890,11 @@
     if (!(key in defaults)) return;
     state[key] = typeof defaults[key] === 'number' ? Number(value) : value;
     localStorage.setItem(KEY, JSON.stringify(state));
-    apply();
+    apply(key === 'sidebarWidth');
     sync();
     document.dispatchEvent(new CustomEvent('nexus:appearancechange', { detail: { ...state } }));
   };
-  window.lxResetAppearance = () => { state = { ...defaults }; localStorage.setItem(KEY, JSON.stringify(state)); apply(); sync(); };
+  window.lxResetAppearance = () => { state = { ...defaults }; localStorage.setItem(KEY, JSON.stringify(state)); apply(true); sync(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { apply(); sync(); });
   else { apply(); sync(); }
   document.addEventListener('settingsOpened', sync);
@@ -1191,5 +1216,5 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', ensureLayers);
   else ensureLayers();
-  new MutationObserver(ensureLayers).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(ensureLayers).observe(document.body, { childList: true });
 })();

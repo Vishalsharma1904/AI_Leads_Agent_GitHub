@@ -1,7 +1,7 @@
 /**
  * ============================================================
- *  CLAVIS AUTOMATION (clavis-automation.js)
- *  Clavis's hands OUTSIDE the app — open / type into / close desktop
+ *  RUDRA24 AI AUTOMATION (clavis-automation.js)
+ *  Rudra24 AI's hands OUTSIDE the app — open / type into / close desktop
  *  apps, run small multi-step tasks, and brief sir on any website.
  *
  *    "chrome kholo" · "file manager kholo" · "claude khol do"
@@ -50,9 +50,9 @@
     ]);
   }
 
-  // What Clavis did last — so "is website ko scroll karo" / "is site ke
+  // What Rudra24 AI did last — so "is website ko scroll karo" / "is site ke
   // baare me batao" know which site, and the gate knows scrolling means
-  // the website, not the Clavis page.
+  // the website, not the Rudra24 AI page.
   const state = { lastSite: null, lastWindow: null, inflight: new Map() };
   const RECENT_MS = 10 * 60 * 1000;
   function rememberSite(url, title) { if (url) state.lastSite = { url, title: title || '', at: Date.now() }; }
@@ -427,7 +427,7 @@
     const t = norm(raw);
     if (!t || t.length > 400 || NEVER_RE.test(t)) return false;
     if (/\b(leads?|candidates?|contacts?|companies|clients?|prospects?)\b/.test(t)) return false;
-    // Not "window"/"tab": those are usually Clavis's own floating window.
+    // Not "window"/"tab": those are usually Rudra24 AI's own floating window.
     const thing = (PC()?.matchApps(t).length) || /\b(pc|computer|laptop|desktop|browser)\b/.test(t);
     const act = OPEN_VERB.test(t) || TYPE_AT.test(t) || KEY_VERB.test(t) || SCROLL_WORD.test(t) || /\b(new\s+tab|naya\s+tab|save\s+karo|minimi[sz]e|maximi[sz]e)\b/.test(t);
     return Boolean(thing && act);
@@ -492,7 +492,7 @@
     if (!window.ClavisDirect?.hasKey?.()) return null;
     const apps = Object.keys(PC()?.APPS || {}).join(', ');
     const sys = [
-      'You turn ONE request into a short plan of Windows PC automation steps for Clavis. Reply with JSON ONLY, no prose, no markdown:',
+      'You turn ONE request into a short plan of Windows PC automation steps for Rudra24 AI. Reply with JSON ONLY, no prose, no markdown:',
       '{"steps":[ ... ],"summary":"<one short Hinglish line of what you will do>"}',
       'Allowed step objects — nothing else exists (no mouse clicks):',
       `{"type":"open","app":"<name>"}  known apps: ${apps}; any other installed app by its plain name`,
@@ -607,7 +607,7 @@
       const next = steps[i + 1];
       const app = s.app ? P.appFor(s.app) : null;
       // A browser opened straight onto the page (one launch, not two) — in its
-      // own window when Clavis will keep working on it, so Clavis's window
+      // own window when Rudra24 AI will keep working on it, so Rudra24 AI's window
       // is never the one being scrolled or typed into.
       if (s.type === 'open' && app?.browser && next && (next.type === 'search-web' || (next.type === 'open-url' && !next.local))) {
         const interactive = steps.slice(i + 2).some((x) => INTERACTIVE.includes(x.type));
@@ -743,7 +743,7 @@
     // Notepad for typing: an empty, named file → a window we can find for sure.
     if (step.freshFile) {
       const stamp = new Date().toTimeString().slice(0, 8).replace(/:/g, '-');
-      ctx.expectTitle = `Clavis Note ${stamp}`;
+      ctx.expectTitle = `Rudra24 AI Note ${stamp}`;
       ctx.before = await snapshotWindows(ctx);
       await P.saveNote('', `${ctx.expectTitle}.txt`);
       return { ok: true, say: `${label} khola`, kind: 'open', label };
@@ -901,7 +901,7 @@
 
   async function doScroll(step, ctx) {
     const P = PC();
-    if (!ctx.caps.bridge) return { ok: false, say: 'dusri website scroll karne ke liye PC bridge chahiye — browser se main sirf Clavis ka page scroll kar sakta hoon' };
+    if (!ctx.caps.bridge) return { ok: false, say: 'dusri website scroll karne ke liye PC bridge chahiye — browser se main sirf Rudra24 AI ka page scroll kar sakta hoon' };
     if (!ctx.caps.control) return { ok: false, say: 'scroll ke liye bridge ka control mode chahiye (Start-Bridge-With-Control.bat)' };
     const target = await scrollTarget(ctx);
     if (!target) return { ok: false, say: 'kaunsi website scroll karun? Pehle site kholiye' };
@@ -917,7 +917,7 @@
     return { ok: true, say: said };
   }
 
-  // Default browser for a page Clavis will keep working on: Chrome, else Edge.
+  // Default browser for a page Rudra24 AI will keep working on: Chrome, else Edge.
   async function openInBrowser(url, newWindow) {
     const P = PC();
     for (const b of ['chrome', 'edge']) {
@@ -952,7 +952,7 @@
     return { ok: true, say: r.native ? say : say };
   }
 
-  // Close apps he named — confirm first; never Clavis's own window.
+  // Close apps he named — confirm first; never Rudra24 AI's own window.
   async function runClose(intent) {
     const P = PC();
     const caps = await capabilities();
@@ -1029,7 +1029,7 @@
       console.warn('[ClavisAutomation]', err);
       result = { handled: true, spoken: `Sir, ye kaam poora nahi ho paya: ${err?.message || err}.` };
     }
-    try { window.setJarvisStatus?.('online', 'Clavis Online'); } catch (_) {}
+    try { window.setJarvisStatus?.('online', 'Rudra24 AI Online'); } catch (_) {}
     if (result) finishTask(task, result);
     return result;
   }
@@ -1055,7 +1055,7 @@
     return null;
   }
   // "this website" = the page in his foreground browser tab, else the site
-  // Clavis showed/opened last, else another browser window's page.
+  // Rudra24 AI showed/opened last, else another browser window's page.
   async function resolveThisWebsite(opts = {}) {
     const P = PC();
     if (P && await P.ping().catch(() => false)) {
@@ -1082,7 +1082,7 @@
     return null;
   }
 
-  // Page text: the Clavis backend reader (same endpoint clavis-live.js and
+  // Page text: the Rudra24 AI backend reader (same endpoint clavis-live.js and
   // ClavisCanvas use), else r.jina.ai (CORS-friendly reader), else the raw
   // HTML through allorigins (the proxy clavis-enrichment-engine.js uses).
   const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,24}/g;
@@ -1178,7 +1178,7 @@
   async function aiBrief(page, url, request, rel) {
     if (!window.ClavisDirect?.hasKey?.() || page.failed) return null;
     const sys = [
-      'You are Clavis, a sharp business analyst for sir — he runs a security guard & housekeeping staffing agency in Gurugram, India, and speaks Hinglish.',
+      'Your name is Rudra. You are a sharp business analyst for sir — he runs a security guard & housekeeping staffing agency in Gurugram, India, and speaks Hinglish.',
       'You get the scraped content of ONE website. Produce TWO different outputs, exactly in this format:',
       '===SCREEN===',
       'A concise markdown brief for the screen (max ~140 words): first line **Name** — what it is in one line; then bullets: **Kya hai**, **Kiske liye**, **Offerings**, **Notable** (facts: locations, scale, clients, pricing, awards — only if present), **Contact** (only emails/phones/address actually in the content). Facts only, no opinions.',
@@ -1221,7 +1221,7 @@
     if (!url) return { handled: true, spoken: 'Kaunsi website, sir? Uska naam ya URL boliye — jaise "brief me about stripe.com".' };
     rememberSite(url);
     progress(task, `${hostOf(url)} padh raha hoon`);
-    // Screenshot + overview in the Clavis display (clavis-canvas.js). Shown
+    // Screenshot + overview in the Rudra24 AI display (clavis-canvas.js). Shown
     // with our quick summary once the text is in, or after 2.5s regardless.
     let shown = false;
     const show = (summary) => {
@@ -1258,11 +1258,11 @@
       if (phase !== 'route' || !looksLikeAutomation(text) || !window.ClavisDirect?.hasKey?.()) return null;
       window.setJarvisStatus?.('thinking', 'Plan bana raha hoon');
       intent = await planWithAI(text);
-      if (!intent) { window.setJarvisStatus?.('online', 'Clavis Online'); return null; }
+      if (!intent) { window.setJarvisStatus?.('online', 'Rudra24 AI Online'); return null; }
     }
     if (intent.contextual) {
       // "is page ko scroll karo" / "is page ke baare me batao" mean the
-      // website only when one is actually in play; otherwise the Clavis page.
+      // website only when one is actually in play; otherwise the Rudra24 AI page.
       const ctxSite = await externalContext(intent.kind === 'brief').catch(() => null);
       if (!ctxSite) return null;
     } else if (phase === 'gate' && !intent.priority) return null;
@@ -1295,7 +1295,10 @@
     if (C.route.__clavisAuto) return true;
     const inner = C.route;
     const gated = async function (text) {
-      if (api.gateEnabled !== false) {
+      // App first: if the text names something inside the app, the PC gate stays out.
+      var inApp = false;
+      try { inApp = Boolean(window.ClavisAppMap && window.ClavisAppMap.resolve(String(text || ''))); } catch (_) {}
+      if (api.gateEnabled !== false && !inApp) {
         try {
           const mine = await handle(text, { phase: 'gate' });
           if (mine && mine.handled) return mine;

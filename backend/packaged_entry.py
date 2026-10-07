@@ -1,4 +1,4 @@
-"""PyInstaller entry point for the Clavis local API bundle."""
+"""PyInstaller entry point for the Rudra24 AI local API bundle."""
 
 import os
 

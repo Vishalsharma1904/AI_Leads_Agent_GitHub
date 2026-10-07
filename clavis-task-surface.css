@@ -54,7 +54,7 @@
     0 64px 110px -30px rgba(23, 21, 18, 0.28);
 
   contain: layout paint style;
-  will-change: transform, opacity, height, width, border-radius;
+  will-change: transform, opacity;
   transform: translateY(10px) scale(0.97);
   transform-origin: top right;
   opacity: 0;
@@ -1269,7 +1269,7 @@ html[data-theme="dark"] .cts-lightbox-body {
 }
 
 /* ============================================================
- * CLAVIS TAB: PERMANENT CHAT REMOVAL & FLOATING WINDOW DEFENSE
+ * RUDRA24 AI TAB: PERMANENT CHAT REMOVAL & FLOATING WINDOW DEFENSE
  * ============================================================ */
 #view-jarvis #jarvis-chat-scroll {
   display: none !important;
@@ -1277,7 +1277,7 @@ html[data-theme="dark"] .cts-lightbox-body {
 
 /* ============================================================
  * CLAUDE / APPLE STYLE MULTI-SCREENSHOT ATTACHMENT DOCK
- * Appears directly above the Clavis composer on paste (Ctrl+V)
+ * Appears directly above the Rudra24 AI composer on paste (Ctrl+V)
  * or upload with fluid spring animations.
  * ============================================================ */
 .clavis-composer-attachment-dock {
@@ -2249,7 +2249,7 @@ html[data-theme="dark"] .cts-composer.has-text .cts-composer-send {
 
 
 /* ============================================================
-   CLAVIS SURFACE — ENHANCEMENT LAYER (added Sep 2026)
+   RUDRA24 AI SURFACE — ENHANCEMENT LAYER (added Sep 2026)
    Requested polish, kept as an additive override layer so the
    structure above is untouched:
      · green CTAs (green by default AND on hover — no colour flip)
@@ -2378,4 +2378,13 @@ html[data-theme="dark"] .cts .cts-composer.has-attachments .cts-composer-send {
 }
 @media (prefers-reduced-motion: reduce) {
   .cts-foot .cts-act { animation: none !important; }
+}
+
+/* "Quoted" words in an answer: typographic quotes, a soft accent wash. */
+.cts-result q.cts-quote {
+  quotes: none;
+  padding: 0 .18em;
+  border-radius: 4px;
+  background: var(--cc-accent-soft, rgba(0, 0, 0, .05));
+  color: var(--cc-ink, inherit);
 }

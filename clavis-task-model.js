@@ -44,7 +44,7 @@
     DATA_EXTRACTION: 'data_extraction',
     /* ── The four this app is actually for ──────────────────────
        Everything above is generic assistant work. These are the
-       jobs the user opens Clavis to do, so they get their own
+       jobs the user opens Rudra24 AI to do, so they get their own
        label, their own panel body, and their own evidence. */
     LEAD_GEN: 'lead_gen',
     CANDIDATE_GEN: 'candidate_gen',
@@ -289,6 +289,7 @@
   }
 
   function scoreUtterance(text) {
+    if (global.ClavisRequestIntent?.classify(text).answerOnly) return { answer: 100 };
     var t = normalise(text);
     var padded = ' ' + t + ' ';
     var scores = {};

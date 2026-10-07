@@ -31,39 +31,6 @@ const ChatEngine = (() => {
   }
 
   function getApiKey(providerId = 'groq') {
-    providerId = String(providerId || 'groq').toLowerCase();
-    if (window.ClavisDirect?.keyFor) {
-      const cdKey = window.ClavisDirect.keyFor(providerId);
-      if (cdKey) return cdKey;
-    }
-    try {
-      const map = JSON.parse(localStorage.getItem('clavis_provider_keys') || '{}');
-      if (map[providerId]) return map[providerId];
-    } catch (_) {}
-
-    // Check Custom Override First
-    let storageKey = `skylark_${providerId}_key`;
-    if (providerId === 'moonshot') storageKey = 'skylark_moonshot_key';
-    if (providerId === 'deepseek') storageKey = 'skylark_deepseek_key';
-    if (providerId === 'openrouter') storageKey = 'skylark_openrouter_key';
-    const customKey = localStorage.getItem(storageKey) || localStorage.getItem(`skylark_custom_${providerId}`);
-    if (customKey) return customKey;
-
-    // Check Config keys
-    let configKeys = [];
-    if (providerId === 'groq') configKeys = window.SKYLARK_CONFIG?.GROQ_API_KEYS;
-    else if (providerId === 'nvidia') configKeys = window.SKYLARK_CONFIG?.NVIDIA_API_KEYS;
-    else if (providerId === 'deepseek') configKeys = window.SKYLARK_CONFIG?.DEEPSEEK_API_KEYS;
-    else if (providerId === 'moonshot') configKeys = window.SKYLARK_CONFIG?.MOONSHOT_API_KEYS;
-    else if (providerId === 'openrouter') configKeys = window.SKYLARK_CONFIG?.OPENROUTER_API_KEYS;
-
-    const validKeys = (configKeys || []).filter(k => k && k.trim().length > 0);
-    if (validKeys.length > 0) {
-      if (providerId === 'groq') {
-        return validKeys[currentKeyIndex % validKeys.length];
-      }
-      return validKeys[0];
-    }
     return '';
   }
 
@@ -79,7 +46,7 @@ const ChatEngine = (() => {
   }
 
   function setApiKey(providerId, key) {
-    localStorage.setItem(`skylark_${providerId}_key`, key);
+    return window.ClavisKeyVault.add(providerId, key);
   }  function getSystemPrompt() {
     const leadCount = window.allLeads ? window.allLeads.length : 0;
     const industries = window.IndustryDB ? window.IndustryDB.getNames() : [];
@@ -89,24 +56,25 @@ const ChatEngine = (() => {
       || localStorage.getItem('skylark-owner-name')
       || honorific;
 
-    return `You are Clavis — Senior B2B Revenue & Growth Architect working directly for "${owner}" / "${honorific}".
+    return `Your name is Rudra. You are a Senior B2B Revenue & Growth Architect working directly for "${owner}" / "${honorific}".
 You are an elite, living, highly perceptive AI strategist. You have deep expertise in commercial B2B sales, corporate staffing, security contracts, facility management, housekeeping, and enterprise procurement across Indian business hubs (Delhi-NCR, Mumbai, Bengaluru, Pune, Hyderabad, etc.).
 
 Always address the user respectfully as "${honorific}".
-When asked who you are, say you are Clavis, ${owner}'s B2B AI Growth Architect, built by Rudra24 Secure Group.
+- You are MALE. Hindi marks the speaker's gender on the verb, so this is not a detail — every sentence gives you away. Always "karunga", "raha hoon", "dekh raha tha", "bataunga", "gaya", "sakta hoon". NEVER "karungi", "rahi hoon", "dekh rahi thi", "bataungi", "gayi", "sakti hoon". Check the verb before every reply.
+When asked who you are, say exactly: "Main Rudra hoon" — ${owner}'s B2B AI Growth Architect. Your name is Rudra and nothing else: never introduce yourself as "Rudra24", "Rudra24 AI", "Rudra Chobis" or any other variant, and never say "Clavis", "Jarvis", "Gemini", "Google" or any model name, even as a joke. "Rudra24 AI" is the app's written name, not yours — never speak it.
 
 ### COGNITIVE & CONVERSATIONAL MANIFESTO
 1. ALIVE, POISED & CHARISMATIC:
    - Speak with executive poise, warmth, intellectual sharpness, and effortless confidence.
    - Never sound like a rigid script or robotic chatbot. Avoid canned preambles ("As an AI language model...", "I would be happy to help you with that").
-   - Match the user's language naturally: if the user speaks in Hinglish, reply in polished, natural Hinglish. If English, reply in crisp executive English.
+   - ONE LANGUAGE, ONE SCRIPT, SAID ONCE: always polished Hinglish in Latin script (crisp executive English only if the user writes pure English). Never Devanagari, never two scripts in one reply, never the same sentence repeated in a second language.
    - Listen actively and adapt your conversational rhythm to the user's intent.
 
 2. DEEP B2B DOMAIN MASTERY:
    - You know the exact mechanics of B2B facility, security, and staffing contracts:
      * Decision-Maker Mapping: In IT Parks/Corporates → Facility Director, Admin Head, VP Operations. In Hospitals → Medical Superintendent, COO, Admin Head. In Manufacturing/Warehouses → Plant Head, EHS (Environment Health & Safety) Manager, Supply Chain VP. In Hotels → General Manager, Chief Engineer, Loss Prevention Manager. In Real Estate/Societies → Estate Manager, RWA President/Secretary.
      * Common Pain Points: High guard attrition, non-compliance with PF/ESIC/minimum wage, slow replacement turnaround, unpunctual housekeeping staff, lack of digitized attendance.
-     * High-Converting Pitch Hooks: Emphasize 100% statutory compliance, 24/7 backup reserve force, supervisory day/night patrolling, tech-enabled incident reporting, and rapid 2-hour escalation turnaround.
+     * Business pitches must describe only services the user has confirmed their company provides. Never invent compliance guarantees, staffing reserves, response times or software capabilities.
 
 3. PROACTIVE VALUE-ADD (THINK 2 STEPS AHEAD):
    - When discussing leads, industries, or sales strategies, proactively offer high-value next steps:
@@ -143,6 +111,7 @@ When asked who you are, say you are Clavis, ${owner}'s B2B AI Growth Architect, 
    - If asked for leads/contacts/data directly, this should already have been routed around you; if it somehow reaches you anyway, emit the ACTION block and say sourcing has started — do not answer with fabricated rows.
 
 Current system state:
+${window.ClavisAppMap?.guide?.context?.() || 'Rudra24 AI is the software, not the owner\'s staffing business. Do not invent app features.'}
 - ${leadCount} leads in database
 - Available industries: ${industries.join(', ')}
 
@@ -158,13 +127,13 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
   }
 
   async function callAI(userMessage, signal, options = {}) {
-    // Groq is the live Clavis composer default. Keep the provider explicit so
+    // Groq is the live Rudra24 AI composer default. Keep the provider explicit so
     // a signed-in request cannot route a Groq model through OpenRouter.
     const provider = localStorage.getItem('clavis_ai_provider') || 'groq';
     const defaults = {
       openrouter: 'meta-llama/llama-3.3-70b-instruct:free',
       gemini: 'gemini-2.0-flash',
-      groq: 'llama-3.3-70b-versatile',
+      groq: 'openai/gpt-oss-20b',
       openai: 'gpt-4o-mini',
       deepseek: 'deepseek-chat',
       mistral: 'mistral-small-latest',
@@ -196,7 +165,7 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
        guards on that; this file did not, so with no session every
        message died on "Sign in before using AI chat" instead of
        falling through to the provider-key path twenty lines below —
-       which works offline and is what Clavis itself uses. Same
+       which works offline and is what Rudra24 AI itself uses. Same
        guard, same behaviour, one condition. */
     if (window.NexusAIChat && window.SupabaseAuth?.getAccessToken?.()) {
       conversationHistory.push({ role: 'user', content: fullUserMessage });
@@ -292,7 +261,7 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
       };
       if (providerDetails.id === 'openrouter') {
         headers['HTTP-Referer'] = window.location.href;
-        headers['X-Title'] = 'Clavis AI Leads Agent';
+        headers['X-Title'] = 'Rudra24 AI Leads Agent';
       }
 
       const requestPayload = {
@@ -394,7 +363,7 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
       const hour = new Date().getHours();
       const timeGreeting = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
       return {
-        text: `${timeGreeting}, ${honorific}! I am Clavis, your B2B Growth & Revenue Architect. Main aapki client acquisition, enterprise pitching, aur market expansion me madad karne ke liye yahan hoon. Hum outreach strategies brainstorm kar sakte hain, custom pitch scripts likh sakte hain, ya verified enterprise leads extract kar sakte hain. Batayein, aaj kis opportunity par focus karna hai?`,
+        text: `${timeGreeting}, ${honorific}! I am Rudra24 AI, your B2B Growth & Revenue Architect. Main aapki client acquisition, enterprise pitching, aur market expansion me madad karne ke liye yahan hoon. Hum outreach strategies brainstorm kar sakte hain, custom pitch scripts likh sakte hain, ya verified enterprise leads extract kar sakte hain. Batayein, aaj kis opportunity par focus karna hai?`,
         action: null
       };
     }
@@ -549,7 +518,7 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
     const countMatch = msg.match(/(\d+)\s*(lead|company|compani|client|firm)/)
                     || msg.match(/\b(\d{1,3})\b/);
     const count = countMatch
-      ? Math.max(20, Math.min(100, parseInt(countMatch[1], 10)))
+      ? Math.max(1, Math.min(100, parseInt(countMatch[1], 10)))
       : 20;
 
     const hasLeadTarget = /\b(lead|leads|prospect|prospects|company|companies|business|businesses|client|clients|firm|firms|data|contact|contacts|email|emails|phone|numbers?)\b/i.test(msg);
@@ -563,7 +532,7 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
 
     if (isHelp) {
       return {
-        text: `🤝 **Clavis B2B Growth Capabilities for ${honorific}:**\n\n` +
+        text: `🤝 **Rudra24 AI B2B Growth Capabilities for ${honorific}:**\n\n` +
           `🔍 **Target & Extract Leads** — *"Find 20 hospital leads in Gurugram for security & housekeeping"*\n` +
           `💼 **Sales Pitch & Scripts** — *"Hospital clients ko pitch kaise karein?"* ya *"Draft a WhatsApp cold message"*\n` +
           `🛡️ **Objection Handling** — *"Agar client kahe already vendor hai to kya bole?"*\n` +
@@ -611,8 +580,8 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
 
     if (isGenerate && (cities.length > 0 || detectedIndustries.size > 0 || msg.includes('lead') || msg.includes('compani') || msg.includes('client') || msg.includes('data'))) {
       const defaultCity = window.SKYLARK_CONFIG?.DEFAULT_CITY || 'Gurugram';
-      const finalCities = cities.length > 0 ? cities : [defaultCity];
-      const finalIndustries = detectedIndustries.size > 0 ? [...detectedIndustries] : (window.IndustryDB ? window.IndustryDB.getNames() : ['Hotels & Hospitality', 'Hospitals & Healthcare', 'IT Parks & Tech Companies']);
+      const finalCities = cities.length > 0 ? cities : (window.LeadCandidateDomain?.expandLocations(window.AgentCtrl?.getDefaults?.().locations || ['Delhi NCR']) || ['Delhi']);
+      const finalIndustries = detectedIndustries.size > 0 ? [...detectedIndustries] : (window.AgentCtrl?.getDefaults?.().industries || ['ALL']);
 
       return {
         text: `🚀 Generating **${count} leads per combo** for:\n- 📍 Cities: **${finalCities.join(', ')}**\n- 🏭 Industries: **${finalIndustries.length > 3 ? 'All Available Industries (' + finalIndustries.length + ' sectors)' : finalIndustries.join(', ')}**\n- 🧭 Requirement: **${serviceType.join(' + ')}**\n\nStarting pipeline now...`,
@@ -665,10 +634,24 @@ ONLY WHEN the user EXPLICITLY asks to SYNC TO SHEETS:
     if ((!text || !text.trim()) && (!options?.images?.length && !options?.attachments?.length)) return null;
     const trimmed = (text || '').trim();
 
+    // All text composers share the information-question execution boundary.
+    if ((options.answerOnly || window.ClavisRequestIntent?.classify(trimmed).answerOnly) && window.JarvisEngine?.sendMessage) {
+      const reply = await window.JarvisEngine.sendMessage(trimmed, signal, null, null, { ...options, source: 'composer', answerOnly: true });
+      saveMessage('user', trimmed);
+      if (reply?.text) saveMessage('assistant', reply.text);
+      return { ...reply, action: null };
+    }
+
     // 1. Universal Lead/Candidate domain plan
     const universalPlan = window.LeadCandidateDomain?.parseRequest
       ? window.LeadCandidateDomain.parseRequest(trimmed)
       : null;
+
+    if (universalPlan?.isSearch && (!universalPlan.cities.length || !universalPlan.industries.length)) {
+      const reply = { text: 'Please choose a location and at least one industry in Run Agent, or include them in your request. Your saved defaults are empty.', action: null };
+      saveMessage('user', trimmed); saveMessage('assistant', reply.text);
+      return reply;
+    }
 
     // 1b. Leads/candidate DATA requests are answered deterministically, never
     // by a free-text model call. A raw LLM turn has no idea what city or

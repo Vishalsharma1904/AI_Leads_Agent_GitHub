@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.daffodilsw.com",
+  "url": "https://www.daffodilsw.com",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": "https://www.daffodilsw.com/",
+  "handled_at": "2026-10-05 06:48:49.654122+00:00"
+}

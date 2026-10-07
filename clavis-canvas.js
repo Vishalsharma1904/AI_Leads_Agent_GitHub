@@ -1,5 +1,5 @@
 /* ============================================================
- * clavis-canvas.js · Clavis's display — the one window that shows
+ * clavis-canvas.js · Rudra24 AI's display — the one window that shows
  * things (maps, pictures, websites) while the voice does the talking.
  * ------------------------------------------------------------
  * Conversation never opens this. It opens only when there is
@@ -21,9 +21,9 @@
  *               SKYLARK_CONFIG.MAP_SATELLITE_TILES for a commercial key)
  *   geocoding   Nominatim, then Photon
  *   nearby      Overpass API (OpenStreetMap)
- *   images      Clavis backend (/api/v1/web/images), else Wikimedia
+ *   images      Rudra24 AI backend (/api/v1/web/images), else Wikimedia
  *               Commons + Openverse straight from the browser
- *   websites    Clavis backend /api/v1/web/read (+ screenshot), else a
+ *   websites    Rudra24 AI backend /api/v1/web/read (+ screenshot), else a
  *               WordPress mShots screenshot
  * MapLibre GL 5.24 is vendored in vendor/maplibre and only loaded the
  * first time a map is shown.
@@ -53,7 +53,7 @@
   const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)';
   const EASE_IN_OUT = 'cubic-bezier(0.65, 0, 0.35, 1)';
   const EASE_FLIP = 'cubic-bezier(0.32, 0.72, 0, 1)';
-  const OPEN_MS = 620, CLOSE_MS = 360, SWAP_MS = 420, EXPAND_MS = 520;
+  const OPEN_MS = 680, CLOSE_MS = 520, SWAP_MS = 420, EXPAND_MS = 720;
 
   const V = {
     el: null, head: null, body: null, foot: null, kicker: null, title: null, seg: null, backdrop: null,
@@ -61,7 +61,7 @@
     map: null, mapWrap: null, mapStyle: 'map', place: null, pin: null, styleCache: {},
     nearby: null, scanRaf: 0, orbitRaf: 0,
     images: [], lightbox: null,
-    me: null, meMarker: null, pts: [], routeGeo: null, leads: [], leadMarkers: [],
+    me: null, meMarker: null, pts: [], routeGeo: null, routeRequestId: 0, routePicking: false, leads: [], leadMarkers: [],
   };
 
   /* ── tiny helpers ───────────────────────────────────────────── */
@@ -69,6 +69,13 @@
   const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
   const reduced = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (_) { return false; } };
   const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+  // Keep the listening HUD out of full-screen visual surfaces (photo lightbox
+  // or an expanded canvas). The HUD remains usable; CSS parks it above the
+  // surface instead of letting its larger z-index cover the content.
+  function syncVisualFocus() {
+    const active = document.querySelector('.ccv.is-expanded, .ccv-lb');
+    document.documentElement.classList.toggle('clavis-display-focus', !!active);
+  }
   function withTimeout(promise, ms, label) {
     let t;
     return Promise.race([promise, new Promise((_, rej) => { t = setTimeout(() => rej(new Error(`${label || 'Request'} timed out`)), ms); })])
@@ -105,7 +112,7 @@
     el.id = SLOT === 'map' ? 'clavis-canvas' : 'clavis-peek-canvas';
     el.className = 'ccv ccv--' + SLOT;
     el.setAttribute('aria-hidden', 'true');
-    el.setAttribute('aria-label', 'Clavis display');
+    el.setAttribute('aria-label', 'Rudra24 AI display');
     el.innerHTML =
       '<header class="ccv-head">' +
       '  <div class="ccv-headtext"><span class="ccv-kicker"></span><h2 class="ccv-title"></h2></div>' +
@@ -135,22 +142,81 @@
       else if (act === 'expand') setExpanded(!V.expanded);
       else if (act === 'locate') locateMe();
       else if (act === 'route-clear') clearRoute();
+      else if (act === 'route-pick') {
+        const on = !V.routePicking;
+        clearRoute();
+        setRoutePicking(on);
+        setChip(on ? '<b>Select point A</b><span>Choose your start, then destination on the map</span>' : '');
+      }
+      else if (act === 'route-details') {
+        const panel = V.body?.querySelector('.ccv-route');
+        if (panel) {
+          const on = panel.classList.toggle('is-detailed');
+          e.target.closest('[data-act="route-details"]')?.setAttribute('aria-expanded', String(on));
+        }
+      }
+      else if (act === 'metro-route') showMetroRoute();
       else if (act === 'dir') routeToLead(Number(e.target.closest('[data-i]')?.dataset.i));
       const st = e.target.closest('[data-style]')?.dataset.style;
       if (st) mapControl({ style: st });
     });
     bd.addEventListener('click', () => setExpanded(false));
+    V.head.querySelector('.ccv-headtext')?.addEventListener('click', () => {
+      if (V.kind === 'map') setExpanded(!V.expanded);
+    });
     document.addEventListener('keydown', (e) => {
+      if (e.defaultPrevented || !V.open) return;
+      if (V.expanded && e.key === 'Tab') {
+        const targets = [...V.el.querySelectorAll('button, a[href], [tabindex="0"]')].filter(el => el.getClientRects().length && !el.disabled);
+        const first = targets[0], last = targets[targets.length - 1];
+        if (first && ((e.shiftKey ? document.activeElement === first : document.activeElement === last) || !V.el.contains(document.activeElement))) {
+          e.preventDefault(); (e.shiftKey ? last : first)?.focus();
+        }
+        return;
+      }
       if (e.key !== 'Escape' || !V.open || V.lightbox) return;
-      if (V.expanded) setExpanded(false); else hide();
+      e.preventDefault();
+      if (V.routePicking) { setRoutePicking(false); clearRoute(); setChip(''); }
+      else if (V.expanded) setExpanded(false); else hide();
     });
     addEventListener('resize', () => { placeWindow(); try { V.map?.resize(); } catch (_) {} }, { passive: true });
+
+    let isDragging = false;
+    let startX = 0, startY = 0, currentX = 0, currentY = 0;
+    V.head.style.cursor = 'grab';
+    V.head.addEventListener('pointerdown', (e) => {
+      if (e.target.closest('button') || V.expanded) return;
+      isDragging = true;
+      startX = e.clientX - currentX;
+      startY = e.clientY - currentY;
+      V.el.style.transition = 'none';
+      V.head.style.cursor = 'grabbing';
+      V.head.setPointerCapture(e.pointerId);
+    });
+    V.head.addEventListener('pointermove', (e) => {
+      if (!isDragging) return;
+      currentX = e.clientX - startX;
+      currentY = e.clientY - startY;
+      V.el.style.transform = `translate3d(${currentX}px, ${currentY}px, 0)`;
+    });
+    const endDrag = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      V.el.style.transition = 'transform 0.4s cubic-bezier(0.16, 1, 0.3, 1)';
+      V.head.style.cursor = 'grab';
+      try { V.head.releasePointerCapture(e.pointerId); } catch (_) {}
+    };
+    V.head.addEventListener('pointerup', endDrag);
+    // A cancelled pointer (window blur, touch cancel) used to leave isDragging
+    // true, so the card then followed the cursor on plain hover.
+    V.head.addEventListener('pointercancel', endDrag);
+    V.head.addEventListener('lostpointercapture', endDrag);
   }
 
   /* The live voice caption (clavis-ear.js) owns a two-line band at the
      top right: topbar bottom + 46 px, 2 x 16px/1.45 text. The window
      always starts below that band (+12 px), card and expanded. */
-  const CAP_BAND = 52, CAP_GAP = 12;
+  const CAP_BAND = 52, CAP_GAP = 24;
   function captionTop() {
     const cap = document.getElementById('clavis-ear-caption');
     const t = cap ? parseFloat(cap.style.top || getComputedStyle(cap).top) : NaN;
@@ -173,12 +239,52 @@
     });
     return t;
   }
+  /* Bottom of the app bar alone. */
+  function topBarBottom() {
+    const r = document.querySelector('.topbar')?.getBoundingClientRect?.();
+    return r && r.height > 8 && r.top < 200 ? r.bottom : 64;
+  }
+  /* Bottom of every bar the compact window must clear: app bar + the chat's
+     own header. Anything below the top strip is content, not chrome. */
+  function headerBottom() {
+    let b = topBarBottom();
+    document.querySelectorAll('.view.active .chat-top-header, .chat-top-header').forEach((nd) => {
+      const r = nd.getBoundingClientRect();
+      if (r.width > 160 && r.height > 8 && r.top < 260) b = Math.max(b, r.bottom);
+    });
+    return b;
+  }
   function placeWindow() {
     if (!V.el) return;
-    const topPx = Math.round(captionTop() + CAP_BAND + CAP_GAP);
+    const cap = document.getElementById('clavis-ear-caption');
+    const capRect = cap?.getBoundingClientRect?.();
+    // The caption band is only owed while the caption is actually on screen
+    // (it lives at opacity 0 until .is-in). Reserving it unconditionally is
+    // what parked the window a hand's width below the header on every open.
+    const capLive = !!(cap && capRect && capRect.height > 6 && capRect.bottom > 0
+      && parseFloat(getComputedStyle(cap).opacity || '0') > 0.05);
+    const hb = headerBottom();
+    const topPx = Math.round(capLive ? Math.max(capRect.bottom + CAP_GAP, hb + 12) : hb + 12);
     setVar('--ccv-top', topPx + 'px');
-    // never reach down over the composer
-    setVar('--ccv-maxh', Math.max(260, Math.round(composerTop() - topPx - 14)) + 'px');
+    // Expanded is a takeover with a backdrop, so it only has to clear the app
+    // bar — tying it to --ccv-top is what left it hanging halfway down.
+    setVar('--ccv-exp-top', Math.round(topBarBottom() + 12) + 'px');
+    // The map sits at the right edge, so its compact height can use the free
+    // viewport below the voice preview without being cut by the centre composer.
+    // A map earns the whole column: header above, and a thumb's width of
+    // breathing room over the composer. The old `innerHeight - 18` let it
+    // run under the composer, which is why it was sized to a fixed 380 and
+    // then floated with dead space below it.
+    const isMap = V.kind === 'map' || V.el.dataset.kind === 'map';
+    const GAP_OVER_COMPOSER = 38;   // ~1cm
+    const bottomEdge = isMap
+      ? Math.min(innerHeight - 18, composerTop() - GAP_OVER_COMPOSER)
+      : composerTop() - 14;
+    const avail = Math.max(120, Math.round(bottomEdge - topPx));
+    setVar('--ccv-maxh', avail + 'px');
+    // Only a map stretches. A picture or a document should stay the size of
+    // what it is holding, not grow a letterbox to fill the column.
+    setVar('--ccv-h', isMap && !V.expanded ? avail + 'px' : 'auto');
     const main = document.getElementById('main-content')?.getBoundingClientRect();
     const mL = main && main.width ? main.left : 0, mW = main && main.width ? main.width : innerWidth;
     const other = INST[SLOT === 'map' ? 'peek' : 'map'];
@@ -260,15 +366,29 @@
     V.el.removeAttribute('aria-hidden');
     try { V.anim?.cancel(); } catch (_) {}
     if (reduced() || !V.el.animate) return;
-    // opacity + transform only: a blur over a live WebGL map dropped frames
-    const dx = V.el.classList.contains('is-left') ? -24 : 24;
+    if (SLOT === 'map' && window.RudraMotionUI) {
+      V.anim = window.RudraMotionUI.surface(V.el, true, .8);
+      V.anim?.finished.then(() => { V.map?.resize(); V.map?.triggerRepaint(); });
+      siblingReplace(); return;
+    }
+    // The globe is morphing into this window — its clone is the entrance.
+    if (window.__RF_MORPH) { siblingReplace(); return; }
+    // opacity + transform only: compositing a blur over live WebGL drops frames.
+    const dx = V.el.classList.contains('is-left') ? -28 : 28;
+    V.el.style.willChange = 'transform, opacity';
     V.anim = V.el.animate([
-      { opacity: 0, transform: `translateX(${dx}px) scale(0.97)`, filter: 'blur(6px)' },
-      { opacity: 1, transform: 'none', filter: 'blur(0)' },
+      { opacity: 0, transform: `translateX(${dx}px) scale(0.965)` },
+      { opacity: 1, offset: 0.42 },
+      { opacity: 1, transform: 'none' },
     ], { duration: OPEN_MS, easing: EASE });
+    // a pinned layer that never unpins is its own source of jank later
+    V.anim.finished.catch(() => {}).then(() => { if (V.el) V.el.style.willChange = ''; });
     siblingReplace();
-    V.body.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }],
-      { duration: 560, delay: 220, easing: EASE, fill: 'backwards' });
+    // Overlaps the shell by design. Waiting 220ms for the shell to land and
+    // THEN starting the body read as two separate arrivals — that was the
+    // stutter, not the frame rate.
+    V.body.animate([{ opacity: 0, transform: 'translateY(10px)' }, { opacity: 1, transform: 'none' }],
+      { duration: 640, delay: 80, easing: EASE, fill: 'backwards' });
   }
 
   /* The other window moves to make room (or takes the room back) with a
@@ -291,25 +411,36 @@
 
   function hide() {
     if (!V.el || !V.open) return;
+    if (V.lightbox) closeLightbox(true);
     V.open = false;
     V.token++;
     stopScan(); stopOrbit();
+    siblingReplace();
     const finish = () => {
       if (V.open) return;
       V.el.classList.remove('is-open', 'is-expanded');
       V.el.setAttribute('aria-hidden', 'true');
+      V.el.removeAttribute('role'); V.el.removeAttribute('aria-modal');
+      if (V.expanded) V.focusBeforeExpand?.focus?.({preventScroll:true});
       V.backdrop.classList.remove('is-on');
       V.expanded = false;
+      syncVisualFocus();
+      V.el.style.transform = '';
       detachMap();
       V.body.innerHTML = ''; V.foot.innerHTML = '';
       V.kind = '';
     };
     try { V.anim?.cancel(); } catch (_) {}
     if (reduced() || !V.el.animate) return finish();
+    if (SLOT === 'map' && window.RudraMotionUI) {
+      V.anim = window.RudraMotionUI.surface(V.el, false, .52);
+      if (V.anim) { V.anim.onfinish = () => { finish(); siblingReplace(); }; return; }
+      return finish();
+    }
     V.backdrop.classList.remove('is-on');
     const dx = V.el.classList.contains('is-left') ? -18 : 18;
     V.anim = V.el.animate([
-      { opacity: 1, transform: 'none' },
+      { opacity: 1, transform: V.el.style.transform || 'none' },
       { opacity: 0, transform: `translateX(${dx}px) scale(0.98)` },
     ], { duration: CLOSE_MS, easing: EASE_IN_OUT, fill: 'forwards' });
     V.anim.onfinish = () => { finish(); try { V.anim.cancel(); } catch (_) {} siblingReplace(); };
@@ -319,11 +450,22 @@
      itself out every frame instead of stretching a picture of itself. */
   function setExpanded(on) {
     if (!V.open || V.expanded === !!on) return;
+    if (on) V.el.style.transform = '';
     placeWindow();
     const from = V.el.getBoundingClientRect();
     V.expanded = !!on;
     V.el.classList.toggle('is-expanded', V.expanded);
+    placeWindow();
+    if (on) {
+      V.focusBeforeExpand = document.activeElement;
+      V.el.setAttribute('role', 'dialog'); V.el.setAttribute('aria-modal', 'true');
+      V.el.querySelector('[data-act="expand"]')?.focus({preventScroll:true});
+    } else {
+      V.el.removeAttribute('role'); V.el.removeAttribute('aria-modal');
+      V.focusBeforeExpand?.focus?.({preventScroll:true});
+    }
     V.backdrop.classList.toggle('is-on', V.expanded);
+    syncVisualFocus();
     const btn = V.el.querySelector('[data-act="expand"]');
     if (btn) { btn.innerHTML = V.expanded ? ICON.collapse : ICON.expand; btn.setAttribute('aria-label', V.expanded ? 'Collapse' : 'Expand'); }
     setMapInteractive(true);
@@ -334,14 +476,21 @@
     // transform only — the compositor does every frame. The map is told
     // its new size once, when the glide lands (never per frame).
     const to = V.el.getBoundingClientRect();
-    const land = () => { try { V.map?.resize(); } catch (_) {} };
+    const land = () => { try { V.map?.resize(); fitCurrentRoute(); } catch (_) {} };
     if (reduced() || !V.el.animate || !to.width || !to.height) return land();
+    if (SLOT === 'map' && window.RudraMotionUI) {
+      V.anim = window.RudraMotionUI.flip(V.el, from, to, .84);
+      V.map?.resize();
+      if (V.anim) V.anim.onfinish = land; else land();
+      return;
+    }
     const sx = from.width / to.width, sy = from.height / to.height;
     const a = V.el.animate([
       { transformOrigin: '0 0', transform: `translate(${from.left - to.left}px, ${from.top - to.top}px) scale(${sx}, ${sy})` },
       { transformOrigin: '0 0', transform: 'none' },
     ], { duration: EXPAND_MS, easing: EASE_FLIP });
     V.anim = a;
+    requestAnimationFrame(() => { try { V.map?.resize(); } catch (_) {} });
     a.onfinish = land;
     a.oncancel = land;
   }
@@ -402,8 +551,10 @@
       '  <div class="ccv-map-gl"></div>' +
       '  <div class="ccv-scan" aria-hidden="true"></div>' +
       `  <button type="button" class="ccv-ctl ccv-locate" data-act="locate" aria-label="Show my location" title="My location">${ICON.locate}</button>` +
-      '  <div class="ccv-route" hidden></div>' +
+      '  <button type="button" class="ccv-ctl ccv-route-pick" data-act="route-pick" aria-pressed="false">Get route A → B</button>' +
+      '  <div class="ccv-route" role="status" aria-live="polite" hidden></div>' +
       '  <div class="ccv-map-chip" hidden></div>' +
+      '  <div class="rf-mapchips"></div>' +
       '  <div class="ccv-map-loading"><span></span></div>' +
       '</div>' +
       '<aside class="ccv-side" hidden></aside>';
@@ -420,10 +571,22 @@
       center: [78.96, 21.5], zoom: 1.35, pitch: 0, bearing: 0,
       attributionControl: { compact: true }, fadeDuration: 180, maxPitch: 78,
       dragRotate: true, pitchWithRotate: true,
+      pixelRatio: Math.max(1, Math.min(2, window.devicePixelRatio || 1)),
     });
     V.map = map;
     map.addControl(new window.maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.on('style.load', () => { reapplyOverlays(); });
+    /* transitionend BUBBLES. The zoom buttons, the fading control group,
+       the chips and the pin all transition inside this container, so this
+       listener was firing many times a second — and map.resize() calls
+       map.stop(), which resets every gesture handler. That is why a drag
+       inside the map lost most of its movement and why a style/zoom ease
+       died halfway. Only the container's own size-bearing transition may
+       ask for a resize. */
+    container.addEventListener('transitionend', (e) => {
+      if (e.target !== container) return;
+      map.resize(); map.triggerRepaint();
+    });
     map.on('click', onMapClick);
     await new Promise((resolve) => { if (map.loaded()) resolve(); else map.once('load', resolve); setTimeout(resolve, 9000); });
     V.mapWrap?.classList.add('is-ready');
@@ -446,6 +609,7 @@
     try { V.map?.remove(); } catch (_) {}
     V.map = null; V.pin = null; V.mapWrap = null; V.nearby = null;
     V.meMarker = null; V.pts = []; V.routeGeo = null; V.leads = []; V.leadMarkers = [];
+    V.routePicking = false;
   }
 
   async function geocode(query) {
@@ -538,15 +702,121 @@
     V.map.flyTo({ ...cam, speed: 0.72, curve: 1.5, maxDuration: wasMap ? 5200 : 6800, essential: true });
     setTimeout(land, 7600);
     renderMapFoot();
+    offerRouteNext(found);
     return { ok: true, place: found.name, address: found.address, lat: +found.lat.toFixed(5), lng: +found.lng.toFixed(5), type: found.kind, style: V.mapStyle };
   }
 
+  /* A pin raises one obvious question: how do I get there. Offer it the
+     moment the pin lands, so "haan" is a complete instruction — the same
+     contract every other ClavisAhead step keeps.
+     Skipped when the pin IS his own location (routing to yourself), and
+     skipped silently when ClavisAhead is not loaded. */
+  function offerRouteNext(place) {
+    try {
+      const A = window.ClavisAhead;
+      if (!A || typeof A.offer !== 'function') return;
+      if (!place || place.kind === 'me' || place.kind === 'leads') return;
+      const name = place.name || 'wahan';
+      A.offer({
+        id: 'route-to-' + (place.lat || 0).toFixed(3) + ',' + (place.lng || 0).toFixed(3),
+        label: 'Route from your location to ' + name,
+        cta: 'Route dikhao',
+        line: 'Sir, aapki location se ' + name + ' ka route bana doon?',
+        ack: 'Route nikal raha hoon, sir.',
+        run: function () {
+          route({ from: 'my location', to: { lat: place.lat, lng: place.lng, label: name } });
+        },
+      });
+    } catch (_) {}
+  }
+
   function renderMapFoot() {
-    if (!V.place) return;
-    const g = `https://www.google.com/maps/search/?api=1&query=${V.place.lat},${V.place.lng}`;
-    V.foot.innerHTML =
-      `<span class="ccv-meta">${esc(V.nearby ? `${V.nearby.items.length} ${V.nearby.label} within ${fmtDist(V.nearby.radius)}` : 'Drag to explore · click two points for a route')}</span>` +
-      `<a class="ccv-link" href="${esc(g)}" target="_blank" rel="noopener">Google Maps ${ICON.open}</a>`;
+    // Guidance belongs inside the map; a separate footer wastes compact height.
+    V.foot.replaceChildren();
+    renderMapChips();
+  }
+
+  /* Small actions that float over the bottom of the map. Which ones appear
+     depends on what is pinned: a shop gets "what else is around", a city
+     gets the civic sweep, and anything at all gets "how do I get there".
+     ponytail: picked from place.kind, not from an LLM round-trip — the
+     chips have to be on screen before the pin stops bouncing. */
+  const CHIP_ICON = {
+    route: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="19" r="2.4"/><circle cx="18" cy="5" r="2.4"/><path d="M8.4 19H14a4 4 0 0 0 0-8h-4a4 4 0 0 1 0-8h5.6"/></svg>',
+    far:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h18"/><path d="M6 9l-3 3 3 3"/><path d="M18 9l3 3-3 3"/></svg>',
+    near:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><circle cx="12" cy="12" r="8.2" opacity=".5"/></svg>',
+    sat:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/></svg>',
+    cube:  '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6 21 7v10l-9 4.4L3 17V7z"/><path d="M3 7l9 4.4L21 7M12 11.4V21.4"/></svg>',
+  };
+
+  function chipsFor(place) {
+    const kind = String(place && place.kind || '').toLowerCase();
+    const out = [];
+    // Getting there is the question every pin raises, so it leads.
+    out.push({ k: 'route', label: 'Route from me', icon: 'route' });
+    out.push({ k: 'far', label: 'How far', icon: 'far' });
+    if (/city|town|village|state|district|suburb|region|administrative/.test(kind)) {
+      out.push({ k: 'near:hospital', label: 'Hospitals', icon: 'near' });
+    } else if (/hotel|restaurant|cafe|shop|store|mall|business|office|company|amenity|building/.test(kind)) {
+      out.push({ k: 'near:similar', label: "What's around", icon: 'near' });
+    } else {
+      out.push({ k: 'near:similar', label: 'Nearby', icon: 'near' });
+    }
+    out.push(V.mapStyle === 'satellite'
+      ? { k: 'style:map', label: 'Map', icon: 'sat' }
+      : { k: 'style:satellite', label: 'Satellite', icon: 'sat' });
+    if (V.mapStyle !== '3d') out.push({ k: 'style:3d', label: '3D', icon: 'cube' });
+    return out.slice(0, 5);
+  }
+
+  function renderMapChips() {
+    const box = V.body && V.body.querySelector('.rf-mapchips');
+    if (!box) return;
+    const place = V.place;
+    if (!place || V.kind !== 'map') { box.replaceChildren(); return; }
+    box.replaceChildren();
+    chipsFor(place).forEach((c, i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'rf-mapchip';
+      b.dataset.act = c.k;
+      b.innerHTML = (CHIP_ICON[c.icon] || '') + '<span>' + esc(c.label) + '</span>';
+      b.addEventListener('click', (e) => { e.stopPropagation(); onChip(c.k, b); });
+      box.appendChild(b);
+      if (b.animate && !reduced()) {
+        b.animate([{ opacity: 0, transform: 'translateY(7px)' }, { opacity: 1, transform: 'none' }],
+          { duration: 460, delay: 240 + i * 55, easing: EASE, fill: 'backwards' });
+      }
+    });
+  }
+
+  async function onChip(act, btn) {
+    const place = V.place;
+    if (!place) return;
+    const to = { lat: place.lat, lng: place.lng, label: place.name || '' };
+    btn.classList.add('is-busy');
+    try {
+      if (act === 'route') {
+        await route({ from: 'my location', to });
+      } else if (act === 'far') {
+        const r = await distance({ from: 'my location', to });
+        if (r && !r.error) {
+          const km = r.road_km != null ? r.road_km + ' km' : (r.straight_km != null ? r.straight_km + ' km straight' : '');
+          const mins = r.car_min != null ? ' · about ' + r.car_min + ' min by car' : '';
+          setChip('<b>' + esc(place.name || 'There') + '</b><span>' + esc(km + mins) + '</span>');
+        }
+      } else if (act === 'near:similar') {
+        await showNearby({ category: /hotel|restaurant|cafe/.test(String(place.kind || '')) ? String(place.kind) : 'restaurant' });
+      } else if (act.indexOf('near:') === 0) {
+        await showNearby({ category: act.slice(5) });
+      } else if (act.indexOf('style:') === 0) {
+        await mapControl({ style: act.slice(6) });
+        renderMapChips();
+      }
+    } catch (_) {
+    } finally {
+      btn.classList.remove('is-busy');
+    }
   }
 
   async function mapControl({ style, zoom, zoom_change, pitch, bearing, action } = {}) {
@@ -564,7 +834,10 @@
         try { m.setStyle(await styleFor(base), { diff: false }); } catch (e) { return { error: 'Map style could not load.' }; }
       }
       if (want === '3d') m.easeTo({ pitch: 62, bearing: m.getBearing() || -28, zoom: Math.max(m.getZoom(), 15.8), duration: 2400, easing: easeInOut });
-      else if (s.match(/flat|2d/)) m.easeTo({ pitch: 0, bearing: 0, duration: 1800, easing: easeInOut });
+      // Coming back from 3D, "Map" has to undo the tilt as well as the
+      // style — otherwise the button looks dead because nothing moves.
+      else if (m.getPitch() > 1 || Math.abs(m.getBearing()) > 0.5)
+        m.easeTo({ pitch: 0, bearing: 0, duration: 1400, easing: easeInOut });
       syncSeg();
       out.style = want;
     }
@@ -722,7 +995,7 @@
     sweep();
     let els = [];
     try {
-      const data = await getJSON('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(ql), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 25000);
+      const data = await getJSON('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(ql), {}, 25000);
       els = data.elements || [];
     } catch (e) {
       setChip(`<b>Area scan unavailable</b><span>${esc(e.message)}</span>`);
@@ -838,7 +1111,7 @@
       V.place = { name: 'Your location', address: '', lat: V.me.lat, lng: V.me.lng, kind: 'me', bbox: null };
       V.title.textContent = 'Your location';
       V.map.flyTo({ center: [V.me.lng, V.me.lat], zoom: 14.5, pitch: 0, bearing: 0, speed: 0.9, essential: true });
-      setChip(`<b>You are here</b><span>Click anywhere for a point; two points give a route</span><em>${V.me.lat.toFixed(4)}°, ${V.me.lng.toFixed(4)}°</em>`);
+      setChip(`<b>You are here</b><span>Use Get route A → B to select a journey</span><em>${V.me.lat.toFixed(4)}°, ${V.me.lng.toFixed(4)}°</em>`);
       renderMapFoot();
       return { ok: true, place: 'your location', lat: +V.me.lat.toFixed(5), lng: +V.me.lng.toFixed(5) };
     }
@@ -886,7 +1159,7 @@
     return '';
   }
 
-  const ME_RE = /^(me|here|my location|current location|meri location|meri jagah|main|mai|yahan|yaha|yahaan|idhar|mere ghar|यहाँ|यहां|मेरी लोकेशन)$/i;
+  const ME_RE = /^(me|here|(?:my|meri|mera|apni) (?:current )?location|current location|meri jagah|main|mai|yahan|yaha|yahaan|idhar|mere ghar|यहाँ|यहां|मेरी लोकेशन)$/i;
   async function resolveEnd(x) {
     if (x && typeof x === 'object' && !Array.isArray(x)) {
       const lat = Number(x.lat ?? x.latitude), lng = Number(x.lng ?? x.lon ?? x.longitude);
@@ -896,10 +1169,18 @@
     if (Array.isArray(x) && x.length === 2) return { lng: Number(x[0]), lat: Number(x[1]), label: '' };
     const q = String(x || '').trim();
     if (!q) throw new Error('Start or end point missing.');
+    if (/^(?:(?:nearest|nearby|closest|aas\s*paas(?:\s+ka)?|paas(?:\s+ka)?)\s+)?metro\s+station(?:\s+(?:near\s+me|nearby))?$|^(?:nearest|nearby|closest)\s+metro$/i.test(q)) {
+      const me = V.me || await getPosition(6000);
+      if (!me) throw new Error('Allow location access to find the nearest metro station.');
+      setMe(me);
+      const station = await nearestStation(me);
+      if (!station) throw new Error('No metro station found within 2 km of your location.');
+      return { lat: station.lat, lng: station.lng, label: station.name || 'Nearest metro station' };
+    }
     if (ME_RE.test(q)) {
       const me = V.me || await getPosition(6000);
       if (!me) throw new Error('Your location is not available.');
-      V.me = me;
+      setMe(me);
       return { lat: me.lat, lng: me.lng, label: 'Your location', me: true };
     }
     const g = await geocode(q);
@@ -927,6 +1208,7 @@
     return pt;
   }
   function onMapClick(e) {
+    if (!V.routePicking) return;
     const t = e.originalEvent?.target;
     if (t?.closest?.('.maplibregl-marker, .maplibregl-popup, .ccv-route, .ccv-ctl, .maplibregl-ctrl')) return;
     // a click that only closes an open popup does nothing else
@@ -934,10 +1216,20 @@
     if (V.pts.length >= 2) clearRoute();
     const pt = addPoint({ lat: e.lngLat.lat, lng: e.lngLat.lng });
     if (V.pts.length === 1) setChip(`<b>Point A</b><span>Click a second point for the route</span><em>${pt.lat.toFixed(4)}°, ${pt.lng.toFixed(4)}°</em>`);
-    else route({ from: V.pts[0], to: V.pts[1], _keep: true });
+    else { setRoutePicking(false); route({ from: V.pts[0], to: V.pts[1], _keep: true }); }
   }
 
-  function clearRoute() {
+  function setRoutePicking(on) {
+    V.routePicking = !!on;
+    const button = V.body?.querySelector('[data-act="route-pick"]');
+    button?.setAttribute('aria-pressed', String(V.routePicking));
+    if (button) button.textContent = on ? 'Cancel route selection' : 'Get route A → B';
+    V.mapWrap?.classList.toggle('is-route-picking', V.routePicking);
+  }
+
+  function clearRoute(cancelPending = true) {
+    setRoutePicking(false);
+    if (cancelPending) V.routeRequestId++;
     V.pts.forEach((p) => { try { p.marker.remove(); } catch (_) {} });
     V.pts = [];
     V.routeGeo = null;
@@ -960,18 +1252,83 @@
     m.addLayer({ id: 'ccv-route-line', type: 'line', source: 'ccv-route', layout: { 'line-join': 'round', 'line-cap': 'round' }, paint: { 'line-color': '#3b6fd8', 'line-width': 4.5 } });
   }
 
+  function fitCurrentRoute(duration = 650) {
+    if (!V.map || !V.pts.length) return;
+    const first = V.pts[0];
+    const bb = new window.maplibregl.LngLatBounds([first.lng, first.lat], [first.lng, first.lat]);
+    V.pts.forEach((p) => bb.extend([p.lng, p.lat]));
+    (V.routeGeo?.coordinates || []).forEach((point) => bb.extend(point));
+    const panel = V.body?.querySelector('.ccv-route');
+    V.map.fitBounds(bb, { padding: { top: 34, bottom: panel && !panel.hidden ? (V.expanded ? 260 : 150) : 36,
+      left: 38, right: 38 }, maxZoom: 16, duration: reduced() ? 0 : duration, pitch: 0, bearing: 0 });
+  }
+
+  /* ── metro itinerary, the way DMRC's own app lays it out ──
+     The quick row above still carries the rough estimate; this is the real
+     thing: which trains, where you change, how many stops on each. Built
+     on demand because it costs an Overpass call — nobody wants that on
+     every route, only when they are actually thinking of taking the metro. */
+  async function showMetroRoute() {
+    const box = V.body?.querySelector('.ccv-metro');
+    const btn = V.body?.querySelector('.ccv-metro-btn');
+    if (!box) return;
+    if (!box.hidden && box.dataset.done === '1') {   // second press closes it
+      box.hidden = true; btn?.setAttribute('aria-expanded', 'false'); return;
+    }
+    const a = V.pts?.[0], b = V.pts?.[1];
+    if (!a || !b) { box.hidden = false; box.innerHTML = '<p class="ccv-rt-note">Draw a route first.</p>'; return; }
+    box.hidden = false;
+    btn?.setAttribute('aria-expanded', 'true');
+    if (btn) btn.classList.add('is-busy');
+    box.innerHTML = '<p class="ccv-rt-note">Reading the metro network…</p>';
+    let plan;
+    try {
+      plan = await window.ClavisMetro?.plan({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng });
+    } catch (err) {
+      plan = { ok: false, error: String(err?.message || err) };
+    }
+    if (btn) btn.classList.remove('is-busy');
+    if (!plan) { box.innerHTML = '<p class="ccv-rt-note">Metro planner is not loaded.</p>'; return; }
+    if (!plan.ok) { box.innerHTML = `<p class="ccv-rt-note">${esc(plan.error || 'No metro route.')}</p>`; return; }
+    box.dataset.done = '1';
+
+    const chip = (l) => `<span class="ccv-mline"${l.colour ? ` style="--mline:${esc(l.colour)}"` : ''}>${esc(l.name)}</span>`;
+    const lineRow = plan.direct && plan.line
+      ? `<li class="ccv-mleg"${plan.line.colour ? ` style="--mline:${esc(plan.line.colour)}"` : ''}>` +
+        `${chip(plan.line)}<div><b>${esc(plan.from_station)} → ${esc(plan.to_station)}</b>` +
+        `<small>Direct · no change</small></div></li>`
+      : `<li class="ccv-mleg"><div><b>${esc(plan.from_station)} → ${esc(plan.to_station)}</b>` +
+        `<small>${plan.lines_from.length || plan.lines_to.length ? 'Change on the way — these two are not on one line' : 'Line names unavailable right now'}</small>` +
+        (plan.lines_from.length ? `<div class="ccv-mchips">${plan.lines_from.map(chip).join('')}` +
+          (plan.lines_to.length ? `<span class="ccv-marrow">→</span>${plan.lines_to.map(chip).join('')}` : '') + `</div>` : '') +
+        `</div></li>`;
+
+    box.innerHTML =
+      `<div class="ccv-mhead">` +
+      (plan.fare_inr ? `<span><b>₹${plan.fare_inr}</b><small>DMRC fare</small></span>` : '') +
+      `<span><b>${plan.total_min} min</b><small>door to door</small></span>` +
+      `<span><b>${plan.ride_km} km</b><small>on the train</small></span></div>` +
+      `<ol class="ccv-mlegs">` +
+      `<li class="ccv-mwalk">Walk ${fmtDist(plan.walk_to_m)} to <b>${esc(plan.from_station)}</b></li>` +
+      lineRow +
+      `<li class="ccv-mwalk">Walk ${fmtDist(plan.walk_from_m)} from <b>${esc(plan.to_station)}</b></li></ol>` +
+      `<p class="ccv-rt-note">${esc(plan.note)}</p>`;
+    if (box.animate && !reduced()) box.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EASE });
+  }
+
   /* ── travel maths (pure; see _selfTest) ── */
   const OSRM = { car: 'routed-car', bike: 'routed-bike', foot: 'routed-foot' };
   // Two-wheelers average ~15% faster than a car on the same city roads (estimate).
   const TWO_WHEELER_FACTOR = 1.15;
   const METRO_KMPH = 34, WALK_KMPH = 4.8, DETOUR = 1.25;
-  /* DMRC fare slabs, effective 25 Aug 2025 (Mon–Sat), by station-to-station km. */
+  /* Rough fare illustration only: straight-line station distance cannot price a
+     real metro network journey, interchange, special line or service day. */
   function metroFare(km) {
     const k = Number(km);
     if (!Number.isFinite(k) || k < 0) return null;
     return k <= 2 ? 11 : k <= 5 ? 21 : k <= 12 ? 32 : k <= 21 ? 43 : k <= 32 ? 54 : 64;
   }
-  // DMRC slabs only make sense for Delhi NCR stations.
+  // Show this rough fare band only around Delhi NCR stations.
   const inDelhiNCR = (p) => !!p && p.lat > 28.2 && p.lat < 28.95 && p.lng > 76.8 && p.lng < 77.65;
   function metroPlan(from, to, sa, sb) {
     if (!sa || !sb) return { practical: false, reason: !sa && !sb ? 'no metro station within 2 km of either end' : `no metro station within 2 km of the ${!sa ? 'start' : 'destination'}` };
@@ -989,25 +1346,51 @@
   const fmtMin = (min) => { const m = Math.max(1, Math.round(min)); return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`; };
 
   async function osrm(profile, a, b) {
-    const url = `https://routing.openstreetmap.de/${OSRM[profile]}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson`;
+    const url = `https://routing.openstreetmap.de/${OSRM[profile]}/route/v1/driving/${a.lng},${a.lat};${b.lng},${b.lat}?overview=full&geometries=geojson&alternatives=true&steps=true`;
     const r = await getJSON(url, {}, 15000);
-    const rt = r?.routes?.[0];
+    const rt = r?.routes?.filter((item) => item?.geometry?.coordinates?.length)
+      .reduce((best, item) => !best || item.distance < best.distance ? item : best, null);
     if (!rt) throw new Error('No route found');
-    return { m: rt.distance, s: rt.duration, geometry: rt.geometry };
+    const steps = (rt.legs || []).flatMap((leg) => leg.steps || [])
+      .filter((step) => step.distance > 100 || /depart|arrive/.test(step.maneuver?.type || ''))
+      .map((step) => ({ road: step.name || '', turn: step.maneuver?.modifier || step.maneuver?.type || '', m: Math.round(step.distance) }));
+    return { m: rt.distance, s: rt.duration, geometry: rt.geometry,
+      steps: steps.length > 7 ? [...steps.slice(0, 5), ...steps.slice(-2)] : steps };
   }
   async function nearestStation(p) {
-    const ql = `[out:json][timeout:15];(node["station"="subway"](around:2000,${p.lat},${p.lng});node["railway"="station"]["subway"="yes"](around:2000,${p.lat},${p.lng}););out 40;`;
-    const data = await getJSON('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(ql), headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, 20000);
+    let candidates = [];
+    try {
+      await nominatimSlot();
+      const box = [p.lng - 0.023, p.lat + 0.018, p.lng + 0.023, p.lat - 0.018].join(',');
+      const data = await getJSON(`https://nominatim.openstreetmap.org/search?format=jsonv2&limit=20&bounded=1&viewbox=${box}&q=subway%20station`, { headers: { Accept: 'application/json' } }, 10000);
+      // Nominatim answers type:'subway' for the TRACK as well (osm_type
+      // 'way'), so an unfiltered pick returns "Delhi Metro Yellow Line" as
+      // the nearest station. Only a node is a station, and a name carrying
+      // "line" is a line however it is tagged.
+      const NOT_A_STATION = /\bline\b|\bcorridor\b|\u0932\u093e\u0907\u0928/i;
+      candidates = (data || [])
+        .filter((e) => e.type === 'subway' && e.osm_type === 'node')
+        .map((e) => ({ lat: Number(e.lat), lng: Number(e.lon), name: e.name || e.display_name?.split(',')[0] || '' }))
+        .filter((e) => e.name && !NOT_A_STATION.test(e.name));
+    } catch (_) { /* Overpass can still provide stations when search is unavailable. */ }
+    if (!candidates.length) {
+      try {
+        const ql = `[out:json][timeout:15];(node["station"="subway"](around:2000,${p.lat},${p.lng});node["railway"="station"]["subway"="yes"](around:2000,${p.lat},${p.lng}););out 40;`;
+        const data = await getJSON('https://overpass-api.de/api/interpreter?data=' + encodeURIComponent(ql), {}, 10000);
+        candidates = (data.elements || []).map((e) => ({ lat: e.lat, lng: e.lon, name: e.tags?.name || e.tags?.['name:en'] || '' }));
+      } catch (_) { return null; }
+    }
     let best = null;
-    (data.elements || []).forEach((e) => {
-      if (!Number.isFinite(e.lat) || !Number.isFinite(e.lon)) return;
-      const d = metres([p.lng, p.lat], [e.lon, e.lat]);
-      if (d <= 2000 && (!best || d < best.d)) best = { d, lat: e.lat, lng: e.lon, name: e.tags?.name || e.tags?.['name:en'] || '' };
+    candidates.forEach((e) => {
+      if (!Number.isFinite(e.lat) || !Number.isFinite(e.lng)) return;
+      const d = metres([p.lng, p.lat], [e.lng, e.lat]);
+      if (d <= 2000 && (!best || d < best.d)) best = { d, lat: e.lat, lng: e.lng, name: e.name };
     });
     return best;
   }
 
   async function route({ from, to, mode, _keep } = {}) {
+    const requestId = ++V.routeRequestId;
     let a, b;
     try {
       if (!(V.open && V.kind === 'map' && V.map)) await openMap('Route', 'Route');
@@ -1016,9 +1399,9 @@
       if (V.map) setChip(`<b>Route unavailable</b><span>${esc(e.message || e)}</span>`);
       return { error: e.message || String(e) };
     }
-    if (!V.map) return { error: 'Display was closed.' };
+    if (!V.map || requestId !== V.routeRequestId) return { error: 'Route request was replaced.' };
     const token = V.token;
-    if (!_keep) { clearRoute(); addPoint(a); addPoint(b); }
+    if (!_keep) { clearRoute(false); addPoint(a); addPoint(b); }
     try { V.pin?.remove(); } catch (_) {}
     V.kicker.textContent = 'Route';
     V.title.textContent = `${a.label || 'A'} → ${b.label || 'B'}`;
@@ -1036,25 +1419,22 @@
       a.label = V.pts[0]?.label || a.label; b.label = V.pts[1]?.label || b.label;
       V.title.textContent = `${a.label || 'A'} → ${b.label || 'B'}`;
     }
-    if (token !== V.token || !V.map) return { error: 'Display was closed.' };
+    if (token !== V.token || requestId !== V.routeRequestId || !V.map) return { error: 'Route request was replaced.' };
     const straight = metres([a.lng, a.lat], [b.lng, b.lat]);
     const shown = (want === 'foot' && foot) || (want === 'bike' && bike) || car || foot;
     if (shown) drawRoute(shown.geometry);
-    const bb = new window.maplibregl.LngLatBounds([a.lng, a.lat], [a.lng, a.lat]);
-    bb.extend([b.lng, b.lat]);
-    (shown?.geometry?.coordinates || []).forEach((c) => bb.extend(c));
-    V.map.fitBounds(bb, { padding: { top: 60, bottom: 40, left: 300, right: 50 }, maxZoom: 16, duration: 1600, pitch: 0, bearing: 0 });
     const metro = sa === undefined || sb === undefined ? { practical: false, reason: 'metro stations could not be looked up right now' } : metroPlan(a, b, sa, sb);
     const km = (x) => +(x.m / 1000).toFixed(1);
     const out = {
       ok: true, from: a.label, to: b.label, straight_km: +(straight / 1000).toFixed(1),
-      car: car ? { km: km(car), min: Math.round(car.s / 60) } : null,
+      car: car ? { km: km(car), min: Math.round(car.s / 60), steps: car.steps } : null,
       two_wheeler: car ? { km: km(car), min: Math.round(car.s / 60 / TWO_WHEELER_FACTOR), estimate: true } : null,
       walk: foot ? { km: km(foot), min: Math.round(foot.s / 60) } : null,
       bicycle: bike ? { km: km(bike), min: Math.round(bike.s / 60) } : undefined,
       metro, note: 'Road times are without traffic. Two-wheeler and metro figures are estimates.',
     };
     renderRoutePanel(out);
+    fitCurrentRoute(1100);
     return out;
   }
 
@@ -1064,13 +1444,27 @@
     const row = (name, tag, val, sub) => `<li><span class="ccv-rt-mode">${esc(name)}${tag ? ` <small>${esc(tag)}</small>` : ''}</span><span class="ccv-rt-val">${val}${sub ? `<small>${sub}</small>` : ''}</span></li>`;
     const dist = (x) => (x ? `${x.km} km · ${fmtMin(x.min)}` : '<em>unavailable</em>');
     const m = r.metro || {};
-    const metroVal = m.practical ? `${fmtMin(m.minutes)}${m.fare_inr ? ` · ₹${m.fare_inr}` : ''}` : '<em>not practical</em>';
+    const metroVal = m.practical ? `${fmtMin(m.minutes)}${m.fare_inr ? ` · approx ₹${m.fare_inr}` : ''}` : '<em>not practical</em>';
     const metroSub = m.practical ? `${esc(m.from_station)} → ${esc(m.to_station)}` : esc(m.reason || '');
+    const primary = r.car || r.walk;
+    const steps = (r.car?.steps || []).map((step) => {
+      const turn = step.turn ? step.turn.replace(/_/g, ' ') : 'Continue';
+      return `<li><span>${esc(turn)}${step.road ? ` · ${esc(step.road)}` : ''}</span><span>${esc(fmtDist(step.m))}</span></li>`;
+    }).join('');
     panel.innerHTML =
       `<header><b>${esc(r.from || 'A')} → ${esc(r.to || 'B')}</b><button type="button" class="ccv-icon" data-act="route-clear" aria-label="Clear route" title="Clear route">${ICON.close}</button></header>` +
-      '<ul>' + row('Car', '', dist(r.car)) + row('Two-wheeler', 'estimate', dist(r.two_wheeler)) + row('Walk', '', dist(r.walk)) +
+      `<div class="ccv-route-quick"><span><b>${primary ? `${primary.km} km` : `${r.straight_km} km`}</b><small>${r.car ? 'Shortest road route' : primary ? 'Walking route' : 'Straight line only'}</small></span>` +
+      `<span><b>${primary ? fmtMin(primary.min) : '—'}</b><small>${primary ? 'Without traffic' : 'Time unavailable'}</small></span>` +
+      `<span><b>${m.practical && m.fare_inr ? `~₹${m.fare_inr}` : '—'}</b><small>${m.practical ? 'Metro fare estimate' : 'Metro unavailable'}</small></span></div>` +
+      '<div class="ccv-route-btns">' +
+      '<button type="button" class="ccv-route-details-btn" data-act="route-details" aria-expanded="false">Route details</button>' +
+      '<button type="button" class="ccv-route-details-btn ccv-metro-btn" data-act="metro-route">Metro route</button>' +
+      '</div>' +
+      '<div class="ccv-metro" hidden></div>' +
+      '<div class="ccv-route-more"><ul>' + row('Car', '', dist(r.car)) + row('Two-wheeler', 'estimate', dist(r.two_wheeler)) + row('Walk', '', dist(r.walk)) +
       row('Metro', m.practical ? 'estimate' : '', metroVal, metroSub) + '</ul>' +
-      `<p class="ccv-rt-note">Without traffic · straight line ${r.straight_km} km${m.practical && m.fare_inr ? ' · DMRC Mon–Sat fare; Sundays/holidays may be cheaper, smart card 10% off' : ''}</p>`;
+      (steps ? `<p class="ccv-rt-section">Road highlights</p><ol class="ccv-rt-steps">${steps}</ol>` : '') +
+      `<p class="ccv-rt-note">Road times exclude traffic. Metro fare and time are rough estimates from nearby stations, not a confirmed metro itinerary. Check official journey planner before travel.</p></div>`;
     panel.hidden = false;
     if (panel.animate && !reduced()) panel.animate([{ opacity: 0, transform: 'translateY(6px)' }, { opacity: 1, transform: 'none' }], { duration: 420, easing: EASE });
   }
@@ -1134,18 +1528,21 @@
   }
   const telHref = (p) => 'tel:' + String(p).replace(/[^\d+]/g, '');
   function leadHTML(l, i) {
-    const phones = [...new Set([].concat(l.phones || [], l.phone || [], l.phoneAlt || [], l.phoneAlt2 || []).map((p) => String(p).trim()).filter(Boolean))].slice(0, 4);
-    const web = l.website ? (/^https?:/i.test(l.website) ? l.website : 'https://' + l.website) : '';
-    const g = l.googleMapsUrl || `https://www.google.com/maps/search/?api=1&query=${l.lat},${l.lng}`;
+    const phones = [...new Set([].concat(l.phones || [], l.phone || [], l.phoneAlt || [], l.phoneAlt2 || []).map((p) => String(p?.number || p).trim()).filter(Boolean))].slice(0, 4);
+    let web = '';
+    try { const u = new URL(/^https?:/i.test(l.website) ? l.website : 'https://' + l.website); if (/^https?:$/.test(u.protocol) && l.website) web = u.href; } catch (_) {}
+    const emails = [...new Set([l.email, ...(Array.isArray(l.emails) ? l.emails : [])].filter(Boolean))].slice(0, 4);
     const d = fromMe(l);
     return `<b class="ccv-pop-title">${esc(l.company || 'Company')}</b>` +
       (l.contactPerson ? `<span class="ccv-pop-who">${esc(l.contactPerson)}${l.designation ? ` · ${esc(l.designation)}` : ''}</span>` : '') +
       (phones.length ? `<span class="ccv-pop-row">${phones.map((p) => `<a href="${esc(telHref(p))}">${esc(p)}</a>`).join(' · ')}</span>` : '') +
-      (l.email ? `<span class="ccv-pop-row"><a href="mailto:${esc(l.email)}">${esc(l.email)}</a></span>` : '') +
+      (emails.length ? `<span class="ccv-pop-row">${emails.map(email => `<a href="mailto:${esc(email)}">${esc(email)}</a>`).join(' · ')}</span>` : '') +
+      (Array.isArray(l.personPhones) && l.personPhones.length ? `<span class="ccv-pop-row">${esc(l.contactPerson || 'Named contact')} · ${l.personPhones.map(p => `<a href="${esc(telHref(p.number || p))}">${esc(p.number || p)}</a>`).join(' · ')}</span>` : '') +
+      (phones.length && l.contactPerson ? '<span class="ccv-pop-addr">Other numbers are company contacts</span>' : '') +
       (web ? `<span class="ccv-pop-row"><a href="${esc(web)}" target="_blank" rel="noopener">${esc(host(web))}</a></span>` : '') +
       (l.address ? `<span class="ccv-pop-addr">${esc(l.address)}</span>` : '') +
       (d ? `<span class="ccv-pop-addr">${esc(d)} from you</span>` : '') +
-      `<span class="ccv-pop-btns" data-i="${i}"><button type="button" data-act="dir">Directions</button><a href="${esc(g)}" target="_blank" rel="noopener">Google Maps</a></span>`;
+      `<span class="ccv-pop-btns" data-i="${i}"><button type="button" data-act="dir">Directions</button></span>`;
   }
 
   async function showLeads(leads, { title } = {}) {
@@ -1170,9 +1567,11 @@
     fanOut(items);
     V.leads = items;
     items.forEach((l, i) => {
-      const el = document.createElement('div');
+      const el = document.createElement('button');
+      el.type = 'button';
       el.className = 'ccv-lead';
-      el.innerHTML = `<span>${i + 1}</span>`;
+      el.innerHTML = `<span>${i + 1}</span><b class="ccv-lead-name">${esc(l.company)}</b>`;
+      el.setAttribute('aria-label', `View ${l.company} contacts and location`);
       el.title = l.company;
       V.leadMarkers.push(new window.maplibregl.Marker({ element: el, anchor: 'center', offset: l.offset })
         .setLngLat([l.lng, l.lat])
@@ -1196,7 +1595,7 @@
     const l = V.leads[i];
     if (!l) return;
     const me = V.me || await getPosition(6000);
-    if (!me) { setChip('<b>Where are you?</b><span>Allow location access, or click your start point on the map</span>'); return; }
+    if (!me) { setChip('<b>Where are you?</b><span>Allow location access, or use Get route A → B</span>'); return; }
     setMe(me);
     V.body?.querySelectorAll('.maplibregl-popup').forEach((p) => p.remove());
     route({ from: { lat: me.lat, lng: me.lng, label: 'Your location' }, to: { lat: l.lat, lng: l.lng, label: l.company } });
@@ -1223,7 +1622,7 @@
     const P = window.ClavisLuxe?.pictures;
     if (!P?.mentions || !u.tokens || !u.tokens.length) return items;
     const kept = items.filter((it) => P.mentions(`${it.title || ''} ${it.page || ''}`, u.tokens));
-    return kept.length ? kept : (u.sure ? items : []);
+    return kept;
   }
   function fromBundle(b, n) {
     return (b?.items || []).slice(0, n).map((it) => ({
@@ -1231,26 +1630,42 @@
       source: it.source || 'Wikipedia', page: it.link || '',
     }));
   }
+  async function withLoadedImage(result) {
+    if (!result?.items?.length) throw new Error('No images');
+    const loads = result.items.slice(0, 3).map((it) => new Promise((resolve, reject) => {
+      const img = new Image();
+      img.referrerPolicy = 'no-referrer';
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = it.thumb;
+    }));
+    await withTimeout(Promise.any(loads), 4500, 'Image preview');
+    return result;
+  }
   async function searchImages(u, n) {
     const L = window.ClavisLuxe;
     // 1 · several subjects ("lord" → the deities): one labelled picture each
     if (u.group && L?.findImages) {
       const b = await settle(L.findImages(u.raw), 12000, null);
-      if (b?.items?.length) return { items: fromBundle(b, n), name: b.name };   // never more than 6
-    }
-    // 2 · the backend's web image search — with the understood query, kept on subject
-    try {
-      const r = await getJSON(`${BACKEND()}/api/v1/web/images?q=${encodeURIComponent(u.search || u.raw)}&n=${n + 3}`, {}, 9000);
-      if (Array.isArray(r.items) && r.items.length) {
-        const kept = keepOnSubject(r.items, u);
-        if (kept.length) return { items: kept.slice(0, n), name: null };
+      if (b?.items?.length) {
+        try { return await withLoadedImage({ items: fromBundle(b, n), name: b.name }); } catch (_) {}
       }
-    } catch (_) { /* backend off or old: go direct */ }
-    // 3 · the trusted chain: the article's own pictures, its Commons category, then open search — each naming the subject
-    if (L?.findImages) {
-      const b = await settle(L.findImages(u.raw), 12000, null);
-      if (b?.items?.length) return { items: fromBundle(b, n), name: b.name };
     }
+    // Run independent sources together; either may be unavailable or slow.
+    const backend = getJSON(`${BACKEND()}/api/v1/web/images?q=${encodeURIComponent(u.search || u.raw)}&n=${n + 3}`, {}, 7000)
+      .then((r) => {
+        const items = keepOnSubject(Array.isArray(r.items) ? r.items : [], u).slice(0, n);
+        if (!items.length) throw new Error('No backend images');
+        return { items, name: null };
+      }).then(withLoadedImage);
+    const article = L?.findImages
+      ? settle(L.findImages(u.raw), 9000, null).then((b) => {
+        if (!b?.items?.length) throw new Error('No article images');
+        return { items: fromBundle(b, n), name: b.name };
+      }).then(withLoadedImage)
+      : Promise.reject(new Error('Article search unavailable'));
+    try { return await Promise.any([backend, article]); } catch (_) { /* try open search */ }
+    // Open search is the final fallback (still filtered by subject).
     // 4 · loose open search, as before (still filtered when the dictionary is loaded)
     const q = u.search || u.raw;
     const [commons, openverse] = await Promise.all([
@@ -1265,7 +1680,8 @@
     ]);
     const seen = new Set();
     const all = commons.concat(openverse).filter((it) => it.full && !seen.has(it.full) && seen.add(it.full));
-    return { items: keepOnSubject(all, u).slice(0, n), name: null };
+    const result = { items: keepOnSubject(all, u).slice(0, n), name: null };
+    try { return await withLoadedImage(result); } catch (_) { return { items: [], name: null }; }
   }
 
   /* The heading sharpens in place when the real name lands. */
@@ -1313,20 +1729,40 @@
     grid.classList.remove('is-loading');
     grid.innerHTML = items.map((it, i) =>
       `<figure class="ccv-tile" data-i="${i}" tabindex="0" role="button" aria-label="${esc(it.label || it.title)}"><img alt="${esc(it.label || it.title)}" loading="eager" decoding="async" referrerpolicy="no-referrer" src="${esc(it.thumb)}">${it.label ? `<figcaption>${esc(it.label)}</figcaption>` : ''}</figure>`).join('');
+    const sources = [...new Set(items.map((it) => String(it.source || '').split(' · ')[0]))].join(', ');
+    let loaded = 0;
+    const updateFoot = () => {
+      if (token !== V.token) return;
+      V.foot.innerHTML = `<span class="ccv-meta">${loaded ? `${loaded} picture${loaded === 1 ? '' : 's'}` : 'Loading pictures…'} · ${esc(sources)}</span><span class="ccv-meta">Click one to view it large</span>`;
+    };
+    updateFoot();
+    const imageLoads = [];
     grid.querySelectorAll('.ccv-tile').forEach((fig, i) => {
       const img = fig.querySelector('img');
-      img.addEventListener('load', () => {
-        fig.classList.add('is-in');
-        if (fig.animate && !reduced()) fig.animate([{ opacity: 0, transform: 'scale(0.96)' }, { opacity: 1, transform: 'none' }], { duration: 620, delay: i * 70, easing: EASE, fill: 'backwards' });
-      }, { once: true });
-      img.addEventListener('error', () => fig.remove(), { once: true });
+      imageLoads.push(new Promise((resolve) => {
+        const done = (ok) => {
+          if (ok) {
+            loaded++;
+            fig.classList.add('is-in');
+            if (fig.animate && !reduced()) fig.animate([{ opacity: 0 }, { opacity: 1 }], { duration: 180, fill: 'backwards' });
+          } else fig.remove();
+          updateFoot();
+          resolve(ok);
+        };
+        if (img.complete) done(img.naturalWidth > 0);
+        else {
+          img.addEventListener('load', () => done(true), { once: true });
+          img.addEventListener('error', () => done(false), { once: true });
+        }
+      }));
       const openIt = () => openLightbox(i, fig);
       fig.addEventListener('click', openIt);
       fig.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openIt(); } });
     });
-    const sources = [...new Set(items.map((it) => String(it.source || '').split(' · ')[0]))].join(', ');
-    V.foot.innerHTML = `<span class="ccv-meta">${items.length} pictures · ${esc(sources)}</span><span class="ccv-meta">Click one to view it large</span>`;
-    return { ok: true, count: items.length, subject: heading, titles: items.slice(0, 6).map((it) => it.label || it.title), sources };
+    await Promise.race([Promise.any(imageLoads.map((p) => p.then((ok) => { if (!ok) throw new Error('Image failed'); }))).catch(() => {}), new Promise((r) => setTimeout(r, 3500))]);
+    if (token !== V.token) return { error: 'Display was closed.' };
+    return { ok: loaded > 0, count: loaded, subject: heading, titles: items.slice(0, 6).map((it) => it.label || it.title), sources,
+      note: loaded ? undefined : 'Images were found but have not loaded yet.' };
   }
 
   /* Claude-style expand: the picture itself grows from its tile. */
@@ -1345,6 +1781,7 @@
       '<div class="ccv-lb-cap"></div>';
     document.body.appendChild(lb);
     V.lightbox = { el: lb, i, fromEl };
+    syncVisualFocus();
     const img = lb.querySelector('.ccv-lb-img');
     const set = (k) => {
       const it = items[k];
@@ -1393,13 +1830,13 @@
     const target = V.body?.querySelector(`.ccv-tile[data-i="${L.i}"]`) || L.fromEl;
     const to = target?.getBoundingClientRect();
     L.el.classList.remove('is-on');
-    if (instant || reduced() || !img.animate || !to) { L.el.remove(); return; }
+    if (instant || reduced() || !img.animate || !to) { L.el.remove(); syncVisualFocus(); return; }
     const r = img.getBoundingClientRect();
     const a = img.animate([
       { transform: 'none', opacity: 1 },
       { transform: `translate(${to.left + to.width / 2 - (r.left + r.width / 2)}px, ${to.top + to.height / 2 - (r.top + r.height / 2)}px) scale(${Math.max(to.width / r.width, to.height / r.height)})`, opacity: 0.4 },
     ], { duration: 520, easing: EASE_IN_OUT, fill: 'forwards' });
-    a.onfinish = () => L.el.remove();
+    a.onfinish = () => { L.el.remove(); syncVisualFocus(); };
   }
 
   /* ── websites ───────────────────────────────────────────────── */
@@ -1449,7 +1886,7 @@
       (d.fonts?.length ? `<div class="ccv-sec"><h4>Typography</h4><div class="ccv-chips">${chips(d.fonts.slice(0, 4), 'ccv-font')}</div></div>` : '') +
       (d.colors?.length ? `<div class="ccv-sec"><h4>Colours</h4><div class="ccv-sw">${d.colors.slice(0, 8).map((c) => `<span title="${esc(c)}" style="background:${esc(c)}"></span>`).join('')}</div></div>` : '') +
       ((d.emails?.length || d.phones?.length) ? `<div class="ccv-sec"><h4>Contact</h4><div class="ccv-chips">${chips(d.emails?.slice(0, 3), 'ccv-chip')}${chips(d.phones?.slice(0, 2), 'ccv-chip')}</div></div>` : '') +
-      (!data ? '<p class="ccv-note">Live reading needs the Clavis backend running — showing a screenshot only.</p>' : '');
+      (!data ? '<p class="ccv-note">Live reading needs the Rudra24 AI backend running — showing a screenshot only.</p>' : '');
     if (over.animate && !reduced()) over.animate([{ opacity: 0, transform: 'translateY(8px)' }, { opacity: 1, transform: 'none' }], { duration: 620, easing: EASE });
     V.title.textContent = d.title || host(u);
     V.foot.innerHTML = `<span class="ccv-meta">${data ? (data.rendered ? 'Rendered in a background browser' : 'Read in the background') : 'Screenshot via mShots'}</span><a class="ccv-link" href="${esc(d.url || u)}" target="_blank" rel="noopener">Open site ${ICON.open}</a>`;
@@ -1467,7 +1904,7 @@
     if (!T) return { error: 'Task window not loaded.' };
     const text = String(markdown || '').trim();
     if (!text) return { error: 'Nothing to show.' };
-    const id = T.begin(String(title || 'Clavis'), { source: 'voice' });
+    const id = T.begin(String(title || 'Rudra24 AI'), { source: 'voice' });
     const t = T.Store.get(id);
     if (t) { t.display = 'window'; if (title) t.title = String(title); }
     T.complete(id, { type: 'answer', text, summary: text.slice(0, 120) });
@@ -1490,10 +1927,10 @@
       } catch (_) {}
       return out;
     };
-    reg('show_map', { builtin: true, description: 'Show a place on the map in the Clavis display (fly-in, pin). Use for any "where is / show on map / location" request.', params: { place: 'place name or address', style: 'optional: map, satellite, dark or 3d' }, run: visual(showMap) });
+    reg('show_map', { builtin: true, description: 'Show a place on the map in the Rudra24 AI display (fly-in, pin). Use for any "where is / show on map / location" request.', params: { place: 'place name or address', style: 'optional: map, satellite, dark or 3d' }, run: visual(showMap) });
     reg('show_nearby', { builtin: true, description: 'On the open map, scan the area and mark every place of one kind (hospital, police, hotel, office, school, bank, mall, metro...).', params: { category: 'what to find, e.g. hospital', place: 'optional place to scan around', radius_m: 'number of metres (default 1500)' }, run: visual(showNearby) });
-    reg('show_images', { builtin: true, description: 'Search the web for pictures and show them in the Clavis display. The owner is Indian and speaks Hinglish: "lord"/"bhagwan"/"god" alone means the Hindu deities, "shiv ji" is Lord Shiva, etc.', params: { query: 'what to find pictures of, correctly spelled (e.g. "Lord Shiva", "Neem Karoli Baba"); pass the owner\'s own words if unsure' }, run: visual((p) => window.ClavisCanvas.showImages(p)) });
-    reg('show_website', { builtin: true, description: 'Show a website in the Clavis display: screenshot plus overview (what it is, fonts, colours, contacts).', params: { url: 'URL or domain', summary: 'optional one-line description' }, run: visual((p) => window.ClavisCanvas.showWebsite(p)) });
+    reg('show_images', { builtin: true, description: 'Search the web for pictures and show them in the Rudra24 AI display. The owner is Indian and speaks Hinglish: "lord"/"bhagwan"/"god" alone means the Hindu deities, "shiv ji" is Lord Shiva, etc.', params: { query: 'what to find pictures of, correctly spelled (e.g. "Lord Shiva", "Neem Karoli Baba"); pass the owner\'s own words if unsure' }, run: visual((p) => window.ClavisCanvas.showImages(p)) });
+    reg('show_website', { builtin: true, description: 'Show a website in the Rudra24 AI display: screenshot plus overview (what it is, fonts, colours, contacts).', params: { url: 'URL or domain', summary: 'optional one-line description' }, run: visual((p) => window.ClavisCanvas.showWebsite(p)) });
     reg('show_map_style', { builtin: true, description: 'Change the open map: style (map/satellite/dark/3d), zoom, or action (zoom_in, zoom_out, rotate, reset, expand).', params: { style: 'optional style', action: 'optional action', zoom: 'number (optional)' }, run: (p) => mapControl(p || {}) });
     reg('show_route', { builtin: true, description: 'Show the route between two places on the map with car, two-wheeler (estimate), walking and metro (estimate, DMRC fare) times — without traffic. "A se B ka route", "route from A to B".', params: { from: 'start place (or "me" for his location)', to: 'destination place', mode: 'optional: car | walk | bicycle (which line to draw)' }, run: visual((p) => route(p)) });
     reg('map_distance', { builtin: true, description: 'How far one place is from another (road km by car + straight line), shown on the map. "A se B kitni door hai".', params: { from: 'start place (or "me")', to: 'destination place' }, run: visual((p) => distance(p)) });
@@ -1530,7 +1967,7 @@
         fmtDist(420) === '420 m' && fmtDist(1500) === '1.5 km' && fmtDist(12000) === '12 km',
         host('https://www.stripe.com/in') === 'stripe.com',
         (CATS[CAT_ALIASES.thana] || [])[1] === 'police stations',
-        // DMRC slabs (25 Aug 2025, Mon–Sat)
+        // Rough fare bands; exact fares require a live metro journey planner.
         [[0.5, 11], [2, 11], [2.1, 21], [5, 21], [11.9, 32], [12, 32], [15, 43], [21, 43], [25, 54], [32, 54], [40, 64]].every(([k, f]) => metroFare(k) === f),
         // metro time = walk + ride at 34 km/h + walk; 10 km straight ride ×1.25 ≈ 22 min, no walk
         (() => { const s = { lat: 28.6, lng: 77.2, name: 'A' }, e = { lat: 28.6 + 10 / 111.2, lng: 77.2, name: 'B' }; const p = metroPlan(s, e, s, e); return p.practical && Math.abs(p.minutes - 22) <= 1 && p.fare_inr === 43; })(),

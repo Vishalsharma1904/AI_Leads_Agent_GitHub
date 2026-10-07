@@ -1,0 +1,114 @@
+/* Voice feedback shares the app's quiet surfaces and never blocks the orb. */
+#view-jarvis #clavis-feature-tip-pill { display: none !important; }
+#view-jarvis #jarvis-composer-voice-btn {
+  display: flex !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  width: 30px !important;
+  height: 30px !important;
+  min-width: 30px !important;
+  min-height: 30px !important;
+  overflow: visible !important;
+}
+
+#clavis-ai-speech-caption {
+  width: min(460px, calc(100vw - 40px));
+  max-height: 0;
+  margin: 0 auto;
+  padding: 0 16px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background: var(--cc-surface, #fff);
+  color: var(--cc-ink, #252521);
+  font: 450 14px/1.5 Inter, system-ui, sans-serif;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(7px);
+  transition: opacity 500ms ease, transform 650ms cubic-bezier(.16,1,.3,1),
+    max-height 650ms cubic-bezier(.16,1,.3,1), padding 500ms ease, margin 500ms ease;
+  pointer-events: none;
+}
+#clavis-ai-speech-caption.is-visible {
+  max-height: 3.4em;
+  margin: 12px auto 0;
+  padding: 10px 16px;
+  border-color: var(--cc-line-2, rgba(40,40,35,.12));
+  opacity: 1;
+  transform: none;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+/* ── Voice preview: top-right corner, right-aligned, two lines ──
+   clavis-ear.js owns the position (it measures the topbar and steps down
+   past the voice bar so nothing overlaps) and owns the motion (FLIP glide
+   + per-character typewriter). These rules only stop anything from
+   re-centring it or padding it into a card. */
+#clavis-ear-caption .ce-clip { max-height: 2.9em; padding: 0; }
+#clavis-ear-caption .ce-line { line-height: 1.45; text-align: right; }
+
+/* ── Voice bar: controls only, no transcript ──
+   The words he says are not in the bar any more (corner preview + chat own
+   them), so the bar shrinks to its orb and three buttons and leaves the top
+   corner free. The screen-reader line is kept, but never seen. */
+.clh-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+html body #clavis-live-hud.clh.clh-top {
+  width: auto !important;
+  max-width: none !important;
+  padding: 5px 6px !important;
+  border-radius: 999px !important;
+}
+html body #clavis-live-hud.clh-top .clh-state,
+html body #clavis-live-hud.clh-top .clh-caption { display: none !important; }
+
+/* Live controls live beside Rudra24 AI's header actions; the header status pill
+   already carries Listening / Thinking / Speaking, so no floating state bar
+   or second orb is needed above the main orb. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline {
+  position: static !important;
+  inset: auto !important;
+  width: 0 !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  height: 30px !important;
+  padding: 0 !important;
+  gap: 2px !important;
+  overflow: hidden !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  transform: none !important;
+  transition: width 300ms cubic-bezier(.16, 1, .3, 1), opacity 220ms ease !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline.is-in {
+  width: 86px !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline .clh-orb,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline .clh-state,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline .clh-caption { display: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline .clh-btn {
+  flex: 0 0 27px !important;
+  width: 27px !important;
+  height: 27px !important;
+  border-radius: 8px !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  #clavis-ai-speech-caption { transition-duration: 0.01ms; }
+  html body #view-jarvis .jarvis-hero-actions #clavis-live-hud.clh-inline { transition-duration: 0.01ms !important; }
+}

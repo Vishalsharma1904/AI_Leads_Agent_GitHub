@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS SUGGESTIONS (clavis-suggestions.js)
+ *  RUDRA24 AI SUGGESTIONS (clavis-suggestions.js)
  *  Contextual quick suggestion chips when the composer is empty.
  *  Centered above the composer box; dismisses when typing.
  * ============================================================
@@ -144,7 +144,7 @@
     if (!view || !input) return;
     // CSS keys off :placeholder-shown, which needs a non-empty placeholder
     // (the visible hint is drawn by .lx-ph; the native one is transparent).
-    if (!input.getAttribute('placeholder')) input.setAttribute('placeholder', 'Message Clavis');
+    if (!input.getAttribute('placeholder')) input.setAttribute('placeholder', 'Message Rudra24 AI');
     const lx = view.querySelector('.lx-suggest');
     const mirror = input.parentElement ? input.parentElement.querySelector('.ciq-mirror') : null;
     watchClass(lx);
@@ -219,7 +219,7 @@
     install();
   }
 
-  // Also listen for view changes to Clavis tab
+  // Also listen for view changes to Rudra24 AI tab
   document.addEventListener('click', (e) => {
     if (e.target.closest && e.target.closest('[data-view="jarvis"], [data-view="view-jarvis"], [href*="jarvis"]')) {
       setTimeout(show, 300);

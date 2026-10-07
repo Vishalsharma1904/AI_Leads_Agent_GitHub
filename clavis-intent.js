@@ -5,10 +5,10 @@
  * and the AI. It exists because the most common things sir says are
  * two or three words long and were going wrong:
  *
- *   "map band karo"      matched the STOP rule — Clavis went quiet
+ *   "map band karo"      matched the STOP rule — Rudra24 AI went quiet
  *                        and the map stayed open.
  *   "close map"          reached the AI, which asked for "more details".
- *   "close close close   must clear CLAVIS's screen (the map, pictures,
+ *   "close close close   must clear RUDRA24 AI's screen (the map, pictures,
  *    everything"         website and the floating window) — never his
  *                        PC apps.
  *   "band karo" / "hatao"  alone: close whatever is on top right now.
@@ -62,7 +62,7 @@
       const k = canvasKind();
       let place = '';
       try { place = window.ClavisCanvas?.place?.()?.name || window.ClavisCanvas?.place?.() || ''; } catch (_) {}
-      bits.push(`the Clavis display is open showing ${k || 'something'}${place && typeof place === 'string' ? ` (${place})` : ''}`);
+      bits.push(`the Rudra24 AI display is open showing ${k || 'something'}${place && typeof place === 'string' ? ` (${place})` : ''}`);
     }
     if (floatOpen()) bits.push('the floating task window is open');
     try { const v = window.currentView || (location.hash || '').replace('#', ''); if (v) bits.push(`current page: ${v}`); } catch (_) {}
@@ -101,7 +101,7 @@
     }
     if (/\bvoice\s*id\b.*\b(band|off|disable|hatao)\b/.test(t)) {
       window.ClavisEar?.voiceId?.setEnabled?.(false);
-      return { handled: true, spoken: 'Voice ID band kar diya. Ab main har us awaaz ko sunungi jo "Clavis" bolegi.' };
+      return { handled: true, spoken: 'Voice ID band kar diya. Ab main har us awaaz ko sunungi jo "Rudra" bolegi.' };
     }
     const SWITCH = /\b(bolo|boliye|karo|kar\s*do|chahiye|use|lagao|laga\s*do|switch|change|badlo|badal\s*do|me\s*baat|speak|talk)\b/;
     const toMale = /\b(male|ladke|ladka|aadmi|mard|jarvis)\b.*\b(voice|awaaz|awaz)\b|\b(voice|awaaz|awaz)\b.*\b(male|ladke|ladka|aadmi|mard)\b/.test(t) && SWITCH.test(t);
@@ -119,7 +119,7 @@
   const SLEPT = 'clavis_slept_at';
   const SLEEP_LINES = [
     'Theek hai sir, main thoda aaram kar leti hoon. Naam lijiyega to haazir.',
-    'Ji sir, chup ho gayi. Chutki bajaiye ya "Clavis" boliye, main aa jaungi.',
+    'Ji sir, chup ho gayi. Chutki bajaiye ya "Rudra" boliye, main aa jaungi.',
     'Okay sir, ek chhoti si jhapki. Zarurat ho to bas awaaz dijiye.',
     'Samajh gayi — ab main chup. Taali bajaiye, turant jaag jaungi.',
     'Theek hai. Main yahin hoon, bas shaant. Naam lenge to sun lungi.',
@@ -145,7 +145,7 @@
     return { handled: true, spoken: pick(SLEEP_LINES, 'sleep'), style: 'sleepy' };
   }
   // One-shot: the yawning line after a nap he asked for (legacy voice path;
-  // Clavis Live reads the same marker and yawns in its own words).
+  // Rudra24 AI Live reads the same marker and yawns in its own words).
   function wakeLine() {
     let st = null;
     try { st = JSON.parse(localStorage.getItem(SLEPT) || 'null'); localStorage.removeItem(SLEPT); } catch (_) {}
@@ -175,7 +175,7 @@
     { name: 'UI sounds', re: /\b(ui\s*sounds?|click\s*sounds?|sound\s*effects?|button\s*sounds?)\b/,
       get: () => !!window.SoundFX?.isEnabled?.(), set: (on) => window.SoundFX?.toggleSound?.(on) },
     { name: 'Voice replies', re: /\b(voice\s*(repl\w*|output|jawab)|bol\s*ke\s*jawab|awaaz\s*(me|mein)\s*jawab|spoken\s*repl\w*|tts)\b/,
-      get: () => ls('jarvis_speech_enabled') === 'true', set: () => window.toggleJarvisSpeech?.() },
+      get: () => ls('jarvis_speech_enabled') === 'true', set: (on) => { if (ls('jarvis_speech_enabled') !== String(on)) window.toggleJarvisSpeech?.(); if (!on) stopTalking(); } },
     { name: 'Sidebar', re: /\b(side\s*bar|sidebar)\b/,
       get: () => !document.getElementById('sidebar')?.classList.contains('collapsed'), set: () => window.toggleSidebarCollapse?.() },
     { name: 'Dark mode', re: /\b(dark\s*(mode|theme)|night\s*mode|andhera)\b/,
@@ -270,13 +270,13 @@
     '',
     '### Me',
     '- **Talk naturally** — I wait till you finish; interrupt me any time ("ruko", "nahi, Noida ki dikhao")',
-    '- **Sleep & wake** — "thodi der chup ho jao"; wake me with "Clavis", a snap or a clap',
+    '- **Sleep & wake** — "thodi der chup ho jao"; wake me with "Rudra", a snap or a clap',
     '- **Switch things on/off** — "caption band karo", "clap wala on karo", "tips off", "dark mode on", "pet hatao"',
     '- **Risky things** — before deleting or sending anything I ask once: "kar doon, sir?"',
     '- **Voice** — "ladke ki awaaz me bolo", "female voice"; Voice ID: "meri awaaz register karo"',
     '- **Look** — "accent blue karo", "claude wala theme", "minimal mode on"',
     '- **Clean up** — "map band karo", "close everything"',
-    '- **Status** — "Clavis, status" · I remember what you teach me',
+    '- **Status** — "Rudra24 AI, status" · I remember what you teach me',
   ].join('\n');
 
   /* ── places: instant, no AI round trip ─────────────────────── */
@@ -329,15 +329,16 @@
   // "open my location on map", "meri location map pe kholo", "show me where I am"
   const ME_WORDS_2 = /^(?:please\s+|zara\s+|clavis\s+)?(?:(?:open|show|find|track|locate)\s+(?:me\s+)?(?:my|meri|mera)\s+(?:current\s+|live\s+)?(?:location|position|lokeshan)(?:\s+(?:on|in)\s+(?:the\s+)?map)?|(?:my|meri|mera)\s+(?:current\s+|live\s+)?(?:location|lokeshan|position)\s+(?:map\s+(?:pe|par|me|mein)\s+)?(?:kholo|khol\s*do|dikhao|dikha\s*do|batao|open\s+karo|show\s+karo))$/i;
   const ME_WORDS = /^(?:meri|mera|my|apni|current)\s+(?:location|lokeshan|jagah|position)\s*(?:kya\s+hai\s*)?(?:dikhao|dikha\s*do|batao|bataiye|show|kahan\s+hai|kaha\s+hai|map\s+pe\s+dikhao)?$|^(?:where\s+am\s+i|main\s+kahan\s+hoon|mai\s+kaha\s+hu|मैं\s+कहाँ\s+हूँ|मेरी\s+लोकेशन\s+दिखाओ)$/i;
-  const HERE = /^(yahan|yaha|yahaan|idhar|here|meri\s+location|my\s+location|mere\s+ghar|यहाँ|यहां|मेरी\s+लोकेशन)$/i;
+  const HERE = /^(yahan|yaha|yahaan|idhar|here|(?:meri|mera|my|apni)\s+(?:current\s+)?location|current\s+location|mere\s+ghar|यहाँ|यहां|मेरी\s+लोकेशन)$/i;
   // What sits after "A se B": the question it asks.
   const TAIL = '(?:metro|मेट्रो|kitn[ai]\\s+(?:door|dur|duur|km|time|samay|der)|kitne\\s+(?:km|kilometer|minute|min)|distance|doori|duri|route|rasta|raasta|directions?|kaise\\s+(?:jaye|jayen|jaun|jau|pahunche|pahunchu)|कितनी\\s+दूर|कितना\\s+(?:समय|टाइम)|दूरी|रास्ता|रूट)';
+  const HI_TRAVEL_TAK = new RegExp(`^(?:(?:clavis|please|zara|mujhe|batao)\\s+)?(.+?)\\s+(?:se|से)\\s+(.+?)\\s+(?:tak|तक)\\s+(?:(?:ka|ki|ke|का|की|के)\\s+)?(${TAIL}.*)$`, 'i');
   const HI_TRAVEL = new RegExp(`^(?:(?:clavis|please|zara|mujhe|batao)\\s+)?(.+?)\\s+(?:se|से)\\s+(.+?)\\s+(?:tak\\s+|तक\\s+)?(?:(?:ka|ki|ke|का|की|के)\\s+)?(${TAIL}.*)$`, 'i');
   function parseTravel(raw) {
     const r = String(raw || '').replace(/[?!.।]+$/g, '').replace(/\s+/g, ' ').trim();
     if (!r || r.split(' ').length > 16 || compound(r)) return null;
     let from, to, tail;
-    let m = r.match(HI_TRAVEL);
+    let m = r.match(HI_TRAVEL_TAK) || r.match(HI_TRAVEL);
     if (m) { [, from, to, tail] = m; }
     else if ((m = r.match(/^(?:what(?:'s|\s+is)\s+the\s+|show\s+(?:me\s+)?(?:the\s+)?)?(distance|route|directions?|metro\s+(?:fare|time|route))\s+(?:between|from)\s+(.+?)\s+(?:and|to)\s+(.+?)(?:\s+(?:by\s+metro|on\s+(?:the\s+)?map|please))?$/i))) { [, tail, from, to] = m; if (/by\s+metro/i.test(r)) tail = 'metro ' + tail; }
     else if ((m = r.match(/^how\s+(far|long)\s+is\s+(.+?)\s+from\s+(.+?)$/i))) { tail = m[1] === 'far' ? 'distance' : 'time'; to = m[2]; from = m[3]; }
@@ -365,8 +366,8 @@
     if (q.want === 'metro_fare') {
       if (!m.practical) return pick([`${A} se ${B} metro practical nahi hai — ${m.reason || 'paas me station nahi'}.`, `Metro yahan kaam ki nahi, sir — ${m.reason || 'station door hai'}.`], 'metro');
       return m.fare_inr
-        ? pick([`${m.from_station} se ${m.to_station} tak lagbhag ₹${m.fare_inr} — Monday se Saturday ka kiraya; Sunday ko thoda sasta, smart card pe 10% off.`, `Metro ka kiraya takreeban ₹${m.fare_inr}, sir — ${m.from_station} se ${m.to_station}. Andaza hai, Sunday sasta padta hai.`], 'metro')
-        : `${m.from_station} se ${m.to_station} ka metro route map pe hai; is shehar ka kiraya mere paas nahi hai, sir.`;
+        ? `Metro ka rough fare estimate ₹${m.fare_inr} hai, sir — ${m.from_station} se ${m.to_station}. Exact fare aur interchange official journey planner mein check kijiye.`
+        : `${m.from_station} se ${m.to_station} ka metro fare abhi available nahi hai, sir.`;
     }
     if (q.want === 'metro_time') {
       if (!m.practical) return pick([`${A} se ${B} metro practical nahi hai — ${m.reason || 'paas me station nahi'}.`, `Metro se nahi banega, sir — ${m.reason || 'station door hai'}.`], 'metro');
@@ -404,12 +405,159 @@
     return { handled: true, spoken: travelLine(q, res) };
   }
 
+  /* ── deterministic command routing (< 50ms) ─────────────── */
+  async function deterministicIntent(t, raw) {
+    // 0. STOP & CANCEL (First-class deterministic local handling)
+    if (/^(?:please\s+|arre\s+|arey\s+)?(?:stop(?:\s+talking|\s+it)?|shut\s*up|be\s*quiet|quiet|chup(?:\s*ho\s*jao|\s*karo|\s*raho)?|bas(?:\s*karo)?|ruko(?:\s+ruko)?|wait(?:\s+wait)?|ruk\s*jao)(?:\s+(?:please|sir|clavis|na|yaar))?$/i.test(t)) {
+      if (typeof window !== 'undefined') {
+        window.ClavisVoiceState?.cancelActiveOperation?.('stop command');
+        window.ClavisVoiceState?.set?.('STOPPED', 'stop command');
+        try { window.interruptClavisSpeech?.(); } catch (_) {}
+        try { window.clavisHushNow?.(); } catch (_) {}
+        try { window.stopJarvisGeneration?.(); } catch (_) {}
+        try { window.ClavisLive?.hush?.(); } catch (_) {}
+        try { window.ClavisVoice?.stop?.(); } catch (_) {}
+        try { window.stopJarvisSpeech?.(); } catch (_) {}
+        try { window.speechSynthesis?.cancel?.(); } catch (_) {}
+        try { if (window.currentPlayingAudio) { window.currentPlayingAudio.pause(); window.currentPlayingAudio = null; } } catch (_) {}
+        try { window.ClavisEar?.caption?.clear?.(); } catch (_) {}
+      }
+      return { handled: true, intent: 'STOP', spoken: '', silent: true };
+    }
+    if (/^(?:please\s+)?(?:cancel(?:\s+karo|\s+kar\s*do)?|radd\s*karo|abort|dismiss)(?:\s+(?:please|sir|clavis|na))?$/i.test(t)) {
+      if (typeof window !== 'undefined') {
+        window.ClavisVoiceState?.cancelActiveOperation?.('cancel command');
+        try { window.stopJarvisGeneration?.(); } catch (_) {}
+        try { hideCanvas(); } catch (_) {}
+        try { hideFloat(); } catch (_) {}
+        try { hideOverlays(); } catch (_) {}
+        try { window.ClavisEar?.caption?.clear?.(); } catch (_) {}
+      }
+      return { handled: true, intent: 'CANCEL', spoken: 'Cancelled.', text: 'Cancelled.' };
+    }
+
+    // 1. Microphone mute / unmute
+    if (/^(?:please\s+)?(?:turn\s+off\s+(?:the\s+)?(?:mic|mike|microphone)|mute\s+(?:the\s+)?(?:mic|mike|microphone)|(?:mic|mike|microphone)\s+(?:band|off|mute)(?:\s+(?:karo|kar\s*do|kijiye))?)$/i.test(t)) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState) {
+        window.ClavisVoiceState.setMicEnabled(false, 'voice command');
+      }
+      try { window.clavisStopCommandEar?.(); } catch (_) {}
+      try { window.stopWakeListener?.(); } catch (_) {}
+      try { window.LocalSpeechEngine?.stopInput?.(); } catch (_) {}
+      try { window.stopClavisSoundTriggers?.(); } catch (_) {}
+      try { window.ClavisLive?.stop?.('mic off command'); } catch (_) {}
+      try { window.ClavisEar?.stop?.(); } catch (_) {}
+      return { handled: true, intent: 'SYSTEM_CONTROL', action: 'MIC_OFF', spoken: 'Mic band kar diya, sir.' };
+    }
+    if (/^(?:please\s+)?(?:turn\s+on\s+(?:the\s+)?(?:mic|mike|microphone)|unmute\s+(?:the\s+)?(?:mic|mike|microphone)|(?:mic|mike|microphone)\s+(?:chalu|chaalu|on|unmute)(?:\s+(?:karo|kar\s*do|kijiye))?)$/i.test(t)) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState) {
+        window.ClavisVoiceState.setMicEnabled(true, 'voice command');
+      }
+      try { if (typeof window.startJarvisVoiceInput === 'function') window.startJarvisVoiceInput(); } catch (_) {}
+      return { handled: true, intent: 'SYSTEM_CONTROL', action: 'MIC_ON', spoken: 'Mic chalu kar diya, sir — boliye.' };
+    }
+
+    // 1b. Voice Output mute / unmute
+    if (/^(?:please\s+)?(?:turn\s+off\s+(?:the\s+)?(?:voice|speech|voice\s*replies?|speaker|audio)|mute\s+(?:the\s+)?(?:voice|speech|audio)|(?:voice|awaaz|awaz|audio|speech)\s+(?:band|off|mute)(?:\s+(?:karo|kar\s*do|kijiye))?)$/i.test(t)) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState) {
+        window.ClavisVoiceState.setVoiceOutputEnabled(false, 'voice command');
+      }
+      if (typeof window !== 'undefined') {
+        window.jarvisSpeechEnabled = false;
+        try { localStorage.setItem('jarvis_speech_enabled', 'false'); } catch (_) {}
+        try { window.updateJarvisSpeechIcon?.(); } catch (_) {}
+        try { window.stopJarvisSpeech?.(); } catch (_) {}
+        try { window.ClavisVoice?.stop?.(); } catch (_) {}
+      }
+      return { handled: true, intent: 'SYSTEM_CONTROL', action: 'VOICE_OFF', spoken: '', silent: true };
+    }
+    if (/^(?:please\s+)?(?:turn\s+on\s+(?:the\s+)?(?:voice|speech|voice\s*replies?|speaker|audio)|unmute\s+(?:the\s+)?(?:voice|speech|audio)|(?:voice|awaaz|awaz|audio|speech)\s+(?:chalu|chaalu|on|unmute)(?:\s+(?:karo|kar\s*do|kijiye))?)$/i.test(t)) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState) {
+        window.ClavisVoiceState.setVoiceOutputEnabled(true, 'voice command');
+      }
+      if (typeof window !== 'undefined') {
+        window.jarvisSpeechEnabled = true;
+        try { localStorage.setItem('jarvis_speech_enabled', 'true'); } catch (_) {}
+        try { window.updateJarvisSpeechIcon?.(); } catch (_) {}
+      }
+      return { handled: true, intent: 'SYSTEM_CONTROL', action: 'VOICE_ON', spoken: 'Voice replies on kar diye, sir.' };
+    }
+
+    // 2. Rudra24 Jobs & Rudra24 Secure exact brand routing
+    if (/\brudra\s*24\s*jobs\b/i.test(t)) {
+      if (/\b(open|launch|khol|kholo|dikhao|visit|chalo|show)\b/i.test(t) || /^(?:the\s+)?rudra\s*24\s*jobs(?:\s+website)?$/i.test(t)) {
+        const mgr = typeof window !== 'undefined' ? (window.BrowserActionManager || window.ClavisBrowser) : null;
+        const res = mgr ? await mgr.openWebsite('Rudra24 Jobs') : { success: true, verified: false };
+        if (res && res.error) {
+          return { handled: true, intent: 'OPEN_WEBSITE', entity: 'Rudra24 Jobs', target: 'https://rudra24jobs.com', verified: false, success: false, spoken: res.error || "I couldn't verify the Rudra24 Jobs website." };
+        }
+        return { handled: true, intent: 'OPEN_WEBSITE', entity: 'Rudra24 Jobs', target: 'https://rudra24jobs.com', verified: true, success: true, spoken: 'Opened Rudra24 Jobs.' };
+      }
+    }
+    if (/\brudra\s*24\s*secure\b/i.test(t) || (/\brudra\s*24\b/i.test(t) && !/\bjobs\b/i.test(t))) {
+      if (/\b(open|launch|khol|kholo|dikhao|visit|chalo|show)\b/i.test(t) || /^(?:the\s+)?rudra\s*24(?:\s*secure)?(?:\s+website)?$/i.test(t)) {
+        const mgr = typeof window !== 'undefined' ? (window.BrowserActionManager || window.ClavisBrowser) : null;
+        const res = mgr ? await mgr.openWebsite('Rudra24 Secure') : { success: true, verified: false };
+        if (res && res.error) {
+          return { handled: true, intent: 'OPEN_WEBSITE', entity: 'Rudra24 Secure', target: 'https://rudra24secure.com', verified: false, success: false, spoken: res.error || "I couldn't verify the Rudra24 Secure website." };
+        }
+        return { handled: true, intent: 'OPEN_WEBSITE', entity: 'Rudra24 Secure', target: 'https://rudra24secure.com', verified: true, success: true, spoken: 'Opened Rudra24 Secure.' };
+      }
+    }
+
+    // 3. Web Search Deterministic Intent
+    const searchMatch = t.match(/^(?:please\s+)?(?:search\s+(?:google\s+)?(?:for\s+)?|google\s+)(.+)$/i)
+      || t.match(/^(.+?)\s+(?:google\s+pe\s+search\s*karo|search\s*karo|dhundho|dhoondo)$/i);
+    if (searchMatch) {
+      let q = searchMatch[1].replace(/\b(kar do|karo|please|jara|zara|na)\b/gi, '').trim();
+      if (q && !/^(map|naksha|camera|screenshot)$/i.test(q)) {
+        const searchUrl = `https://www.google.com/search?q=${encodeURIComponent(q)}`;
+        const mgr = typeof window !== 'undefined' ? (window.BrowserActionManager || window.ClavisBrowser) : null;
+        const res = mgr ? await mgr.openWebsite(searchUrl, { requestedEntity: q }) : { success: true, verified: false };
+        if (res && res.error) {
+          return { handled: true, intent: 'SEARCH_WEB', query: q, target: searchUrl, verified: false, success: false, spoken: res.error };
+        }
+        return { handled: true, intent: 'SEARCH_WEB', query: q, target: searchUrl, verified: true, success: true, spoken: `Searching Google for ${q}.` };
+      }
+    }
+
+    // 4. Deterministic open website / application
+    const openMatch = t.match(/^(?:please\s+)?(?:open|launch|khol(?:o| do| de)?|chalu karo?|chalao)\s+(.+)$/i)
+      || t.match(/^(.+?)\s+(?:khol(?:o| do| de)?|open karo?|chalu karo?|chalao|launch karo?)\s*$/i);
+    if (openMatch) {
+      let targetRaw = openMatch[1].replace(/\b(kar do|karo|kholo|please|jara|zara|na|website|site|portal|page)\b/gi, '').trim();
+      if (targetRaw && targetRaw.split(' ').length <= 4 && !/^(map|naksha|camera|screenshot)$/i.test(targetRaw)) {
+        const mgr = typeof window !== 'undefined' ? (window.BrowserActionManager || window.ClavisBrowser) : null;
+        const resolved = mgr?.resolve?.(targetRaw);
+        if (resolved?.url) {
+          const res = await mgr.openWebsite(targetRaw);
+          if (res && res.error) {
+            return { handled: true, intent: 'OPEN_WEBSITE', entity: targetRaw, target: resolved.url, verified: false, success: false, spoken: res.error || `I couldn't verify the ${targetRaw} website.` };
+          }
+          return { handled: true, intent: 'OPEN_WEBSITE', entity: targetRaw, target: resolved.url, verified: true, success: true, spoken: `Opened ${targetRaw}.` };
+        }
+        if (typeof window !== 'undefined' && window.ClavisPC?.matchApp?.(targetRaw)) {
+          const r = await window.ClavisPC.open(targetRaw);
+          if (r && r.ok === false) {
+            return { handled: true, intent: 'OPEN_APPLICATION', entity: targetRaw, verified: false, success: false, spoken: r.error || `${targetRaw} nahi khul paya.` };
+          }
+          return { handled: true, intent: 'OPEN_APPLICATION', entity: targetRaw, verified: true, success: true, spoken: `Opened ${targetRaw}.` };
+        }
+      }
+    }
+
+    return null;
+  }
+
   /* ── the router ────────────────────────────────────────────── */
   async function route(text, opts = {}) {
     const raw = String(text || '').trim();
     const t = norm(raw);
     if (!t) return { handled: false };
     const words = t.split(' ');
+
+    const det = await deterministicIntent(t, raw);
+    if (det) return det;
 
     const v = voiceIntent(t);
     if (v) return v;
@@ -509,7 +657,7 @@
     // Register only what isn't there yet — other modules may already own some.
     const reg = (name, def) => { if (!K.has?.(name)) K.register(name, def); };
     reg('show_map', {
-      description: 'Show a place on the Clavis map display (cinematic fly-in + pin). Use for any place, address, city or "where is…".',
+      description: 'Show a place on the Rudra24 AI map display (cinematic fly-in + pin). Use for any place, address, city or "where is…" — and also, without being asked, when the answer is about a person, company or landmark with a real location (a founder\'s city, a head office, a hotel, a college, a monument). If he could physically stand there, pin it while you answer. Skip it for abstract things, and never re-open a place already on screen.',
       params: { place: 'place name or address, as specific as possible', style: 'optional: map | satellite | dark | 3d' },
       run: async ({ place, style }) => out(await C()?.showMap?.({ place, style }), `Showing ${place} on the map.`),
     });
@@ -519,22 +667,22 @@
       run: async (a) => out(await C()?.showNearby?.(a), 'Scanning the area.'),
     });
     reg('show_images', {
-      description: 'Search pictures and show them in the Clavis display. Interpret words the Indian way ("lord" / "bhagwan" = Hindu God).',
+      description: 'Search pictures and show them in the Rudra24 AI display. Interpret words the Indian way ("lord" / "bhagwan" = Hindu God).',
       params: { query: 'what to find pictures of (correctly spelled)', count: 'number 3-12 (default 9)' },
       run: async ({ query, count }) => out(await C()?.showImages?.({ query, count }), `Showing pictures of ${query}.`),
     });
     reg('show_website', {
-      description: 'Open a website in the Clavis display: a screenshot plus an overview. Then explain it in two or three sentences.',
+      description: 'Open a website in the Rudra24 AI display: a screenshot plus an overview. Then explain it in two or three sentences.',
       params: { url: 'URL or domain', summary: 'optional one-line description' },
       run: async ({ url, summary }) => out(await C()?.showWebsite?.({ url, summary }), `Showing ${url}.`),
     });
     reg('close_display', {
-      description: 'Close the Clavis display (map / pictures / website) AND the floating task window. "Close everything / sab band karo" means this — never closing his PC apps.',
+      description: 'Close the Rudra24 AI display (map / pictures / website) AND the floating task window. "Close everything / sab band karo" means this — never closing his PC apps.',
       params: {},
       run: async () => { clearAll(); return 'Screen cleared.'; },
     });
     reg('app_command', {
-      description: 'Do something in the Clavis app or on the PC that no other tool covers: open an app or website, type into an app, take a screenshot, save a note, scroll, brief a website. Pass his request as one clear sentence.',
+      description: 'Do something in the Rudra24 AI app or on the PC that no other tool covers: open an app or website, type into an app, take a screenshot, save a note, scroll, brief a website. Pass his request as one clear sentence.',
       params: { request: 'the command as one clear sentence' },
       run: async ({ request }) => {
         const r = await window.ClavisCommands?.route?.(String(request || ''));
@@ -621,6 +769,7 @@
       ['नोएडा से गाज़ियाबाद कितनी दूर है', 'नोएडा', 'गाज़ियाबाद', 'distance'],
       ['yahan se Loni ka rasta batao', 'me', 'Loni', 'route'],
       ['metro fare from Dwarka to Rajiv Chowk', 'Dwarka', 'Rajiv Chowk', 'metro_fare'],
+      ['meri current location se nearest metro station tak route dikhao', 'me', 'nearest metro station', 'route'],
     ].every(([q, f, to, w]) => { const r = P(q); return r.from === f && r.to === to && r.want === w; });
     const notTrips = ['main kal se office kitni der me jaunga', 'map kholo', 'hello kaise ho'].every((q) => !parseTravel(q));
     const savedLive = window.ClavisLive, savedPet = window.NexusPet;

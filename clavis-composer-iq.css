@@ -147,7 +147,7 @@ html[data-theme="dark"] .ciq-tab-hint kbd {
   background: rgba(255, 255, 255, 0.12);
 }
 
-/* In the Clavis studio composer the top-right corner is where the ghost
+/* In the Rudra24 AI studio composer the top-right corner is where the ghost
    sentence runs — the pill sat right on top of it. clavis-composer-iq.js
    now puts the hint INSIDE the bottom tool row (.ciq-tab-hint--inbar), as
    a flex item between the left tools and the right-hand buttons: it can
@@ -299,10 +299,10 @@ html[data-theme="dark"] .cts-composer.ciq-caught {
   30%  { box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.22); }
   100% { box-shadow: 0 0 0 0 rgba(10, 132, 255, 0); }
 }
-/* ── Clavis smoothness pass (2026-09-23) ─────────────────────
+/* ── Rudra24 AI smoothness pass (2026-09-23) ─────────────────────
    Keep the character of the orb, but remove the layout/paint churn that was
    making an already-hidden task surface and notification rail participate in
-   every frame. These rules are last in the Clavis cascade on purpose. */
+   every frame. These rules are last in the Rudra24 AI cascade on purpose. */
 html body #clavis-task-surface:not(.is-open) {
   display: none !important;
   visibility: hidden !important;

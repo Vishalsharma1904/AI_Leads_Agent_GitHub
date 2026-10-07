@@ -126,9 +126,7 @@ const DashboardCtrl = {
     const sorted = Object.entries(sourceCount).sort((a,b) => b[1]-a[1]).slice(0, 6);
     const max = sorted[0]?.[1] || 1;
 
-    const colors = [
-      '#007AFF', '#6C5CE7', '#30D158', '#FF9F0A', '#FF453A', '#BF5AF2'
-    ];
+    const colors = ['var(--cc-accent)', 'var(--cc-accent-ink)', 'var(--cc-mute)'];
 
     container.innerHTML = sorted.map(([src, count], i) => {
       const pct = Math.round((count / max) * 100);
@@ -191,7 +189,7 @@ const DashboardCtrl = {
         <div class="do-bar-item">
           <span class="do-bar-label" title="${ind}">${ind}</span>
           <div class="do-bar-track">
-            <div class="do-bar-fill" style="background:var(--do-purple);" data-target="${pct}"></div>
+            <div class="do-bar-fill" style="background:var(--cc-accent);" data-target="${pct}"></div>
           </div>
           <span class="do-bar-val">${count}</span>
         </div>
@@ -234,7 +232,7 @@ const DashboardCtrl = {
         <div class="do-bar-item">
           <span class="do-bar-label" title="${city}">${city}</span>
           <div class="do-bar-track">
-            <div class="do-bar-fill" style="background:var(--do-blue);" data-target="${pct}"></div>
+            <div class="do-bar-fill" style="background:var(--cc-accent);" data-target="${pct}"></div>
           </div>
           <span class="do-bar-val">${count}</span>
         </div>
@@ -266,13 +264,14 @@ const DashboardCtrl = {
       statusMap['New'] = 0;
     }
 
+    const tone = getComputedStyle(canvas);
     const colorMap = {
-      'New': '#007AFF',
-      'Contacted': '#30D158',
-      'Interested': '#BF5AF2',
-      'Not Interested': '#FF453A',
-      'Appointment': '#FF9F0A',
-      'Closed': '#6C5CE7',
+      'New': tone.getPropertyValue('--cc-accent').trim(),
+      'Contacted': tone.getPropertyValue('--cc-accent-ink').trim(),
+      'Interested': tone.getPropertyValue('--cc-mute').trim(),
+      'Not Interested': '#9b7771',
+      'Appointment': '#9b8862',
+      'Closed': tone.getPropertyValue('--cc-ink-2').trim(),
     };
 
     const entries = Object.entries(statusMap);
@@ -366,9 +365,7 @@ const DashboardCtrl = {
       return tb - ta;
     }).slice(0, 8);
 
-    const avatarColors = [
-      '#007AFF', '#6C5CE7', '#30D158', '#FF9F0A', '#FF453A', '#BF5AF2', '#5AC8FA', '#FF6B6B'
-    ];
+    const avatarColors = ['#486650', '#718976', '#878a79', '#9b8862'];
 
     const statusClasses = {
       'new': 'do-status-new',
@@ -509,7 +506,7 @@ const AnalyticsCtrl = {
 
     const sorted = Object.entries(sourceCount).sort((a,b) => b[1]-a[1]).slice(0,6);
     const max = sorted[0]?.[1] || 1;
-    const colors = ['#007AFF','#6C5CE7','#30D158','#FF9F0A','#FF453A','#BF5AF2'];
+    const colors = ['var(--cc-accent)', 'var(--cc-accent-ink)', 'var(--cc-mute)'];
 
     container.innerHTML = sorted.map(([src, count], i) => {
       const pct = Math.round((count / max) * 100);
@@ -538,9 +535,9 @@ const AnalyticsCtrl = {
     const total = leads.length;
 
     const types = [
-      { label: 'Security', count: security, color: '#007AFF' },
-      { label: 'Housekeeping', count: housekeeping, color: '#30D158' },
-      { label: 'Both / Other', count: both, color: '#6C5CE7' },
+      { label: 'Security', count: security, color: 'var(--cc-accent)' },
+      { label: 'Housekeeping', count: housekeeping, color: 'var(--cc-accent-ink)' },
+      { label: 'Both / Other', count: both, color: 'var(--cc-mute)' },
     ].filter(t => t.count > 0);
 
     if (types.length === 0 || total === 0) {
@@ -597,7 +594,7 @@ const AnalyticsCtrl = {
       const isToday = day.date.toDateString() === now.toDateString();
       return `
         <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;" title="${day.label}: ${day.count} leads">
-          <div style="width:100%;height:${h}px;background:${isToday ? 'var(--do-blue)' : 'var(--do-purple)'};border-radius:4px 4px 2px 2px;opacity:${isToday ? 1 : 0.7};transition:height 0.8s cubic-bezier(0.23,1,0.32,1);"></div>
+          <div style="width:100%;height:${h}px;background:${isToday ? 'var(--cc-accent)' : 'var(--cc-mute)'};border-radius:4px 4px 2px 2px;opacity:${isToday ? 1 : 0.7};transition:height 0.8s cubic-bezier(0.23,1,0.32,1);"></div>
           ${i % 3 === 0 ? `<span style="font-size:9px;color:var(--do-t3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;text-align:center;">${day.label}</span>` : '<span style="height:13px;"></span>'}
         </div>
       `;
@@ -614,10 +611,10 @@ const AnalyticsCtrl = {
     const closed = leads.filter(l => (l.status||'').toLowerCase() === 'closed').length;
 
     const stages = [
-      { label: 'Total Leads', count: total, color: '#007AFF', pct: 100 },
-      { label: 'Contacted', count: contacted, color: '#6C5CE7', pct: total > 0 ? Math.round((contacted/total)*100) : 0 },
-      { label: 'Interested', count: interested, color: '#30D158', pct: total > 0 ? Math.round((interested/total)*100) : 0 },
-      { label: 'Converted', count: closed, color: '#FF9F0A', pct: total > 0 ? Math.round((closed/total)*100) : 0 },
+      { label: 'Total Leads', count: total, color: 'var(--cc-accent)', pct: 100 },
+      { label: 'Contacted', count: contacted, color: 'var(--cc-accent-ink)', pct: total > 0 ? Math.round((contacted/total)*100) : 0 },
+      { label: 'Interested', count: interested, color: 'var(--cc-mute)', pct: total > 0 ? Math.round((interested/total)*100) : 0 },
+      { label: 'Converted', count: closed, color: 'var(--cc-ink-2)', pct: total > 0 ? Math.round((closed/total)*100) : 0 },
     ];
 
     container.innerHTML = stages.map(s => `
@@ -662,7 +659,7 @@ const AnalyticsCtrl = {
       const pct = Math.round((count / max) * 100);
       return `<div class="do-bar-item">
         <span class="do-bar-label" title="${ind}">${ind}</span>
-        <div class="do-bar-track"><div class="do-bar-fill" style="background:var(--do-orange)" data-target="${pct}"></div></div>
+        <div class="do-bar-track"><div class="do-bar-fill" style="background:var(--cc-accent)" data-target="${pct}"></div></div>
         <span class="do-bar-val">${count}</span>
       </div>`;
     }).join('');

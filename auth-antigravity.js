@@ -5,6 +5,9 @@
  */
 'use strict';
 
+const RUDRA_APP_NAME = 'Rudra24 AI & Leads';
+const RUDRA_APP_DESCRIPTION = 'Lead Generation · Business Support · Business Analysis';
+
 // ──────────────────────────────────────────────
 //  0. USER-SCOPED STORAGE ENGINE (Multi-Tenant / Multi-User Silo)
 // ──────────────────────────────────────────────
@@ -17,20 +20,8 @@ window.UserStorage = {
   },
 
   getUserId() {
-    try {
-      const activeEmail = localStorage.getItem('skylark_active_email');
-      if (activeEmail && activeEmail.includes('@')) {
-        return this.emailToUserId(activeEmail);
-      }
-      const raw = localStorage.getItem('skylark_user_profile') || localStorage.getItem('skylark_user');
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        if (parsed && parsed.email && parsed.email.includes('@')) {
-          return this.emailToUserId(parsed.email);
-        }
-        if (parsed && parsed.id) return parsed.id;
-      }
-    } catch (_) {}
+    const verifiedEmail = window.SupabaseAuth?.getUser?.()?.email;
+    if (verifiedEmail) return this.emailToUserId(verifiedEmail);
     return 'usr_default';
   },
 
@@ -305,23 +296,23 @@ window.UserProfileManager = {
       candidateGreeting.innerHTML = `Find real candidates, <span class="lx-greet-name">instantly</span>`;
     }
 
-    // 4. Clavis Greeting
+    // 4. Rudra24 AI Greeting
     const jarvisGreet = document.getElementById('jarvis-welcome-text');
     if (jarvisGreet) {
-      jarvisGreet.textContent = `Namaste ${honorificName}! Main Clavis hoon.`;
+      jarvisGreet.textContent = `Namaste ${honorificName}! Main Rudra hoon.`;
     }
 
     // 5. Sidebar Branding
     const brandText = document.getElementById('logo-brand-text');
-    if (brandText) brandText.textContent = `${honorificName}'s Agent`;
+    if (brandText) brandText.textContent = 'Rudra24 AI';
     const sidebarSub = document.querySelector('#sidebar .logo-sub');
-    if (sidebarSub) sidebarSub.textContent = 'Clavis AI Agent';
+    if (sidebarSub) sidebarSub.textContent = 'Rudra24 AI';
 
     // Legacy selectors
     const brandSub = document.querySelector('.sidebar-brand-sub');
-    if (brandSub) brandSub.textContent = 'Clavis AI Agent';
+    if (brandSub) brandSub.textContent = 'Rudra24 AI';
     const brandName = document.querySelector('.sidebar-brand-name');
-    if (brandName) brandName.textContent = `${honorificName}'s Agent`;
+    if (brandName) brandName.textContent = 'Rudra24 AI';
 
     // 6. Settings Form Inputs (both settings modal and config)
     const setVal = (id, val) => {
@@ -344,7 +335,7 @@ window.UserProfileManager = {
     if (genderRadio) genderRadio.checked = true;
 
     // App name setting
-    const appName = localStorage.getItem('skylark-app-name') || 'Neural Lead Intelligence';
+    const appName = localStorage.getItem('skylark-app-name') || RUDRA_APP_NAME;
     setVal('settings-app-name', appName);
 
     // 7. Account/Email signature update
@@ -394,8 +385,6 @@ window.UserProfileManager = {
     // Save and sync app name
     if (appName) {
       localStorage.setItem('skylark-app-name', appName);
-      const cardTitle = document.getElementById('ag-card-title');
-      if (cardTitle) cardTitle.textContent = appName;
     }
 
     const honorific = this.getHonorificName(name, gender);
@@ -415,6 +404,7 @@ window.AntigravityAuth = {
   captchaAnswer: null,
   mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
   rafId: null,
+  _transitioningUserId: '',
 
   init() {
     this.bindMouseEffects();
@@ -424,32 +414,33 @@ window.AntigravityAuth = {
   },
 
   async checkInitialSession() {
-    if (window.CLAVIS_LOCAL_MODE || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
-      this.transitionToApp();
-      return { success: true, localMode: true };
-    }
-    // Supabase is the only authentication authority. Local flags/profile data
-    // are UI metadata only and never grant access to the app.
+    // Keep sign-in hidden while the persisted Supabase session is restored. Showing
+    // it first causes a login flash on every refresh for returning users.
     const authScreen = document.getElementById('auth-screen');
     const appShell = document.getElementById('app-shell');
     if (authScreen) {
-      authScreen.style.display = '';
-      authScreen.classList.remove('ag-hidden');
-      authScreen.classList.add('ag-auth-screen');
+      authScreen.style.display = 'none';
+      authScreen.classList.add('ag-hidden');
     }
     if (appShell) appShell.style.display = 'none';
     const form = document.getElementById('ag-auth-form');
     const tabs = document.getElementById('ag-segmented-tabs');
     const subtitle = document.getElementById('ag-card-sub');
     const title = document.getElementById('ag-card-title');
-    if (form) form.style.display = 'none';
-    if (tabs) tabs.style.display = 'none';
-    if (title) title.textContent = 'Sign in to Clavis';
-    if (subtitle) subtitle.textContent = 'Use your Google account to securely access your workspace';
+    if (form) form.style.display = '';
+    if (tabs) tabs.style.display = '';
+    if (title) title.textContent = RUDRA_APP_NAME;
+    if (subtitle) subtitle.textContent = RUDRA_APP_DESCRIPTION;
     const googleText = document.getElementById('ag-google-btn-text');
     if (googleText) googleText.textContent = 'Continue with Google';
+    this.switchTab('login');
     const ready = await window.SupabaseAuth?.init?.();
     if (!ready?.success) {
+      if (authScreen) {
+        authScreen.style.display = '';
+        authScreen.classList.remove('ag-hidden');
+        authScreen.classList.add('ag-auth-screen');
+      }
       this.showToast(ready?.error || 'Supabase Auth is unavailable.', 'error');
     }
     return;
@@ -497,7 +488,7 @@ window.AntigravityAuth = {
     const formGrid = document.getElementById('ag-form-grid');
 
     // Check if this is a known device (password-only mode)
-    const isKnownDevice = !!(window.DeviceAccount && window.DeviceAccount.exists());
+    const isKnownDevice = false; // Passwords are verified by Supabase on every sign-in.
 
     if (tabContainer) tabContainer.setAttribute('data-tab', tab);
     if (formGrid) formGrid.setAttribute('data-tab', tab);
@@ -510,8 +501,8 @@ window.AntigravityAuth = {
       if (submitBtn) {
         submitBtn.innerHTML = `<span>Create Account &amp; Sync</span> <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
       }
-      if (cardTitle) cardTitle.textContent = 'Create Your Workspace';
-      if (cardSub) cardSub.textContent = 'Sign up to synchronize your leads & settings across devices';
+      if (cardTitle) cardTitle.textContent = RUDRA_APP_NAME;
+      if (cardSub) cardSub.textContent = RUDRA_APP_DESCRIPTION;
     } else {
       if (loginBtn) loginBtn.classList.add('active');
       if (signupBtn) signupBtn.classList.remove('active');
@@ -527,7 +518,7 @@ window.AntigravityAuth = {
         const firstName = (deviceProfile && deviceProfile.name) ? deviceProfile.name.split(/\s+/)[0] : '';
         const savedEmail = (deviceProfile && deviceProfile.email) ? deviceProfile.email : '';
 
-        if (cardTitle) cardTitle.textContent = firstName ? `Welcome back, ${firstName}! 👋` : 'Welcome Back!';
+        if (cardTitle) cardTitle.textContent = RUDRA_APP_NAME;
         if (cardSub) cardSub.textContent = savedEmail
           ? `Enter your password to continue${firstName ? `, ${firstName}` : ''}`
           : 'Enter your password to unlock the app';
@@ -549,9 +540,8 @@ window.AntigravityAuth = {
         if (emailInput && !emailInput.value && existingEmail) {
           emailInput.value = existingEmail;
         }
-        const who = (window.UserProfileManager?.getProfile?.().name || '').split(/\s+/)[0];
-        if (cardTitle) cardTitle.textContent = who ? `Welcome back, ${who}` : 'Sign In to Your Workspace';
-        if (cardSub) cardSub.textContent = 'Enter your email and password to sync all your data';
+        if (cardTitle) cardTitle.textContent = RUDRA_APP_NAME;
+        if (cardSub) cardSub.textContent = RUDRA_APP_DESCRIPTION;
       }
     }
 
@@ -602,18 +592,34 @@ window.AntigravityAuth = {
     const authScreen = document.getElementById('auth-screen');
     const appShell = document.getElementById('app-shell');
     if (!nextSession?.user) {
+      this._transitioningUserId = '';
       localStorage.setItem('skylark_logged_in', 'false');
+      localStorage.removeItem('skylark_active_email');
+      localStorage.removeItem('skylark_user_profile');
+      localStorage.removeItem('skylark_user');
+      window.allLeads = [];
+      window.all_candidates = [];
       if (appShell) appShell.style.display = 'none';
       if (authScreen) {
         authScreen.style.display = '';
         authScreen.classList.remove('ag-hidden');
         authScreen.classList.add('ag-auth-screen');
       }
+      window.dispatchEvent(new Event('clavis:workspace-change'));
       return;
     }
     const authUser = nextSession.user;
+    if (this._transitioningUserId === authUser.id ||
+        (authScreen?.classList.contains('ag-hidden') && appShell?.style.display === 'flex')) return;
+    this._transitioningUserId = authUser.id;
     const metadata = authUser.user_metadata || {};
     const email = String(authUser.email || '').trim().toLowerCase();
+    if (!email) { this._transitioningUserId = ''; return; }
+    const previousEmail = localStorage.getItem('skylark_active_email') || '';
+    if (previousEmail && previousEmail !== email) {
+      window.allLeads = [];
+      window.all_candidates = [];
+    }
     const name = String(metadata.full_name || metadata.name || email.split('@')[0] || 'User').trim();
     const profile = window.UserProfileManager.saveProfile({
       id: authUser.id,
@@ -627,11 +633,11 @@ window.AntigravityAuth = {
     if (email) localStorage.setItem('skylark_active_email', email);
     localStorage.setItem('skylark_logged_in', 'true');
     if (profile && window.DeviceAccount?.clear) {
-      try { await window.DeviceAccount.clear(); } catch (_) {}
+      try { Promise.resolve(window.DeviceAccount.clear()).catch(() => {}); } catch (_) {}
     }
-    if (authScreen?.classList.contains('ag-hidden') && appShell?.style.display === 'flex') return;
     this.showToast(`Welcome, ${profile?.firstName || name.split(/\s+/)[0]}!`, 'success');
     this.transitionToApp();
+    this._transitioningUserId = '';
   },
 
   renderGoogleButton(clientId) {
@@ -1101,31 +1107,37 @@ window.AntigravityAuth = {
     }
   },
 
-  /**
-   * Local recovery: five taps on "Forgot password?" unlocks this device's own workspace.
-   */
-  forgotTaps: 0,
-  forgotWindow: 0,
+  /** Send a verified password-reset link through Supabase Auth. */
   handleForgot() {
-    const now = Date.now();
-    if (now > this.forgotWindow) { this.forgotTaps = 0; this.forgotWindow = now + 8000; }
-    this.forgotTaps++;
-    const left = 5 - this.forgotTaps;
-    const hint = document.getElementById('ag-forgot-hint');
-
-    if (left > 0) {
-      if (hint) {
-        hint.textContent = left === 4
-          ? 'Tap it 4 more times to recover access'
-          : `${left} more…`;
-        hint.classList.add('show');
-      }
+    const email = document.getElementById('ag-input-email')?.value.trim().toLowerCase();
+    if (!email || !email.includes('@')) {
+      this.showToast('Enter your account email to reset your password.', 'error');
       return;
     }
-    this.forgotTaps = 0;
-    if (hint) { hint.textContent = 'Access recovered'; hint.classList.add('show'); }
-    this.showToast('For security, password recovery requires verified Google sign-in.', 'info');
-    this.handleGoogleLogin();
+    window.SupabaseAuth.resetPassword(email).then(result => {
+      this.showToast(result.success ? 'If that account exists, a reset link is on its way.' : (result.error || 'Reset failed.'), result.success ? 'success' : 'error');
+    });
+  },
+
+  showPasswordRecovery() {
+    this.currentTab = 'reset';
+    const screen = document.getElementById('auth-screen');
+    const shell = document.getElementById('app-shell');
+    const email = document.getElementById('ag-input-email');
+    const form = document.getElementById('ag-auth-form');
+    const tabs = document.getElementById('ag-segmented-tabs');
+    if (shell) shell.style.display = 'none';
+    if (screen) { screen.style.display = ''; screen.classList.remove('ag-hidden'); }
+    if (email) { email.value = window.SupabaseAuth?.getUser?.()?.email || ''; email.required = false; }
+    if (form) form.style.display = '';
+    if (tabs) tabs.style.display = 'none';
+    document.querySelectorAll('.ag-signup-only').forEach(el => { el.style.display = 'none'; });
+    const title = document.getElementById('ag-card-title');
+    const subtitle = document.getElementById('ag-card-sub');
+    const submit = document.getElementById('ag-submit-btn');
+    if (title) title.textContent = RUDRA_APP_NAME;
+    if (subtitle) subtitle.textContent = 'Choose a password for your Rudra24 AI account';
+    if (submit) submit.textContent = 'Save new password';
   },
 
   // ── Security Captcha ──
@@ -1164,191 +1176,46 @@ window.AntigravityAuth = {
   },
 
   async handleSubmit() {
-    this.showToast('Password sign-in is disabled. Continue with Google.', 'info');
-    return;
-    /* Legacy password registration/login intentionally disabled. */
     const email = document.getElementById('ag-input-email')?.value.trim().toLowerCase();
-    const password = document.getElementById('ag-input-password')?.value.trim();
-    const captchaVal = parseInt(document.getElementById('ag-input-captcha')?.value.trim(), 10);
+    const password = document.getElementById('ag-input-password')?.value || '';
     const submitBtn = document.getElementById('ag-submit-btn');
-
-    // Validation
-    if (this.currentTab === 'signup') {
-      const name = document.getElementById('ag-input-name')?.value.trim();
-      const company = document.getElementById('ag-input-company')?.value.trim();
-      const phone = document.getElementById('ag-input-phone')?.value.trim();
-
-      if (!name) {
-        this.showToast('Please enter your Full Name', 'error');
-        return;
-      }
-      if (!company) {
-        this.showToast('Please enter your Company / Agency Name', 'error');
-        return;
-      }
-      if (email && !email.includes('@')) {
-        this.showToast('Please enter a valid email address if providing one', 'error');
-        return;
-      }
-      if (!password || password.length < 8) {
-        this.showToast('Password must be at least 8 characters', 'error');
-        return;
-      }
-      if (captchaVal !== this.captchaAnswer) {
-        this.showToast('Security check answer is incorrect. Please retry.', 'error');
-        this.generateCaptcha();
-        return;
-      }
-
-      if (submitBtn) {
-        submitBtn.disabled = true;
-        submitBtn.innerHTML = `<svg width="17" height="17" viewBox="0 0 20 20" fill="currentColor" style="animation:agBtnSpin 0.6s linear infinite;"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg><span>Creating Workspace…</span>`;
-      }
-
-      // Generate unique user ID (email-derived if provided, or unique local ID)
-      const userId = (email && email.includes('@'))
-        ? (window.UserStorage ? window.UserStorage.emailToUserId(email) : 'usr_' + email.replace(/[^a-z0-9]/g, '_'))
-        : 'usr_' + Date.now().toString(36) + '_' + Math.random().toString(36).substring(2, 6);
-
-      // Register with CloudSyncManager if email provided
-      if (email && email.includes('@') && window.CloudSyncManager && typeof window.CloudSyncManager.register === 'function') {
-        const registration = await window.CloudSyncManager.register({
-          name,
-          company,
-          email,
-          password,
-          phone,
-          role: 'Owner'
-        });
-        if (!registration?.success) {
-          if (submitBtn) {
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Create Account & Sync';
-          }
-          this.showToast(registration?.error || 'Could not create the account.', 'error');
-          return;
-        }
-      }
-
-      // Save user profile locally
-      window.UserProfileManager.saveProfile({
-        id: userId,
-        name,
-        company,
-        email: email || '',
-        phone: phone || '',
-        role: 'Owner'
-      });
-
-      // Switch MemoryEngine database to this new user's isolated silo
-      if (window.MemoryEngine && typeof window.MemoryEngine.switchUser === 'function') {
-        window.MemoryEngine.switchUser(userId);
-      }
-
-      // Register the password for this device
-      if (window.DeviceAccount) {
-        window.DeviceAccount.create(password, { id: userId, name, email: email || '' }).catch(() => {});
-      }
-
-      // Remember this account on the laptop if email provided
-      if (email && email.includes('@')) {
-        this.rememberLaptopAccount(email, name, 'Laptop Account');
-      }
-
-      if (submitBtn) {
-        submitBtn.innerHTML = `<svg width="17" height="17" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"/></svg><span>Account Created — Launching…</span>`;
-        submitBtn.style.background = 'linear-gradient(135deg, #10B981 0%, #059669 100%)';
-        submitBtn.style.boxShadow = '0 6px 22px -3px rgba(16,185,129,0.5)';
-      }
-
-      this.showToast(`Welcome, ${name}! Your workspace is ready.`, 'success');
-      setTimeout(() => this.transitionToApp(), 550);
-
-
-    } else {
-      // ── Sign In ──
-      // KNOWN DEVICE: Password-only (no email needed)
-      const isKnownDevice = !!(window.DeviceAccount && window.DeviceAccount.exists());
-
-      if (!password) {
-        this.showToast('Please enter your password', 'error');
-        return;
-      }
-
-      // If NOT known device, also validate email
-      if (!isKnownDevice && (!email || !email.includes('@'))) {
-        this.showToast('Please enter your account email address', 'error');
-        return;
-      }
-
-      const loginBtn = document.getElementById('ag-submit-btn');
-      const restoreBtn = () => {
-        if (!loginBtn) return;
-        loginBtn.disabled = false;
-        loginBtn.innerHTML = `<span>Sign In</span> <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
-      };
-
-      if (loginBtn) {
-        loginBtn.innerHTML = `<svg width="17" height="17" viewBox="0 0 20 20" fill="currentColor" style="animation:agBtnSpin 0.6s linear infinite;"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg><span>Signing in…</span>`;
-        loginBtn.disabled = true;
-      }
-
-      try {
-        let authOk = false;
-        // On known device, use stored email; otherwise use entered email
-        let activeEmail = email;
-
-        if (isKnownDevice) {
-          // Password-only login: verify against stored device password
-          const valid = await window.DeviceAccount.verify(password);
-          if (valid) {
-            authOk = true;
-            // Use saved email from device account
-            const deviceProfile = window.DeviceAccount.getProfile();
-            activeEmail = (deviceProfile && deviceProfile.email) ? deviceProfile.email : (email || localStorage.getItem('skylark_active_email') || '');
-          }
-        } else {
-          // Cross-device login: try CloudSyncManager first
-          if (window.CloudSyncManager && typeof window.CloudSyncManager.login === 'function') {
-            const syncRes = await window.CloudSyncManager.login(email, password);
-            if (syncRes && syncRes.success) authOk = true;
-          }
-          // Fallback to local DeviceAccount
-          if (!authOk && window.DeviceAccount && window.DeviceAccount.exists()) {
-            const valid = await window.DeviceAccount.verify(password);
-            if (valid) authOk = true;
-          }
-        }
-
-        if (authOk) {
-          localStorage.setItem('skylark_logged_in', 'true');
-          if (activeEmail) localStorage.setItem('skylark_active_email', activeEmail);
-          window.UserProfileManager.syncUI();
-          const current = window.UserProfileManager.getProfile();
-          const displayEmail = activeEmail || (current && current.email) || '';
-          const first = (current.name || (displayEmail ? displayEmail.split('@')[0] : '')).split(/\s+/)[0];
-          if (displayEmail) this.rememberLaptopAccount(displayEmail, current.name || '', 'Laptop Account');
-          this.showToast(first ? `Welcome back, ${first}! 🎉` : 'Welcome back!', 'success');
-          setTimeout(() => this.transitionToApp(), 450);
-        } else {
-          restoreBtn();
-          const pw = document.getElementById('ag-input-password');
-          if (pw) {
-            pw.value = '';
-            pw.classList.add('ag-input-error');
-            setTimeout(() => pw.classList.remove('ag-input-error'), 900);
-            pw.focus();
-          }
-          const forgot = document.getElementById('ag-forgot-row');
-          if (forgot) forgot.style.display = 'flex';
-          this.showToast('Galat password. Phir try karo ya "Forgot password?" use karo.', 'error');
-        }
-      } catch (err) {
-        console.warn('Login error:', err);
-        restoreBtn();
-        this.showToast('Login failed. Please check the backend connection and try again.', 'error');
-      }
+    const wasReset = this.currentTab === 'reset';
+    if (!wasReset && (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) {
+      this.showToast('Enter a valid email address.', 'error');
+      return;
     }
+    if (password.length < 8) {
+      this.showToast('Password must be at least 8 characters.', 'error');
+      return;
+    }
+    if (submitBtn) submitBtn.disabled = true;
+    try {
+      let result;
+      if (this.currentTab === 'signup') {
+        const name = document.getElementById('ag-input-name')?.value.trim();
+        const company = document.getElementById('ag-input-company')?.value.trim();
+        const phone = document.getElementById('ag-input-phone')?.value.trim();
+        if (!name) { this.showToast('Enter your name.', 'error'); return; }
+        result = await window.SupabaseAuth.signUp(email, password, { full_name: name, company, phone });
+      } else if (wasReset) {
+        result = await window.SupabaseAuth.updatePassword(password);
+        if (result.success) {
+          const tabs = document.getElementById('ag-segmented-tabs');
+          if (tabs) tabs.style.display = '';
+          this.switchTab('login');
+        }
+      } else {
+        result = await window.SupabaseAuth.signInWithPassword(email, password);
+      }
+      if (!result?.success) this.showToast(result?.error || 'Sign-in failed.', 'error');
+      else if (result.needsVerification) this.showToast('Check your email to verify your account, then sign in.', 'success');
+      else if (wasReset) this.showToast('Password updated. Sign in to continue.', 'success');
+    } catch (err) {
+      this.showToast(err?.message || 'Sign-in failed.', 'error');
+    } finally {
+      if (submitBtn) submitBtn.disabled = false;
+    }
+    return;
   },
 
   // ── Dev / Fast Demo Bypass ──
@@ -1372,6 +1239,7 @@ window.AntigravityAuth = {
   // Simple, reliable, no complex dependencies.
   // Works regardless of overlay presence or CSS issues.
   transitionToApp() {
+    if (!window.SupabaseAuth?.getSession?.() || window.SupabaseAuth?.isRecoveryMode?.()) return;
     // Step 1: Mark as logged in (belt AND suspenders)
     localStorage.setItem('skylark_logged_in', 'true');
 
@@ -1406,6 +1274,7 @@ window.AntigravityAuth = {
       authScreen.classList.remove('ag-auth-screen', 'ag-exit-soft');
       authScreen.style.pointerEvents = '';
     }
+    window.dispatchEvent(new Event('clavis:workspace-change'));
 
     // Step 5: Sync identity into the UI.
     try { window.UserProfileManager.syncUI(); } catch(e) {}
@@ -1455,6 +1324,7 @@ window.AntigravityAuth = {
       authScreen.classList.add('ag-auth-screen');
       authScreen.style.display = '';  // let CSS flex !important take over
     }
+    window.dispatchEvent(new Event('clavis:workspace-change'));
     this.switchTab('login');
     this.generateCaptcha();
     this.showToast('Signed out successfully', 'info');
@@ -1606,14 +1476,10 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Load saved app name into auth card title
   const savedAppName = localStorage.getItem('skylark-app-name');
-  if (savedAppName) {
-    const cardTitle = document.getElementById('ag-card-title');
-    if (cardTitle) cardTitle.textContent = savedAppName;
-  }
 
   // Sync transition overlay app name
   const transText = document.querySelector('.ag-trans-app-name');
-  if (transText) transText.textContent = savedAppName || 'Neural Lead Intelligence';
+  if (transText) transText.textContent = savedAppName && savedAppName !== 'Neural Lead Intelligence' ? savedAppName : RUDRA_APP_NAME;
 });
 
 // ══════════════════════════════════════════════════════════════

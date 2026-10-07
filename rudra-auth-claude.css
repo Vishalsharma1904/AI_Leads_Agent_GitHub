@@ -1,0 +1,274 @@
+/* ============================================================
+ * rudra-auth-claude.css · the sign-in screen, Claude-quiet
+ * ------------------------------------------------------------
+ * Loaded last, after auth-antigravity.css, so it wins on order
+ * without that 43 KB file being rewritten.
+ *
+ * What changed and why:
+ *  · The floating orbs and the cursor spotlight are gone. Claude's
+ *    own pages put nothing behind the content; ambient glow is the
+ *    opposite of minimal and it fought the ivory ground.
+ *  · One serif headline, one sans everything-else — the same two
+ *    local faces the rest of the app uses (clavis-claude.css), so
+ *    the splash, this screen and the product read as one product.
+ *  · The primary action and card use a restrained olive/sage palette
+ *    that carries the Rudra24 mark without reducing text contrast.
+ *  · The card arrives slowly from under the fold, continuing the
+ *    splash's motion instead of popping in after it.
+ * ============================================================ */
+
+#auth-screen.ag-auth-screen {
+  --ra-sheet:   #FAF9F5;
+  --ra-surface: #EEF3E9;
+  --ra-sunk:    #F9FBF7;
+  --ra-ink:     #243629;
+  --ra-ink-2:   #405442;
+  --ra-mute:    #667366;
+  --ra-faint:   #707D70;
+  --ra-line:    rgba(55, 82, 55, .12);
+  --ra-line-2:  rgba(55, 82, 55, .2);
+  --ra-accent:  #536B43;
+  --ra-ease:    cubic-bezier(.22, 1, .36, 1);
+
+  background: var(--ra-sheet) !important;
+  font-family: 'CX Sans', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Nothing behind the content. */
+#auth-screen .ag-ambient-canvas,
+#auth-screen .ag-floating-orb,
+#auth-screen .ag-cursor-spotlight,
+#auth-screen .ag-card-shine { display: none !important; }
+
+/* ── the card ─────────────────────────────────────────────── */
+#auth-screen .ag-auth-card {
+  width: min(460px, calc(100vw - 32px)) !important;
+  max-height: calc(100dvh - 24px) !important;
+  overflow-y: auto !important;
+  margin: 0 auto !important;
+  padding: 22px 28px 16px !important;
+  border-radius: 18px !important;
+  background: var(--ra-surface) !important;
+  border: 1px solid var(--ra-line) !important;
+  box-shadow:
+    0 1px 2px rgba(35, 54, 40, .04),
+    0 20px 48px -30px rgba(44, 69, 47, .25) !important;
+  backdrop-filter: none !important;
+  animation: raCardIn 900ms var(--ra-ease) 120ms both !important;
+  scrollbar-color: rgba(83, 107, 67, .25) transparent !important;
+}
+#auth-screen .ag-auth-card::-webkit-scrollbar-thumb { background: rgba(83, 107, 67, .25) !important; }
+@keyframes raCardIn {
+  from { opacity: 0; transform: translateY(16px) scale(.985); filter: blur(5px); }
+  60%  { filter: blur(0); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* ── brand header ─────────────────────────────────────────── */
+#auth-screen .ag-brand-header {
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin-bottom: 10px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  background: none !important;
+}
+#auth-screen .ag-logo-emblem {
+  flex: 0 0 auto !important;
+  padding: 0 !important;
+  background: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+}
+#auth-screen .ag-logo-emblem img {
+  display: block !important;
+  width: 72px !important;
+  height: auto !important;
+  mix-blend-mode: multiply;
+}
+
+#auth-screen .ag-brand-badge {
+  display: none !important;
+}
+#auth-screen .ag-brand-name {
+  font-family: 'CX Serif', Georgia, serif !important;
+  font-size: 28px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0 !important;
+  line-height: 1.12 !important;
+  color: var(--ra-ink) !important;
+  margin: 0 0 4px !important;
+  text-shadow: none !important;
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+}
+#auth-screen .ag-brand-sub {
+  font-size: 11.5px !important;
+  line-height: 1.4 !important;
+  color: var(--ra-mute) !important;
+  margin: 0 !important;
+}
+
+/* ── Google button ────────────────────────────────────────── */
+#auth-screen .ag-btn-google {
+  width: 100% !important;
+  height: 42px !important;
+  gap: 10px !important;
+  border-radius: 11px !important;
+  background: var(--ra-surface) !important;
+  border: 1px solid var(--ra-line-2) !important;
+  color: var(--ra-ink) !important;
+  font-size: 14px !important;
+  font-weight: 500 !important;
+  box-shadow: none !important;
+  transition: background-color 240ms var(--ra-ease),
+              border-color 240ms var(--ra-ease),
+              transform 240ms var(--ra-ease) !important;
+}
+#auth-screen .ag-btn-google:hover { background: var(--ra-sunk) !important; transform: translateY(-1px) !important; }
+#auth-screen .ag-btn-google:active { transform: scale(.985) !important; transition-duration: 120ms !important; }
+
+/* ── divider ──────────────────────────────────────────────── */
+#auth-screen .ag-auth-divider {
+  margin: 10px 0 !important;
+  color: var(--ra-faint) !important;
+  font-size: 10.5px !important;
+  letter-spacing: .08em !important;
+  text-transform: uppercase !important;
+}
+#auth-screen .ag-auth-divider::before,
+#auth-screen .ag-auth-divider::after { background: var(--ra-line) !important; height: 1px !important; }
+#auth-screen .ag-auth-divider span { background: transparent !important; padding: 0 12px !important; }
+
+/* ── segmented tabs ───────────────────────────────────────── */
+#auth-screen .ag-segmented-tabs {
+  background: var(--ra-sunk) !important;
+  border: 1px solid var(--ra-line) !important;
+  border-radius: 12px !important;
+  padding: 3px !important;
+  margin-bottom: 12px !important;
+}
+#auth-screen .ag-tab-pill-bg {
+  background: var(--ra-surface) !important;
+  border-radius: 9px !important;
+  box-shadow: 0 1px 2px rgba(20, 20, 19, .07) !important;
+  border: 0 !important;
+  transition: transform 520ms var(--ra-ease) !important;
+}
+#auth-screen .ag-tab-btn {
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  color: var(--ra-mute) !important;
+  gap: 7px !important;
+  transition: color 280ms var(--ra-ease) !important;
+}
+#auth-screen .ag-tab-btn.active { color: var(--ra-ink) !important; font-weight: 600 !important; }
+
+/* ── fields ───────────────────────────────────────────────── */
+#auth-screen .ag-form-label {
+  font-size: 11.5px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0 !important;
+  text-transform: none !important;
+  color: var(--ra-ink-2) !important;
+  margin-bottom: 4px !important;
+}
+#auth-screen .ag-form-label span { color: var(--ra-accent) !important; }
+#auth-screen .ag-form-grid { row-gap: 6px !important; }
+
+#auth-screen .ag-input {
+  height: 42px !important;
+  border-radius: 11px !important;
+  background: rgba(255, 255, 255, .72) !important;
+  border: 1px solid var(--ra-line) !important;
+  color: var(--ra-ink) !important;
+  font-size: 14px !important;
+  padding-left: 40px !important;
+  box-shadow: none !important;
+  transition: background-color 240ms var(--ra-ease),
+              border-color 240ms var(--ra-ease) !important;
+}
+#auth-screen .ag-input::placeholder { color: var(--ra-faint) !important; }
+#auth-screen .ag-input:hover { background: rgba(20, 20, 19, .055) !important; }
+#auth-screen .ag-input:focus {
+  background: var(--ra-surface) !important;
+  border-color: var(--ra-line-3, rgba(20, 20, 19, .3)) !important;
+  outline: none !important;
+}
+#auth-screen .ag-input-icon { color: var(--ra-faint) !important; left: 14px !important; width: 16px !important; height: 16px !important; }
+#auth-screen .ag-pw-toggle { color: var(--ra-faint) !important; }
+#auth-screen .ag-pw-toggle:hover { color: var(--ra-ink-2) !important; }
+
+/* ── primary action ───────────────────────────────────────── */
+#auth-screen .ag-btn-submit {
+  width: 100% !important;
+  height: 42px !important;
+  margin-top: 10px !important;
+  border-radius: 9px !important;
+  background: #536B43 !important;
+  border: 0 !important;
+  color: #FAF9F5 !important;
+  font-size: 14px !important;
+  font-weight: 550 !important;
+  letter-spacing: -0.002em !important;
+  box-shadow: none !important;
+  transition: background-color 180ms var(--ra-ease), transform 180ms var(--ra-ease) !important;
+}
+#auth-screen .ag-btn-submit:hover { background: #455B39 !important; transform: translateY(-1px) !important; }
+#auth-screen .ag-btn-submit:active { transform: scale(.985) !important; transition-duration: 120ms !important; }
+
+#auth-screen .ag-forgot-btn {
+  font-size: 12.5px !important;
+  color: var(--ra-mute) !important;
+  font-weight: 500 !important;
+  transition: color 240ms var(--ra-ease) !important;
+}
+#auth-screen .ag-forgot-btn:hover { color: var(--ra-ink) !important; text-decoration: none !important; }
+
+/* ── footer ───────────────────────────────────────────────── */
+#auth-screen .ag-auth-footer {
+  margin-top: 12px !important;
+  padding-top: 10px !important;
+  border-top: 1px solid var(--ra-line) !important;
+  font-size: 11.5px !important;
+  color: var(--ra-faint) !important;
+  background: none !important;
+}
+#auth-screen .ag-footer-dot { background: #536B43 !important; box-shadow: none !important; }
+
+#auth-screen .ag-auth-card::before { display: none !important; }
+
+/* ── language switcher, top right ─────────────────────────── */
+#auth-screen select,
+body > .rudra-lang-switch select {
+  border-radius: 10px !important;
+  border: 1px solid var(--ra-line-2) !important;
+  background: var(--ra-surface) !important;
+  color: var(--ra-ink) !important;
+  font-size: 13px !important;
+  padding: 7px 11px !important;
+  box-shadow: none !important;
+}
+
+/* ── toast ────────────────────────────────────────────────── */
+#ag-auth-toast {
+  border-radius: 12px !important;
+  font-size: 13px !important;
+  font-weight: 500 !important;
+  box-shadow: 0 1px 2px rgba(20, 20, 19, .06), 0 18px 44px -26px rgba(20, 20, 19, .4) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #auth-screen .ag-auth-card { animation: none !important; }
+  #auth-screen .ag-btn-google:hover,
+  #auth-screen .ag-btn-submit:hover { transform: none !important; }
+}
+
+@media (max-width: 540px) {
+  #auth-screen .ag-auth-card { padding: 18px 18px 16px !important; }
+  #auth-screen .ag-brand-name { font-size: 25px !important; }
+  #auth-screen .ag-brand-header { gap: 10px !important; margin-bottom: 12px !important; }
+  #auth-screen .ag-logo-emblem img { width: 64px !important; }
+}

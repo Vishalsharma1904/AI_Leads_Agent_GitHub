@@ -1,0 +1,44 @@
+/* Calm text entry: the caret is the pointer-focus affordance. */
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) body :is(input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]):not([type="file"]):not([type="button"]):not([type="submit"]), textarea, [contenteditable="true"]),
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) body :is(input:not([type="checkbox"],[type="radio"],[type="range"],[type="color"],[type="file"],[type="button"],[type="submit"]),textarea,[contenteditable="true"]):is(:focus,:focus-visible) {
+  border-color: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  caret-color: currentColor;
+}
+/* One visible shell, with the same edge and elevation before and during typing. */
+:root {
+  --entry-edge: color-mix(in srgb, var(--cc-ink,#1c211d) 13%, transparent);
+  --entry-shadow: 0 3px 8px -4px rgba(24,43,34,.10), 0 18px 36px -16px rgba(24,43,34,.18);
+}
+html[data-theme="dark"] { --entry-shadow: 0 3px 8px -4px rgba(0,0,0,.25), 0 18px 36px -16px rgba(0,0,0,.48); }
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) body :is(.jarvis-input-container,.claude-input-container,.cts-composer-row),
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) body :is(.jarvis-input-container,.claude-input-container,.cts-composer-row):is(:hover,:focus-within) {
+  background: var(--cc-surface,#fffff5) !important;
+  border: 1px solid var(--entry-edge) !important;
+  border-radius: 18px !important;
+  outline: none !important;
+  box-shadow: var(--entry-shadow) !important;
+}
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) body :is(#jarvis-input,#chat-input,#candidate-ai-input,.cts-composer-input,.cts-composer-input-wrap,.jarvis-composer-input-row) {
+  background: transparent !important;
+  border: 0 !important;
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* Geometry rules must not expose an empty hidden CRM count badge. */
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) #sidebar [hidden] { display:none !important; }
+/* One travelling pill; per-row hover backgrounds otherwise flash underneath it. */
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) body .cts-act[aria-pressed="true"] { background:var(--cc-accent,#04534b) !important; color:#fff !important; }
+.cts-act:disabled { opacity:.45; cursor:default; }
+html body dialog.cx-dialog input:is(:focus,:focus-visible) { outline:none !important; box-shadow:none !important; border-color:transparent !important; }
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) #sidebar .lx-pill-on :is(.nav-item,.nav-sub-item):not(.active):hover { background: transparent !important; }
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) #sidebar .lx-nav-pill {
+  background: var(--flow-nav-hover,rgba(255,255,255,.10)) !important;
+  box-shadow: none !important;
+  transition: transform 440ms cubic-bezier(.22,1,.36,1),left 440ms cubic-bezier(.22,1,.36,1),width 440ms cubic-bezier(.22,1,.36,1),height 440ms cubic-bezier(.22,1,.36,1),opacity 180ms ease !important;
+}
+html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) #sidebar .lx-nav-pill.is-instant { transition:none !important; }
+@media(prefers-reduced-motion:reduce) {
+  html:not(#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet#quiet) #sidebar .lx-nav-pill { transition:none !important; }
+}

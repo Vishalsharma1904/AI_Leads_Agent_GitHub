@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rudra24 AI</title>
+<style>
+  /* Local fonts, same files clavis-claude.css uses — the splash must render
+     correctly before any network exists, so nothing is fetched from a CDN. */
+  @font-face {
+    font-family: 'CX Sans'; font-style: normal; font-weight: 100 900; font-display: block;
+    src: url(fonts/geist-latin-wght-normal.woff2) format('woff2-variations'),
+         url(fonts/geist-latin-wght-normal.woff2) format('woff2');
+  }
+  @font-face {
+    font-family: 'CX Serif'; font-style: normal; font-weight: 200 900; font-display: block;
+    src: url(fonts/source-serif-4-latin-opsz-normal.woff2) format('woff2-variations'),
+         url(fonts/source-serif-4-latin-opsz-normal.woff2) format('woff2');
+  }
+
+  :root {
+    --sheet: #FAF9F5;   /* Claude ivory — index.html shares it, so the swap is invisible */
+    --ink:   #141413;
+    --mute:  #6B6A64;
+    --line:  rgba(20, 20, 19, .08);
+    --ease:  cubic-bezier(.22, 1, .36, 1);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    display: grid;
+    place-items: center;
+    background: var(--sheet);
+    color: var(--ink);
+    font: 400 14px/1.6 'CX Sans', Inter, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -webkit-user-select: none;
+    user-select: none;
+    overflow: hidden;
+    opacity: 1;
+    transition: opacity 560ms var(--ease);
+  }
+  /* electron/main.js sets this just before it swaps in the app, so the two
+     screens cross-fade instead of cutting. */
+  body.leaving { opacity: 0; }
+
+  .wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    animation: rise 900ms var(--ease) both;
+  }
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(14px); filter: blur(6px); }
+    60%  { filter: blur(0); }
+    to   { opacity: 1; transform: none; filter: none; }
+  }
+
+  .mark {
+    width: 64px; height: 64px;
+    object-fit: contain;
+    margin-bottom: 26px;
+    /* A slow, barely-there breath. It says "alive", not "loading bar". */
+    animation: breathe 4.2s ease-in-out 900ms infinite;
+  }
+  @keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: .62; } }
+
+  .name {
+    font-family: 'CX Serif', Georgia, serif;
+    font-size: 34px;
+    font-weight: 400;
+    letter-spacing: -0.018em;
+    line-height: 1.1;
+    margin: 0;
+  }
+
+  .rule {
+    width: 34px; height: 1px;
+    margin: 24px 0 20px;
+    background: var(--line);
+  }
+
+  .msg {
+    font-size: 13.5px;
+    color: var(--mute);
+    letter-spacing: -0.003em;
+    min-height: 1.6em;
+  }
+  /* Each line arrives, settles, then leaves — the words change, so it never
+     reads as one frozen string repeating forever. */
+  .msg > span {
+    display: inline-block;
+    animation: line 440ms var(--ease) both;
+  }
+  .msg > span.out { animation: lineOut 320ms cubic-bezier(.4, 0, 1, 1) both; }
+  @keyframes line    { from { opacity: 0; transform: translateY(5px); filter: blur(3px); } to { opacity: 1; transform: none; filter: none; } }
+  @keyframes lineOut { from { opacity: 1; } to { opacity: 0; transform: translateY(-5px); filter: blur(3px); } }
+
+  @media (prefers-color-scheme: dark) {
+    :root { --sheet: #121211; --ink: #ECEAE4; --mute: #A6A199; --line: rgba(236, 234, 228, .12); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .wrap, .mark, .msg > span { animation: none !important; }
+    body { transition: none; }
+  }
+</style>
+</head>
+<body>
+  <main class="wrap">
+    <img class="mark" src="assets/rudra24-icon.png" alt="" onerror="this.style.display='none'" />
+    <h1 class="name">Rudra24 AI</h1>
+    <div class="rule"></div>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  </main>
+<script>
+  /* This page never talks to the backend — electron/main.js waits for the API
+     and swaps the page. These lines only describe what is happening, in order,
+     so a slow first start feels like progress rather than a stuck screen. */
+  const LINES = [
+    'Waking up',
+    'Starting services',
+    'Connecting securely',
+    'Loading your workspace',
+    'Almost there'
+  ];
+  const el = document.getElementById('msg');
+  let i = -1;
+
+  function show(text) {
+    const old = el.firstElementChild;
+    if (old) {
+      old.classList.add('out');
+      setTimeout(() => old.remove(), 320);
+    }
+    const span = document.createElement('span');
+    span.textContent = text;
+    setTimeout(() => el.appendChild(span), old ? 220 : 0);
+  }
+
+  function next() {
+    // Stop at the last line rather than looping: a message that comes back
+    // around tells the user the app is going in circles.
+    i = Math.min(i + 1, LINES.length - 1);
+    show(LINES[i]);
+    if (i < LINES.length - 1) setTimeout(next, i === 0 ? 2600 : 4200);
+  }
+  next();
+</script>
+</body>
+</html>

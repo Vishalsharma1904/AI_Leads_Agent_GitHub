@@ -4,7 +4,7 @@
    Loaded last. Three things live here and nothing else:
 
      1. the ghost-completion mirror and its Tab affordance
-     2. the attachment tray in the Clavis composer
+     2. the attachment tray in the Rudra24 AI composer
      3. the Peek Task window's motion — the slow blur-to-clear
         open, the per-word settle of an answer, and the smart chips
 
@@ -156,7 +156,7 @@ html[data-theme="dark"] .ciq-tab-hint kbd { color: #F4F4F6; }
 }
 
 /* ══════════════════════════════════════════════════════════
-   2 · Attachment tray in the Clavis composer
+   2 · Attachment tray in the Rudra24 AI composer
    ══════════════════════════════════════════════════════════
    Pasted screenshots get their own labelled section. The 0fr→1fr
    grid trick animates to the tray's natural height, so the composer

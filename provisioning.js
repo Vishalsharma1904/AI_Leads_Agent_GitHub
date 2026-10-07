@@ -234,7 +234,7 @@ window.Provisioning = (function () {
 
     // Adopt branding immediately, even before signup completes
     const brand = document.getElementById('logo-brand-text');
-    if (brand && (!brand.textContent || /Your Workspace/i.test(brand.textContent))) brand.textContent = p.company;
+    if (brand) brand.textContent = 'Rudra24 AI';
 
     // If a profile already exists but has no company, inherit the licensed one
     try {

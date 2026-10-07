@@ -1,4 +1,4 @@
-"""Local speech-performance primitives used by Clavis desktop and telephony."""
+"""Local speech-performance primitives used by Rudra24 AI desktop and telephony."""
 
 from .contracts import ConversationState, SpeechPerformanceSegment, new_generation_id
 from .language_router import clean_for_speech, route_clauses

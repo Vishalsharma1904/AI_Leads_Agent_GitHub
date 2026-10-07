@@ -116,6 +116,34 @@
       const leads = JSON.parse(localStorage.getItem('allLeads') || '[]');
       t('usage-leads', leads.length.toLocaleString('en-IN'));
       t('usage-runs', localStorage.getItem('skylark_run_count') || '0');
+
+      const heatmap = document.getElementById('usage-heatmap');
+      if (heatmap) {
+        heatmap.innerHTML = '';
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const counts = new Array(12).fill(0);
+        leads.forEach(l => {
+          if (!l.createdAt && !l.timestamp && !l.sourceTimestamp) return;
+          const d = new Date(l.createdAt || l.timestamp || l.sourceTimestamp);
+          d.setHours(0, 0, 0, 0);
+          const daysAgo = Math.round((today - d) / (1000 * 60 * 60 * 24));
+          if (daysAgo >= 0 && daysAgo < 12) counts[11 - daysAgo]++;
+        });
+        const maxC = Math.max(1, ...counts);
+        counts.forEach(c => {
+          const intensity = c === 0 ? 0 : 0.2 + (0.8 * (c / maxC));
+          const bg = c === 0 ? 'var(--cc-line, rgba(127,127,127,0.15))' : `color-mix(in srgb, var(--olive-700, var(--cc-accent, #3B82F6)) ${intensity * 100}%, transparent)`;
+          heatmap.innerHTML += `<div style="background: ${bg}; border-radius: 4px;" title="${c} leads"></div>`;
+        });
+      }
+
+      const utApify = document.getElementById('ut-apify');
+      if (utApify) utApify.textContent = localStorage.getItem('skylark_run_count') || '0';
+      const utPlaces = document.getElementById('ut-places');
+      if (utPlaces) utPlaces.textContent = leads.filter(l => String(l.source || '').includes('places') || l.placeId).length.toLocaleString('en-IN');
+      const utReader = document.getElementById('ut-reader');
+      if (utReader) utReader.textContent = leads.filter(l => l.scraped || l.fullText || (l.emails && l.emails.length)).length.toLocaleString('en-IN');
     } catch (_) {}
   }
 

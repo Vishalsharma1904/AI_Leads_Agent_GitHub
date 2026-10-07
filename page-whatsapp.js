@@ -134,7 +134,7 @@ const WhatsAppCtrl = {
       } else if (!textarea.value.trim()) {
         const me = window.UserProfileManager?.getProfile?.() || {};
         const brand = me.company || me.name || 'our team';
-        textarea.value = `Namaste {Company} Team,\n\nWe provide certified *Security Guards*, professional *Housekeeping Staff* and *Pantry Boys* for commercial facilities in {City}.\n\n📄 *Company Brochure & Catalog:* {Brochure}\n\nCan we schedule a 5-minute call?\n\nBest regards,\n${brand}`;
+        textarea.value = `Namaste {Company} Team,\n\nI'm reaching out from ${brand}. We help teams in {City} with {JobTitle}.\n\nWould a short call about your current needs be useful?\n\nBest regards,\n${brand}`;
       }
     }
     this.loadBrochure();
@@ -171,191 +171,204 @@ const WhatsAppCtrl = {
     if (window.showToast) window.showToast('Company Brochure attached to WhatsApp campaigns!', 'success');
   },
 
-  isPaused: false,
-  autoTimer: null,
-
-  togglePause() {
-    this.isPaused = !this.isPaused;
-    const pauseBtn = document.getElementById('wa-pause-btn');
-    if (pauseBtn) {
-      pauseBtn.textContent = this.isPaused ? '▶️ Resume' : '⏸️ Pause';
-    }
-    if (!this.isPaused && this.isBatchRunning) {
-      this.runNextStep();
-    }
-  },
-
-  // ── Start WhatsApp Single-Tab Auto Batch ──
-  startBatch() {
-    this.refreshQueue();
-    const batchLimit = parseInt(document.getElementById('wa-batch-size')?.value, 10) || 10;
-    const audience = this.queue.slice(0, batchLimit);
-
-    if (audience.length === 0) {
-      if (window.showToast) window.showToast('No leads with valid phone numbers available.', 'warning');
-      else alert('No valid phone numbers available.');
-      return;
-    }
-
-    this.isBatchRunning = true;
-    this.isPaused = false;
-    this.currentIndex = 0;
-
-    const queueUI = document.getElementById('wa-queue-ui');
-    const startBtn = document.getElementById('wa-start-batch-btn');
-    const pauseBtn = document.getElementById('wa-pause-btn');
-
-    if (queueUI) queueUI.style.display = 'block';
-    if (startBtn) startBtn.style.display = 'none';
-    if (pauseBtn) pauseBtn.textContent = '⏸️ Pause';
-
-    this.runNextStep();
-  },
-
-  runNextStep() {
-    clearTimeout(this.autoTimer);
-    if (!this.isBatchRunning || this.isPaused) return;
-
-    const batchLimit = parseInt(document.getElementById('wa-batch-size')?.value, 10) || 10;
-    const totalLeads = Math.min(batchLimit, this.queue.length);
-
-    if (this.currentIndex >= totalLeads) {
-      this.stopBatch();
-      if (window.showToast) window.showToast('WhatsApp anti-ban campaign completed safely!', 'success');
-      return;
-    }
-
-    const lead = this.queue[this.currentIndex];
-    const rawTemplate = document.getElementById('whatsapp-body')?.value || document.getElementById('whatsapp-message-text')?.value || '';
-    const brochureUrl = localStorage.getItem('skylark_whatsapp_brochure_url') || '';
-
-    // Anti-Ban Greeting Variation (Spintax Jitter to make body hash unique)
-    const GREETINGS = ['Namaste', 'Hello', 'Hi', 'Good day'];
-    const randomGreeting = GREETINGS[this.currentIndex % GREETINGS.length];
-
-    let rendered = rawTemplate
-      .replace(/^Namaste|^Hello|^Hi|^Good day/gi, randomGreeting)
-      .replace(/\{Company\}/gi, lead.company || 'your facility')
-      .replace(/\{City\}/gi, lead.city || 'your area')
-      .replace(/\{JobTitle\}/gi, lead.jobTitle || 'Security & Housekeeping')
-      .replace(/\{Phone\}/gi, lead.phone || '')
-      .replace(/\{Brochure\}/gi, brochureUrl);
-
-    if (brochureUrl && !rendered.includes(brochureUrl) && !rendered.toLowerCase().includes('brochure')) {
-      rendered += `\n\n📄 *Company Brochure:* ${brochureUrl}`;
-    }
-
-    let phone = (lead.phone || '').replace(/[^0-9]/g, '');
-    if (phone.length === 10) phone = '91' + phone;
-
-    // Error-free tab dispatch
-    try {
-      // Single Recycled Window Target ('skylark_wa_automation_tab')
-      // Re-uses exact same tab to prevent tab clutter & PC RAM load!
-      const url = `https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(rendered)}`;
-      window.open(url, 'skylark_wa_automation_tab');
-    } catch (err) {
-      console.warn('[WhatsApp Auto] Tab dispatch notice:', err);
-    }
-
-    // Update lead status in storage
-    lead.whatsappSent = true;
-    lead.status = 'Contacted';
-    try {
-      let allLeads = JSON.parse(localStorage.getItem('allLeads') || '[]');
-      const match = allLeads.find(l => l.id === lead.id || l.phone === lead.phone);
-      if (match) {
-        match.whatsappSent = true;
-        match.status = 'Contacted';
-        localStorage.setItem('allLeads', JSON.stringify(allLeads));
-      }
-    } catch(e) {}
-
-    this.currentIndex++;
-
-    // Update Progress Bar & UI
-    const statusEl = document.getElementById('wa-queue-status');
-    const currentLeadEl = document.getElementById('wa-queue-current-lead');
-    const progressBar = document.getElementById('wa-progress-bar');
-    const timerBadge = document.getElementById('wa-queue-timer');
-
-    const pct = Math.round((this.currentIndex / totalLeads) * 100);
-    if (progressBar) progressBar.style.width = pct + '%';
-    if (statusEl) statusEl.innerHTML = `<span>Sent: ${this.currentIndex} / ${totalLeads}</span>`;
-
-    if (this.currentIndex < totalLeads) {
-      const nextLead = this.queue[this.currentIndex];
-      if (currentLeadEl) currentLeadEl.innerHTML = `Next: <b>${nextLead.company}</b> (${nextLead.phone} • ${nextLead.city})`;
-    } else {
-      if (currentLeadEl) currentLeadEl.textContent = 'All messages dispatched safely!';
-    }
-
-    if (window.LeadsCtrl) window.LeadsCtrl.init();
-    if (window.DashboardCtrl) window.DashboardCtrl.init();
-
-    // 🛡️ ANTI-BAN HUMAN JITTER & SMART REST PAUSE:
-    // 1. Every 5 messages, take a 12s human rest break
-    // 2. Add +1.5s to +3.5s randomized human typing delay
-    const baseDelaySec = parseInt(document.getElementById('wa-delay-size')?.value, 10) || 6;
-    const isRestStep = (this.currentIndex % 5 === 0 && this.currentIndex < totalLeads);
-    const extraJitterSec = Math.floor(Math.random() * 3) + 1;
-    let delaySec = isRestStep ? (12 + extraJitterSec) : (baseDelaySec + extraJitterSec);
-
-    let remaining = delaySec;
-
-    const countdown = () => {
-      if (!this.isBatchRunning || this.isPaused) return;
-      if (remaining <= 0) {
-        this.runNextStep();
-      } else {
-        if (timerBadge) {
-          timerBadge.textContent = isRestStep ? `🛡️ Rest ${remaining}s` : `⏱️ Next in ${remaining}s`;
-        }
-        if (isRestStep && currentLeadEl) {
-          currentLeadEl.innerHTML = `<span style="color:#d97706; font-weight:700;">🛡️ Smart Human Rest Pause (${remaining}s) — Protecting WhatsApp Number</span>`;
-        }
-        remaining--;
-        this.autoTimer = setTimeout(countdown, 1000);
-      }
-    };
-    countdown();
-  },
-
-  stopBatch() {
-    this.isBatchRunning = false;
-    this.isPaused = false;
-    clearTimeout(this.autoTimer);
-
-    const queueUI = document.getElementById('wa-queue-ui');
-    const startBtn = document.getElementById('wa-start-batch-btn');
-
-    if (queueUI) queueUI.style.display = 'none';
-    if (startBtn) startBtn.style.display = 'flex';
-
-    this.refreshQueue();
-    if (window.showToast) window.showToast('WhatsApp batch queue stopped.', 'info');
-  }
 };
 
 // Global Bridges
 window.WhatsAppCtrl = WhatsAppCtrl;
 window.saveWhatsappTemplate = () => {
   WhatsAppCtrl.saveTemplate();
-  if (window.showToast) window.showToast('WhatsApp template saved successfully!', 'success');
+  window.showToast?.('success', 'Template saved', 'Your WhatsApp message is saved on this device.');
 };
 window.saveWhatsappBrochure = () => WhatsAppCtrl.saveBrochure();
-window.handleWhatsappBrochureFile = (e) => {
-  const file = e.target?.files?.[0];
-  if (!file) return;
-  const fakeUrl = URL.createObjectURL(file);
-  WhatsAppCtrl.saveBrochure(fakeUrl, file.name);
-};
 window.openWhatsappWeb = () => window.open('https://web.whatsapp.com', '_blank');
 window.startWhatsappBatch = () => WhatsAppCtrl.startBatch();
-window.processWhatsappQueueNext = () => WhatsAppCtrl.processNext();
+window.processWhatsappQueueNext = () => WhatsAppCtrl.openCurrent();
 window.stopWhatsappQueue = () => WhatsAppCtrl.stopBatch();
 window.updateWhatsappPreview = () => WhatsAppCtrl.updatePreview();
 
 document.addEventListener('DOMContentLoaded', () => {
   WhatsAppCtrl.init();
 });
+
+// The browser cannot tell whether a message was sent in WhatsApp Web. Keep
+// this as a deliberate review queue and record a send only after confirmation.
+Object.assign(WhatsAppCtrl, {
+  initialized: false,
+  reviewed: [],
+  getStorage() {
+    return window.UserStorage || {
+      getJSON: (key, fallback) => { try { return JSON.parse(localStorage.getItem(key) || 'null') || fallback; } catch (_) { return fallback; } },
+      setJSON: (key, value) => localStorage.setItem(key, JSON.stringify(value))
+    };
+  },
+  init() {
+    if (!this.initialized) {
+      this.initialized = true;
+      document.getElementById('whatsapp-body')?.addEventListener('input', () => { this.saveTemplate(); this.updatePreview(); });
+      document.getElementById('wa-batch-size')?.addEventListener('input', event => {
+        document.getElementById('wa-batch-val').textContent = event.target.value;
+      });
+      document.getElementById('wa-consent-confirm')?.addEventListener('change', event => {
+        const open = document.getElementById('wa-open-btn');
+        if (open) open.disabled = !event.target.checked;
+      });
+      document.addEventListener('nexus:leadsupdated', () => this.refreshQueue());
+      this.loadTemplate();
+    }
+    this.refreshQueue();
+  },
+  refreshQueue() {
+    const selected = window.crmSelectedLead;
+    const audience = window.crmAudience;
+    const leads = selected ? [selected] : Array.isArray(audience) && audience.length ? audience :
+      this.getStorage().getJSON('allLeads', window.allLeads || []);
+    const seen = new Set();
+    const eligible = (Array.isArray(leads) ? leads : []).filter(lead => {
+      const phone = String(lead?.phone || '').replace(/\D/g, '');
+      if (phone.length < 10 || phone.length > 15 || seen.has(phone) || lead.phoneOptOut || (!selected && lead.whatsappSent)) return false;
+      seen.add(phone);
+      return true;
+    });
+    if (!this.isBatchRunning) this.queue = eligible;
+    const count = document.getElementById('wa-eligible-count');
+    if (count) count.textContent = String(eligible.length);
+    this.updatePreview();
+  },
+  renderMessage(lead) {
+    const brochure = localStorage.getItem('skylark_whatsapp_brochure_url') || '';
+    return String(document.getElementById('whatsapp-body')?.value || '')
+      .replace(/\{Company\}/gi, lead.company || 'your team')
+      .replace(/\{City\}/gi, lead.city || '')
+      .replace(/\{JobTitle\}/gi, lead.jobTitle || 'services')
+      .replace(/\{Phone\}/gi, lead.phone || '')
+      .replace(/\{Brochure\}/gi, brochure);
+  },
+  updatePreview() {
+    const box = document.getElementById('whatsapp-preview-box');
+    if (!box) return;
+    const lead = this.queue[this.currentIndex] || this.queue[0];
+    box.textContent = lead ? this.renderMessage(lead) : 'Leads with valid phone numbers will appear here.';
+    box.style.whiteSpace = 'pre-wrap';
+  },
+  saveBrochure(url, name) {
+    const target = String(url || document.getElementById('whatsapp-brochure-url')?.value || '').trim();
+    if (target && !/^https:\/\/[^\s]+$/i.test(target)) {
+      window.showToast?.('warning', 'Public link needed', 'Paste an HTTPS brochure link that recipients can open.');
+      return;
+    }
+    localStorage.setItem('skylark_whatsapp_brochure_url', target);
+    localStorage.setItem('skylark_whatsapp_brochure_name', name || 'Brochure link');
+    this.loadBrochure();
+    this.updatePreview();
+  },
+  loadBrochure() {
+    const url = localStorage.getItem('skylark_whatsapp_brochure_url') || '';
+    const input = document.getElementById('whatsapp-brochure-url');
+    const status = document.getElementById('whatsapp-brochure-status');
+    if (input) input.value = url;
+    if (status) status.textContent = url ? `Brochure link ready: ${url}` : 'Optional: paste a public HTTPS brochure link.';
+  },
+  startBatch() {
+    this.refreshQueue();
+    const size = Math.max(1, Math.min(50, Number(document.getElementById('wa-batch-size')?.value) || 10));
+    this.queue = this.queue.slice(0, size);
+    if (!this.queue.length) return window.showToast?.('warning', 'No eligible leads', 'Add leads with phone numbers first.');
+    if (!document.getElementById('whatsapp-body')?.value.trim()) return window.showToast?.('warning', 'Message required', 'Write a message before reviewing the batch.');
+    this.currentIndex = 0;
+    this.reviewed = [];
+    this.isBatchRunning = true;
+    document.getElementById('wa-queue-ui').style.display = 'block';
+    document.getElementById('wa-start-batch-btn').style.display = 'none';
+    this.renderCurrent();
+  },
+  renderCurrent() {
+    const lead = this.queue[this.currentIndex];
+    if (!lead) return this.finishBatch();
+    const status = document.getElementById('wa-queue-status');
+    const current = document.getElementById('wa-queue-current-lead');
+    if (status) status.textContent = `Review ${this.currentIndex + 1} of ${this.queue.length} · ${this.reviewed.filter(x => x === 'confirmed').length} confirmed`;
+    if (current) current.textContent = `${lead.company || 'Lead'} · ${lead.phone || ''} · ${lead.city || ''}`;
+    document.getElementById('wa-progress-bar').style.width = `${Math.round(this.currentIndex / this.queue.length * 100)}%`;
+    const consent = document.getElementById('wa-consent-confirm');
+    if (consent) consent.checked = Boolean(lead.whatsappOptIn);
+    const open = document.getElementById('wa-open-btn');
+    if (open) open.disabled = !consent?.checked;
+    const confirm = document.getElementById('wa-confirm-btn');
+    if (confirm) confirm.disabled = !this.chatOpened;
+    this.updatePreview();
+  },
+  openCurrent() {
+    if (!this.isBatchRunning) return;
+    if (!document.getElementById('wa-consent-confirm')?.checked) {
+      return window.showToast?.('warning', 'Consent needed', 'Only open chats for leads who opted in to WhatsApp messages.');
+    }
+    const lead = this.queue[this.currentIndex];
+    if (lead.phoneOptOut) return window.showToast?.('warning', 'Phone opt-out', 'This lead opted out of phone outreach.');
+    const digits = String(lead.phone || '').replace(/\D/g, '');
+    const phone = digits.length === 10 ? `91${digits}` : digits;
+    const tab = window.open(`https://web.whatsapp.com/send?phone=${phone}&text=${encodeURIComponent(this.renderMessage(lead))}`, '_blank');
+    if (!tab) return window.showToast?.('warning', 'Popup blocked', 'Allow popups, then open this chat again.');
+    try { tab.opener = null; } catch (_) {}
+    this.chatOpened = true;
+    document.getElementById('wa-confirm-btn').disabled = false;
+  },
+  async confirmCurrent() {
+    if (!this.isBatchRunning || !this.chatOpened || this.confirming) return;
+    const lead = this.queue[this.currentIndex];
+    if (lead.phoneOptOut) return window.showToast?.('warning', 'Phone opt-out', 'This lead opted out of phone outreach.');
+    this.confirming = true;
+    document.getElementById('wa-confirm-btn').disabled = true;
+    try {
+      await window.CRMBridge?.logWhatsApp?.(lead);
+    } catch (error) {
+      window.showToast?.('warning', 'CRM not updated', `${error.message || 'Could not save this confirmation.'} The message was confirmed by you; do not resend.`);
+    }
+    const storage = this.getStorage();
+    const leads = storage.getJSON('allLeads', window.allLeads || []);
+    const phone = String(lead.phone || '').replace(/\D/g, '');
+    const matches = leads.filter(item => lead.id ? item.id === lead.id : String(item.phone || '').replace(/\D/g, '') === phone);
+    if (matches.length) {
+      for (const match of matches) {
+        match.whatsappOptIn = true;
+        match.whatsappSent = true;
+        match.whatsappContactedAt = new Date().toISOString();
+        const stage = window.CRMBridge?.getStage?.(match.id);
+        if (stage) match.status = window.CRMBridge.stageLabel(stage);
+        else if (!match.status || /^(new|contacted|attempted)$/i.test(match.status)) match.status = 'Attempted';
+        try { await window.MemoryEngine?.updateLead?.(match.id, {
+          whatsappOptIn: true, whatsappSent: true, whatsappContactedAt: match.whatsappContactedAt, status: match.status
+        }); } catch (_) {}
+      }
+      storage.setJSON('allLeads', leads);
+      window.allLeads = leads;
+      document.dispatchEvent(new CustomEvent('nexus:leadsupdated', { detail: { source: 'whatsapp-confirmed' } }));
+    }
+    this.reviewed.push('confirmed');
+    this.confirming = false;
+    window.CRMBridge?.notifyLeads?.();
+    this.advance();
+  },
+  skipCurrent() {
+    if (!this.isBatchRunning) return;
+    this.reviewed.push('skipped');
+    this.advance();
+  },
+  advance() {
+    this.currentIndex++;
+    this.chatOpened = false;
+    this.renderCurrent();
+  },
+  finishBatch() {
+    const count = this.reviewed.filter(x => x === 'confirmed').length;
+    this.stopBatch();
+    window.showToast?.('success', 'Review complete', `${count} sends confirmed by you; ${this.reviewed.length - count} skipped.`);
+  },
+  stopBatch() {
+    this.isBatchRunning = false;
+    this.chatOpened = false;
+    document.getElementById('wa-queue-ui').style.display = 'none';
+    document.getElementById('wa-start-batch-btn').style.display = 'flex';
+    this.refreshQueue();
+  }
+});
+window.handleWhatsappBrochureFile = () => window.showToast?.('info', 'Use a public link', 'Upload your brochure to a shareable HTTPS location, then paste its link.');

@@ -1,5 +1,5 @@
 /**
- * CLAVIS SNEAK PEEK AGENT PIPELINE WINDOW (clavis-sneak-peek.js)
+ * RUDRA24 AI SNEAK PEEK AGENT PIPELINE WINDOW (clavis-sneak-peek.js)
  * ==============================================================
  * Apple macOS & Claude inspired floating live task & agent pipeline
  * inspection popover.
@@ -479,7 +479,7 @@
     var mainInput = document.getElementById('chat-input') || document.getElementById('prompt-input');
     if (mainInput) {
       mainInput.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
           var val = (mainInput.value || '').trim().toLowerCase();
           if (val.length > 5 && (val.includes('lead') || val.includes('search') || val.includes('find') || val.includes('automate') || val.includes('scrape') || val.includes('call') || val.includes('pipeline'))) {
             setTimeout(function() {

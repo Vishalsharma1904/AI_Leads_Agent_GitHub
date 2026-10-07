@@ -121,6 +121,34 @@ def pcm16_to_wav(audio: bytes, sample_rate: int = SAMPLE_RATE) -> bytes:
     return output.getvalue()
 
 
+def prepare_transcription_wav(data: bytes) -> bytes | None:
+    """Bounded decode + existing Silero gate; preserve words between first/last speech."""
+    import av
+    from faster_whisper.vad import VadOptions, get_speech_timestamps
+    chunks, count = [], 0
+    try:
+        with av.open(io.BytesIO(data)) as container:
+            resampler = av.AudioResampler(format="fltp", layout="mono", rate=16000)
+            for frame in container.decode(audio=0):
+                for part in resampler.resample(frame):
+                    values = part.to_ndarray().reshape(-1)
+                    count += len(values)
+                    if count > 16000 * 60:
+                        raise ValueError("Voice recording must be under 60 seconds")
+                    chunks.append(values)
+            chunks.extend(part.to_ndarray().reshape(-1) for part in resampler.resample(None))
+    except av.FFmpegError as exc:
+        raise ValueError("Audio could not be decoded") from exc
+    samples = np.concatenate(chunks) if chunks else np.zeros(0, dtype=np.float32)
+    if not len(samples) or float(np.max(np.abs(samples))) < 1e-5:
+        return None
+    speech = get_speech_timestamps(samples, VadOptions(min_speech_duration_ms=150,
+                                    min_silence_duration_ms=350, speech_pad_ms=250))
+    if not speech:
+        return None
+    return pcm16_to_wav(float_audio_to_pcm16(samples[speech[0]["start"]:speech[-1]["end"]]),16000)
+
+
 def wav_to_pcm16(data: bytes) -> tuple[bytes, int]:
     with wave.open(io.BytesIO(data), "rb") as wav:
         return wav.readframes(wav.getnframes()), wav.getframerate()

@@ -2765,20 +2765,11 @@ html #sidebar svg, html #sidebar .icon-sm {
   --lx-glow-radius: 320px;
   --lx-black-level: .96;
 }
-:root:has(#sidebar.collapsed) { --sidebar-current: var(--sidebar-collapsed); }
-
-#sidebar.sidebar, #sidebar {
-  width: var(--sidebar-current) !important;
-  min-width: var(--sidebar-current) !important;
-  max-width: var(--sidebar-current) !important;
-  transition: width 340ms cubic-bezier(.22,1,.36,1), min-width 340ms cubic-bezier(.22,1,.36,1), background-color 260ms ease, border-color 260ms ease !important;
-}
-#main-content.main-content, #main-content {
-  margin-left: var(--sidebar-current) !important;
-  width: calc(100% - var(--sidebar-current)) !important;
-  max-width: calc(100% - var(--sidebar-current)) !important;
-  transition: margin-left 340ms cubic-bezier(.22,1,.36,1), width 340ms cubic-bezier(.22,1,.36,1), max-width 340ms cubic-bezier(.22,1,.36,1), background-color 260ms ease !important;
-}
+/* The rail geometry used to live here too, keyed off --sidebar-current and a
+   :root:has(#sidebar.collapsed) rule. A :has() on :root makes the engine
+   re-check the whole document on class changes anywhere, and these width and
+   transition declarations were a fourth clock besides. rudra-motion-ui.js
+   writes the width inline now; this block was pure cost. */
 .sidebar-resizing #sidebar, .sidebar-resizing #main-content { transition: none !important; }
 body.sidebar-dragging { cursor: col-resize !important; user-select: none !important; }
 

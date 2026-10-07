@@ -32,7 +32,7 @@
      or a table earns the extra width instead of turning into a column
      of two-word lines. Height does the same, independently. */
   var DENSITY = { compact: 340, normal: 400, expanded: 480 };
-  var WIDTH = { min: 320, minTable: 480, max: 560, maxTable: 800 };
+  var WIDTH = { min: 320, minTable: 560, max: 560, maxTable: 1040 };
   var DRAG_KEY = 'clavis-task-pos';
   var MARGIN = 8;
 
@@ -119,7 +119,7 @@
       ta.rows = 1;
       ta.setAttribute('aria-label', 'Follow-up message');
     }
-    ta.placeholder = 'Reply to Clavis';
+    ta.placeholder = 'Reply to Rudra24 AI';
     if (ta.parentNode !== wrap) wrap.insertBefore(ta, wrap.firstChild);
 
     var send = comp.querySelector('.cts-composer-send');
@@ -156,11 +156,11 @@
       el.id = 'clavis-task-surface';
       el.setAttribute('role', 'status');
       el.setAttribute('aria-live', 'polite');
-      el.setAttribute('aria-label', 'Clavis task');
+      el.setAttribute('aria-label', 'Rudra24 AI task');
       el.innerHTML =
         '<header class="cts-head">' +
         '  <span class="cts-dot" aria-hidden="true"></span>' +
-        '  <span class="cts-head-label">Clavis</span>' +
+        '  <span class="cts-head-label">Rudra24 AI</span>' +
         '  <button type="button" class="cts-x" aria-label="Dismiss">' +
         '    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>' +
         '  </button>' +
@@ -172,7 +172,7 @@
           '<div class="cts-composer-row">' +
           '  <input type="file" class="cts-file-input" style="display:none;" accept="image/*,.pdf,.txt,.csv,.json,.md,.js,.py,.docx,.xlsx" multiple>' +
           '  <div class="cts-composer-input-wrap">' +
-          '    <textarea class="cts-composer-input" rows="1" placeholder="Reply to Clavis" aria-label="Follow-up message"></textarea>' +
+          '    <textarea class="cts-composer-input" rows="1" placeholder="Reply to Rudra24 AI" aria-label="Follow-up message"></textarea>' +
           '    <button type="button" class="cts-composer-send" aria-label="Send" title="Send (Enter)">' +
           '      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">' +
           '        <line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/>' +
@@ -246,23 +246,39 @@
     // Leads/contacts/dataset tables get real breathing room; plain text
     // stays at the narrower reading width.
     var hasTable = !!el.querySelector('.cts-preview-wrap, .cts-preview-table');
+    var maxW = ceilingW(hasTable);
+    var minW = Math.min(hasTable ? WIDTH.minTable : WIDTH.min, maxW);
     var prevW = el.style.width, prevH = el.style.height;
+    var prevPriority = el.style.getPropertyPriority('width');
     var prevMax = el.style.maxWidth, prevTrans = el.style.transition;
 
     el.style.transition = 'none';
     el.style.height = 'auto';
-    el.style.maxWidth = ceilingW(hasTable) + 'px';
-    el.style.width = 'max-content';
+    el.style.maxWidth = maxW + 'px';
+    el.style.setProperty('width', 'max-content', 'important');
     // A compact 3-row preview table doesn't naturally ask for much room —
     // its cells are deliberately truncated — so raising only the ceiling
     // would leave it just as narrow. A table gets a floor as well, so the
     // panel genuinely reads as an expanded view, not a squeezed one.
-    var w = clamp(Math.ceil(el.getBoundingClientRect().width), hasTable ? WIDTH.minTable : WIDTH.min, ceilingW(hasTable));
+    var w = clamp(Math.ceil(el.getBoundingClientRect().width), minW, maxW);
 
-    el.style.width = w + 'px';
+    /* A `.cts-preview-wrap` is its own scroll container, so `max-content`
+       above stops at the width it is CURRENTLY showing — the panel never
+       grew to meet a wide table, it just handed you a scrollbar. Ask each
+       wrap how much it is hiding and buy that much more width, up to the
+       ceiling. Past the ceiling the scrollbar takes over, as it should. */
+    if (hasTable) {
+      var hidden = 0;
+      Array.prototype.forEach.call(el.querySelectorAll('.cts-preview-wrap'), function (wrap) {
+        hidden = Math.max(hidden, wrap.scrollWidth - wrap.clientWidth);
+      });
+      if (hidden > 0) w = clamp(w + hidden, minW, maxW);
+    }
+
+    el.style.setProperty('width', w + 'px', 'important');
     var h = Math.min(Math.ceil(el.getBoundingClientRect().height), ceilingH());
 
-    el.style.width = prevW;
+    el.style.setProperty('width', prevW, prevPriority);
     el.style.height = prevH;
     el.style.maxWidth = prevMax;
     el.style.transition = prevTrans;
@@ -290,8 +306,13 @@
     return 'inset(0px ' + (fromRight ? 0 : dx) + 'px ' + dy + 'px ' + (fromRight ? dx : 0) + 'px round ' + radius + ')';
   }
   function settle(to) {
-    el.style.width = to.w + 'px';
+    el.style.setProperty('width', to.w + 'px', 'important');
     el.style.height = 'auto';
+    // A remembered drag position was measured against the smaller card.
+    // Re-clamp after layout so expanding a table cannot move its actions offscreen.
+    if (el.classList.contains('is-moved')) {
+      place(parseFloat(el.style.left) || MARGIN, parseFloat(el.style.top) || MARGIN);
+    }
   }
 
   /* Already-open window, content just changed: glide to the new box. */
@@ -306,12 +327,20 @@
     settle(to);
     if (reducedMotion() || !el.animate) return;
     var grows = to.w >= from.width - 1 && to.h >= from.height - 1;
+    var travel = Math.abs(to.w - from.width) + Math.abs(to.h - from.height);
+    if (travel < 2) return;
+    /* Distance sets the duration: a 40px nudge should not take as long as
+       a 400px unfurl. Both stay inside one unhurried range. */
+    var dur = Math.round(clamp(420 + travel * 0.55, 420, 900));
     geoAnim = grows
       ? el.animate([
           { clipPath: clipBox(from.width, from.height, to.w, to.h, '18px') },
           { clipPath: 'inset(0px 0px 0px 0px round 18px)' }
-        ], { duration: 480, easing: EASE_APPLE })
-      : el.animate([{ opacity: 0.6 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' });
+        ], { duration: dur, easing: EASE_APPLE })
+      : el.animate([
+          { clipPath: 'inset(0px 0px 0px 0px round 18px)' },
+          { clipPath: clipBox(to.w, to.h, from.width, from.height, '18px') }
+        ], { duration: Math.round(dur * 0.78), easing: EASE_APPLE });
     var a = geoAnim;
     geoAnim.onfinish = function () { if (geoAnim === a) geoAnim = null; };
   }
@@ -338,25 +367,33 @@
     settle(to);
     if (reducedMotion() || !el.animate) return;
 
+    /* Three beats, not two: the capsule lands (0 → .16), holds for a
+       breath so the eye registers a THING arriving (.16 → .24), then
+       unfurls into the card. The hold is what separates this from a
+       box that simply appears — and it costs 55 ms. */
     var capsule = clipBox(Math.min(236, to.w), 40, to.w, to.h, '999px');
     geoAnim = el.animate(
       [
-        { clipPath: capsule, opacity: 0, transform: 'translateY(-8px) scale(0.97)', offset: 0 },
-        { clipPath: capsule, opacity: 1, transform: 'none', offset: 0.18 },
+        { clipPath: capsule, opacity: 0, transform: 'translateY(-10px) scale(0.965)', offset: 0 },
+        { clipPath: capsule, opacity: 1, transform: 'translateY(0) scale(1.004)', offset: 0.16 },
+        { clipPath: capsule, opacity: 1, transform: 'none', offset: 0.24 },
         { clipPath: 'inset(0px 0px 0px 0px round 18px)', opacity: 1, transform: 'none', offset: 1 }
       ],
-      { duration: 680, easing: EASE_APPLE }
+      { duration: 880, easing: EASE_APPLE }
     );
     var opened = geoAnim;
     geoAnim.onfinish = function () { if (geoAnim === opened) geoAnim = null; };
 
+    /* The header is already inside the capsule, so it does not fade —
+       it is the thing that arrived. Everything below it trails the
+       unfurl, each a beat behind the last. */
     [bodyEl, footerEl, composerEl].forEach(function (node, i) {
       if (!node || node.hidden) return;
       try {
         node.animate(
-          [ { opacity: 0, transform: 'translateY(6px)', filter: 'blur(5px)' },
+          [ { opacity: 0, transform: 'translateY(7px)', filter: 'blur(4px)' },
             { opacity: 1, transform: 'none', filter: 'blur(0px)' } ],
-          { duration: 420, delay: 180 + i * 50, easing: EASE_APPLE, fill: 'backwards' }
+          { duration: 540, delay: 280 + i * 85, easing: EASE_APPLE, fill: 'backwards' }
         );
       } catch (e) {}
     });
@@ -371,18 +408,20 @@
     [bodyEl, footerEl, composerEl].forEach(function (node) {
       if (!node || node.hidden) return;
       try {
-        contentExit.push(node.animate([{ opacity: 1, filter: 'blur(0px)' }, { opacity: 0, filter: 'blur(4px)' }],
-          { duration: 220, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }));
+        contentExit.push(node.animate([{ opacity: 1, filter: 'blur(0px)', transform: 'none' }, { opacity: 0, filter: 'blur(5px)', transform: 'translateY(5px)' }],
+          { duration: 260, easing: 'cubic-bezier(0.4, 0.0, 0.6, 1)', fill: 'forwards' }));
       } catch (e) {}
     });
-    var a = el.animate(
+    var a = geoAnim = el.animate(
       [
         { clipPath: 'inset(0px 0px 0px 0px round 18px)', opacity: 1, transform: 'none' },
         { clipPath: clipBox(Math.min(236, r.width), 40, r.width, r.height, '999px'), opacity: 0, transform: 'translateY(-6px) scale(0.97)' }
       ],
-      { duration: 340, easing: 'cubic-bezier(0.4, 0, 1, 1)', fill: 'forwards' }
+      { duration: 440, easing: 'cubic-bezier(0.5, 0, 0.75, 0)', fill: 'forwards' }
     );
     a.onfinish = function () {
+      if (geoAnim !== a) return;
+      geoAnim = null;
       done();
       try { a.cancel(); } catch (e) {}
       cancelContentExit();
@@ -743,7 +782,7 @@
     }
 
     composerInput.addEventListener('keydown', function (e) {
-      if (e.key === 'Enter' && !e.shiftKey) {
+      if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         submitComposer();
       }
@@ -824,21 +863,13 @@
   }
 
   function autoGrowComposer() {
-    if (!composerInput || !composerEl) return;
-    var prevH = composerInput.offsetHeight;
-    composerInput.style.height = 'auto';
-    var scrollH = composerInput.scrollHeight;
-    var clampedH = Math.min(124, Math.max(20, scrollH));
-    composerInput.style.height = clampedH + 'px';
-    // One line stays compact; the row only changes alignment once the
-    // text genuinely wraps, so an empty composer is never tall for
-    // no reason.
-    composerEl.classList.toggle('is-multiline', clampedH > 30);
-    composerEl.classList.toggle('is-empty', !(composerInput.value || '').trim() && !currentAttachments.length);
-
-    if (Math.abs(clampedH - prevH) > 2 && el && el.classList.contains('is-open')) {
-      smoothResize(function () {});
-    }
+    if (!composerInput || !composerEl || !global.ClavisComposerSizing) return;
+    global.ClavisComposerSizing.attach(composerInput, { min: 20, max: 124, onSize: function (height, previous) {
+      composerEl.classList.toggle('is-multiline', height > 30);
+      composerEl.classList.toggle('is-empty', !(composerInput.value || '').trim() && !currentAttachments.length);
+      if (Math.abs(height - previous) > 2 && el && el.classList.contains('is-open')) smoothResize(function () {});
+    }});
+    global.ClavisComposerSizing.request(composerInput);
   }
 
   function submitComposer() {
@@ -877,7 +908,7 @@
       fullText += '\n\n' + fileSnippets.join('\n\n');
     }
 
-    // Begin Clavis Task
+    // Begin Rudra24 AI Task
     var taskId = null;
     if (global.ClavisTask && typeof global.ClavisTask.begin === 'function') {
       taskId = global.ClavisTask.begin(fullText, {
@@ -938,8 +969,15 @@
     placeholderTimer = setInterval(function () {
       if (!composerInput || composerInput.value.trim() || document.activeElement === composerInput || currentAttachments.length > 0) return;
       placeholderIdx = (placeholderIdx + 1) % PLACEHOLDERS.length;
-      composerInput.placeholder = PLACEHOLDERS[placeholderIdx];
+      composerInput.placeholder = contextualPlaceholder(Task.current());
     }, 5000);
+  }
+
+  function contextualPlaceholder(task) {
+    if (task?.approval?.multiSelect && task.requiresApproval) return 'Select industries above, then Start search…';
+    if (task && ['working','understanding'].includes(task.phase) && task.mode === 'leads') return 'Ask about this lead search…';
+    if (global.ClavisRequestIntent?.classify(task?._text).answerOnly) return 'Ask a follow-up or explore this answer…';
+    return PLACEHOLDERS[placeholderIdx];
   }
 
   /* Click-away and Esc close it. Both are pointerdown/keydown on the
@@ -948,6 +986,10 @@
     document.addEventListener('pointerdown', function (e) {
       if (!el || !el.classList.contains('is-open')) return;
       if (el.contains(e.target)) return;
+      var activeTask = Task.current();
+      var sourcing = activeTask && (activeTask.mode === 'leads' || activeTask.mode === 'contacts' ||
+        activeTask.mode === 'dataset' || activeTask.intent === 'lead_gen');
+      if (sourcing && (activeTask.phase === 'working' || activeTask.phase === 'understanding' || activeTask.phase === 'waiting')) return;
       // Do not dismiss when clicking inside the main composer or floating pill dock
       if (e.target.closest && e.target.closest(
         '#tb-sneak-peek-btn, #jarvis-header-panel-toggle, #jarvis-input, .jarvis-luxury-composer, .jarvis-input-container, .claude-input-container, #clavis-floating-pill-dock'
@@ -957,6 +999,10 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape' || !el || !el.classList.contains('is-open')) return;
+      var activeTask = Task.current();
+      var sourcing = activeTask && (activeTask.mode === 'leads' || activeTask.mode === 'contacts' ||
+        activeTask.mode === 'dataset' || activeTask.intent === 'lead_gen');
+      if (sourcing && (activeTask.phase === 'working' || activeTask.phase === 'understanding' || activeTask.phase === 'waiting')) return;
       dismiss();
     });
   }
@@ -972,7 +1018,7 @@
         sessionStorage.setItem('cts_saved_html', bodyEl.innerHTML);
         sessionStorage.setItem('cts_saved_scroll', String(bodyEl.scrollTop || 0));
         sessionStorage.setItem('cts_saved_task', hiddenTaskId || '');
-        sessionStorage.setItem('cts_saved_label', labelEl ? labelEl.textContent : 'Clavis');
+        sessionStorage.setItem('cts_saved_label', labelEl ? labelEl.textContent : 'Rudra24 AI');
       } catch (e) {}
     }
     hide();
@@ -1081,7 +1127,7 @@
   }
 
   /* shared pieces ------------------------------------------------ */
-  /* overrideTitle is a renderer's own fixed wording ("Clavis", an
+  /* overrideTitle is a renderer's own fixed wording ("Rudra", an
      approval's title) and is shown as given; the task's title — his
      words — goes through the clean-up above. */
   function titleBlock(task, overrideTitle) {
@@ -1095,7 +1141,8 @@
     var last = task.events.length ? task.events[task.events.length - 1] : null;
     var text = (last && last.label) || task.subtitle || fallback || '';
     if (!text) return '';
-    return '<p class="cts-live"><span class="cts-live-text">' + esc(cleanLine(text)) + '</span></p>';
+    return '<p class="cts-live"><span class="cts-live-text" data-tw="live-' + esc(task.id) + '">' +
+           esc(cleanLine(text)) + '</span></p>';
   }
   function meter(task) {
     if (task.phase === 'completed' || task.phase === 'failed') return '';
@@ -1114,8 +1161,8 @@
   }
 
   register('thinking', function (task) {
-    return titleBlock(task, task.confidence < 0.4 && !titleOverrides[task.id] ? 'Clavis' : null) +
-           liveLine(task, 'Thinking…') + meter(task);
+    return titleBlock(task, task.confidence < 0.4 && !titleOverrides[task.id] ? 'Rudra' : null) +
+           liveLine(task, 'Thinking…') + (global.ClavisRequestIntent?.classify(task._text).answerOnly ? '' : meter(task));
   });
 
   register('search', function (task) {
@@ -1174,14 +1221,28 @@
       return '<button type="button" class="cts-prompt-pill" data-fill="' + esc(text) + '"><span>' + esc(text) + '</span>' +
         '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg></button>';
     };
+    var remembered = {};
+    try { remembered = global.ClavisIQ && global.ClavisIQ.memory ? global.ClavisIQ.memory() : {}; } catch (e) {}
+    var city = (remembered.topCities && remembered.topCities[0]) ||
+      (global.SKYLARK_CONFIG && global.SKYLARK_CONFIG.DEFAULT_CITY) || 'Gurugram';
+    var turn = 0;
+    try {
+      turn = Number(sessionStorage.getItem('cts_idle_prompt_turn') || 0) || 0;
+      sessionStorage.setItem('cts_idle_prompt_turn', String(turn + 1));
+    } catch (e) {}
+    var sectors = ['hotels', 'hospitals', 'IT parks', 'warehouses'];
+    var nearby = (remembered.topCities && remembered.topCities[1]) || ['Ghaziabad', 'Noida', 'Delhi'][turn % 3];
+    var prompts = [
+      city + ' ke ' + sectors[turn % sectors.length] + ' ki 15 leads nikalo',
+      nearby + ' ki 10 leads nikalo',
+      turn % 2 ? 'Meri location map pe dikhao' : 'Taj Mahal ki photos dikhao'
+    ];
     return [
       '<div class="cts-idle">',
       '  <h3 class="cts-idle-title">' + greeting + ', <em>' + esc(who) + '</em></h3>',
       '  <p class="cts-idle-sub">Kuch bhi boliye ya likhiye — jo kaam chalega, woh yahin dikhega.</p>',
       '  <div class="cts-prompt-pills">',
-           pill('Gurugram ke hotels ki 20 leads nikalo'),
-           pill('Meri location map pe dikhao'),
-           pill('Taj Mahal ki photos dikhao'),
+           prompts.map(pill).join(''),
       '  </div>',
       '</div>'
     ].join('\n');
@@ -1190,19 +1251,33 @@
   /* ── 4-Stage Live Pipeline & Table Preview ──────────────── */
   function pipeline(steps) {
     if (!Array.isArray(steps) || !steps.length) return '';
+    var doneCount = steps.filter(function (s) { return s.state === 'done'; }).length;
+    var activeAt = steps.findIndex ? steps.findIndex(function (s) { return s.state === 'active'; }) : -1;
+    // How far the rail has actually travelled: finished steps plus half of
+    // the one in flight. It is a real fraction of real steps, never a fake
+    // percentage that creeps while nothing happens.
+    var reached = doneCount + (activeAt >= 0 ? 0.5 : 0);
+    // 0..1, applied as scaleY — a transform, so the rail growing can never
+    // reflow the four lines of text sitting next to it.
+    var railFrac = steps.length > 1 ? Math.max(0, Math.min(1, (reached - 0.5) / (steps.length - 1))) : 1;
+
     var items = steps.map(function (s, idx) {
       var stateClass = s.state === 'done' ? 'is-done' : (s.state === 'active' ? 'is-active' : 'is-pending');
       // Done steps carry a plain dot, not a checkmark — the CSS draws it.
       var numContent = s.state === 'done' ? '' : String(idx + 1);
-      return '<div class="cts-pipe-step ' + stateClass + '">' +
+      // Only the step in flight types its line out; the settled ones are
+      // just read, and a finished step re-typing itself is noise.
+      var subAttr = s.state === 'active' && s.key ? ' data-tw="pipe-' + esc(s.key) + '"' : '';
+      return '<div class="cts-pipe-step ' + stateClass + '" style="--cts-step:' + idx + '">' +
         '<div class="cts-pipe-num">' + numContent + '</div>' +
         '<div class="cts-pipe-info">' +
           '<span class="cts-pipe-title">' + esc(s.title) + '</span>' +
-          (s.sub ? '<span class="cts-pipe-sub">' + esc(s.sub) + '</span>' : '') +
+          (s.sub ? '<span class="cts-pipe-sub"' + subAttr + '>' + esc(s.sub) + '</span>' : '') +
         '</div>' +
       '</div>';
     }).join('');
-    return '<div class="cts-pipeline">' + items + '</div>';
+    return '<div class="cts-pipeline" style="--cts-railf:' + railFrac.toFixed(3) + '">' +
+      '<i class="cts-pipe-rail" aria-hidden="true"></i>' + items + '</div>';
   }
 
   function getLeadPipelineSteps(task) {
@@ -1235,10 +1310,10 @@
     }
 
     return [
-      { title: 'Google Maps Discovery', sub: step1Sub, state: states[0] },
-      { title: 'Website Contact Scrape', sub: step2Sub, state: states[1] },
-      { title: 'Mobile & Landline Verification', sub: step3Sub, state: states[2] },
-      { title: 'Excel Lead Sheet', sub: step4Sub, state: states[3] }
+      { key: task.id + ':l0', title: 'Google Maps Discovery', sub: step1Sub, state: states[0] },
+      { key: task.id + ':l1', title: 'Website Contact Scrape', sub: step2Sub, state: states[1] },
+      { key: task.id + ':l2', title: 'Mobile & Landline Verification', sub: step3Sub, state: states[2] },
+      { key: task.id + ':l3', title: 'Excel Lead Sheet', sub: step4Sub, state: states[3] }
     ];
   }
 
@@ -1272,36 +1347,39 @@
     }
 
     return [
-      { title: 'Job Portals Discovery', sub: step1Sub, state: states[0] },
-      { title: 'Candidate Profile Extraction', sub: step2Sub, state: states[1] },
-      { title: 'Direct Contact & Verification', sub: step3Sub, state: states[2] },
-      { title: 'Candidate Sheet & Database', sub: step4Sub, state: states[3] }
+      { key: task.id + ':c0', title: 'Job Portals Discovery', sub: step1Sub, state: states[0] },
+      { key: task.id + ':c1', title: 'Candidate Profile Extraction', sub: step2Sub, state: states[1] },
+      { key: task.id + ':c2', title: 'Direct Contact & Verification', sub: step3Sub, state: states[2] },
+      { key: task.id + ':c3', title: 'Candidate Sheet & Database', sub: step4Sub, state: states[3] }
     ];
   }
 
-  /* Leads: the sheet in small — who to ask for, a mobile, an email, where.
-     ~10 rows, then "+N more"; the full set is in Download Excel / CSV. */
+  /* Five real leads first; the full set stays in Download Excel / CSV. */
   function leadPreview(rows) {
-    var LIMIT = 10;
+    var LIMIT = 5;
     var dash = '<span style="color:var(--cts-faint);">—</span>';
     var trs = rows.slice(0, LIMIT).map(function (l) {
       var phones = [].concat(l.phones || [], l.phone || [], l.phoneAlt || []).map(function (p) { return p && typeof p === 'object' ? p.number : p; }).filter(Boolean);
       var mobile = phones.filter(function (p) { return /^\+91 [6-9]/.test(String(p)); })[0] || phones[0] || '';
       var who = l.contactPerson ? esc(l.contactPerson) + (l.designation ? '<br><span style="color:var(--cts-faint);">' + esc(l.designation) + '</span>' : '') : dash;
+      var need = l.serviceType || (Array.isArray(l.serviceTypes) && l.serviceTypes[0]) || l.industry || '';
+      var source = l.source || l.provider || '';
       return '<tr>' +
         '<td title="' + esc(l.company || '') + '"><strong>' + esc(l.company || l.title || 'Company') + '</strong></td>' +
+        '<td title="' + esc(need) + '">' + (need ? esc(need) : dash) + '</td>' +
         '<td>' + who + '</td>' +
         '<td>' + (mobile ? '<span class="cts-badge-phone">' + esc(mobile) + '</span>' : dash) + '</td>' +
         '<td title="' + esc(l.email || '') + '">' + (l.email ? esc(l.email) : dash) + '</td>' +
         '<td>' + esc(l.city || '') + '</td>' +
+        '<td>' + (source ? esc(source) : dash) + '</td>' +
       '</tr>';
     }).join('');
     var more = rows.length > LIMIT
-      ? '<tr><td colspan="5" style="color:var(--cts-faint);text-align:center;">+' + (rows.length - LIMIT) + ' more in the download</td></tr>' : '';
+      ? '<tr><td colspan="7" style="color:var(--cts-faint);text-align:center;">+' + (rows.length - LIMIT) + ' more collected</td></tr>' : '';
     // narrow window: the table scrolls sideways inside its own frame
-    return '<div class="cts-preview-wrap cts-leads-preview" style="overflow-x:auto;overscroll-behavior-x:contain;">' +
-      '<table class="cts-preview-table" style="min-width:560px;">' +
-        '<thead><tr><th>Company</th><th>Authority</th><th>Mobile</th><th>Email</th><th>Area</th></tr></thead>' +
+    return '<div class="cts-preview-hint">Preview · first ' + Math.min(rows.length, LIMIT) + ' of ' + rows.length + ' leads · scroll sideways for all columns</div><div class="cts-preview-wrap cts-leads-preview" tabindex="0" role="region" aria-label="Lead preview, scroll horizontally for all columns">' +
+      '<table class="cts-preview-table" style="min-width:700px;">' +
+        '<thead><tr><th>Company</th><th>Need</th><th>Authority</th><th>Mobile</th><th>Email</th><th>Area</th><th>Source</th></tr></thead>' +
         '<tbody>' + trs + more + '</tbody>' +
       '</table>' +
     '</div>';
@@ -1351,8 +1429,10 @@
   register('leads', function (task) {
     var rows = task.result && Array.isArray(task.result.rows) ? task.result.rows : [];
     if (rows.length) return titleBlock(task) + leadPreview(rows);
+    var partial = Array.isArray(task.partialRows) ? task.partialRows : [];
     return titleBlock(task) +
            pipeline(getLeadPipelineSteps(task)) +
+           (partial.length ? leadPreview(partial) : '') +
            stats([
              ['Leads', task.metrics.leads || null],
              ['Complete contacts', task.metrics.completeContacts || null],
@@ -1579,16 +1659,37 @@
   }
 
   function headLabel(task) {
-    if (task.phase === 'idle' || task.mode === 'idle') return 'Clavis';
+    if (task.phase === 'idle' || task.mode === 'idle') return 'Rudra';
     if (task.phase === 'failed') return task.error && task.error.cancelled ? 'Stopped' : 'Failed';
     if (task.requiresApproval) return 'Needs you';
     if (task.phase === 'completed') return 'Done';
-    return 'Clavis';
+    return 'Rudra';
   }
 
   function actionsFor(task) {
     if (task.phase === 'idle' || task.mode === 'idle') return [];   // greeting only — nothing to act on yet
     if (task.requiresApproval) {
+      if (task.approval && Array.isArray(task.approval.options) && task.approval.options.length) {
+        if (task.approval.multiSelect) {
+          var selected = task.approval.selected || [];
+          return task.approval.options.map(function (option) {
+            return { id: option.id, label: option.label, selected: selected.indexOf(option.id) >= 0,
+              run: function () { Task.toggleApprovalOption(task.id, option.id); } };
+          }).concat([
+            { id: 'start-search', label: 'Start search', primary: true, disabled: !selected.length,
+              run: function () { var values = Task.approvalValues(task.id); if (values.length) Task.resolveApproval(task.id, values); } },
+            { id: 'deny', label: 'Cancel', run: function () { Task.resolveApproval(task.id, false); } }
+          ]);
+        }
+        return task.approval.options.map(function (option, index) {
+          return {
+            id: option.id || ('choice-' + index),
+            label: option.label,
+            primary: index === 0,
+            run: function () { Task.resolveApproval(task.id, option.value || option.id); }
+          };
+        }).concat([{ id: 'deny', label: 'Cancel', run: function () { Task.resolveApproval(task.id, false); } }]);
+      }
       return [
         { id: 'approve', label: 'Approve', primary: true, run: function () { Task.resolveApproval(task.id, true); } },
         { id: 'deny', label: 'Cancel', run: function () { Task.resolveApproval(task.id, false); } }
@@ -1622,8 +1723,61 @@
      that can only be decided once the content is measurable in the
      document happens here — chiefly crossing off whatever just
      finished, which needs real text widths to draw over. */
+  /* ── Typewriter ───────────────────────────────────────────
+     The live line is the one thing in this window that changes while
+     he watches. Swapping it instantly reads as a dashboard flicker;
+     typing it reads as someone talking. Only lines that ACTUALLY
+     changed are retyped — a repaint caused by something else leaves
+     the sentence alone, which is what stops the flicker loop.
+
+     Two characters a tick at 13 ms: a 60-character line lands in
+     ~0.4 s, fast enough that nothing feels withheld. */
+  var typedCache = Object.create(null);
+  var typeTimers = Object.create(null);
+  var TYPE_TICK_MS = 13;
+  var TYPE_CHARS = 2;
+  var TYPE_MAX = 170;            // longer than this, just show it
+
+  function stopType(key) {
+    if (typeTimers[key]) { clearInterval(typeTimers[key]); delete typeTimers[key]; }
+  }
+
+  function runType(node, key, text) {
+    stopType(key);
+    var i = 0;
+    node.textContent = '';
+    node.classList.add('is-typing');
+    typeTimers[key] = setInterval(function () {
+      if (!node.isConnected) { stopType(key); return; }
+      i = Math.min(text.length, i + TYPE_CHARS);
+      node.textContent = text.slice(0, i);
+      if (i >= text.length) { stopType(key); node.classList.remove('is-typing'); }
+    }, TYPE_TICK_MS);
+  }
+
+  function typeSweep(root) {
+    if (!root || reducedMotion()) return;
+    var nodes = root.querySelectorAll('[data-tw]');
+    for (var i = 0; i < nodes.length; i++) {
+      var node = nodes[i];
+      var key = node.getAttribute('data-tw');
+      var text = node.textContent;
+      if (typedCache[key] === text) continue;   // unchanged — leave it be
+      typedCache[key] = text;
+      if (!text || text.length > TYPE_MAX) continue;
+      runType(node, key, text);
+    }
+    // A key whose node is gone will never be asked about again; drop the
+    // cache before it grows across a long session.
+    var keys = Object.keys(typedCache);
+    if (keys.length > 60) {
+      for (var k = 0; k < keys.length - 30; k++) { stopType(keys[k]); delete typedCache[keys[k]]; }
+    }
+  }
+
   function decorate(root, task) {
     if (!root) return;
+    if (!task || !['working', 'waiting', 'understanding'].includes(task.phase)) typeSweep(root);
     try {
       if (global.ClavisPencil) {
         // One frame's grace so text has laid out and widths are real.
@@ -1643,6 +1797,25 @@
   /* ── Paint ───────────────────────────────────────────────── */
   var pendingTask = null;
 
+  // Keep live text, buttons, scroll position and selection in the same DOM nodes.
+  function reconcile(parent, next) {
+    var desired = Array.from(next.childNodes);
+    for (var i = 0; i < desired.length; i++) {
+      var incoming = desired[i], current = parent.childNodes[i];
+      if (!current) { parent.appendChild(incoming.cloneNode(true)); continue; }
+      var compatible = current.nodeType === incoming.nodeType &&
+        (current.nodeType !== 1 || (current.tagName === incoming.tagName &&
+          current.getAttribute('data-action-id') === incoming.getAttribute('data-action-id')));
+      if (!compatible) { parent.replaceChild(incoming.cloneNode(true), current); continue; }
+      if (current.nodeType === 3) { if (current.nodeValue !== incoming.nodeValue) current.nodeValue = incoming.nodeValue; continue; }
+      if (current.nodeType !== 1) continue;
+      Array.from(current.attributes).forEach(function (a) { if (!incoming.hasAttribute(a.name)) current.removeAttribute(a.name); });
+      Array.from(incoming.attributes).forEach(function (a) { if (current.getAttribute(a.name) !== a.value) current.setAttribute(a.name, a.value); });
+      reconcile(current, incoming);
+    }
+    while (parent.childNodes.length > desired.length) parent.removeChild(parent.lastChild);
+  }
+
   function schedule(task) {
     pendingTask = task;
     if (frame) return;                       // coalesce a burst into one paint
@@ -1658,10 +1831,11 @@
 
     // The presenter (jarvis_ui.js) decided this turn has something to show.
     if (task.display === 'window') return true;
+    if (task.mode === 'leads' || task.intent === 'lead_gen') return true;
 
     // Voice turns stay in the orb/audio channel — kabhi auto-show nahi
     // (failure bhi bol kar batayi jaati hai). Pehle overheard speech se
-    // "Clavis · Thinking… · Stop" panel pop ho jaata tha.
+    // "Rudra24 AI · Thinking… · Stop" panel pop ho jaata tha.
     if (task.display === 'voice' || task.source === 'voice') return false;
 
     // On completion: open floating surface with the answer + composer
@@ -1685,7 +1859,14 @@
     if (!task) { hide(); return; }
     // A voice-only turn leaves the window exactly as it is — open with the
     // last result, or closed. No flash open, no flash closed.
-    if (task.display === 'voice' && !task.requiresApproval && !userPinned) return;
+    // A LEAD RUN is the exception, however it was asked for. "Ghaziabad ki
+    // 10 leads nikalo" spoken out loud is the same job as typing it, and
+    // its pipeline + result table are the whole point of the window; the
+    // controller sets display='window' a tick later, which left the first
+    // paint of a spoken run falling through here and the window shut.
+    var isLeadRun = task.mode === 'leads' || task.mode === 'contacts' ||
+                    task.mode === 'dataset' || task.intent === 'lead_gen';
+    if (task.display === 'voice' && !isLeadRun && !task.requiresApproval && !userPinned) return;
     build();
     // The user closed this one; keep it closed until a new task starts.
     if (manuallyHidden && task.id === hiddenTaskId) return;
@@ -1695,7 +1876,7 @@
     var width = DENSITY[density];
     var html = withLeadPreview(cleanHeading((rendererFor(task) || registry.thinking)(task), task), task);
     var acts = actionsFor(task);
-    var signature = task.id + '|' + task.phase + '|' + task.mode + '|' + density + '|' + html + '|' + acts.map(function (a) { return a.id; }).join(',');
+    var signature = task.id + '|' + task.phase + '|' + task.mode + '|' + density + '|' + html + '|' + acts.map(function (a) { return a.id + ':' + !!a.selected + ':' + !!a.disabled; }).join(',');
     // Never closes itself: a turn that has nothing to show leaves whatever
     // sir is reading where it is. It closes on ×, Esc, a click outside,
     // or when he asks.
@@ -1719,22 +1900,30 @@
     var wasClosed = !el.classList.contains('is-open');
 
     function applyContent() {
-      bodyEl.innerHTML = html;
-      footerEl.innerHTML = '';
+      if (composerInput && !composerInput.value.trim()) composerInput.placeholder = contextualPlaceholder(task);
+      var nextBody = document.createElement('div'); nextBody.innerHTML = html;
+      reconcile(bodyEl, nextBody);
+      var nextFooter = document.createElement('div');
       if (acts.length) {
         acts.forEach(function (a) {
           var b = document.createElement('button');
           b.type = 'button';
-          b.className = 'cts-act' + (a.primary ? ' is-primary' : '');
+          b.className = 'cts-act' + (a.primary ? ' is-primary' : '') + (a.selected ? ' is-selected' : '');
           b.dataset.actionId = a.id || '';
+          b.disabled = !!a.disabled;
+          if (a.selected != null) b.setAttribute('aria-pressed', String(a.selected));
           b.textContent = a.label;
-          b.addEventListener('click', function () { try { a.run && a.run(); } catch (e) { console.warn(e); } });
-          footerEl.appendChild(b);
+          nextFooter.appendChild(b);
         });
         footerEl.hidden = false;
       } else {
         footerEl.hidden = true;
       }
+      reconcile(footerEl, nextFooter);
+      Array.from(footerEl.children).forEach(function (b, index) {
+        var a = acts[index];
+        b.onclick = function () { try { a && !a.disabled && a.run && a.run(); } catch (e) { console.warn(e); } };
+      });
       decorate(bodyEl, task);
     }
 
@@ -1749,8 +1938,6 @@
       // gets its own small entrance while the box glides to fit.
       smoothResize(applyContent);
       bodyEl.classList.remove('cts-enter');
-      void bodyEl.offsetWidth;
-      bodyEl.classList.add('cts-enter');
     }
 
     // No auto-dismiss. A result that disappears while you are still
@@ -1760,6 +1947,8 @@
 
   function show() {
     if (!el) return;
+    cancelGeo();
+    cancelContentExit();
     var wasClosed = !el.classList.contains('is-open');
     el.classList.add('is-open');
     el.removeAttribute('aria-hidden');
@@ -1784,7 +1973,7 @@
     if (composerInput) {
       composerInput.value = '';
       if (composerEl) composerEl.classList.remove('has-text', 'is-multiline');
-      composerInput.style.height = 'auto';
+      global.ClavisComposerSizing?.request(composerInput);
     }
     clearAttachments();
     try {
@@ -1815,12 +2004,40 @@
   }
 
   function attachDrag() {
-    var startX = 0, startY = 0, baseL = 0, baseT = 0, dragging = false;
+    var startX = 0, startY = 0, baseL = 0, baseT = 0, panelW = 0, panelH = 0;
+    var targetX = 0, targetY = 0, drawnX = 0, drawnY = 0, frame = 0, dragging = false;
+    /* 1:1 with the pointer. The old 0.42 lerp meant the window was always
+       ~2 frames behind the cursor and never quite under it — which does not
+       read as "smooth", it reads as dropped frames. A dragged object should
+       be stuck to the finger; easing belongs on things that move by
+       themselves, not on things the user is holding. */
+    var dragEase = 1;
+
+    function paint() {
+      frame = 0;
+      drawnX += (targetX - drawnX) * dragEase;
+      drawnY += (targetY - drawnY) * dragEase;
+      if (Math.abs(targetX - drawnX) < 0.25) drawnX = targetX;
+      if (Math.abs(targetY - drawnY) < 0.25) drawnY = targetY;
+      el.style.setProperty('transform', 'translate3d(' + drawnX + 'px,' + drawnY + 'px,0)', 'important');
+      if (drawnX !== targetX || drawnY !== targetY) frame = requestAnimationFrame(paint);
+      else if (!dragging) {
+        place(baseL + targetX, baseT + targetY);
+        el.style.removeProperty('transform');
+        el.classList.remove('is-dragging');
+        try { localStorage.setItem(DRAG_KEY, JSON.stringify({ left: parseFloat(el.style.left), top: parseFloat(el.style.top) })); } catch (err) {}
+      }
+    }
 
     headerEl.addEventListener('pointerdown', function (e) {
       if (e.button !== 0 || e.target.closest('button')) return;
       var r = el.getBoundingClientRect();
+      cancelAnimationFrame(frame);
+      el.style.removeProperty('transform');
+      el.classList.remove('is-dragging');
       dragging = true; startX = e.clientX; startY = e.clientY; baseL = r.left; baseT = r.top;
+      panelW = r.width; panelH = r.height;
+      targetX = targetY = drawnX = drawnY = 0;
       el.classList.add('is-dragging');
       place(baseL, baseT);
       headerEl.setPointerCapture(e.pointerId);
@@ -1828,14 +2045,15 @@
     });
     headerEl.addEventListener('pointermove', function (e) {
       if (!dragging) return;
-      place(baseL + (e.clientX - startX), baseT + (e.clientY - startY));
+      targetX = clamp(e.clientX - startX, MARGIN - baseL, Math.max(MARGIN, innerWidth - panelW - MARGIN) - baseL);
+      targetY = clamp(e.clientY - startY, MARGIN - baseT, Math.max(MARGIN, innerHeight - panelH - MARGIN) - baseT);
+      if (!frame) frame = requestAnimationFrame(paint);
     });
     function end(e) {
       if (!dragging) return;
       dragging = false;
-      el.classList.remove('is-dragging');
       try { headerEl.releasePointerCapture(e.pointerId); } catch (err) {}
-      try { localStorage.setItem(DRAG_KEY, JSON.stringify({ left: parseFloat(el.style.left), top: parseFloat(el.style.top) })); } catch (err) {}
+      if (!frame) frame = requestAnimationFrame(paint);
     }
     headerEl.addEventListener('pointerup', end);
     headerEl.addEventListener('pointercancel', end);
@@ -1953,11 +2171,11 @@
       else {
         // Try to restore last saved output
         var savedHtml = '';
-        var savedLabel = 'Clavis';
+        var savedLabel = 'Rudra24 AI';
         var savedScroll = 0;
         try {
           savedHtml = sessionStorage.getItem('cts_saved_html') || '';
-          savedLabel = sessionStorage.getItem('cts_saved_label') || 'Clavis';
+          savedLabel = sessionStorage.getItem('cts_saved_label') || 'Rudra24 AI';
           savedScroll = parseInt(sessionStorage.getItem('cts_saved_scroll') || '0', 10);
         } catch(e) {}
         if (savedHtml) {

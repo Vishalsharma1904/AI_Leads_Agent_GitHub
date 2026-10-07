@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clavis AI page header declutter — Apple-style pass, requested explicitly
+"""Rudra24 AI page header declutter — Apple-style pass, requested explicitly
 by the user (audit + redesign). Scoped ONLY to the Jarvis-specific header row
 (#view-jarvis .jarvis-hero-header and its children) — the shared app-wide top
 bar (title/History/Shortcuts/Run Agent) is left untouched since it's likely
@@ -62,7 +62,7 @@ class Patcher:
 
 
 HEADER_CSS = r'''/* ============================================================
- * CLAVIS HEADER DECLUTTER (clavis-header-declutter.css)
+ * RUDRA24 AI HEADER DECLUTTER (clavis-header-declutter.css)
  * ------------------------------------------------------------
  * Scoped to #view-jarvis .jarvis-hero-header only. Loaded LAST (see
  * index.html <link> order) so it wins the cascade over the five
@@ -173,7 +173,7 @@ def main():
         raise SystemExit(f"{RED}Missing:{OFF} {', '.join(missing)}")
 
     print("=" * 60)
-    print(" Clavis AI page header declutter (Apple-style pass)")
+    print(" Rudra24 AI page header declutter (Apple-style pass)")
     print("=" * 60)
     n = 0
     n += write_header_css()

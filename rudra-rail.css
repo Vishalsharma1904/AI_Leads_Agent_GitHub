@@ -1,0 +1,57 @@
+/* ============================================================
+ * rudra-rail.css · the rail's width has ONE owner.
+ * ------------------------------------------------------------
+ * Five sheets each wrote the rail's geometry on its own stopwatch
+ * (320 / 340 / 380 / 450 / 680ms), so the rail finished before the
+ * page did and hover-peek opened the rail to 236px while the page
+ * margin went to 220px. That was the stutter.
+ *
+ * This file does NOT set the width. rudra-motion-ui.js (React +
+ * Motion spring) writes it inline with !important on exactly two
+ * elements, which is the only thing that outranks the sheets above
+ * and the only way to keep style recalculation off the rest of the
+ * document — measured: the custom-property version cost 41ms of
+ * style recalc per frame, this one costs two element invalidations.
+ * All this file does is take the old transitions away so nothing
+ * runs a second clock, and make the no-JS peek width agree.
+ * ============================================================ */
+
+@media (min-width: 769px) {
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body aside#sidebar.sidebar,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek {
+    transition: background-color 240ms ease, border-color 240ms ease, box-shadow 260ms ease !important;
+  }
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #main-content,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body main#main-content,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar ~ #main-content,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed ~ #main-content,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek ~ #main-content {
+    max-width: none !important;
+    transform: none !important;
+    transition: none !important;
+  }
+  /* Only used before the bundle boots: peek must match the page margin. */
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek,
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body aside#sidebar.sidebar.collapsed.au-peek {
+    width: var(--sidebar-expanded, 220px) !important;
+    min-width: var(--sidebar-expanded, 220px) !important;
+    max-width: var(--sidebar-expanded, 220px) !important;
+  }
+  /* The rail repaints every frame while it opens; keep that paint off the
+     page behind it. */
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar { contain: paint; }
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek { contain: none; }
+}
+
+/* The rail is one scroll surface from the brand down to the last item. */
+html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar-nav-scroll { overscroll-behavior: contain; scroll-behavior: auto; }
+
+/* ── map: decorative markers must not eat the drag ───────────────
+   The pin and the "you are here" dot are MapLibre markers, so they are
+   real DOM on top of the canvas with pointer-events auto. The camera
+   centres on the pin, so the natural place to grab a small map card is
+   exactly where the pin is — and the drag died on it. Nothing listens
+   to either. .ccv-pt / .ccv-lead stay clickable. */
+html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-pin, html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-pin *, html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-me, html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-me * { pointer-events: none !important; }

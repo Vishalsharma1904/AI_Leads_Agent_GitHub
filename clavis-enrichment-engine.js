@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS ENRICHMENT ENGINE v1.0
+ *  RUDRA24 AI ENRICHMENT ENGINE v1.0
  *  Intelligent Chunked Company Contact & Website Scraping Engine
  *
  *  Features:
@@ -12,7 +12,7 @@
  *       2. Deep website scraping for verified emails, phones, key people, LinkedIn
  *   - Robust Apify Places & Contact Scraper integration + resilient web fallback
  *   - Compiles all chunks into ONE SINGLE consolidated Excel file (.xlsx)
- *   - Syncs enriched records directly into Clavis Leads Database
+ *   - Syncs enriched records directly into Rudra24 AI Leads Database
  * ============================================================
  */
 'use strict';
@@ -502,7 +502,7 @@ const ClavisEnrichmentEngine = (() => {
 
           enrichedResults.push(enrichedRecord);
 
-          // Add to Clavis in-memory lead DB
+          // Add to Rudra24 AI in-memory lead DB
           if (Array.isArray(window.allLeads)) {
             window.allLeads.unshift({
               id: enrichedRecord.id,

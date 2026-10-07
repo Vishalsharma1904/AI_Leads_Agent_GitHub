@@ -462,21 +462,16 @@ const AIScoringEngine = (() => {
     if (lead.googleRating) confidence += 10;
     confidence = Math.min(100, confidence);
 
-    // Intelligence Attributes
-    const currentSecurityVendor = (lead.tenderPage || lead.vendorPage) 
-      ? 'Outsourced via Annual Contract' 
-      : 'Likely Agency Contract (Empanelled)';
-
-    const currentFacilityVendor = (lead.facilityEmail || lead.vendorPage) 
-      ? 'External Soft Services Provider' 
-      : 'In-house / Vendor Mix';
-
-    const hiringSignals = (lead.hrEmail || lead.careersPage) 
-      ? 'Active Guard & Housekeeper Hiring Noticed' 
-      : 'Standard Operational Requirements';
-
-    const decisionMaker = lead.decisionMaker || (lead.facilityEmail ? 'Facility Manager / Head Admin' : (lead.purchaseEmail ? 'Purchase Manager / Procurement Officer' : ''));
-    const designation   = lead.designation   || (decisionMaker ? 'Head of Administration / Facility Director' : '');
+    // These used to be guessed from whether an email address happened to
+    // exist ("Likely Agency Contract (Empanelled)", "Facility Manager /
+    // Head Admin"). Nobody observed any of it, and it reached the Excel
+    // and the call script looking like researched fact. Only what a page
+    // actually said survives; the rest stays blank.
+    const currentSecurityVendor = lead.currentSecurityVendor || '';
+    const currentFacilityVendor = lead.currentFacilityVendor || '';
+    const hiringSignals = (lead.hrEmail || lead.careersPage) ? 'Careers page found' : '';
+    const decisionMaker = lead.decisionMaker || '';
+    const designation   = lead.designation || '';
 
     return {
       securityScore: secScore,
@@ -723,19 +718,21 @@ const RealLeadExtractor = (() => {
             googleRating: googleRating,
             reviewCount: reviewCount,
             linkedinUrl: '',
-            employeeSize: reviewCount && reviewCount > 100 ? '250-1000+ Staff' : '50-250 Staff',
-            officeType: 'Commercial Establishment / Facility',
-            workingHours: '24x7 Shifts & General Duty',
-            businessSize: reviewCount && reviewCount > 100 ? 'Enterprise Client' : 'Mid-Market Facility',
+            // Staff counts, office type and working hours were invented from
+            // the Google review count. Left blank unless something real says so.
+            employeeSize: '',
+            officeType: '',
+            workingHours: '',
+            businessSize: '',
             decisionMaker: '',
             designation: '',
-            hiringStatus: 'Likely Outsourcing Procurement Active',
+            hiringStatus: '',
             vendorPage: '',
             tenderPage: '',
             careersPage: '',
             timestamp: Date.now(),
             lastUpdated: new Date().toLocaleDateString('en-IN'),
-            status: 'Verified Client Lead',
+            status: 'New',
             requirement: jobTitle,
             enrichedByMaps: true,
             enrichedByCrawler: false,

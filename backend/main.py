@@ -4,6 +4,7 @@ import asyncio
 import re
 import time
 import secrets
+import jwt
 import logging
 from collections import defaultdict, deque
 
@@ -22,15 +23,25 @@ from api.email_sender import router as email_router
 from api.outlook_bridge import router as outlook_router
 from api.sms_fast2sms import router as sms_router
 from api.lead_jobs import router as lead_jobs_router
+from api.crm import router as crm_router
+from api.crm_automation import router as crm_automation_router
+from api.textbee import router as textbee_router
 from api.candidate_jobs import router as candidate_jobs_router
 from api.credentials import router as credentials_router
 from api.google_sheets import router as google_sheets_router
+from api.connectors import router as connectors_router, connector_job_worker
 from api.ai_chat import router as ai_chat_router
 from api.tts import router as tts_router
 from api.speech import router as speech_router
 from api.web_reader import router as web_reader_router
+from api.developer_insights import router as developer_insights_router
+from api.toughtongue import router as toughtongue_router
+from api.sarvam import router as sarvam_router
+from api.billing import router as billing_router
+from api.limits import router as limits_router
+from api.composio_tools import router as composio_router
 from services.capability_registry import list_capabilities
-from api.auth_sync import engine as auth_engine, get_current_user, UserAccount
+from api.auth_sync import engine as auth_engine, get_current_user, UserAccount, authenticate_websocket
 from services.speech.kokoro_engine import get_kokoro_engine
 
 load_dotenv()
@@ -40,13 +51,13 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Jarvis Voice Calling Agent API",
-    description="Backend API for the Clavis AI Voice Assistant (Exotel + OpenRouter)",
+    description="Backend API for the Rudra24 AI Voice Assistant (Exotel + OpenRouter)",
     version="1.1.0"
 )
 
 # Configure CORS for the static HTML frontend
 cors_origins = [origin.strip() for origin in os.getenv(
-    "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000"
+    "CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3210"
 ).split(",") if origin.strip()]
 if APP_ENV := os.getenv("APP_ENV", "development").strip().lower():
     if APP_ENV == "production" and not cors_origins:
@@ -60,7 +71,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
 )
 if APP_ENV == "production":
@@ -68,7 +79,7 @@ if APP_ENV == "production":
 
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(10 * 1024 * 1024)))
 _rate_windows = defaultdict(deque)
-_RATE_LIMITED_PREFIXES = ("/api/auth/", "/api/v1/ai/", "/api/v1/lead-jobs", "/api/email/", "/api/sms/")
+_RATE_LIMITED_PREFIXES = ("/api/auth/", "/api/credentials", "/api/speech/", "/api/tts", "/api/v1/ai/", "/api/v1/lead-jobs", "/api/v1/toughtongue", "/api/v1/sarvam", "/api/v1/billing/order", "/api/email/", "/api/sms/", "/api/crm", "/api/textbee")
 
 @app.middleware("http")
 async def security_controls(request, call_next):
@@ -78,10 +89,13 @@ async def security_controls(request, call_next):
                         media_type="application/json")
     if request.url.path.startswith(_RATE_LIMITED_PREFIXES):
         now = time.monotonic()
-        bucket = _rate_windows[(request.client.host if request.client else "unknown", request.url.path)]
+        prefix = next(prefix for prefix in _RATE_LIMITED_PREFIXES if request.url.path.startswith(prefix))
+        bucket = _rate_windows[(request.client.host if request.client else "unknown", prefix)]
         while bucket and now - bucket[0] > 60:
             bucket.popleft()
-        if len(bucket) >= int(os.getenv("RATE_LIMIT_PER_MINUTE", "60")):
+        default_limit = os.getenv("RATE_LIMIT_PER_MINUTE", "60")
+        limit = int(os.getenv("CRM_RATE_LIMIT_PER_MINUTE", os.getenv("RATE_LIMIT_PER_MINUTE", "240"))) if prefix in ("/api/crm", "/api/textbee") else int(default_limit)
+        if len(bucket) >= limit:
             return Response(content='{"detail":"Too many requests"}', status_code=429,
                             media_type="application/json", headers={"Retry-After": "60"})
         bucket.append(now)
@@ -100,29 +114,76 @@ app.include_router(email_router)
 app.include_router(outlook_router)
 app.include_router(sms_router)
 app.include_router(lead_jobs_router)
+app.include_router(crm_router)
+app.include_router(crm_automation_router)
+app.include_router(textbee_router)
 app.include_router(candidate_jobs_router)
 app.include_router(credentials_router)
 app.include_router(google_sheets_router)
+app.include_router(connectors_router)
 app.include_router(ai_chat_router)
 app.include_router(tts_router)
 app.include_router(speech_router)
 app.include_router(web_reader_router)
+app.include_router(developer_insights_router)
+app.include_router(toughtongue_router)
+app.include_router(sarvam_router)
+app.include_router(billing_router)
+app.include_router(limits_router)
+app.include_router(composio_router)
+
+
+@app.on_event("startup")
+async def sync_db_columns():
+    """Every router is imported by now, so every model is registered. Patch in
+    any column an existing table is missing — otherwise a field added to a
+    model since the DB file was created 500s on first query and the app just
+    says "backend is unavailable"."""
+    try:
+        from api.auth_sync import ensure_columns
+        ensure_columns()
+        from api.crm import ensure_crm_indexes
+        ensure_crm_indexes()
+    except Exception as exc:  # noqa: BLE001 - never block startup on this
+        logging.getLogger(__name__).warning("column sync skipped: %s", exc)
+
+
+@app.on_event("startup")
+async def start_connector_worker():
+    app.state.connector_worker = asyncio.create_task(connector_job_worker())
+
+
+@app.on_event("shutdown")
+async def stop_connector_worker():
+    worker = getattr(app.state, "connector_worker", None)
+    if worker:
+        worker.cancel()
+        try:
+            await worker
+        except asyncio.CancelledError:
+            pass
 
 
 @app.on_event("startup")
 async def warm_local_kokoro():
-    """Warm the shared model in the background so the first spoken turn is not
-    charged the model-load cost. Set CLAVIS_WARM_KOKORO=false for a text-only
-    or memory-constrained deployment."""
-    if os.getenv("CLAVIS_WARM_KOKORO", "true").lower() == "false":
+    """Cloud voice needs no local TTS model. Local Exotel TTS stays lazy;
+    opt in to warm-up only on a machine provisioned for that workload."""
+    if os.getenv("CLAVIS_WARM_KOKORO", "false").lower() not in {"true", "1", "yes"}:
         return
 
     async def load():
+        # BaseException, not Exception. spaCy's model downloader (pulled in by
+        # Kokoro's English G2P) calls sys.exit() when it cannot fetch, and a
+        # SystemExit escaping this task unwinds the event loop and takes the
+        # whole API down with it — leads, e-mail, sheets and all. Voice is
+        # optional here; the API is not.
         try:
             await get_kokoro_engine().warm()
             logger.info("Shared Kokoro model warmed and ready")
-        except Exception as exc:
-            logger.warning("Kokoro warm-up deferred: %s", exc)
+        except asyncio.CancelledError:
+            raise
+        except BaseException as exc:
+            logger.warning("Kokoro warm-up deferred (server stays up): %r", exc)
 
     asyncio.create_task(load(), name="clavis-kokoro-warmup")
 
@@ -144,6 +205,11 @@ async def health_check():
         db_status = "ok"
     except Exception:
         db_status = "error"
+    try:
+        from services.leads.browser_runtime import status as lead_browser_status
+        lead_browser = await asyncio.to_thread(lead_browser_status)
+    except Exception:
+        lead_browser = {"browser_ready": False, "browser_path": None}
     return {
         "status": "healthy",
         "services": {
@@ -153,7 +219,11 @@ async def health_check():
             "db": db_status,
             "redis": "pending",
             "chromadb": "pending",
-        }
+            "lead_browser": "ok" if lead_browser.get("browser_ready") else "missing",
+        },
+        # The UI shows this verbatim: without the browser, leads come back with
+        # no phone and no e-mail, and the honest fix is one command.
+        "lead_browser": lead_browser,
     }
 
 
@@ -166,10 +236,17 @@ async def capabilities(user: UserAccount = Depends(get_current_user)):
 @app.get("/api/public-config")
 async def public_config():
     """Only public browser configuration may cross this boundary."""
+    publishable_key = os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip()
+    if publishable_key and not publishable_key.startswith("sb_publishable_"):
+        try:
+            if jwt.decode(publishable_key, options={"verify_signature": False}).get("role") != "anon":
+                raise ValueError("Not a public key")
+        except (jwt.PyJWTError, ValueError):
+            raise HTTPException(status_code=503, detail="Public authentication configuration is invalid") from None
     return {
         "google_client_id": os.getenv("GOOGLE_CLIENT_ID", "").strip(),
         "supabase_url": os.getenv("SUPABASE_URL", "").strip().rstrip("/"),
-        "supabase_publishable_key": os.getenv("SUPABASE_PUBLISHABLE_KEY", "").strip(),
+        "supabase_publishable_key": publishable_key,
         "supabase_redirect_url": os.getenv("SUPABASE_REDIRECT_URL", "http://localhost:3000/").strip(),
     }
 
@@ -184,7 +261,7 @@ class OutboundCallRequest(BaseModel):
 @app.post("/api/calls/outbound")
 async def start_outbound_call(req: OutboundCallRequest, user: UserAccount = Depends(get_current_user)):
     """
-    Places a real outbound call via Exotel and connects it to Clavis's
+    Places a real outbound call via Exotel and connects it to Rudra24 AI's
     live voice pipeline over /ws/audio. Requires EXOTEL_* env vars and a
     publicly reachable PUBLIC_WSS_DOMAIN.
     """
@@ -216,10 +293,8 @@ async def active_streams(user: UserAccount = Depends(get_current_user)):
 @app.websocket("/ws/live-calls")
 async def websocket_live_calls(websocket: WebSocket):
     """Dashboard-facing socket for streaming live call status/events to the UI."""
-    if websocket.headers.get("origin") not in cors_origins:
-        await websocket.close(code=1008)
+    if not await authenticate_websocket(websocket, cors_origins):
         return
-    await websocket.accept()
     try:
         while True:
             data = await websocket.receive_text()
@@ -235,12 +310,11 @@ async def websocket_audio(websocket: WebSocket):
     streamurl passed to /calls/connect) points here. Runs one
     AudioHandler + VoiceOrchestrator per connected call leg.
     """
-    if APP_ENV == "production":
-        expected = os.getenv("EXOTEL_STREAM_TOKEN", "").strip()
-        supplied = websocket.query_params.get("stream-token", "")
-        if not expected or not supplied or not secrets.compare_digest(supplied, expected):
-            await websocket.close(code=1008)
-            return
+    expected = os.getenv("EXOTEL_STREAM_TOKEN", "").strip()
+    supplied = websocket.query_params.get("stream-token", "")
+    if not expected or not supplied or not secrets.compare_digest(supplied, expected):
+        await websocket.close(code=1008)
+        return
     handler = AudioHandler(websocket)
     orchestrator = VoiceOrchestrator()
     await handler.connect()
@@ -259,6 +333,15 @@ async def websocket_audio(websocket: WebSocket):
         logger.info("Call audio stream disconnected")
     finally:
         await handler.disconnect()
+
+# Old "AIza…" keys and the newer "AQ.…" AI Studio keys (same shape as clavis-setup.js).
+# fullmatch also keeps newlines / "=" out of the .env line below.
+GEMINI_KEY_RE = re.compile(r"AIza[0-9A-Za-z_\-]{30,}|AQ\.[0-9A-Za-z_\-.]{20,}")
+
+
+@app.post("/api/credentials/gemini-local")
+async def save_gemini_local_key(payload: dict):
+    raise HTTPException(status_code=410, detail="Retired. Sign in and use the account credential vault.")
 
 
 if __name__ == "__main__":

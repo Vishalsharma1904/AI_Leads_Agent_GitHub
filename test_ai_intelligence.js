@@ -1,7 +1,7 @@
 /**
  * test_ai_intelligence.js
  * Verification suite for the elevated intelligence, proactivity, and domain expertise
- * across Client AI, Candidate AI, and Clavis AI Studio.
+ * across Client AI, Candidate AI, and Rudra24 AI Studio.
  */
 const assert = require('assert');
 const fs = require('fs');
@@ -117,13 +117,13 @@ const attritionRes = getLocalAdviceFn('guard log chhod ke kyu bhagte hai', globa
 assert(attritionRes.includes('Reduce Staff Attrition'), 'Attrition response must give actionable strategies');
 console.log('  PASS: Candidate AI provides actionable staff retention strategies');
 
-// 3. Test Clavis AI Studio / Jarvis (jarvis.js)
-console.log('\n3. Testing Clavis AI Studio (jarvis.js)...');
+// 3. Test Rudra24 AI Studio / Jarvis (jarvis.js)
+console.log('\n3. Testing Rudra24 AI Studio (jarvis.js)...');
 const jarvisCode = fs.readFileSync(path.join(__dirname, 'jarvis.js'), 'utf8');
 
 assert(jarvisCode.includes('AI Executive Partner and Chief of Staff'), 'Jarvis must define Executive Partner & Chief of Staff persona');
 assert(jarvisCode.includes('SECOND-ORDER THINKING'), 'Jarvis must include second-order thinking');
 assert(jarvisCode.includes('ANTI-ROBOTIC LIFE & VARIETY'), 'Jarvis must include anti-robotic variety instructions');
-console.log('  PASS: Clavis AI Studio prompt has Chief of Staff depth, second-order cognition, and anti-robotic variety');
+console.log('  PASS: Rudra24 AI Studio prompt has Chief of Staff depth, second-order cognition, and anti-robotic variety');
 
 console.log('\n✅ ALL AI INTELLIGENCE & PROACTIVITY TESTS PASSED!\n');

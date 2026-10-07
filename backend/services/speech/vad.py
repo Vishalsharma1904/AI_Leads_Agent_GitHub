@@ -27,8 +27,10 @@ class AdaptiveVAD:
             if self._model is not None or self._silero_error:
                 return
             try:
-                from silero_vad import load_silero_vad
-                self._model = load_silero_vad(onnx=True)
+                # Share the existing cloud-transcription ONNX gate. Importing
+                # silero_vad loaded PyTorch even with onnx=True (~GB of RAM).
+                from faster_whisper.vad import get_vad_model
+                self._model = get_vad_model()
             except Exception as exc:
                 self._silero_error = str(exc)
                 logger.warning("Silero VAD unavailable; using adaptive energy gate: %s", exc)
@@ -45,12 +47,10 @@ class AdaptiveVAD:
         self._ensure_model()
         if self._model is not None:
             try:
-                import torch
                 usable = samples[: (len(samples) // 512) * 512]
                 if usable.size:
-                    window = torch.from_numpy(usable).reshape(-1, 512)
-                    scores = [float(self._model(chunk, self.sample_rate)) for chunk in window]
-                    return max(scores, default=0.0) >= 0.52
+                    scores = self._model(usable)
+                    return float(np.max(scores)) >= 0.52
             except Exception as exc:
                 logger.debug("Silero frame failed, using energy gate: %s", exc)
         # Learn noise only on quiet frames. This avoids a loud utterance

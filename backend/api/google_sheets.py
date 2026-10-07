@@ -28,16 +28,23 @@ class SheetsSyncRequest(BaseModel):
     rows: list[list[Any]] = Field(min_length=1, max_length=5000)
 
 
-def _oauth_config() -> tuple[str, str, str]:
+def _oauth_config(require_redirect: bool = True) -> tuple[str, str, str]:
     client_id = os.getenv("GOOGLE_CLIENT_ID", "").strip()
     client_secret = os.getenv("GOOGLE_CLIENT_SECRET", "").strip()
     redirect_uri = os.getenv("GOOGLE_SHEETS_REDIRECT_URI", "").strip()
-    if not client_id or not client_secret or not redirect_uri:
+    if not client_id or not client_secret or (require_redirect and not redirect_uri):
         raise HTTPException(status_code=503, detail="Google Sheets OAuth is not configured on the server")
     return client_id, client_secret, redirect_uri
 
 
 def _credential(user: UserAccount, db: Session) -> ProviderCredential | None:
+    workspace = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider="google_workspace").first()
+    if workspace:
+        try:
+            if SHEETS_SCOPE in json.loads(decrypt_secret(workspace)).get("scope", "").split():
+                return workspace
+        except (ValueError, KeyError):
+            pass
     return db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider="google_sheets").first()
 
 
@@ -56,7 +63,8 @@ async def connect_sheets(req: SheetsConnectRequest, db: Session = Depends(get_db
             raise HTTPException(status_code=401, detail="Google Sheets authorization was not granted")
         secret = json.dumps({"refresh_token": token_data["refresh_token"], "scope": token_data.get("scope", SHEETS_SCOPE)})
         ciphertext, nonce = encrypt_secret(secret)
-        record = _credential(user, db)
+        # Legacy Sheets consent must not overwrite the broader Workspace token.
+        record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider="google_sheets").first()
         if record:
             record.ciphertext, record.nonce, record.updated_at = ciphertext, nonce, time.time()
         else:
@@ -81,7 +89,7 @@ async def sync_sheets(req: SheetsSyncRequest, db: Session = Depends(get_db), use
     record = _credential(user, db)
     if not record:
         raise HTTPException(status_code=409, detail="Connect Google Sheets before syncing")
-    client_id, client_secret, _ = _oauth_config()
+    client_id, client_secret, _ = _oauth_config(require_redirect=False)
     try:
         stored = json.loads(decrypt_secret(record))
         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=5.0)) as client:

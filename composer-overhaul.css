@@ -750,7 +750,7 @@ html[data-theme="dark"] .cand-src-chip:hover {
   transform: translateY(-1px) !important;
 }
 
-/* Clavis/Jarvis */
+/* Rudra24 AI/Jarvis */
 #view-jarvis.active .jarvis-input-container,
 #view-jarvis.active .jarvis-luxury-composer {
   width: min(100%, 660px) !important;
@@ -780,7 +780,7 @@ html[data-theme="dark"] .cand-src-chip:hover {
 }
 
 
-/* ── 10. CLAVIS COMPOSER STRUCTURE FIX ──────────────────────
+/* ── 10. RUDRA24 AI COMPOSER STRUCTURE FIX ──────────────────────
    Old rule: display:block — breaks flex layout.
    ──────────────────────────────────────────────────────────── */
 #view-jarvis.active .jarvis-input-container {

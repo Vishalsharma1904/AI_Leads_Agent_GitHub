@@ -180,12 +180,7 @@ html[data-theme="dark"] {
 }
 html[data-theme="light"] { color-scheme: light; }
 
-/* ── 1 · Theme reveal ─────────────────────────────────────────
-   clavis-luxe.js wraps the change in document.startViewTransition
-   and grows an Apple spring-curved circle out of the switch on
-   ::view-transition-new. It is 100% hardware-composited on the GPU
-   with zero CPU raster thrashing for a silky 120 FPS transition.
-   The knob slides crisply on its own Apple spring above the wave. */
+/* ── 1 · Theme reveal ───────────────────────────────────────── */
 html.lx-vt-wave:not(#_)::view-transition-old(root),
 html.lx-vt-wave:not(#_)::view-transition-new(root) {
   animation: none !important;
@@ -211,23 +206,17 @@ html.lx-vt-wave:not(#_)::view-transition-new(lx-knob) {
   mix-blend-mode: normal !important;
 }
 
-/* A soft crossfade for switches nobody clicked (auto day/night). */
 html.lx-vt-fade:not(#_)::view-transition-old(root) { animation: lx-vt-out 620ms cubic-bezier(0.2, 0, 0, 1) both !important; }
 html.lx-vt-fade:not(#_)::view-transition-new(root) { animation: lx-vt-in 620ms cubic-bezier(0.2, 0, 0, 1) both !important; }
 @keyframes lx-vt-out { to { opacity: 0; } }
 @keyframes lx-vt-in { from { opacity: 0; } }
 
-/* While the wave runs, nothing underneath may run its own colour
-   transition: a live 380ms fade inside the circle reads as mud, and
-   starting thousands of them is most of the cost of a theme switch
-   (measured ~210ms → ~45ms of style work with this in place). */
 html.lx-theme-busy:not(#_) *,
 html.lx-theme-busy:not(#_) *::before,
 html.lx-theme-busy:not(#_) *::after {
   transition: none !important;
 }
 
-/* Fallback wave (no View Transitions): a disc in the new ground on GPU. */
 .lx-theme-wave {
   position: fixed;
   inset: 0;
@@ -976,6 +965,7 @@ html[data-theme="dark"]:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):no
 }
 html:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):not(#_) .sidebar-nav.lx-pill-on > .nav-item,
 html:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):not(#_) .sidebar-nav.lx-pill-on > .nav-category-block,
+html:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):not(#_) .sidebar-nav.lx-pill-on > .crm-nav-group,
 html:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):not(#_) .sidebar-nav.lx-pill-on > .nav-section-label { position: relative; z-index: 1; }
 
 /* Inhibit static item hover backgrounds when dynamic pill is active */
@@ -2272,8 +2262,8 @@ html[data-theme="dark"]:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay.s
 html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay .settings-modal {
   transition: transform 520ms var(--lxe-spring), opacity 240ms var(--lxe-out) !important;
 }
-html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay:not(.open) .settings-modal { transform: translateY(14px) scale(0.965) !important; opacity: 0; }
-html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay.open .settings-modal { transform: none !important; opacity: 1; }
+html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay:not(.open) .settings-modal { transform: translateY(14px) scale(0.965); opacity: 0; }
+html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay.open .settings-modal { transform: none; opacity: 1; }
 html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay .smodal-field.lx-gone { display: none !important; }
 html:not(#_):not(#_) body:not(#_):not(#_) #settings-overlay .smodal-section.lx-sec-in { animation: lx-sec-in 420ms var(--lxe-spring) both; }
 @keyframes lx-sec-in { from { opacity: 0; transform: translateY(8px); } }
@@ -2428,7 +2418,7 @@ html[data-theme="dark"] .lx-ph { color: var(--lxe-faint); }
 html[data-theme="dark"] .lx-suggest-chip { background: var(--lxe-raised); box-shadow: inset 0 0 0 1px var(--lxe-line), 0 1px 2px rgba(0, 0, 0, 0.4); }
 html[data-theme="dark"] .lx-suggest-chip:hover { background: var(--lxe-raised-2); }
 
-/* ── Clavis rail polish: type, icon clarity, and reversible peek motion ── */
+/* ── Rudra24 AI rail polish: type, icon clarity, and reversible peek motion ── */
 html:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):not(#_):not(#_) .sidebar-brand-title {
   font-family: var(--lxe-serif, "Instrument Serif", "Iowan Old Style", Georgia, serif) !important;
   font-size: 17.5px !important;
@@ -2456,13 +2446,13 @@ html:not(#_):not(#_) body:not(#_):not(#_) #sidebar:not(#_):not(#_):not(#_) .nav-
   color: var(--lxe-ink) !important;
   stroke: currentColor !important;
 }
-html:has(#sidebar.collapsed.au-peek) body main#main-content,
-html:has(#sidebar.collapsed.au-peek) body #main-content {
+html.rudra-rail-legacy body main#main-content,
+html.rudra-rail-legacy body #main-content {
   margin-left: 232px !important;
   width: calc(100% - 232px) !important;
   max-width: calc(100% - 232px) !important;
 }
-html:has(#sidebar.collapsed.au-peek) body #sidebar {
+html.rudra-rail-legacy body #sidebar {
   width: 232px !important;
   min-width: 232px !important;
   max-width: 232px !important;
@@ -2523,6 +2513,6 @@ html[data-theme="dark"]:not(#_):not(#_) body:not(#_):not(#_) .desktop-notificati
   .lx-shot.is-loaded img, .lx-skel > *::after, .lx-shot::before,
   html:not(#_):not(#_) body:not(#_):not(#_) .cts .cts-next-btn { animation: none !important; }
   .lx-lb-img { transition: none; }
-  html:has(#sidebar.collapsed.au-peek) body main#main-content,
-  html:has(#sidebar.collapsed.au-peek) body #main-content { transition-duration: 1ms !important; }
+  html.rudra-rail-legacy body main#main-content,
+  html.rudra-rail-legacy body #main-content { transition-duration: 1ms !important; }
 }

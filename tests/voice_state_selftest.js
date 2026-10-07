@@ -5,7 +5,8 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const store = {};
+// These session tests explicitly opt into wake words; ordinary boot keeps them off.
+const store = { clavis_wake_sources: 'snap,clap,tap,typed,touch,word' };
 const doc = {
   readyState: 'complete',
   documentElement: { setAttribute() {} },
@@ -29,14 +30,18 @@ const clock = () => t;
 VS._setClock(clock); W._setClock(clock);
 
 // ── endpointing ──
-assert.strictEqual(VS.decide('Open Chrome and', 2000), 'wait', 'dangling "and" must survive a 2 s pause');
-assert.strictEqual(VS.decide('mujhe gurgaon ki', 2000), 'wait');
-assert.strictEqual(VS.decide('Open Chrome and', 2900), 'commit');
-assert.strictEqual(VS.decide('gurgaon ki leads dikhao', 450), 'commit', 'finished sentence ends at ~0.45 s');
-assert.strictEqual(VS.decide('gurgaon ki leads dikhao', 300), 'wait');
+assert.strictEqual(VS.decide('Open Chrome and', 1199), 'wait', 'connector keeps a longer pause');
+assert.strictEqual(VS.decide('mujhe gurgaon ki', 1199), 'wait');
+assert.strictEqual(VS.decide('Open Chrome and', 1200), 'commit');
+assert.strictEqual(VS.decide('gurgaon ki leads dikhao', 220), 'commit');
+assert.strictEqual(VS.decide('gurgaon ki leads dikhao', 219), 'wait');
 assert.strictEqual(VS.decide('what is the weather today?', 700), 'commit');
-assert.strictEqual(VS.decide('open chrome', 700), 'wait');
-assert.strictEqual(VS.decide('open chrome', 850), 'commit');
+assert.strictEqual(VS.decide('open chrome', 449), 'wait');
+assert.strictEqual(VS.decide('open chrome', 450), 'commit');
+assert.ok(W.named('Hey Rudra leads dikhao'));
+assert.ok(W.named('रुद्र leads dikhao'));
+assert.strictEqual(W.named('Hey Clavis'), false);   // purana naam ab nahi jagata
+assert.strictEqual(VS.parseStop('Rudra chup').kind, 'hush');
 assert.strictEqual(VS.decide('wait', 5000), 'hold', '"wait" holds');
 assert.strictEqual(VS.decide('ek minute ruko', 9000), 'hold');
 assert.strictEqual(VS.decide('mujhe leads chahiye', 9000, { holding: true }), 'hold', 'held until release');
@@ -58,6 +63,8 @@ assert.strictEqual(VS.parseStop('shut up').kind, 'hush');
 assert.strictEqual(VS.parseStop('chup').kind, 'hush');
 assert.strictEqual(VS.parseStop('stop talking').kind, 'hush');
 assert.strictEqual(VS.parseStop('be quiet').kind, 'hush');
+for (const command of ['चुप', 'चुप रहो', 'रुको', 'बोलना बंद करो', 'रुद्र चुप करो']) assert.strictEqual(VS.parseStop(command).kind, 'hush', command);
+assert.strictEqual(VS.parseStop('रुको का मतलब क्या होता है'), null);
 assert.strictEqual(VS.parseStop('stop the lead search in noida'), null);
 assert.strictEqual(VS.parseStop('gurgaon ki leads dikhao'), null);
 
@@ -66,6 +73,9 @@ for (const y of ['haan', 'ha', 'yes', 'kar do', 'ok', 'theek hai', 'haan ji kar 
 for (const n of ['na', 'nahi', 'no', 'mat karo', 'rehne do', 'cancel', 'nahi rehne do', 'haan mat karo']) assert.strictEqual(VS.parseYesNo(n), 'no', n);
 assert.strictEqual(VS.parseYesNo('gurgaon ki leads'), null);
 assert.strictEqual(VS.parseYesNo('Haan ya na?'), null, 'own question is not an answer');
+for (const answer of ['हाँ', 'हां', 'जी हाँ कर दो', 'ठीक है']) assert.strictEqual(VS.parseYesNo(answer), 'yes', answer);
+for (const answer of ['नहीं', 'रहने दो', 'हाँ लेकिन भेजो मत']) assert.strictEqual(VS.parseYesNo(answer), 'no', answer);
+assert.strictEqual(VS.parseYesNo('हाँ या ना?'), null, 'Hindi echo is not confirmation');
 
 // ── [[directive]] stripping ──
 assert.strictEqual(VS.stripDirectives('Sir, kya error aa raha hai?]]'), 'Sir, kya error aa raha hai?');

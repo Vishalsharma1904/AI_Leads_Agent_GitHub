@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS PROMPT MASTER AGENT (clavis-prompt-master.js)
+ *  RUDRA24 AI PROMPT MASTER AGENT (clavis-prompt-master.js)
  *  Autonomous prompt engineering & orchestration agent.
  * 
  *  User Flow:

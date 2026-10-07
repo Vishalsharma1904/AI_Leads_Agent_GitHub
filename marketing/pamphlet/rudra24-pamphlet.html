@@ -1,0 +1,1284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Rudra24 AI — Business Autopilot Flyer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Mukta:wght@600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@600;700;800&family=Cabinet+Grotesk:wght@800;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream-bg: #FAF6ED;
+    --cream-card: #FFFFFF;
+    --o-deep: #0D1C10;
+    --o-forest: #1A391F;
+    --o-primary: #27562D;
+    --o-tint: #EBF3E8;
+    --gold: #D4A338;
+    --gold-glow: #FDE047;
+    --gold-tint: #FEF3C7;
+    --wa-green: #25D366;
+    --wa-dark: #128C7E;
+    --ink: #111A13;
+    --ink-muted: #4B5A4D;
+    --ink-faint: #6E7D70;
+    --font-hindi: 'Mukta', 'Plus Jakarta Sans', sans-serif;
+    --font-serif: 'Instrument Serif', Georgia, serif;
+    --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1240px; height: 1754px; overflow: hidden; }
+
+  body {
+    font-family: var(--font-sans);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: geometricPrecision;
+    background: 
+      radial-gradient(900px 600px at 92% 5%, rgba(39, 86, 45, 0.18), transparent 65%),
+      radial-gradient(800px 550px at 8% 35%, rgba(212, 163, 56, 0.15), transparent 60%),
+      radial-gradient(950px 700px at 88% 70%, rgba(37, 211, 102, 0.10), transparent 70%),
+      linear-gradient(180deg, #FBF8F2 0%, var(--cream-bg) 45%, #F4ECE0 100%);
+  }
+
+  .canvas {
+    position: relative;
+    width: 1240px;
+    height: 1754px;
+    padding: 24px 44px 22px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+  }
+
+  /* Tactile Grain Overlay */
+  .grain {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.28;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .2  0 0 0 0 .19  0 0 0 0 .15  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  }
+
+  /* ================= 1. TOP BRAND HEADER ================= */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 50px;
+    position: relative;
+    z-index: 5;
+    border-bottom: 1px solid rgba(39, 86, 45, 0.15);
+    padding-bottom: 8px;
+  }
+  .brand-group {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+  }
+  .logo-box {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: #FFFFFF;
+    display: grid;
+    place-items: center;
+    box-shadow: 
+      0 2px 6px rgba(18, 33, 20, 0.06),
+      0 10px 20px -6px rgba(18, 33, 20, 0.2);
+    border: 1px solid rgba(39, 86, 45, 0.16);
+  }
+  .logo-box img {
+    width: 38px;
+    height: 38px;
+    object-fit: contain;
+  }
+  .brand-text h1 {
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.02em;
+    color: var(--o-deep);
+    line-height: 1.1;
+  }
+  .brand-text p {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    color: var(--o-primary);
+    text-transform: uppercase;
+  }
+  .header-badges {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .badge-exclusive {
+    font-size: 10.5px;
+    font-weight: 700;
+    background: #FEF3C7;
+    color: #92400E;
+    border: 1px solid #FCD34D;
+    padding: 4px 10px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .badge-autopilot {
+    font-size: 10.5px;
+    font-weight: 700;
+    background: var(--o-tint);
+    color: var(--o-primary);
+    border: 1px solid rgba(39, 86, 45, 0.25);
+    padding: 4px 11px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pulse-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10B981;
+    box-shadow: 0 0 0 4px rgba(16, 185, 129, 0.25);
+  }
+
+  /* ================= 2. THE ULTIMATE QUESTION HOOK ================= */
+  .hook-hero {
+    margin-top: 10px;
+    position: relative;
+    z-index: 4;
+    background: linear-gradient(135deg, rgba(255,255,255,0.92) 0%, rgba(248, 252, 246, 0.88) 100%);
+    border: 1.5px solid rgba(39, 86, 45, 0.22);
+    border-radius: 22px;
+    padding: 22px 28px 20px;
+    box-shadow: 
+      0 2px 8px rgba(18, 33, 20, 0.04),
+      0 18px 36px -12px rgba(18, 33, 20, 0.12);
+    display: grid;
+    grid-template-columns: 1fr 340px;
+    gap: 24px;
+    align-items: center;
+  }
+
+  .hook-content {
+    display: flex;
+    flex-direction: column;
+  }
+  .hook-eyebrow {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #D97706;
+    margin-bottom: 6px;
+  }
+  .hook-title-block {
+    display: block;
+  }
+  .hook-title {
+    font-family: var(--font-hindi);
+    font-size: 50px;
+    font-weight: 800;
+    line-height: 1.06;
+    letter-spacing: -0.015em;
+    color: var(--o-deep);
+  }
+  .hook-title .en-word {
+    font-family: var(--font-serif);
+    font-size: 60px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+  }
+  .hook-title .glow-autopilot {
+    font-family: var(--font-sans);
+    color: #166534;
+    background: linear-gradient(135deg, #15803D 0%, #047857 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    font-size: 54px;
+  }
+  .giant-qmark {
+    font-family: var(--font-serif);
+    font-size: 76px;
+    font-weight: 900;
+    line-height: 0.8;
+    color: #D97706;
+    background: linear-gradient(145deg, #F59E0B 0%, #D97706 70%, #B45309 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    filter: drop-shadow(0 4px 12px rgba(217, 119, 6, 0.4));
+    user-select: none;
+    margin-left: 8px;
+    display: inline-block;
+    vertical-align: baseline;
+  }
+
+  .hook-explanation {
+    font-size: 14.5px;
+    line-height: 1.55;
+    color: var(--ink-muted);
+    margin-top: 12px;
+    text-wrap: pretty;
+  }
+  .hook-explanation strong {
+    color: var(--o-deep);
+    font-weight: 700;
+  }
+
+  /* Gamechanger Ribbon */
+  .gamechanger-ribbon {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    border: 1px solid #F59E0B;
+    border-radius: 10px;
+    padding: 7px 14px;
+    font-size: 12px;
+    font-weight: 800;
+    color: #92400E;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 10px -2px rgba(245, 158, 11, 0.25);
+  }
+  .gamechanger-ribbon svg { flex-shrink: 0; }
+
+  /* Right Side Hero Visual: Mini Autopilot Brain Widget */
+  .brain-widget {
+    background: linear-gradient(145deg, #142817 0%, #0F1E12 100%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 18px;
+    padding: 16px;
+    color: #FFF;
+    box-shadow: 0 16px 32px -8px rgba(15, 30, 18, 0.4);
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    position: relative;
+    overflow: hidden;
+  }
+  .brain-widget::before {
+    content: "";
+    position: absolute;
+    top: -50px;
+    right: -50px;
+    width: 140px;
+    height: 140px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(37, 211, 102, 0.3), transparent 70%);
+  }
+  .widget-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 10.5px;
+    color: #A7F3D0;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+  .widget-live-badge {
+    background: rgba(37, 211, 102, 0.2);
+    border: 1px solid #25D366;
+    color: #86EFAC;
+    padding: 2.5px 7px;
+    border-radius: 999px;
+    font-size: 9.5px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .widget-prompt {
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 11px;
+    padding: 9px 11px;
+    font-size: 11.5px;
+    line-height: 1.4;
+    color: #F3F4F6;
+    display: flex;
+    gap: 7px;
+    align-items: flex-start;
+  }
+  .widget-prompt svg { color: #F59E0B; flex-shrink: 0; margin-top: 2px; }
+  .widget-action-card {
+    background: rgba(37, 211, 102, 0.14);
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    border-radius: 11px;
+    padding: 9px 11px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .action-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: #25D366;
+    color: #064E3B;
+    display: grid;
+    place-items: center;
+    font-weight: 900;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .action-text {
+    flex: 1;
+    min-width: 0;
+  }
+  .action-text b {
+    font-size: 11px;
+    color: #FFFFFF;
+    display: block;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .action-text span {
+    font-size: 9.5px;
+    color: #A7F3D0;
+    display: block;
+  }
+  .widget-stat-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .w-stat {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 8px;
+    padding: 6px 8px;
+    text-align: center;
+  }
+  .w-stat-num {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    font-weight: 800;
+    color: #FDE047;
+  }
+  .w-stat-lbl {
+    font-size: 8.5px;
+    color: #D1D5DB;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-top: 1px;
+  }
+
+  /* ================= 3. GOLDEN OFFER TICKER (500 - 2,000 LEADS/MO) ================= */
+  .golden-ticket {
+    margin-top: 12px;
+    position: relative;
+    z-index: 4;
+    background: linear-gradient(135deg, #1C3820 0%, #122415 50%, #0D1A0F 100%);
+    border: 1.5px solid rgba(212, 163, 56, 0.6);
+    border-radius: 18px;
+    padding: 14px 22px;
+    display: grid;
+    grid-template-columns: 80px 1fr 260px;
+    gap: 18px;
+    align-items: center;
+    color: #FFF;
+    box-shadow: 
+      0 0 0 1px rgba(212, 163, 56, 0.2),
+      0 12px 28px -6px rgba(13, 26, 15, 0.45);
+  }
+  .gt-badge-circle {
+    width: 68px;
+    height: 68px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, #F59E0B, #B45309);
+    border: 2px solid #FDE68A;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 14px rgba(217, 119, 6, 0.4);
+    color: #FFF;
+  }
+  .gt-badge-circle svg { width: 34px; height: 34px; }
+  .gt-center h3 {
+    font-family: var(--font-serif);
+    font-size: 32px;
+    line-height: 1;
+    color: #FDE047;
+    letter-spacing: -0.01em;
+  }
+  .gt-center h3 span {
+    color: #FFF;
+    font-family: var(--font-sans);
+    font-size: 20px;
+    font-weight: 800;
+  }
+  .gt-center p {
+    font-size: 12px;
+    color: #E2E8F0;
+    margin-top: 4px;
+    line-height: 1.4;
+  }
+  .gt-pills {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    align-items: flex-end;
+  }
+  .gt-pill {
+    font-size: 10.5px;
+    font-weight: 700;
+    color: #FDFBF7;
+    background: rgba(255, 255, 255, 0.12);
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    padding: 3px 9px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .gt-pill.highlight {
+    background: rgba(37, 211, 102, 0.25);
+    border-color: #25D366;
+    color: #86EFAC;
+  }
+
+  /* ================= 4. THE 6 HIGH-TECH SUPERPOWERS ================= */
+  .superpowers-section {
+    margin-top: 13px;
+    position: relative;
+    z-index: 3;
+  }
+  .section-headline {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 9px;
+  }
+  .sec-tag {
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--o-forest);
+  }
+  .sec-title {
+    font-family: var(--font-serif);
+    font-size: 34px;
+    line-height: 1.05;
+    letter-spacing: -0.02em;
+    color: var(--o-deep);
+  }
+  .sec-title em {
+    font-style: italic;
+    color: var(--o-primary);
+  }
+  .sec-sub-note {
+    font-size: 11px;
+    color: var(--ink-faint);
+    font-weight: 600;
+  }
+
+  .powers-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 9px;
+  }
+  .power-card {
+    background: rgba(255, 255, 255, 0.82);
+    border: 1px solid rgba(255, 255, 255, 0.95);
+    border-radius: 14px;
+    padding: 11px 13px;
+    box-shadow: 
+      0 0 0 1px rgba(39, 86, 45, 0.08),
+      0 3px 8px rgba(18, 33, 20, 0.03);
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    position: relative;
+    overflow: hidden;
+  }
+  .power-card::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 3px;
+    background: transparent;
+  }
+  .power-card.c-leads::after    { background: linear-gradient(90deg, #F59E0B, #D97706); }
+  .power-card.c-calling::after  { background: linear-gradient(90deg, #10B981, #059669); }
+  .power-card.c-whatsapp::after { background: linear-gradient(90deg, #25D366, #128C7E); }
+  .power-card.c-map::after      { background: linear-gradient(90deg, #3B82F6, #1D4ED8); }
+  .power-card.c-voice::after    { background: linear-gradient(90deg, #8B5CF6, #6D28D9); }
+  .power-card.c-crm::after      { background: linear-gradient(90deg, #EC4899, #BE185D); }
+
+  .power-top-row {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+  }
+  .power-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+    display: grid;
+    place-items: center;
+    flex-shrink: 0;
+  }
+  .i-leads    { background: #FEF3C7; color: #B45309; }
+  .i-calling  { background: #D1FAE5; color: #047857; }
+  .i-whatsapp { background: rgba(37, 211, 102, 0.18); color: #15803D; }
+  .i-map      { background: #DBEAFE; color: #1D4ED8; }
+  .i-voice    { background: #EDE9FE; color: #6D28D9; }
+  .i-crm      { background: #FCE7F3; color: #BE185D; }
+
+  .power-name {
+    font-size: 13px;
+    font-weight: 800;
+    color: var(--o-deep);
+    letter-spacing: -0.01em;
+  }
+  .power-badge-tag {
+    font-size: 9px;
+    font-weight: 700;
+    margin-left: auto;
+    padding: 2px 6px;
+    border-radius: 4px;
+    text-transform: uppercase;
+  }
+  .tag-leads    { background: #FEF3C7; color: #92400E; }
+  .tag-calling  { background: #DCFCE7; color: #166534; }
+  .tag-whatsapp { background: #DCFCE7; color: #15803D; }
+  .tag-map      { background: #EFF6FF; color: #1E40AF; }
+  .tag-voice    { background: #F5F3FF; color: #5B21B6; }
+  .tag-crm      { background: #FDF2F8; color: #9D174D; }
+
+  .power-desc {
+    font-size: 11px;
+    line-height: 1.45;
+    color: var(--ink-muted);
+  }
+  .power-highlight-row {
+    margin-top: 2px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--o-primary);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  /* ================= 5. INTERACTIVE LIVE WORKFLOW DECK ================= */
+  .workflow-deck {
+    margin-top: 13px;
+    position: relative;
+    z-index: 3;
+    background: rgba(255, 255, 255, 0.78);
+    border: 1px solid rgba(39, 86, 45, 0.15);
+    border-radius: 17px;
+    padding: 12px 18px;
+    box-shadow: 0 4px 14px rgba(18, 33, 20, 0.04);
+  }
+  .deck-header-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+  }
+  .deck-header-title {
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--o-forest);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .deck-flow-steps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    position: relative;
+  }
+  .flow-step-box {
+    background: #FFFFFF;
+    border: 1px solid rgba(39, 86, 45, 0.12);
+    border-radius: 11px;
+    padding: 9px 11px;
+    position: relative;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.02);
+  }
+  .flow-step-box + .flow-step-box::before {
+    content: "→";
+    position: absolute;
+    left: -11px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 14px;
+    font-weight: 800;
+    color: var(--o-primary);
+  }
+  .step-num-pill {
+    font-size: 9px;
+    font-weight: 800;
+    background: var(--o-tint);
+    color: var(--o-primary);
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-bottom: 3px;
+  }
+  .flow-step-box h5 {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--o-deep);
+  }
+  .flow-step-box p {
+    font-size: 10px;
+    color: var(--ink-faint);
+    margin-top: 2px;
+    line-height: 1.35;
+  }
+
+  /* ================= 6. STATS ACCELERATOR STRIP ================= */
+  .stats-strip {
+    margin-top: 12px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    position: relative;
+    z-index: 3;
+  }
+  .stat-card {
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(39, 86, 45, 0.14);
+    border-radius: 12px;
+    padding: 8px 12px;
+    text-align: center;
+  }
+  .stat-card-num {
+    font-family: var(--font-serif);
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--o-primary);
+  }
+  .stat-card-lbl {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--ink-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-top: 3px;
+  }
+
+  /* ================= 7. FOOTER HIGH-CONVERTING CONTACT BAND ================= */
+  .cta-footer {
+    min-height: 242px;
+    border-radius: 24px;
+    background: 
+      radial-gradient(750px 380px at 95% 0%, rgba(39, 86, 45, 0.42), transparent 70%),
+      radial-gradient(450px 320px at 0% 100%, rgba(212, 163, 56, 0.24), transparent 70%),
+      linear-gradient(145deg, #16301A 0%, #0F2012 50%, #09150B 100%);
+    box-shadow: 
+      inset 0 1px 0 rgba(255, 255, 255, 0.18),
+      0 20px 48px -16px rgba(9, 21, 11, 0.6);
+    color: #FDFBF7;
+    padding: 16px 26px;
+    position: relative;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1fr 438px;
+    gap: 20px;
+    align-items: center;
+    z-index: 5;
+  }
+
+  .footer-left {
+    position: relative;
+    z-index: 2;
+  }
+  .footer-brand-row {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    margin-bottom: 6px;
+  }
+  .footer-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #FFF;
+    display: grid;
+    place-items: center;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  }
+  .footer-logo img { width: 34px; height: 34px; object-fit: contain; }
+  .footer-left h3 {
+    font-family: var(--font-serif);
+    font-size: 34px;
+    line-height: 1.02;
+    color: #FFF;
+    letter-spacing: -0.02em;
+  }
+  .footer-left h3 em {
+    font-style: italic;
+    color: #A3E635;
+  }
+  .footer-sub {
+    font-size: 12.5px;
+    color: rgba(244, 238, 223, 0.82);
+    margin-top: 5px;
+    max-width: 530px;
+    line-height: 1.45;
+  }
+  .footer-trust-chips {
+    display: flex;
+    gap: 8px;
+    margin-top: 9px;
+  }
+  .f-chip {
+    font-size: 10px;
+    font-weight: 600;
+    color: #FDE68A;
+    background: rgba(212, 163, 56, 0.15);
+    border: 1px solid rgba(212, 163, 56, 0.3);
+    padding: 3px 9px;
+    border-radius: 999px;
+  }
+
+  /* Contact Information Desk (Right side) */
+  .footer-right {
+    position: relative;
+    z-index: 2;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 18px;
+    padding: 12px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  
+  /* Primary Box: 9999881949 (Vishal Sharma) First with WhatsApp Highlight */
+  .contact-primary-lead {
+    background: linear-gradient(135deg, rgba(37, 211, 102, 0.22), rgba(18, 140, 126, 0.15));
+    border: 1.5px solid rgba(37, 211, 102, 0.55);
+    border-radius: 12px;
+    padding: 9px 13px;
+  }
+  .c-manager-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 11px;
+    margin-bottom: 2px;
+  }
+  .c-manager-title {
+    font-weight: 800;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #86EFAC;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .c-live-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #25D366;
+    box-shadow: 0 0 8px #25D366;
+    display: inline-block;
+  }
+  .c-manager-name {
+    font-weight: 700;
+    color: #FFFFFF;
+    font-size: 11.5px;
+  }
+  .c-phone-main-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: 3px;
+  }
+  .c-phone-top {
+    font-family: var(--font-mono);
+    font-size: 19.5px;
+    font-weight: 800;
+    color: #FFFFFF;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .c-wa-pill-tag {
+    font-size: 10px;
+    font-weight: 700;
+    color: #DCFCE7;
+    background: rgba(37, 211, 102, 0.25);
+    border: 1px solid rgba(37, 211, 102, 0.55);
+    padding: 3px 8px;
+    border-radius: 999px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .c-wa-notice {
+    font-size: 10px;
+    color: #A7F3D0;
+    font-weight: 600;
+    margin-top: 3px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  /* Secondary Executive Desk Box */
+  .contact-exec-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 7px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .exec-left {
+    font-size: 10.5px;
+    color: rgba(255, 255, 255, 0.85);
+  }
+  .exec-left b {
+    color: #FDE68A;
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.02em;
+  }
+  .exec-right {
+    text-align: right;
+  }
+  .exec-phone {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    color: #FFFFFF;
+    letter-spacing: 0.02em;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+  .exec-email {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.75);
+    margin-top: 2px;
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 5px;
+  }
+  
+  /* Dual Action CTAs */
+  .action-buttons-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-top: 2px;
+  }
+  .btn-wa-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    background: linear-gradient(135deg, #25D366, #128C7E);
+    color: #FFFFFF;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 9px 12px;
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(18, 140, 126, 0.45);
+    letter-spacing: -0.01em;
+  }
+  .btn-demo-action {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: linear-gradient(135deg, #FAF5EB, #F3EAD3);
+    color: var(--o-deep);
+    font-size: 12px;
+    font-weight: 800;
+    padding: 9px 12px;
+    border-radius: 999px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.01em;
+  }
+</style>
+</head>
+<body>
+<div class="canvas">
+  <div class="grain"></div>
+
+  <!-- ================= 1. HEADER ================= -->
+  <header>
+    <div class="brand-group">
+      <div class="logo-box">
+        <img src="../../assets/rudra24-icon.png" alt="Rudra24 Digital">
+      </div>
+      <div class="brand-text">
+        <h1>Rudra24 AI</h1>
+        <p>Smart AI Marketing Manager &amp; Autonomous Agent · Rudra24 Digital</p>
+      </div>
+    </div>
+    
+    <div class="header-badges">
+      <div class="badge-exclusive">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        India's #1 B2B AI Growth Engine
+      </div>
+      <div class="badge-autopilot">
+        <span class="pulse-dot"></span>
+        100% Autopilot Mode Active
+      </div>
+    </div>
+  </header>
+
+  <!-- ================= 2. THE BIG HOOK SECTION ================= -->
+  <section class="hook-hero">
+    <div class="hook-content">
+      <div class="hook-eyebrow">
+        <span>🔥 Attention Business Owners &amp; Directors 🔥</span>
+      </div>
+
+      <div class="hook-title-block">
+        <h2 class="hook-title">
+          क्या आप अपने <span class="en-word">Business</span> को<br>
+          <span class="glow-autopilot">AUTOPILOT</span> पर चलाना चाहते हैं<span class="giant-qmark">?</span>
+        </h2>
+      </div>
+
+      <p class="hook-explanation">
+        Ab manual cold-calling, bekaar leads aur client dhoondne ki tension khatam! <strong>Rudra24 Digital</strong> laya hai aapke liye ek aisa <strong>Smart AI Marketing Manager</strong> jo din-raat aapke business ki growth ko boost karega, genuine B2B clients generate karega aur aapke pure sales process ko autopilot par run karega.
+      </p>
+
+      <div class="gamechanger-ribbon">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+        <span>THIS CAN BE THE BIGGEST GAMECHANGER FOR YOUR BUSINESS IN 2026!</span>
+      </div>
+    </div>
+
+    <!-- Live Preview Brain Widget -->
+    <div class="brain-widget">
+      <div class="widget-head">
+        <span>Rudra24 Live AI Engine</span>
+        <span class="widget-live-badge"><span class="pulse-dot" style="width:5px;height:5px"></span> Active</span>
+      </div>
+
+      <div class="widget-prompt">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+        <span><strong>Voice Command:</strong> "Gurugram ke top 20 Luxury Hotels par Security &amp; Housekeeping pitch karo"</span>
+      </div>
+
+      <div class="widget-action-card">
+        <div class="action-avatar">AI</div>
+        <div class="action-text">
+          <b>Calling The Grand Aravali Resort</b>
+          <span>Live Human Pitch in Hinglish · Decision Maker Connected</span>
+        </div>
+      </div>
+
+      <div class="widget-stat-row">
+        <div class="w-stat">
+          <div class="w-stat-num">1,240+</div>
+          <div class="w-stat-lbl">Staff Reqd Plotted</div>
+        </div>
+        <div class="w-stat">
+          <div class="w-stat-num">98%</div>
+          <div class="w-stat-lbl">High-Intent Score</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 3. GOLDEN TICKET OFFER (500 - 2,000 LEADS/MO) ================= -->
+  <section class="golden-ticket">
+    <div class="gt-badge-circle">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+    </div>
+
+    <div class="gt-center">
+      <h3>500 Se 2,000+ Verified B2B Leads <span>/ Har Mahine</span></h3>
+      <p>Hotels, Hospitals, IT Parks, Shopping Malls, Factories aur Corporate Towers ke verified decision makers — Direct Procurement Heads &amp; Facility Managers ki verified contact list sidhe aapke CRM me!</p>
+    </div>
+
+    <div class="gt-pills">
+      <span class="gt-pill highlight">✓ 100% Commercial Contracts</span>
+      <span class="gt-pill">✓ Zero Fake Contacts Guarantee</span>
+      <span class="gt-pill">✓ Auto-Scored 0–100% Probability</span>
+    </div>
+  </section>
+
+  <!-- ================= 4. THE 6 HIGH-TECH SUPERPOWERS ================= -->
+  <section class="superpowers-section">
+    <div class="section-headline">
+      <div>
+        <span class="sec-tag">Autonomous Features</span>
+        <h3 class="sec-title">Rudra24 AI Ke <em>6 Revolutionary Superpowers</em></h3>
+      </div>
+      <span class="sec-sub-note">Ek Pura Sales &amp; Operations Department · Ab AI Ke Autopilot Par</span>
+    </div>
+
+    <div class="powers-grid">
+      <!-- 1. Auto Lead Generation -->
+      <div class="power-card c-leads">
+        <div class="power-top-row">
+          <div class="power-icon i-leads">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          </div>
+          <span class="power-name">Auto Lead Generation</span>
+          <span class="power-badge-tag tag-leads">500-2000/Mo</span>
+        </div>
+        <p class="power-desc">Apni city, state ya pincode enter karein — hamara proprietary engine real-time me genuine B2B clients aur company details generate karta hai.</p>
+        <div class="power-highlight-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Best Quality 100% Verified Corporate Records</span>
+        </div>
+      </div>
+
+      <!-- 2. Auto Calling Agent -->
+      <div class="power-card c-calling">
+        <div class="power-top-row">
+          <div class="power-icon i-calling">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </div>
+          <span class="power-name">Auto Calling Agent</span>
+          <span class="power-badge-tag tag-calling">Human-Like AI</span>
+        </div>
+        <p class="power-desc">Real human voice me natural Hindi &amp; Hinglish bolkar company heads ko automatically call lagata hai, services pitch karta hai aur deal meetings book karta hai.</p>
+        <div class="power-highlight-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Zero Human Dialling · Live Call Conversations</span>
+        </div>
+      </div>
+
+      <!-- 3. WhatsApp & Email Automation -->
+      <div class="power-card c-whatsapp">
+        <div class="power-top-row">
+          <div class="power-icon i-whatsapp">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+          </div>
+          <span class="power-name">WhatsApp &amp; Email Auto</span>
+          <span class="power-badge-tag tag-whatsapp">1-Click Dispatch</span>
+        </div>
+        <p class="power-desc">Call khatam hote hi customized Quotation, Company Profile, Rate Card aur SLA agreements client ke WhatsApp aur Email par seconds me pahuch jate hain.</p>
+        <div class="power-highlight-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Instant Proposal Delivery · High Response Rate</span>
+        </div>
+      </div>
+
+      <!-- 4. Interactive Territory Map & Directions -->
+      <div class="power-card c-map">
+        <div class="power-top-row">
+          <div class="power-icon i-map">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          </div>
+          <span class="power-name">Map Info &amp; Directions</span>
+          <span class="power-badge-tag tag-map">GPS Radar</span>
+        </div>
+        <p class="power-desc">Map par nearby factories, hotels aur hospitals ki exact location dekhein, facility size jaanein aur 1-click se field survey ke liye driving directions paayein.</p>
+        <div class="power-highlight-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Visual Territory Plotting · Distance &amp; Directions</span>
+        </div>
+      </div>
+
+      <!-- 5. Voice Control AI ("Control Everything By Voice") -->
+      <div class="power-card c-voice">
+        <div class="power-top-row">
+          <div class="power-icon i-voice">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/></svg>
+          </div>
+          <span class="power-name">Voice Command Control</span>
+          <span class="power-badge-tag tag-voice">Control By Voice</span>
+        </div>
+        <p class="power-desc">Type karne ki zaroorat nahi — sirf bolkar command dijiye: <em>"Jarvis, Manesar ke 30 plants ko call karke security guard pitch karo"</em> aur pura operation execute!</p>
+        <div class="power-highlight-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>Control Everything By Voice · Zero Effort</span>
+        </div>
+      </div>
+
+      <!-- 6. Smart CRM Pipeline -->
+      <div class="power-card c-crm">
+        <div class="power-top-row">
+          <div class="power-icon i-crm">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+          </div>
+          <span class="power-name">Autonomous Deal CRM</span>
+          <span class="power-badge-tag tag-crm">Pipeline Sync</span>
+        </div>
+        <p class="power-desc">Tenders, RFPs, client biddings aur signed SLA contracts ko manage karein. Google Sheets aur Excel (.xlsx) me 1-click instant export karein.</p>
+        <div class="power-highlight-row">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          <span>End-to-End Contract Tracking · 1-Click Excel Sync</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 5. HOW TO RUN ON AUTOPILOT IN 3 STEPS ================= -->
+  <section class="workflow-deck">
+    <div class="deck-header-row">
+      <span class="deck-header-title">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        How You Can Run Your Business on Autopilot (Simple 4-Step Process)
+      </span>
+      <span style="font-size:10px;font-weight:700;color:var(--o-primary)">⚡ Ready In Less Than 15 Minutes</span>
+    </div>
+
+    <div class="deck-flow-steps">
+      <div class="flow-step-box">
+        <span class="step-num-pill">STEP 01</span>
+        <h5>Target Area Chunhein</h5>
+        <p>City, Pincode ya Industrial Area ka naam bolkar ya type karke set karein.</p>
+      </div>
+
+      <div class="flow-step-box">
+        <span class="step-num-pill">STEP 02</span>
+        <h5>AI Generates Leads</h5>
+        <p>AI seconds me verified companies ki list aur requirement scores nikalta hai.</p>
+      </div>
+
+      <div class="flow-step-box">
+        <span class="step-num-pill">STEP 03</span>
+        <h5>AI Calls &amp; Pitches</h5>
+        <p>Voice AI decision-maker ko call lagakar meeting book aur WhatsApp bhejta hai.</p>
+      </div>
+
+      <div class="flow-step-box">
+        <span class="step-num-pill">STEP 04</span>
+        <h5>Deal Close &amp; Growth</h5>
+        <p>Aapko milte hain confirmed meetings, client contracts aur 10X business growth!</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= 6. STATS STRIP ================= -->
+  <section class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-card-num">500 – 2,000+</div>
+      <div class="stat-card-lbl">Verified Leads / Month</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-num">0 Manual Calls</div>
+      <div class="stat-card-lbl">100% Autonomous AI Voice</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-num">10X Faster</div>
+      <div class="stat-card-lbl">Commercial Deal Closures</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-card-num">24/7 Autopilot</div>
+      <div class="stat-card-lbl">Revenue Growth Engine</div>
+    </div>
+  </section>
+
+  <!-- ================= 7. FOOTER HIGH-CONVERTING CONTACT BAND ================= -->
+  <footer class="cta-footer">
+    <div class="footer-left">
+      <div class="footer-brand-row">
+        <div class="footer-logo">
+          <img src="../../assets/rudra24-icon.png" alt="Rudra24">
+        </div>
+        <div>
+          <span style="font-size:10.5px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#A3E635">Live AI Deployment</span>
+          <h3 style="margin-top:2px">Apne Business Ko Aaj Hi <em>Autopilot Par Daalein.</em></h3>
+        </div>
+      </div>
+      
+      <p class="footer-sub">
+        Manual calling aur lead generation ki purani takleefon ko alvida kahein. Rudra24 AI ke sath apne business ko scale karein aur daily confirmed B2B meetings paayein.
+      </p>
+
+      <div class="footer-trust-chips">
+        <span class="f-chip">500–2,000 Leads Guarantee</span>
+        <span class="f-chip">Zero Cold-Calling</span>
+        <span class="f-chip">Ready In 15 Mins</span>
+        <span class="f-chip">Rudra24 Secure Group</span>
+      </div>
+    </div>
+
+    <!-- Contact Information Box -->
+    <div class="footer-right">
+      <!-- 1. Top Primary: Vishal Sharma (Ends in 49) FIRST with WhatsApp Highlight -->
+      <div class="contact-primary-lead">
+        <div class="c-manager-row">
+          <div class="c-manager-title">
+            <span class="c-live-dot"></span>
+            PRIMARY CONTACT · MARKETING MANAGER
+          </div>
+          <span class="c-manager-name">Vishal Sharma (Marketing Manager)</span>
+        </div>
+        
+        <div class="c-phone-main-row">
+          <div class="c-phone-top">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2.5"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            +91 99998 81949
+          </div>
+          <div class="c-wa-pill-tag">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="#25D366"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+            Contact us on WhatsApp
+          </div>
+        </div>
+
+        <div class="c-wa-notice">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+          Direct Line Active 24/7 · WhatsApp Proposals &amp; Fast Response
+        </div>
+      </div>
+
+      <!-- 2. Founder & Executive Desk: 9625729177 Second -->
+      <div class="contact-exec-row">
+        <div class="exec-left">
+          <b>Founder / Executive Desk</b>
+          <span>Priority Direct Escalation</span>
+        </div>
+        <div class="exec-right">
+          <div class="exec-phone">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#A3E635" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            +91 96257 29177
+          </div>
+          <div class="exec-email">
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Rudra24securegroup@gmail.com
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Dual Action CTAs -->
+      <div class="action-buttons-row">
+        <div class="btn-wa-action">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/></svg>
+          Contact us on WhatsApp
+        </div>
+        <div class="btn-demo-action">
+          <span>Book Live Demo</span>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </div>
+      </div>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,11 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Lead map interaction check</title>
+<link rel="stylesheet" href="../clavis-canvas.css?lead-quality=1005j">
+<link rel="stylesheet" href="../clavis-manual.css?lead-quality=1005j">
+<style>body{margin:0;background:#ffffec;color:#143c34;font:16px system-ui}main{padding:28px;max-width:560px}button{font:inherit;padding:10px;border:1px solid #d9ddcc;border-radius:10px;background:#fffef7;color:#143c34}h1{font:36px Georgia}p{line-height:1.6}</style>
+<main><h1>Lead map interaction check</h1><p>Preview test data — no records are saved and no lead search runs. Check marker labels, company details, ordinary map taps, explicit A/B selection and square expansion.</p><button id="preview">Show test companies</button></main>
+<script src="../clavis-canvas.js?lead-quality=1005j"></script>
+<script>document.getElementById('preview').addEventListener('click',()=>ClavisCanvas.showLeads([
+ {company:'Demo Hospital',address:'Test pin, Delhi',lat:28.635,lng:77.216,website:'https://example.org',email:'info@example.org',emails:['info@example.org','hr@example.org'],phones:[{number:'+91 98100 11111'}],contactPerson:'Demo Person',designation:'Admin Head'},
+ {company:'Demo Office',address:'Test pin, Delhi',lat:28.627,lng:77.228,website:'https://example.com'}
+],{title:'Preview · test companies'}));</script></html>

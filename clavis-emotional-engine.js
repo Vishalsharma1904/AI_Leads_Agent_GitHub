@@ -1,5 +1,5 @@
 /**
- * CLAVIS EMOTIONAL ENGINE
+ * RUDRA24 AI EMOTIONAL ENGINE
  *
  * A small deterministic companion to the LLM.  The model still owns meaning
  * and decisions; this module supplies the social context that models cannot

@@ -1,5 +1,5 @@
 /* =====================================================================
-   APPLE-POLISH  —  Clavis design system & interaction layer
+   APPLE-POLISH  —  Rudra24 AI design system & interaction layer
    Loads LAST. Purely additive: no markup or behaviour is removed.
 
    Fixes the systemic issues found in the UI audit:
@@ -917,17 +917,17 @@ html body .dropdown-item.ap-pressed, html body .smodal-nav-item.ap-pressed {
    The rail is 62px with no labels; tooltips come from apple-polish.js.
    Give the icons a real hit area and optical centring.
    ------------------------------------------------------------------ */
-html[data-sidebar-state="collapsed"] body .sidebar .nav-item {
+#sidebar.collapsed .nav-item {
   justify-content: center !important;
   padding-inline: 0 !important;
 }
-html[data-sidebar-state="collapsed"] body .sidebar .nav-item.active::before { left: -5px; }
+#sidebar.collapsed .nav-item.active::before { left: -5px; }
 html body .sidebar .nav-item { min-height: 34px; }
 html body .sidebar .nav-section-label {
   padding-inline: var(--ap-s4) !important;
   margin-block: var(--ap-s5) var(--ap-s1) !important;
 }
-html[data-sidebar-state="collapsed"] body .sidebar .nav-section-label {
+#sidebar.collapsed .nav-section-label {
   height: 1px; padding: 0 !important; margin: var(--ap-s5) var(--ap-s4) !important;
   overflow: hidden; color: transparent !important;
   background: var(--ap-sep);
@@ -1263,8 +1263,8 @@ html body #settings-overlay #settings-modal {
   border-radius: var(--ap-r-xl) !important;
   box-shadow: var(--ap-e4) !important;
 }
-/* the modal body was clipping its last row — give the scroll area room */
-html body #settings-overlay .smodal-body { padding-bottom: var(--ap-s8) !important; }
+/* Bottom spacing belongs inside the scrolling content, not under both panes. */
+html body #settings-overlay .smodal-body { padding-bottom: 0 !important; }
 
 
 /* ------------------------------------------------------------------
@@ -1366,7 +1366,7 @@ html body .jarvis-composer-dropdown[hidden]:not(#\9) {
 
 
 /* ══════════════════════════════════════════════════════════════════
-   26 · CLAVIS STUDIO — centred orb, calmer chrome, more room
+   26 · RUDRA24 AI STUDIO — centred orb, calmer chrome, more room
    In the .has-messages state the orb was demoted to a 36px avatar
    pinned to the left of a 48px strip, stacked under a second 1px
    border from the toolbar ribbon — two hard rules within 55px of each
@@ -1514,7 +1514,7 @@ html body .clavis-orb-sheen::after {
 }
 
 /* the ring element existed in the markup but had no styling — make it
-   the state indicator: a hairline halo that answers to what Clavis is
+   the state indicator: a hairline halo that answers to what Rudra24 AI is
    doing, instead of the whole orb changing colour. */
 html body .clavis-orb-ring {
   position: absolute !important;
@@ -1728,7 +1728,7 @@ html body .sidebar .nav-text,
 html body .sidebar .nav-section-label {
   transition: opacity 160ms var(--ap-ease-out) !important;
 }
-html[data-sidebar-state="collapsed"] body .sidebar .nav-item > span { opacity: 0 !important; }
+#sidebar.collapsed .nav-item > span { opacity: 0 !important; }
 
 /* The sticky table header used a saturating backdrop blur on every
    scroll frame. An opaque header costs nothing and looks the same. */
@@ -2436,7 +2436,7 @@ html body #main-scroll-area {
   overflow: hidden !important;
 }
 
-/* Clavis AI View Seamless Integration inside Canvas */
+/* Rudra24 AI View Seamless Integration inside Canvas */
 html body #view-jarvis.active {
   background: var(--wf-canvas-bg) !important;
   border-top-left-radius: 22px !important;
@@ -2514,7 +2514,7 @@ html body .jarvis-voice-center-btn:hover {
   box-shadow: 0 0 0 4px var(--wf-lime-dim, rgba(212, 244, 88, 0.18)), 0 10px 30px rgba(0, 0, 0, 0.25) !important;
 }
 
-/* ── 6. Clavis Neural Orb: Vivid Internal Colors & NO Edge Glow ── */
+/* ── 6. Rudra24 AI Neural Orb: Vivid Internal Colors & NO Edge Glow ── */
 /* Strictly suppress any outer edge glow, ring, or halo across all states */
 html body #orb-container::before,
 html body #orb-container::after,
@@ -2945,7 +2945,7 @@ html[data-theme="dark"] #view-jarvis .jarvis-visualizer .wave-bar {
 
 
 /* ══════════════════════════════════════════════════════════════════
-   28 · CLAVIS TAB — COMPLETE APPLE / MACOS HIG REDESIGN
+   28 · RUDRA24 AI TAB — COMPLETE APPLE / MACOS HIG REDESIGN
    ─ Header: Status & mic on LEFT, ALL action buttons on FAR RIGHT.
    ─ Hero State: Neural Orb centered prominently (146px) with clean
      greeting & tip pill. Chat container completely hidden on load.
@@ -3662,10 +3662,10 @@ html body #main-content {
     width 0.32s cubic-bezier(0.16, 1, 0.3, 1) !important;
 }
 
-html[data-sidebar-state="collapsed"] body #main-content.main-content,
-html[data-sidebar-state="collapsed"] body #main-content,
-html:has(#sidebar.collapsed) body #main-content.main-content,
-html:has(#sidebar.collapsed) body #main-content {
+html.rudra-rail-legacy body #main-content.main-content,
+html.rudra-rail-legacy body #main-content,
+html.rudra-rail-legacy body #main-content.main-content,
+html.rudra-rail-legacy body #main-content {
   margin-left: 64px !important;
   width: calc(100% - 64px) !important;
   max-width: calc(100% - 64px) !important;
@@ -3682,11 +3682,11 @@ html body #sidebar .nav-badge {
   white-space: nowrap !important;
 }
 
-html[data-sidebar-state="collapsed"] body #sidebar .nav-item > span,
-html[data-sidebar-state="collapsed"] body #sidebar .nav-section-label,
-html[data-sidebar-state="collapsed"] body #sidebar .logo-text,
-html[data-sidebar-state="collapsed"] body #sidebar .chevron-arrow,
-html[data-sidebar-state="collapsed"] body #sidebar .nav-badge {
+#sidebar.collapsed .nav-item > span,
+#sidebar.collapsed .nav-section-label,
+#sidebar.collapsed .logo-text,
+#sidebar.collapsed .chevron-arrow,
+#sidebar.collapsed .nav-badge {
   opacity: 0 !important;
   pointer-events: none !important;
 }
@@ -3912,5 +3912,87 @@ html body #view-jarvis .jarvis-hero-actions {
     pointer-events: auto !important;
   }
 }
+
+/* ============================================================
+   WISPR FLOW & ANTHROPIC TYPOGRAPHY OVERHAUL
+   ============================================================ */
+
+body, html, input, button, textarea, select {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', 'Segoe UI', system-ui, sans-serif !important;
+  -webkit-font-smoothing: antialiased !important;
+  -moz-osx-font-smoothing: grayscale !important;
+  text-rendering: optimizeLegibility !important;
+}
+
+/* Headlines: Wispr Flow style crisp tight tracking and confident weight */
+h1, h2, h3, .cts-title, .do-section-title, .hero-title {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', system-ui, sans-serif !important;
+  letter-spacing: -0.022em !important;
+  font-weight: 600 !important;
+  line-height: 1.25 !important;
+}
+
+h4, h5, h6 {
+  letter-spacing: -0.012em !important;
+  font-weight: 600 !important;
+}
+
+/* Body copy: comfortable line height */
+p, .cts-text, .msg-text, .jarvis-message-text {
+  line-height: 1.62 !important;
+  letter-spacing: -0.006em !important;
+}
+
+/* Anthropic & Wispr Flow style Blockquotes */
+blockquote, .quote-box {
+  margin: 14px 0 !important;
+  padding: 12px 18px !important;
+  border-left: 3.5px solid #6366f1 !important;
+  background: rgba(99, 102, 241, 0.06) !important;
+  border-radius: 0 12px 12px 0 !important;
+  font-style: normal !important;
+  color: inherit !important;
+  font-size: 13.5px !important;
+  line-height: 1.65 !important;
+}
+
+:root[data-theme="dark"] blockquote,
+:root[data-theme="dark"] .quote-box {
+  background: rgba(99, 102, 241, 0.12) !important;
+  border-left-color: #818cf8 !important;
+}
+
+/* Quote Highlights and Smart Emphasis */
+mark, .highlight-quote, .quote-highlight {
+  background: rgba(234, 179, 8, 0.22) !important;
+  color: inherit !important;
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  font-weight: 500 !important;
+}
+
+:root[data-theme="dark"] mark,
+:root[data-theme="dark"] .highlight-quote,
+:root[data-theme="dark"] .quote-highlight {
+  background: rgba(250, 204, 21, 0.25) !important;
+}
+
+q {
+  quotes: "“" "”" "‘" "’";
+  font-weight: 500;
+  color: #6366f1;
+}
+
+:root[data-theme="dark"] q {
+  color: #a5b4fc;
+}
+
+/* Code & Tokens in text */
+code, pre, .cts-code {
+  font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace !important;
+  font-size: 12px !important;
+  letter-spacing: -0.01em !important;
+}
+
 
 

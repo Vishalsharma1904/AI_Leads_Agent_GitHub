@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Rudra24 AI · Connection setup</title>
+  <link rel="stylesheet" href="desktop-setup.css">
+  <script src="desktop-setup.js" defer></script>
+</head>
+<body>
+  <header><img src="assets/rudra24-icon.png" width="46" height="46" alt=""><span>Rudra24 AI</span></header>
+  <main>
+    <p class="eyebrow">YOUR DESKTOP WORKSPACE</p>
+    <h1>One connection.<br>Your workspace, ready.</h1>
+    <p class="intro">Rudra24 AI runs your AI and lead searches on your team's secure server. This computer only needs the app and an internet connection.</p>
+    <section aria-labelledby="setup-title">
+      <div class="step">01 <span>Connect your workspace</span></div>
+      <h2 id="setup-title">Enter your server address</h2>
+      <p>Your administrator provides this address. No Python, Node.js or command window is needed.</p>
+      <form id="connection-form">
+        <label for="backend-url">Workspace server</label>
+        <input id="backend-url" type="url" placeholder="https://api.your-domain.com" autocomplete="url" spellcheck="false" required aria-describedby="connection-note connection-status">
+        <small id="connection-note">Only the server address is saved. Your provider keys remain on the server.</small>
+        <p id="connection-status" role="status" aria-live="polite"></p>
+        <div class="actions"><button id="connect" type="submit">Connect workspace <span aria-hidden="true">→</span></button><button id="back" type="button" hidden>Back to app</button></div>
+      </form>
+    </section>
+    <p class="footer">Install once. Open from your desktop.<br>Closing the app releases its local services and memory.</p>
+  </main>
+</body>
+</html>

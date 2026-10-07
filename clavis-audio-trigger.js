@@ -1,5 +1,5 @@
 /*
- * Clavis sound activation — a snap (or two claps) wakes Clavis.
+ * Rudra24 AI sound activation — a snap (or two claps) wakes Rudra24 AI.
  *
  * Why the old detector "never worked", and what changed:
  *   1. It polled an AnalyserNode every 32 ms over a ~21 ms window, so a
@@ -33,7 +33,7 @@
 (() => {
   const AudioContextCtor = window.AudioContext || window.webkitAudioContext;
   const SENS = { low: 1.4, medium: 1, high: 0.7 };
-  const SETTLE_MS = 650;       // wait this long after the last impulse before judging the pattern
+  const SETTLE_MS = 650;       // keep the full two-clap window for an ordinary first impulse
   const MIN_GAP = 110, MAX_GAP = 650;
   const ISOLATION_MS = 1500;   // a lone snap must come out of quiet
   const CRISP_MS = 40, LOUD = 0.16;   // a lone snap has to be a real, firm snap
@@ -50,6 +50,12 @@
     const g = group[0];
     if (mode !== 'double' && quietBefore >= ISOLATION_MS && g.ms <= CRISP_MS && g.level >= LOUD) return 'single';
     return null;
+  }
+  function settleDelay(group, mode, quietBefore) {
+    if (group.length === 2 && group[1].at - group[0].at >= MIN_GAP && group[1].at - group[0].at <= MAX_GAP) return 0;
+    const first = group[0];
+    return group.length === 1 && first.kind === 'snap' && mode !== 'double'
+      && quietBefore >= ISOLATION_MS && first.ms <= CRISP_MS && first.level >= LOUD ? 180 : SETTLE_MS;
   }
 
   class ClavisAudioTrigger extends EventTarget {
@@ -92,6 +98,7 @@
     }
 
     async start(nextOptions = {}) {
+      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
       this.setOptions(nextOptions);
       if (this.running || this.starting) return true;
       this.starting = true;
@@ -100,7 +107,7 @@
         this.dispatchEvent(new CustomEvent('error', { detail: {
           code: insecure ? 'SOUND_TRIGGER_INSECURE_ORIGIN' : 'SOUND_TRIGGER_UNSUPPORTED',
           message: insecure
-            ? 'Open Clavis from http://localhost, not a file:// URL, for persistent microphone access.'
+            ? 'Open Rudra24 AI from http://localhost, not a file:// URL, for persistent microphone access.'
             : 'Sound triggers need a modern Chrome or Edge browser.',
         } }));
         this.starting = false;
@@ -122,7 +129,7 @@
           this.ownsStream = true;
         }
         this.context = new AudioContextCtor({ latencyHint: 'playback' });
-        await this.context.audioWorklet.addModule('clavis-clap-worklet.js?v=2');
+        await window.ClavisWorklet.add(this.context, 'clavis-clap-worklet.js?v=2');
         this.source = this.context.createMediaStreamSource(this.stream);
         this.node = new AudioWorkletNode(this.context, 'clavis-clap', { numberOfInputs: 1, numberOfOutputs: 0 });
         this.node.port.postMessage({ sens: SENS[this.options.sensitivity] || 1 });
@@ -169,13 +176,19 @@
       const now = Date.now();
       if (now < this.cooldownUntil) return;
       // ponytail: zero-crossing rate is a rough clap/snap split (label only;
-      // both wake Clavis). A spectral check would be the upgrade if it matters.
+      // both wake Rudra24 AI). A spectral check would be the upgrade if it matters.
       const kind = d.zcr > 0.3 ? 'snap' : 'clap';
       if (!this.group.length) this.quietBefore = this.lastImpulseAt ? now - this.lastImpulseAt : Infinity;
       this.lastImpulseAt = now;
       this.group.push({ at: now, kind, level: d.level, ms: d.ms });
       clearTimeout(this.settleTimer);
-      this.settleTimer = setTimeout(() => this.settle(), SETTLE_MS);
+      const mode = localStorage.getItem('clavis_clap_mode');
+      const delay = settleDelay(this.group, mode, this.quietBefore);
+      if (!delay) {
+        this.settle(); // second clap completes the pattern; no extra 650 ms wait
+        return;
+      }
+      this.settleTimer = setTimeout(() => this.settle(), delay);
     }
 
     settle() {
@@ -209,6 +222,9 @@
         judge([{ at: 0, ms: 80, level: 0.3 }], 'auto', Infinity) === null,   // a thud, not a snap
         judge([{ at: 0, ms: 20, level: 0.1 }], 'auto', Infinity) === null,   // too faint
         judge(snap, 'double', Infinity) === null,
+        settleDelay([{ ...snap[0], kind: 'snap' }], 'auto', Infinity) === 180,
+        settleDelay([{ ...snap[0], kind: 'clap' }], 'auto', Infinity) === SETTLE_MS,
+        settleDelay([{ ...snap[0], kind: 'clap' }, { at: 300, kind: 'clap', ms: 20, level: 0.3 }], 'auto', Infinity) === 0,
         judge([{ at: 0, ms: 80, level: 0.05 }], 'single', 0) === 'single',
       ];
       const passed = ok.filter(Boolean).length;
@@ -218,4 +234,7 @@
   }
 
   window.ClavisAudioTrigger = new ClavisAudioTrigger();
+  if (typeof window !== 'undefined' && window.ClavisVoiceState?.registerAudioCleanup) {
+    window.ClavisVoiceState.registerAudioCleanup(() => window.ClavisAudioTrigger?.stop?.());
+  }
 })();

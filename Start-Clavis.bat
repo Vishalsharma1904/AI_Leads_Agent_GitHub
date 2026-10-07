@@ -1,5 +1,5 @@
 @echo off
-:: Clavis ab Clavis.exe se chalta hai (ek double-click, turant window).
+:: Rudra24 AI ab Clavis.exe se chalta hai (ek double-click, turant window).
 :: Yeh file sirf purane shortcuts ke liye hai.
 cd /d "%~dp0"
 if exist "Clavis.exe" (

@@ -1,8 +1,8 @@
 /**
  * ============================================================
- *  CLAVIS PROACTIVE ENGINE (clavis-proactive.js)
+ *  RUDRA24 AI PROACTIVE ENGINE (clavis-proactive.js)
  *
- *  Clavis stops waiting to be asked. It watches WHAT you are working on
+ *  Rudra24 AI stops waiting to be asked. It watches WHAT you are working on
  *  (foreground window/tab title + OS idle time, read from the local bridge)
  *  and speaks first when that pattern says you could use help.
  *
@@ -52,7 +52,9 @@
     idleMs: 0,
     // Give the user a quiet landing. Proactivity begins only after the
     // normal budget window or a meaningful context change.
-    lastSpokeAt: Date.now(),
+    // Four minutes of quiet landing, not the full twenty. Twenty meant sir
+    // never saw Rudra24 AI notice anything in a short working session.
+    lastSpokeAt: Date.now() - 960000,
     spokenAt: [],         // timestamps, for the per-hour cap
     snoozeUntil: 0,
     ignoredStreak: 0,
@@ -65,7 +67,14 @@
 
   // ── settings ────────────────────────────────────────────
   const num = (k, d) => { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v > 0 ? v : d; };
-  const isEnabled   = () => localStorage.getItem(LS.enabled) !== 'false';   // default ON
+  // 2026-09: default OFF — background LLM nudges keys kha jaate the. Settings se ON.
+  // 2026-09-30: default ON again. It was switched off because background LLM
+  // nudges burned keys; that is handled properly now — a 20 min floor between
+  // lines, max 2 an hour, an ignore-backoff, and ClavisWake's presence check.
+  // Settings se OFF kiya ja sakta hai.
+  const isEnabled   = () => localStorage.getItem(LS.enabled) !== 'false';
+  // Soye hue Rudra24 AI ko background me LLM / Live nahi chalana (ClavisWake).
+  const bgAllowed   = () => { try { return window.ClavisVoiceState?.isClavisWorkspace?.() && (!window.ClavisWake || window.ClavisWake.allowBackground()); } catch (_) { return false; } };
   const shareTitles = () => localStorage.getItem(LS.privacy) !== 'false';   // default ON
   const gapMs       = () => Math.max(MIN_GAP, num(LS.gapMs, DEFAULT_GAP));
   const perHour     = () => Math.min(4, num(LS.perHour, DEFAULT_HOUR));
@@ -85,7 +94,7 @@
     state.bridgeUp = Boolean(info);
     if (!info) {
       // Browser-only fallback: we at least know if this tab is focused.
-      info = { title: document.hasFocus() ? 'Clavis' : '', process: 'browser', idleMs: 0 };
+      info = { title: document.hasFocus() ? 'Rudra' : '', process: 'browser', idleMs: 0 };
       if (!state.bridgeWarned) {
         state.bridgeWarned = true;
         console.info('[ClavisProactive] Bridge off — OS-wide awareness disabled, using in-app signals only.');
@@ -185,17 +194,16 @@
       'Sir, raat kaafi ho gayi hai aur aap kaafi der se kaam par hain. Thoda break le lijiye — main yahin hoon.',
       'Sir, itni der baad thakan aa jati hai. Paani pi lijiye, phir main aage sambhal leta hoon.',
     ],
-    working: [
-      'Sir, kuch chahiye ho to bata dijiye — main dekh raha hoon.',
-      'Sir, kuch kaam ho toh boliye — main free hoon.',
-      'Sir, koi help chahiye toh batayein, main hoon.',
-      'Sir, agar kuch karna hai toh bol dijiye — ready hoon.',
-      'Sir, main yahan hoon — aap boliye bass.',
-      'Sir, agar leads chahiye ya data, toh bol dijiye.',
-    ],
+    // 'working' has no canned lines, on purpose. An assistant that fills
+    // silence with "kuch chahiye ho to bata dijiye" is noise — sir said so in
+    // as many words. In a plain working state Rudra24 AI speaks only when the
+    // model has something specific about what he is actually doing; otherwise
+    // it stays quiet and saves the budget for a moment that earns it.
+    working: [],
   };
 
   function pick(arr, scope = 'proactive') {
+    if (!Array.isArray(arr) || !arr.length) return '';   // nothing to say → say nothing
     return window.ClavisEmotionalEngine?.pickDifferent?.(arr, scope)
       || arr[Math.floor(Math.random() * arr.length)];
   }
@@ -215,10 +223,10 @@
 
   async function composeLine(mood, s) {
     const canLLM = Boolean(window.ClavisDirect?.complete && window.ClavisDirect.hasKey?.());
-    if (!canLLM) return pick(FALLBACK[mood] || FALLBACK.working);
+    if (!canLLM) return pick(FALLBACK[mood] || []);
 
     const sys = [
-      'You are Clavis, a proactive personal AI assistant for one user.',
+      'You are Rudra24 AI, a proactive personal AI assistant for one user.',
       'You always address the user as "sir", warmly and respectfully.',
       'You speak Hinglish (Hindi written in Latin script mixed with English) unless the context is clearly English.',
       'You were NOT asked a question. You noticed something in the user\'s work pattern and are speaking first.',
@@ -237,6 +245,7 @@
 
     try {
       const data = await window.ClavisDirect.complete({
+        background: true, purpose: 'proactive',
         messages: [
           { role: 'system', content: sys },
           { role: 'user', content: `Observed state: ${mood}. ${moodHint}\n\n${contextDigest(s)}\n\nSay your one proactive line now.` },
@@ -244,9 +253,12 @@
         max_tokens: 90,
       });
       const text = String(data?.choices?.[0]?.message?.content || '').trim();
-      return text || pick(FALLBACK[mood] || FALLBACK.working);
-    } catch (_) {
-      return pick(FALLBACK[mood] || FALLBACK.working);
+      return text || pick(FALLBACK[mood] || []);
+    } catch (err) {
+      if (err && err.code === 'asleep') return '';
+      // No model right now: a templated line is fine for a state Rudra24 AI can
+      // genuinely read (stuck / scattered / tired), never for plain 'working'.
+      return pick(FALLBACK[mood] || []);
     }
   }
 
@@ -262,10 +274,11 @@
     // answer. If it repeats a recent opener, use a contextual local line
     // instead of making the user hear the same offer twice.
     if (window.ClavisEmotionalEngine?.shouldRewrite?.(outgoing)) {
-      outgoing = pick(FALLBACK[mood] || FALLBACK.working, `proactive:${mood}`);
+      outgoing = pick(FALLBACK[mood] || [], `proactive:${mood}`);
+      if (!String(outgoing || '').trim()) return;   // a repeat with nothing fresh → silence
     }
     window.ClavisEmotionalEngine?.rememberAssistant?.(outgoing);
-    // A vision-sourced idea goes through Clavis Live too (its own words).
+    // A vision-sourced idea goes through Rudra24 AI Live too (its own words).
     if (window.ClavisLive?.isAvailable?.()) {
       const live = () => { if (window.ClavisLive.proactive({ mood, line: outgoing })) book(mood); };
       if (window.ClavisMind?.speech) window.ClavisMind.speech.request({ source: 'casual_initiative', deliver: live });
@@ -289,7 +302,11 @@
   }
 
   async function intervene(mood, s) {
-    // Live voice available: skip the template/LLM line and hand Clavis the
+    if (!bgAllowed()) return;   // soya hai → na LLM, na Live
+    // Nothing observed and nothing wrong: there is no proactive line worth
+    // spending sir's attention — or a key — on.
+    if (mood === 'working' && !s.title) return;
+    // Live voice available: skip the template/LLM line and hand Rudra24 AI the
     // real context, so what it says is specific and never sounds scripted.
     if (window.ClavisLive?.isAvailable?.()) {
       const digest = contextDigest(s);
@@ -303,6 +320,7 @@
       return;
     }
     const line = await composeLine(mood, s);
+    if (!line || !bgAllowed()) return;
     deliver(line, mood);
   }
 
@@ -326,17 +344,20 @@
 
   // ── main loop ───────────────────────────────────────────
   async function tick() {
+    if (window.ClavisAhead) return; // App outcomes own proactive suggestions now.
     try {
       await sample();
       const s = signals();
       const mood = readMood(s);
-      if (maySpeak(mood)) await intervene(mood, s);
+      if (maySpeak(mood) && bgAllowed()) await intervene(mood, s);
     } catch (err) {
-      console.warn('[ClavisProactive] tick failed:', err);
+      if (err && err.code === 'asleep') return;
+      console.debug('[ClavisProactive] tick failed:', err);
     }
   }
 
   function start() {
+    if (window.ClavisAhead) return true;
     if (state.running) return true;
     state.running = true;
     state.timer = window.setInterval(tick, POLL_MS);
@@ -377,7 +398,7 @@
 
   window.ClavisProactive = { start, stop, status, snooze, setEnabled, acknowledge, tick, deliver, canSpeak };
 
-  // Autostart once the page is ready (default ON, per user request).
+  // Autostart once the page is ready — sirf jab owner ne Settings se ON kiya ho.
   const boot = () => { if (isEnabled()) start(); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();

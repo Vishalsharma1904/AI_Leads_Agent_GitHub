@@ -3,36 +3,34 @@
 <head>
   <meta charset="UTF-8"/>
   <!-- file:// launcher: sabse pehle, taaki fonts/CSS ka wait na ho -->
-  <script src="file-protocol-guard.js?v=2"></script>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <script src="file-protocol-guard.js?v=3"></script>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content"/>
   <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate"/>
   <meta http-equiv="Pragma" content="no-cache"/>
   <meta http-equiv="Expires" content="0"/>
-  <title>Clavis — Lead Generation Agent</title>
+  <title>Rudra24 AI</title>
+  <link rel="icon" type="image/png" href="assets/rudra24-icon.png">
   <link rel="manifest" href="manifest.json" id="app-manifest-link">
-  <meta name="theme-color" content="#6366f1">
+  <meta name="theme-color" content="#3F6045">
   <meta name="description" content="Intelligent B2B lead and candidate sourcing platform — discover public business requirements and live job listings for any service provider."/>
   <link rel="preconnect" href="https://fonts.googleapis.com"/>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
   <script>
-    // Local development mode: direct index.html stays usable without Supabase.
-    window.CLAVIS_LOCAL_MODE = window.location.protocol === 'file:' ||
-      window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+    // Authentication is required on localhost as well as deployed origins.
+    window.CLAVIS_LOCAL_MODE = false;
   </script>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500;1,600;1,700&family=Figtree:ital,wght@0,300..900;1,300..900&family=Inter:ital,opsz,wght@0,14..32,300..700;1,14..32,300..700&family=Instrument+Serif:ital@0;1&family=Newsreader:ital,opsz,wght@0,6..72,200..700;1,6..72,200..700&family=Plus+Jakarta+Sans:ital,wght@0,400..800;1,400..800&family=JetBrains+Mono:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&display=swap" rel="stylesheet"/>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/animate.css/4.1.1/animate.min.css"/>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js" defer></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/howler/2.2.4/howler.min.js" defer></script>
-  <script src="https://unpkg.com/@studio-freight/lenis@1.0.42/dist/lenis.min.js" defer></script>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.js" defer></script>
   <!-- Google Identity Services Client Library -->
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="node_modules/@supabase/supabase-js/dist/umd/supabase.js" defer></script>
+  <script src="vendor/supabase/supabase.js?v=1" defer></script>
   <link rel="stylesheet" href="styles_tailwind.css">
 
   <link rel="stylesheet" href="styles.css?v=2.2"/>
   <link rel="stylesheet" href="settings.css?v=1.0"/>
+  <link rel="stylesheet" href="voice-ai-studio.css?v=1"/>
   <script>
     (function() {
       const savedTheme = localStorage.getItem('skylark-theme') || 'dark';
@@ -40,12 +38,12 @@
     })();
   </script>
   <!-- Appearance (colours, fonts, minimal) — applied before first paint. -->
-  <script src="clavis-appearance.js?v=1.1"></script>
+  <script src="clavis-appearance.js?v=1.3&r=1004flow"></script>
   <!-- Graphics tier (Auto / Smooth / Max) — must run before the orb draws. -->
-  <script src="clavis-perf.js?v=1.2"></script>
-  <!-- Wake state (asleep until "Clavis" / Hey Buddy / Hey Clay / snap / clap) — everyone asks this before any LLM call. -->
-  <script src="clavis-wake.js?v=1.1&r=0926"></script>
-  <script src="clavis-voice-state.js?v=1.1&r=0926b"></script>
+  <script src="clavis-perf.js?v=1.3&r=1002jank&finish=1006e"></script>
+  <!-- Wake state (asleep until "Rudra" / Hey Buddy / Hey Clay / snap / clap) — everyone asks this before any LLM call. -->
+  <script src="clavis-wake.js?v=1.3&r=rudra"></script>
+  <script src="clavis-voice-state.js?v=1.6&r=1001latency&voice-fix=1005i"></script>
   <script>
     (function() {
       if (window.location.protocol === 'file:') {
@@ -142,19 +140,18 @@
 
     /* 1. CSS Variable seed — JS reads AND writes these */
     :root {
-      --sidebar-expanded: 220px !important;
-      --sidebar-collapsed: 62px !important;
-      --sidebar-width: 220px !important;
-      --sidebar-current: 220px !important;
-      --main-left: 220px !important;
+      --sidebar-expanded: 220px;
+      --sidebar-collapsed: 64px;
+      --sidebar-width: 220px;
+      --sidebar-current: 220px;
+      --main-left: 220px;
     }
 
-    /* 2. Collapsed state via JS-added class OR data attribute */
-    :root:has(#sidebar.collapsed),
-    html[data-sidebar-state="collapsed"] {
-      --sidebar-current: 62px !important;
-      --main-left: 62px !important;
-    }
+    /* 2. --sidebar-current / --main-left are gone. They were custom
+       properties set on <html>, and custom properties inherit, so each
+       flip of data-sidebar-state re-styled every element in the document.
+       Nothing read --main-left at all, and the rail's width is written
+       inline by the spring in rudra-motion-ui.js. */
 
     /* 3. SIDEBAR — Maximum specificity selector to beat clamp() rules and !important collisions */
     html body aside#sidebar.sidebar,
@@ -200,10 +197,10 @@
     }
 
     /* 6. Collapsed main content */
-    html[data-sidebar-state="collapsed"] body main#main-content,
-    html[data-sidebar-state="collapsed"] body #main-content,
+    html.rudra-rail-legacy body main#main-content,
+    html.rudra-rail-legacy body #main-content,
     html body #main-content.full-width,
-    html:has(#sidebar.collapsed) body #main-content {
+    html.rudra-rail-legacy body #main-content {
       margin-left: 64px !important;
       width: calc(100% - 64px) !important;
       max-width: calc(100% - 64px) !important;
@@ -380,21 +377,14 @@
     } catch(e) {
       document.documentElement.setAttribute('data-theme', 'dark');
     }
-    // Auth guard: NEVER auto-show app-shell on page load.
-    // AntigravityAuth.checkInitialSession() always resets logged_in to false
-    // and handles showing the correct auth screen (signup or password-only login).
+      // Keep both surfaces quiet until Supabase restores the saved session.
+      // The auth controller reveals sign-in only after it confirms no session.
     window.addEventListener('DOMContentLoaded', function() {
       setTimeout(function() {
-        // Safety: if app-shell is somehow visible and user hasn't authenticated, hide it
-        const isLoggedIn = window.CLAVIS_LOCAL_MODE || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || Boolean(window.SupabaseAuth?.getSession?.());
+        const isLoggedIn = Boolean(window.SupabaseAuth?.getSession?.()) && !window.SupabaseAuth?.isRecoveryMode?.();
         if (!isLoggedIn) {
           const shell = document.getElementById('app-shell');
           if (shell) shell.style.display = 'none';
-          // Make sure auth screen is visible
-          const auth = document.getElementById('auth-screen');
-          if (auth && auth.classList.contains('ag-hidden')) {
-            auth.classList.remove('ag-hidden');
-          }
         }
       }, 800);
     });
@@ -453,7 +443,7 @@
       // ── 4. Jarvis-specific error events ───────────────────
       window.addEventListener('jarvis:error', function(e) {
         const detail = e.detail || {};
-        safeToast('error', '🤖 Clavis Error', detail.message || 'Clavis ne response nahi diya. Backend connection check karein.');
+        safeToast('error', '🤖 Rudra24 AI Error', detail.message || 'Rudra24 AI ne response nahi diya. Backend connection check karein.');
       });
 
       // ── 5. Periodic Jarvis key health check ───────────────
@@ -466,7 +456,7 @@
               const hasGemini = !!(localStorage.getItem('skylark_gemini_api_key') || localStorage.getItem('gemini_api_key'));
               if (!keys.length && !hasGemini) {
                 if (typeof window.showToast === 'function') {
-                  window.showToast('warning', '🧠 Clavis Setup Missing', 'Clavis ke liye backend workspace credential configure karein.');
+                  window.showToast('warning', '🧠 Rudra24 AI Setup Missing', 'Rudra24 AI ke liye backend workspace credential configure karein.');
                 }
               }
             }
@@ -507,12 +497,13 @@
 <div id="clavis-credential-dialog" class="clavis-credential-dialog" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="clavis-credential-title" aria-describedby="clavis-credential-desc" data-modal-layer="clavis-credential" onclick="if (event.target === this) closeClavisCredentialDialog()" hidden>
   <div class="clavis-credential-card" onclick="event.stopPropagation()">
     <button class="clavis-dialog-close" type="button" aria-label="Close API key setup" onclick="closeClavisCredentialDialog()">×</button>
-    <p class="clavis-dialog-kicker">Clavis setup</p>
+    <p class="clavis-dialog-kicker">Rudra24 AI setup</p>
     <h2 id="clavis-credential-title">Connect your AI key</h2>
     <p id="clavis-credential-desc">Choose a provider and paste its key. Your key is verified and stored locally in this browser only — no login, no server. It never leaves your device except to call that provider directly.</p>
     <label class="clavis-key-label" for="clavis-provider-select">AI provider</label>
     <select id="clavis-provider-select" class="clavis-provider-select" onchange="updateClavisProviderHelp(); updateClavisConnectionStatus();">
       <option value="gemini" selected>✨ Google AI Studio (Gemini 2.0 Flash - Recommended &amp; Free)</option>
+      <option value="fish_audio">🐟 Fish Audio (Voice · TTS + transcription)</option>
       <option value="groq">⚡ Groq (Fast LLaMA 3.3)</option>
       <option value="openrouter">OpenRouter</option>
       <option value="openai">OpenAI</option>
@@ -527,6 +518,7 @@
     <div class="clavis-provider-quick-links" aria-label="Quick provider links">
       <a href="https://console.x.ai/" target="_blank" rel="noopener noreferrer">Grok (xAI) keys ↗</a>
       <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer">Google AI Studio keys ↗</a>
+      <a href="https://fish.audio/app/api-keys/" target="_blank" rel="noopener noreferrer">Fish Audio keys ↗</a>
     </div>
     <p class="clavis-provider-help"><a id="clavis-provider-link" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Get a free key from Groq <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-left:4px;"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg></a></p>
     <p id="clavis-connection-status" class="clavis-provider-help" style="color:var(--gray-600)"></p>
@@ -549,7 +541,7 @@
   </div>
 </div>
 
-<!-- Generic styled confirm dialog — replaces window.confirm() across Clavis.
+<!-- Generic styled confirm dialog — replaces window.confirm() across Rudra24 AI.
      window.confirm() blocks the whole tab (freezing timers/proactive polling),
      looks inconsistent with the rest of the UI, and Chrome can silently
      disable it page-wide after repeated dialogs ("Prevent this page from
@@ -558,7 +550,7 @@
 <div id="clavis-confirm-dialog" class="clavis-credential-dialog" role="alertdialog" aria-modal="true" aria-hidden="true" aria-labelledby="clavis-confirm-title" aria-describedby="clavis-confirm-desc" data-modal-layer="clavis-confirm" onclick="if (event.target === this) clavisConfirmAnswer(false)" hidden>
   <div class="clavis-credential-card" onclick="event.stopPropagation()">
     <button class="clavis-dialog-close" type="button" aria-label="Close" onclick="clavisConfirmAnswer(false)">×</button>
-    <p class="clavis-dialog-kicker" id="clavis-confirm-kicker">Clavis</p>
+    <p class="clavis-dialog-kicker" id="clavis-confirm-kicker">Rudra24 AI</p>
     <h2 id="clavis-confirm-title">Confirm</h2>
     <p id="clavis-confirm-desc" style="white-space:pre-line"></p>
     <div class="clavis-dialog-actions">
@@ -569,7 +561,7 @@
 </div>
 
 <!-- ═══════════ ANTIGRAVITY LUXURY AUTH SCREEN (CLEAN RECTANGULAR EDITION) ═══════════ -->
-<div id="auth-screen" class="ag-auth-screen" style="display: none;">
+<div id="auth-screen" class="ag-auth-screen ag-hidden" style="display: none; background:#FAF9F5;">
   <!-- Dynamic Ambient Lighting -->
   <div class="ag-ambient-canvas">
     <div class="ag-cursor-spotlight" id="ag-cursor-spotlight"></div>
@@ -584,15 +576,10 @@
 
       <!-- Brand Header -->
       <div class="ag-brand-header">
-        <div class="ag-logo-emblem">
-          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
-          </svg>
-        </div>
+        <div class="ag-logo-emblem"><img src="assets/rudra24-icon.png" alt="Rudra24 Digital" width="72" height="72"></div>
         <div class="ag-brand-title-wrap">
-          <span class="ag-brand-badge">CLAVIS NEURAL SUITE</span>
-          <h1 class="ag-brand-name" id="ag-card-title">Neural Lead Intelligence</h1>
-          <p class="ag-brand-sub" id="ag-card-sub">AI-Powered B2B Acquisition &amp; Multi-Device Cloud Sync</p>
+          <h1 class="ag-brand-name" id="ag-card-title" data-rudra-i18n-ignore>Rudra24 AI &amp; Leads</h1>
+          <p class="ag-brand-sub" id="ag-card-sub">Lead Generation · Business Support · Business Analysis</p>
         </div>
       </div>
 
@@ -650,10 +637,10 @@
 
           <!-- Email Address (Both) -->
           <div class="ag-form-group ag-field-email">
-            <label class="ag-form-label" for="ag-input-email">Email Address <span style="font-weight:400; color:#8C8076; font-size:10px;">(Optional)</span></label>
+            <label class="ag-form-label" for="ag-input-email">Email Address <span style="color:#B85D26;">*</span></label>
             <div class="ag-input-wrap">
               <svg class="ag-input-icon" viewBox="0 0 20 20" fill="currentColor"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg>
-              <input type="email" id="ag-input-email" class="ag-input" placeholder="name@company.com (Optional)" autocomplete="email" />
+              <input type="email" id="ag-input-email" class="ag-input" placeholder="name@company.com" autocomplete="email" required />
             </div>
           </div>
 
@@ -701,28 +688,17 @@
           <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         </button>
 
-        <!-- Instant Access Bypass Buttons -->
-        <div class="ag-bypass-row">
-          <button type="button" class="ag-bypass-pill" onclick="AntigravityAuth.devBypass()">
-            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clip-rule="evenodd"/></svg>
-            Skip as Guest
-          </button>
-          <button type="button" class="ag-bypass-pill ag-bypass-pill--accent" onclick="AntigravityAuth.quickAccess()">
-            <svg width="12" height="12" viewBox="0 0 20 20" fill="currentColor"><path d="M13 6a3 3 0 11-6 0 3 3 0 016 0zM18 8a2 2 0 11-4 0 2 2 0 014 0zM14 15a4 4 0 00-8 0v3h8v-3zM6 8a2 2 0 11-4 0 2 2 0 014 0zM16 18v-3a5.972 5.972 0 00-.75-2.906A3.005 3.005 0 0119 15v3h-3zM4.75 12.094A5.973 5.973 0 004 15v3H1v-3a3 3 0 013.75-2.906z"/></svg>
-            Try Demo Dashboard
-          </button>
-        </div>
       </form>
 
       <!-- Auth Footer -->
       <div class="ag-auth-footer">
         <span class="ag-footer-brand">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-2px; margin-right:4px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-          OAuth-protected Cloud Sync
+          Account-protected workspace
         </span>
         <span class="ag-footer-status">
           <span class="ag-footer-dot"></span>
-          Ready to connect
+          Sign in required
         </span>
       </div>
     </div>
@@ -760,7 +736,7 @@
           <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.35 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
         </svg>
         <h2 class="ag-g-title" id="ag-g-title">Sign in with Google</h2>
-        <p class="ag-g-subtitle">Choose an account to continue to <span class="ag-g-appname">Clavis AI Leads Agent</span></p>
+        <p class="ag-g-subtitle">Choose an account to continue to <span class="ag-g-appname">Rudra24 AI Leads Agent</span></p>
       </div>
 
       <!-- Account List -->
@@ -783,7 +759,7 @@
 
       <!-- Google Policy / Consent Note -->
       <div class="ag-g-consent-text">
-        To continue, Google will share your name, email address, and language preference with Clavis AI Leads Agent. Review their <a href="#" onclick="return false;">Privacy Policy</a> and <a href="#" onclick="return false;">Terms of Service</a>.
+        To continue, Google will share your name, email address, and language preference with Rudra24 AI Leads Agent. Review their <a href="#" onclick="return false;">Privacy Policy</a> and <a href="#" onclick="return false;">Terms of Service</a>.
       </div>
 
       <!-- Google Footer -->
@@ -904,7 +880,7 @@
         <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
       </svg>
     </div>
-    <div class="ag-trans-app-name">Neural Lead Intelligence</div>
+    <div class="ag-trans-app-name">Rudra24 AI &amp; Leads</div>
     <div class="ag-trans-tagline">Initializing your AI workspace…</div>
     <div class="ag-trans-progress-bar"><div class="ag-trans-progress-fill" id="ag-trans-fill"></div></div>
   </div>
@@ -922,7 +898,8 @@
         <button type="button" class="mac-dot mac-maximize" title="Expand Sidebar" aria-label="Expand sidebar"></button>
       </div>
       <div class="sidebar-brand-row">
-        <div class="sidebar-brand-title" id="logo-brand-text">Clavis AI</div>
+        <img src="assets/rudra24-icon.png" width="32" height="32" alt="">
+        <div class="sidebar-brand-title" id="logo-brand-text">Rudra24 AI</div>
       </div>
     </div>
     <div class="sidebar-resizer" id="sidebar-resizer" title="Drag to resize sidebar"></div>
@@ -930,7 +907,7 @@
     <nav class="sidebar-nav relative z-10" id="sidebar-nav-scroll" style="position: relative; z-index: 10;">
       <div class="nav-section-label">AI assistant</div>
       
-        <a href="#jarvis" class="nav-item stagger-in" data-view="jarvis" data-tooltip="Clavis AI Studio">
+        <a href="#jarvis" class="nav-item stagger-in" data-view="jarvis" data-tooltip="Rudra24 AI Studio">
         <!-- Jarvis: neural/brain nodes icon -->
         <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="8" cy="4.5" r="1.5"/>
@@ -940,7 +917,7 @@
           <line x1="8" y1="6" x2="11" y2="10.5"/>
           <line x1="5" y1="12" x2="11" y2="12"/>
         </svg>
-        <span class="nav-label-wrap">Clavis AI <span class="nav-badge dev-badge">DEV</span></span>
+        <span class="nav-label-wrap">Rudra24 AI <span class="nav-badge dev-badge">DEV</span></span>
       </a>
 
       <a href="#chat" class="nav-item active stagger-in" data-view="chat" data-tooltip="Client AI & Leads Chat">
@@ -964,6 +941,15 @@
         <span>Voice Calling AI</span>
       </a>
 
+      <a href="#calling" class="nav-item stagger-in" data-view="calling" data-tooltip="Voice Calling Setup">
+        <!-- Calling agent: phone with outgoing arrow -->
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 3.5C2 2.7 2.7 2 3.5 2c.6 0 1.8 1.5.8 2.5L3.5 5.3C4.5 7.3 6 8.8 8 9.8l.8-.8c1-.9 2.5.2 2.5.8C11.3 10.8 12 11.5 12 12.3 12 13.2 11.2 14 10.3 14 5.7 14 2 10.3 2 5.7c0-.9.7-2.2 0-2.2z"/>
+          <path d="M10.5 5.5 14 2"/><path d="M11 2h3v3"/>
+        </svg>
+        <span>Voice Calling</span>
+      </a>
+
       <a href="#candidate-ai" class="nav-item stagger-in" data-view="candidate-ai" data-tooltip="Candidate Recruiter AI">
         <!-- Candidate: person with star accent -->
         <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -974,6 +960,19 @@
         <span>Candidate AI</span>
       </a>
 
+      <div id="crm-nav-group" class="crm-nav-group">
+        <button type="button" id="crm-nav-toggle" class="nav-item" aria-expanded="false" aria-controls="crm-nav-links" data-tooltip="CRM">
+          <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="2" width="13" height="12" rx="2"/><circle cx="5.5" cy="6" r="1.5"/><path d="M3.5 11c0-2 4-2 4 0M10 6h2M10 10h2"/></svg>
+          <span>CRM</span><span id="crm-due-count" class="nav-badge" hidden></span><svg class="crm-nav-chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><path d="m4 6 4 4 4-4"/></svg>
+        </button>
+        <div id="crm-nav-links" class="crm-nav-disclosure" inert><div>
+          <a href="#crm-overview" class="nav-sub-item" data-view="crm-overview" data-tooltip="CRM Overview"><span>Overview</span></a>
+          <a href="#crm-pipeline" class="nav-sub-item" data-view="crm-pipeline" data-tooltip="CRM Pipeline"><span>Pipeline</span></a>
+          <a href="#crm-activity" class="nav-sub-item" data-view="crm-activity" data-tooltip="CRM Follow-ups & Activity"><span>Follow-ups &amp; Activity</span></a>
+          <a href="#crm-reports" class="nav-sub-item" data-view="crm-reports" data-tooltip="CRM Reports"><span>Reports</span></a>
+          <a href="#crm-clients" class="nav-sub-item" data-view="crm-clients" data-tooltip="Clients & Contracts"><span>Clients &amp; Contracts</span></a>
+        </div></div>
+      </div>
       <div class="nav-section-label stagger-in" style="margin-top:14px">Lead &amp; data hub</div>
 
       <a href="#dashboard" class="nav-item stagger-in" data-view="dashboard" data-tooltip="Dashboard Overview">
@@ -1072,6 +1071,7 @@
         <span>WhatsApp Auto</span>
       </a>
 
+      <a href="#sms" class="nav-item" data-view="sms" data-tooltip="Text messages"><svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="4" y="1" width="8" height="14" rx="2"/><path d="M6 4h4M6 7h4M7 12h2"/></svg><span>Text messages</span></a>
       <a href="#accounts" class="nav-item stagger-in" data-view="accounts" data-tooltip="Connected Accounts">
         <!-- Link/chain icon -->
         <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
@@ -1080,6 +1080,14 @@
           <line x1="5" y1="7.5" x2="11" y2="7.5"/>
         </svg>
         <span>Accounts</span>
+      </a>
+
+      <a href="#connectors" class="nav-item stagger-in" data-view="connectors" data-tooltip="Connectors">
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="3" cy="8" r="1.5"/><circle cx="13" cy="4" r="1.5"/><circle cx="13" cy="12" r="1.5"/>
+          <path d="M4.5 7.4 11.5 4.6M4.5 8.6l7 2.8"/>
+        </svg>
+        <span>Connectors</span>
       </a>
 
       <div class="nav-section-label stagger-in" style="margin-top:14px">System</div>
@@ -1117,6 +1125,10 @@
           <circle cx="5.5" cy="12" r="1.5" fill="currentColor" stroke="none"/>
         </svg>
         <span>Settings</span>
+      </a>
+      <a href="#developer" class="nav-item stagger-in" data-view="developer" data-tooltip="Developer insights" id="developer-nav" hidden>
+        <svg class="icon-sm" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="1.5" y="2" width="13" height="12" rx="2"/><path d="M4 10V7m4 3V5m4 5V8"/></svg>
+        <span>Developer</span>
       </a>
     </nav>
 
@@ -1181,7 +1193,7 @@
           </div>
         </div>
 
-        <!-- Theme switch (clavis-luxe). The new theme spreads out of this
+          <!-- Theme switch (clavis-luxe). The new theme spreads out of this
              button over the whole window — see ThemeReveal in clavis-luxe.js. -->
         <button type="button" class="luxe-switch" id="mark-bennett-theme-btn" onclick="toggleDayNightTheme()" role="switch" aria-checked="false" aria-label="Dark mode">
           <span class="luxe-switch-track" aria-hidden="true">
@@ -1198,6 +1210,10 @@
           <svg class="lx-i" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/><path d="M9 9v12"/></svg>
           Connect Sheets
         </div>
+        <button type="button" id="tb-manual-btn" class="tb-manual-btn" aria-label="Manual" onclick="ClavisAppMap.guide.open()" title="Rudra24 AI Manual">
+          <svg class="lx-i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 7v14M3 3h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5v17h-5a4 4 0 0 0-4 1 4 4 0 0 0-4-1H3z"/></svg>
+          <span class="manual-label">Manual</span>
+        </button>
         <button class="tb-history-btn" onclick="ChatHistory.open()" title="Chat History (Ctrl/⌘ + Shift + H)">
           <svg class="lx-i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
           History
@@ -1219,84 +1235,125 @@
 
     <!-- VIEWS -->
     <div class="views-container" id="main-scroll-area">
+      <section class="view" id="view-manual" aria-label="Rudra24 AI Manual"></section>
       <!-- ═══════════ VOICE AI VIEW ═══════════ -->
       <div class="view" id="view-voice-ai">
         <div class="view-header">
           <div>
             <div style="display:flex; align-items:center; gap: 12px;">
-              <h1 class="view-title">Voice AI Dialer</h1>
-              <span data-voice-ai-status data-status="offline" style="font-size:11px; font-weight:600; padding:4px 8px; border-radius:12px; background:var(--gray-100); color:var(--gray-600);">Voice AI: Offline</span>
+              <h1 class="view-title">Voice Agent Studio</h1>
+              <span data-voice-ai-status style="font-size:11px; font-weight:600; color:var(--gray-600);">Tough Tongue AI</span>
             </div>
-            <div class="view-subtitle">Manage automated AI voice campaigns and live calls</div>
+            <div class="view-subtitle">Build, test and call from your workspace.</div>
           </div>
           <div class="view-header-actions">
-            <button class="btn-secondary" onclick="VoiceAI.openSettings()">Settings</button>
-            <button class="btn-primary" onclick="VoiceAI.createCampaign()">+ New Campaign</button>
+            <!-- Which calling service this workspace uses. The two are genuinely
+                 different products, so the picker swaps the surface rather than
+                 pretending one form fits both. -->
+            <label class="vp-picker">
+              <span>Service</span>
+              <select id="vp-provider" onchange="VoiceProvider.select(this.value)">
+                <option value="toughtongue">Tough Tongue AI</option>
+                <option value="sarvam">Sarvam AI</option>
+              </select>
+            </label>
+            <button class="btn-secondary" type="button" data-vp-tt onclick="VoiceAI.importAgent()">Import agent</button>
+            <button class="btn-primary" type="button" data-vp-tt onclick="VoiceAI.newAgent()">+ New agent</button>
           </div>
         </div>
 
-        <div class="stats-grid">
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#eef2ff; color:#6366f1;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+        <!-- ── Sarvam AI panel ───────────────────────────────────────
+             Paste one key. Everything else — agent id, version, connection,
+             the agent's own phone number — is read back from Sarvam and
+             saved against this company alone. -->
+        <section class="vp-sarvam" id="vp-sarvam" hidden>
+          <div class="vp-card">
+            <h2>Connect Sarvam AI</h2>
+            <p class="vp-hint">The key is encrypted on this server against your company's login. It is never stored in the browser and no other company can read it.</p>
+            <label for="vp-sarvam-key">Sarvam API subscription key</label>
+            <div class="vp-row">
+              <input id="vp-sarvam-key" type="password" autocomplete="off" placeholder="sk_…" />
+              <button class="btn-primary" type="button" onclick="VoiceProvider.connectSarvam()">Connect</button>
             </div>
-            <div>
-              <div class="stat-value" id="voice-calls-today">0</div>
-              <div class="stat-label">Calls Today</div>
+            <div class="vp-row">
+              <label class="vp-field"><span>Organisation ID</span><input id="vp-sarvam-org" placeholder="org_…" /></label>
+              <label class="vp-field"><span>Workspace ID</span><input id="vp-sarvam-ws" placeholder="ws_…" /></label>
             </div>
+            <div class="vp-actions">
+              <button class="btn-secondary" type="button" onclick="VoiceProvider.discover()">Find my agents &amp; number</button>
+              <button class="btn-secondary" type="button" onclick="showView('calling')">Open Voice Calling Setup</button>
+            </div>
+            <p id="vp-sarvam-status" class="vp-hint" role="status" aria-live="polite">Not connected yet.</p>
+            <div id="vp-sarvam-deployments" class="vp-deployments"></div>
           </div>
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#f0fdf4; color:#10b981;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-            </div>
-            <div>
-              <div class="stat-value" id="voice-appointments">0</div>
-              <div class="stat-label">Appointments Booked</div>
-            </div>
-          </div>
-          <div class="stat-card">
-            <div class="stat-icon" style="background:#fff7ed; color:#f59e0b;">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-            </div>
-            <div>
-              <div class="stat-value" id="voice-avg-duration">0s</div>
-              <div class="stat-label">Avg. Duration</div>
-            </div>
-          </div>
-        </div>
 
-        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:24px; margin-top:24px;">
-          <!-- Active Campaigns -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Active Campaigns</h3>
-            </div>
-            <div class="card-body">
-              <div id="voice-campaigns-list" style="display:flex;flex-direction:column;gap:12px;">
-                <div class="empty-state" style="padding:24px;text-align:center;">
-                  <p>No active campaigns.</p>
-                </div>
+          <!-- Plan. Calls cost real money, so this is where the customer sees
+               what they have left and buys more. Everything is decided on the
+               server; this is a readout and a checkout button. -->
+          <div class="vp-card vp-plan">
+            <h2>Your plan</h2>
+            <p id="vp-plan-line" class="vp-hint">Loading…</p>
+            <div class="vp-meter" id="vp-plan-meter" hidden><span></span></div>
+            <div id="vp-plans" class="vp-deployments"></div>
+          </div>
+        </section>
+
+        <p id="tt-status" class="tt-status" role="status" aria-live="polite">Checking connection…</p>
+        <div class="tt-grid">
+          <aside class="tt-panel">
+            <h2>Connection</h2>
+            <p>Each business connects its own Tough Tongue account. The key stays encrypted on this server.</p>
+            <button id="tt-signin" type="button" class="btn-secondary" onclick="VoiceAI.signIn()" hidden>Sign in to connect</button>
+            <label for="tt-key">API key</label>
+            <input id="tt-key" type="password" autocomplete="off" placeholder="ttai_pat_…" />
+            <button type="button" class="btn-secondary" onclick="VoiceAI.connect()">Connect account</button>
+            <p class="tt-hint">Create a key once in Tough Tongue Developer settings. Phone calls also need a SIP trunk configured there.</p>
+            <div class="tt-divider"></div>
+            <h2>Your agents</h2>
+            <div id="tt-agents" class="tt-agent-list">Connect an account to load agents.</div>
+          </aside>
+          <section class="tt-panel tt-editor" aria-label="Voice agent editor">
+            <form id="tt-form">
+              <div class="tt-editor-head"><h2>Agent setup</h2><span id="tt-save-state">New agent</span></div>
+              <div class="tt-brief"><label for="tt-brief">Describe your business and calling goal</label><textarea id="tt-brief" rows="3" placeholder="We sell… Our customers are… The agent should qualify…" ></textarea><button class="btn-secondary" type="button" onclick="VoiceAI.generate()">Draft with AI</button></div>
+              <div class="tt-fields">
+                <label>Agent name<input name="name" required maxlength="120" placeholder="e.g. Acme sales assistant" /></label>
+                <label>Public description<input name="user_friendly_description" maxlength="500" placeholder="What this agent helps with" /></label>
+                <label class="tt-wide">AI instructions<textarea name="ai_instructions" required rows="9" placeholder="You are a sales agent for… Define the offer, audience, questions, objections, handoff and boundaries."></textarea></label>
+                <label class="tt-wide">Evaluation criteria<textarea name="rubrik" rows="3" placeholder="e.g. Need identified, objection handled, next step agreed"></textarea></label>
+                <label>Voice<input name="voice" placeholder="Aoede" value="Aoede" /></label>
+                <label>Language code<input name="language_code" placeholder="hi-IN" value="hi-IN" /></label>
+                <label class="tt-check"><input name="is_recording" type="checkbox" /> Record calls</label>
+                <label class="tt-check"><input name="is_auto_analysis" type="checkbox" checked /> Analyze completed sessions</label>
               </div>
-            </div>
-          </div>
-
-          <!-- Live Calls -->
-          <div class="card">
-            <div class="card-header">
-              <h3 class="card-title">Live Calls</h3>
-              <span class="nav-badge green" id="live-calls-count">0 Active</span>
-            </div>
-            <div class="card-body">
-              <div id="live-calls-list" style="display:flex;flex-direction:column;gap:12px;">
-                <div class="empty-state" style="padding:24px;text-align:center;">
-                  <p>No calls in progress.</p>
-                </div>
-              </div>
-            </div>
-          </div>
+              <details class="tt-advanced"><summary>Advanced scenario fields (JSON)</summary><p>Optional strategy, tools, extraction and model settings. These merge with the form above.</p><textarea name="advanced" rows="7" spellcheck="false" placeholder='{"strategy":{"max_duration_seconds":600}}'></textarea></details>
+              <div class="tt-actions"><button class="btn-primary" type="submit">Save agent</button><button class="btn-secondary" type="button" onclick="VoiceAI.preview()">Test in app</button></div>
+            </form>
+            <div id="tt-preview" class="tt-preview" hidden><div class="tt-preview-head"><strong>Voice preview</strong><button type="button" class="btn-secondary" onclick="VoiceAI.closePreview()">Close</button></div><iframe id="tt-frame" title="Tough Tongue voice agent" allow="microphone; camera; autoplay" referrerpolicy="no-referrer"></iframe></div>
+            <div class="tt-divider"></div>
+            <h2>Place a test call</h2>
+            <form id="tt-call-form" class="tt-call-form">
+              <label>SIP trunk<select name="sip_trunk_id" required><option value="">Load after saving an agent</option></select></label>
+              <label>Phone number<input name="phone_number" required inputmode="tel" placeholder="+919876543210" pattern="\+[1-9][0-9]{7,14}" /></label>
+              <label>Recipient name<input name="user_name" maxlength="120" placeholder="Optional" /></label>
+              <label>Call variables (JSON)<input name="dynamic_vars" placeholder='{"customer_name":"Asha"}' /></label>
+              <label class="tt-check tt-wide"><input name="permission" type="checkbox" required /> I have permission to place this call.</label>
+              <button class="btn-primary" type="submit">Place call</button>
+            </form>
+            <p id="tt-call-result" class="tt-hint" role="status" aria-live="polite"></p>
+            <div class="tt-divider"></div>
+            <div class="tt-preview-head"><h2>Recent calls</h2><button type="button" class="btn-secondary" onclick="VoiceAI.loadCalls()">Refresh</button></div>
+            <div id="tt-calls" class="tt-agent-list">Select an agent to view its calls.</div>
+          </section>
         </div>
+
       </div>
 
+
+      <!-- ═══════════ CALLING AGENT VIEW ═══════════ -->
+      <!-- sarvam-calling-ui.js isko bharta hai. Khaali isliye rakha hai
+           ki poora markup ek hi jagah (JS me) rahe. -->
+      <section class="view" id="view-calling"></section>
 
       <!-- ═══════════ JARVIS AI VIEW ═══════════ -->
       <div id="view-jarvis" class="view jarvis-wrapper claude-ui-wrapper">
@@ -1305,7 +1362,7 @@
           <div class="jarvis-hero-stage">
             <div class="jarvis-hero-header">
               <div class="clavis-header-brand-wrap">
-                <span class="clavis-ai-title-top" id="clavis-ai-title-top">Clavis A.I</span>
+                <span class="clavis-ai-title-top" id="clavis-ai-title-top">Rudra</span>
                 <div class="jarvis-status-pill jarvis-luxury-status-pill" id="jarvis-status-pill">
                   <span id="jarvis-status-text">Online</span>
                 </div>
@@ -1356,7 +1413,7 @@
                       AI setup
                     </button>
                     <div class="jarvis-more-sep"></div>
-                    <button class="jarvis-more-item" id="jarvis-vision-btn" onclick="toggleClavisVision()" title="Clavis watches your screen and offers help — opt-in, needs the PC bridge">
+                    <button class="jarvis-more-item" id="jarvis-vision-btn" onclick="toggleClavisVision()" title="Rudra24 AI watches your screen and offers help — opt-in, needs the PC bridge">
                   <svg class="lx-i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/></svg>
                       Vision <span id="jarvis-vision-live-dot" class="jarvis-live-dot" style="display:none;"></span>
                     </button>
@@ -1373,7 +1430,8 @@
             <!-- Center Orb + Welcome -->
             <div class="jarvis-center-orb-wrapper" id="jarvis-orb-stage">
               <!-- Strands WebGL2 Orb (React Bits Strands component - large prominent glowing sphere) -->
-              <div id="orb-container" data-orb-source="strands" data-orb-state="IDLE" onclick="handleOrbClick()" title="Clavis Strands Orb · Click to speak or interrupt" style="position:relative;cursor:pointer;margin:0 auto;background:transparent;border:none;box-shadow:none;"></div>
+              <div id="orb-container" data-orb-source="strands" data-orb-state="IDLE" onclick="handleOrbClick()" title="Rudra24 AI Strands Orb · Click to speak or interrupt" style="position:relative;cursor:pointer;margin:0 auto;background:transparent;border:none;box-shadow:none;"></div>
+              <div id="clavis-ai-speech-caption" role="status" aria-live="polite"></div>
               <div id="jarvis-welcome" class="jarvis-greeting-container" style="flex:none;min-height:auto;">
                 <h2 class="jarvis-greeting" id="jarvis-welcome-text">Hello <em>Sir!</em></h2>
                 <!-- Short dynamic feature tip ticker (replaces long/static text) -->
@@ -1401,7 +1459,7 @@
                 </div>
                 <div class="jarvis-subtitles-box" id="jarvis-subtitle-box">
                   <span class="subtitle-label" id="jarvis-subtitle-label">STATUS</span>
-              <span class="subtitle-text" id="jarvis-subtitle-text">Clavis ready</span>
+              <span class="subtitle-text" id="jarvis-subtitle-text">Rudra24 AI ready</span>
                 </div>
                 <div class="jarvis-visualizer">
                   <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
@@ -1437,12 +1495,12 @@
             </div>
 
             <!-- Input Area -->
-            <div class="jarvis-input-container jarvis-luxury-composer" role="group" aria-label="Message Clavis" onclick="focusJarvisComposer(event)">
+            <div class="jarvis-input-container jarvis-luxury-composer" role="group" aria-label="Message Rudra24 AI" onclick="focusJarvisComposer(event)">
               <!-- Claude-Style Multi-Screenshot / Image Attachment Dock -->
               <div id="clavis-composer-attachment-dock" class="clavis-composer-attachment-dock" aria-label="Attached screenshots"></div>
               <!-- Upper Input Row with Live Typing Active Dot -->
               <div class="jarvis-composer-input-row" onclick="focusJarvisComposer(event)">
-                <textarea id="jarvis-input" class="claude-textarea jarvis-luxury-textarea" placeholder="Clavis se kuch bhi puchiye ya screenshot paste karein..." rows="1" aria-label="Message Clavis"></textarea>
+                <textarea id="jarvis-input" class="claude-textarea jarvis-luxury-textarea" placeholder="Rudra24 AI se kuch bhi puchiye ya screenshot paste karein..." rows="1" aria-label="Message Rudra24 AI"></textarea>
                 <span id="jarvis-composer-active-dot" class="jarvis-composer-active-dot" title="Active typing" style="display:none;"></span>
               </div>
               <!-- Bottom Tool Bar (Screenshot 2 exact layout) -->
@@ -1501,7 +1559,7 @@
                       <button class="jarvis-dropdown-item" onclick="quickSendJarvis('Mujhe follow-up email template bana ke do'); toggleComposerInspirationMenu(false)">
                         <svg class="lx-i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg> Follow-up email template
                       </button>
-                      <button class="jarvis-dropdown-item" onclick="quickSendJarvis('Clavis ke saare advanced voice commands aur automations batao'); toggleComposerInspirationMenu(false)">
+                      <button class="jarvis-dropdown-item" onclick="quickSendJarvis('Rudra24 AI ke saare advanced voice commands aur automations batao'); toggleComposerInspirationMenu(false)">
                         <svg class="lx-i" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"/><path d="M19 10v2a7 7 0 0 1-14 0v-2"/><path d="M12 19v3"/></svg> Voice commands cheatsheet
                       </button>
                     </div>
@@ -1565,7 +1623,7 @@
           <div id="jarvis-side-backdrop" class="jarvis-side-backdrop" onclick="toggleJarvisSidePanel(false)" aria-hidden="true"></div>
           <div class="jarvis-side" id="jarvis-side-panel">
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-              <span style="font-size:13px;font-weight:700;color:var(--gray-800);">Clavis Side Panel</span>
+              <span style="font-size:13px;font-weight:700;color:var(--gray-800);">Rudra24 AI Side Panel</span>
               <button class="jarvis-icon-pill jarvis-side-close-btn" id="jarvis-side-close-btn" onclick="toggleJarvisSidePanel(false)" style="padding:4px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;" title="Close Side Panel" aria-label="Close Side Panel">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               </button>
@@ -1654,7 +1712,7 @@
       <div id="jarvis-memory-modal" class="jarvis-modal-overlay" style="display:none;" onclick="if(event.target===this) closeJarvisMemoryPanel()">
         <div class="jarvis-modal">
           <div class="jarvis-modal-header">
-            <h3>Clavis Memory</h3>
+            <h3>Rudra24 AI Memory</h3>
             <button class="icon-btn" onclick="closeJarvisMemoryPanel()">✕</button>
           </div>
           <div class="jarvis-modal-body">
@@ -1760,14 +1818,16 @@
               <div class="claude-toolbar-right">
                 <div class="candidate-source-picker client-source-picker">
                   <input type="hidden" id="home-ai-model-select" value="llama-3.3-70b-versatile">
-                  <input type="hidden" id="client-ai-sources" value="maps,linkedin,indeed,google,apify">
-                  <button type="button" id="client-source-menu-btn" class="candidate-source-trigger" aria-expanded="false" aria-controls="client-source-chips" aria-label="5 live sources selected" title="Choose live search sources">
+                  <input type="hidden" id="client-ai-sources" value="sulekha,justdial,maps,linkedin,indeed,google,apify">
+                  <button type="button" id="client-source-menu-btn" class="candidate-source-trigger" aria-expanded="false" aria-controls="client-source-chips" aria-label="7 live sources selected" title="Choose live search sources">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="8" ry="3"></ellipse><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5"></path><path d="M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"></path></svg>
-                    <span>Sources</span><span id="client-source-count" class="candidate-source-count">5</span>
+                    <span>Sources</span><span id="client-source-count" class="candidate-source-count">7</span>
                     <svg class="candidate-source-chevron" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
                   </button>
                   <div class="cand-source-menu" id="client-source-chips" role="group" aria-label="Live client search sources" hidden>
-                    <div class="cand-source-menu-head"><span>Search sources</span><small>Public listings and company signals</small></div>
+                    <div class="cand-source-menu-head"><span>Search sources</span><small>Public index discovery · contacts cross-checked</small></div>
+                    <button type="button" class="cand-src-chip active" data-client-source="sulekha" aria-pressed="true" title="Public search-index discovery; business contacts cross-checked"><span class="cand-src-dot"></span><span>Sulekha</span><span class="cand-src-check">✓</span></button>
+                    <button type="button" class="cand-src-chip active" data-client-source="justdial" aria-pressed="true" title="Public search-index discovery; business contacts cross-checked"><span class="cand-src-dot"></span><span>Justdial</span><span class="cand-src-check">✓</span></button>
                     <button type="button" class="cand-src-chip active" data-client-source="maps" aria-pressed="true"><span class="cand-src-dot"></span><span>Google Maps</span><span class="cand-src-check">✓</span></button>
                     <button type="button" class="cand-src-chip active" data-client-source="linkedin" aria-pressed="true"><span class="cand-src-dot"></span><span>LinkedIn</span><span class="cand-src-check">✓</span></button>
                     <button type="button" class="cand-src-chip active" data-client-source="indeed" aria-pressed="true"><span class="cand-src-dot"></span><span>Indeed</span><span class="cand-src-check">✓</span></button>
@@ -1798,7 +1858,7 @@
               <button class="chat-chip" onclick="sendQuickChat('25 office leads in Gurugram that need pantry boys')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg> Pantry (Gurugram)</button>
               <button class="chat-chip" onclick="sendQuickChat('Export all leads to excel')"><svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg> Export Excel</button>
             </div>
-            <div class="chat-footer-text">Clavis can make mistakes. Always verify lead data.</div>
+            <div class="chat-footer-text">Rudra24 AI can make mistakes. Always verify lead data.</div>
           </div>
         </div>
       <!-- ══════════ TOKEN DASHBOARD VIEW ══════════ -->
@@ -1835,7 +1895,7 @@
         
         <!-- API Key Overrides -->
         <div class="chart-card" style="margin-bottom:16px">
-          <div class="chart-card-header"><h3>🔑 Set Custom API Keys</h3><span style="font-size:12px;color:var(--gray-400)">Saves to your browser and overrides config.js</span></div>
+          <div class="chart-card-header"><h3>🔑 Set Custom API Keys</h3><span style="font-size:12px;color:var(--gray-400)">Apify keys are verified and stored encrypted in your account.</span></div>
           <div style="display:flex;flex-wrap:wrap;gap:16px; margin-bottom: 16px;">
             <div class="form-group" style="flex:1;min-width:250px">
               <label>Apify API Key</label>
@@ -1878,8 +1938,8 @@
         </div>
         <!-- Apify Keys Table -->
         <div class="chart-card" style="margin-bottom:16px">
-          <div class="chart-card-header"><h3>🔑 Apify API Keys Health</h3><span style="font-size:12px;color:var(--gray-400)">Auto-rotates when a key hits 90% usage</span></div>
-          <div id="apify-keys-table"><div class="empty-chart-msg">No Apify keys configured in config.js</div></div>
+          <div class="chart-card-header"><h3>🔑 Apify API Keys Health</h3><span style="font-size:12px;color:var(--gray-400)">Paste one Apify key to connect lead sourcing.</span></div>
+          <div id="apify-keys-table"><div class="empty-chart-msg">Checking Apify connection...</div></div>
         </div>
         <!-- Groq Keys Table -->
         <div class="chart-card">
@@ -1897,6 +1957,12 @@
         </div>
       </section>
 
+      <section class="view" id="view-crm-overview"></section>
+      <section class="view" id="view-crm-pipeline"></section>
+      <section class="view" id="view-crm-activity"></section>
+      <section class="view" id="view-crm-reports"></section>
+      <section class="view" id="view-crm-clients"></section>
+      <section class="view crm-workspace" id="view-sms"></section>
       <!-- DASHBOARD VIEW -->
       <section class="view active" id="view-dashboard">
         <!-- Greeting + Clock -->
@@ -2012,6 +2078,10 @@
         <div class="view-header">
           <div><h1 class="view-title">All Leads</h1><p class="view-subtitle">Buyer companies matched to your requested service or requirement</p></div>
           <div class="view-header-actions">
+            <button class="btn-secondary" onclick="SarvamCallingUI.pullLeads()" style="color:#2e7d50;border-color:#2e7d50;">
+              <svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3.5C2 2.7 2.7 2 3.5 2c.6 0 1.8 1.5.8 2.5L3.5 5.3C4.5 7.3 6 8.8 8 9.8l.8-.8c1-.9 2.5.2 2.5.8C11.3 10.8 12 11.5 12 12.3 12 13.2 11.2 14 10.3 14 5.7 14 2 10.3 2 5.7c0-.9.7-2.2 0-2.2z"/><path d="M10.5 5.5 14 2"/><path d="M11 2h3v3"/></svg>
+              Send to Voice Calling
+            </button>
             <button class="btn-secondary" onclick="pushSelectedToSheets()">
               <svg width="15" height="15" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4zm0 5a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm0 5a1 1 0 011-1h6a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd"/></svg>
               Sync to Sheets
@@ -2108,31 +2178,11 @@
                 <div class="tag-input-wrapper" id="location-tag-wrapper">
                   <div class="tag-chips" id="location-chips"></div>
                   <input type="text" id="location-input" class="tag-input"
-                    placeholder="Type city name + press Enter..."
-                    onkeydown="handleLocationKeydown(event)"
-                    list="city-suggestions"/>
-                  <datalist id="city-suggestions">
-                    <option value="Mumbai"/><option value="Delhi"/><option value="New Delhi"/><option value="Bangalore"/>
-                    <option value="Hyderabad"/><option value="Chennai"/><option value="Pune"/>
-                    <option value="Kolkata"/><option value="Ahmedabad"/><option value="Noida"/>
-                    <option value="Gurgaon"/><option value="Jaipur"/><option value="Lucknow"/>
-                    <option value="Surat"/><option value="Kochi"/><option value="Chandigarh"/>
-                    <option value="Indore"/><option value="Bhopal"/><option value="Nagpur"/>
-                    <option value="Vadodara"/><option value="Coimbatore"/><option value="Ghaziabad"/>
-                    <option value="Faridabad"/><option value="Greater Noida"/><option value="Meerut"/>
-                    <option value="Rohtak"/><option value="Sonipat"/><option value="Panipat"/>
-                    <option value="Hapur"/><option value="Alwar"/><option value="Bharatpur"/>
-                    <option value="Baghpat"/><option value="Bulandshahr"/><option value="Muzaffarnagar"/>
-                    <option value="Shamli"/><option value="Bhiwani"/><option value="Charkhi Dadri"/>
-                    <option value="Jhajjar"/><option value="Jind"/><option value="Karnal"/>
-                    <option value="Mahendragarh"/><option value="Nuh"/><option value="Palwal"/>
-                    <option value="Rewari"/><option value="Bawal"/><option value="Manesar"/>
-                    <option value="Dharuhera"/><option value="Bahadurgarh"/><option value="Modinagar"/>
-                    <option value="Muradnagar"/><option value="Khurja"/><option value="Pilkhuwa"/>
-                    <option value="Dadri"/><option value="Bhiwadi"/><option value="Neemrana"/>
-                  </datalist>
+                    placeholder="Type city name + press Enter..." autocomplete="off" aria-label="Search cities or states"/>
+                  <button type="button" id="location-browse" aria-expanded="false" aria-controls="location-picker">Browse India <span aria-hidden="true">⌄</span></button>
+                  <div id="location-picker" hidden></div>
                 </div>
-                <p class="field-hint">Press Enter or comma after each city</p>
+                <p class="field-hint">Saved as your AI search defaults · Delhi NCR covers Delhi, Noida, Greater Noida, Ghaziabad, Meerut, Loni, Gurugram, Faridabad, Manesar, Sonipat, Bahadurgarh and Panipat.</p>
               </div>
 
               <!-- Industry Selector -->
@@ -2342,7 +2392,7 @@
             </div>
 
             <button id="excel-import-btn" class="gmail-send-btn gmail-exact-send" style="width: 100%; justify-content: center; font-size: 14px; padding: 12px; border-radius: var(--radius-full); background:#107c41; margin-top: 24px;" disabled onclick="processExcelImport()">
-              ⚡ Push Companies to Extraction Queue
+              Push Companies to Extraction Queue
             </button>
           </div>
 
@@ -2393,10 +2443,10 @@
 
             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px; margin-top:24px;">
               <button class="btn-primary" style="justify-content:center; padding:12px; font-size:14px; background:#107c41; border-radius:var(--radius-full);" onclick="exportToExcel()">
-                💚 Download Excel (.xlsx)
+                Download Excel (.xlsx)
               </button>
               <button class="btn-secondary" style="justify-content:center; padding:12px; font-size:14px; border-radius:var(--radius-full);" onclick="exportToCSV()">
-                📄 Download CSV
+                Download CSV
               </button>
             </div>
           </div>
@@ -2459,6 +2509,24 @@
       </section>
 
       <!-- ══════════ SETTINGS VIEW (STUB - ROUTES TO MODAL) ══════════ -->
+      <section class="view" id="view-developer" aria-label="Developer insights">
+        <div class="di-shell">
+          <header class="di-header"><div><p class="di-eyebrow">PRIVATE WORKSPACE</p><h1>Product insights</h1><p>Real activity from verified accounts</p></div><button type="button" id="di-refresh" class="di-button">Refresh</button></header>
+          <div id="di-state" class="di-state" role="status">Checking developer access…</div>
+          <div id="di-content" hidden>
+            <div class="di-metrics" id="di-metrics"></div>
+            <div class="di-grid">
+              <section class="di-panel di-wide"><div class="di-panel-head"><h2>Activity</h2><span>Sessions · last 30 days</span></div><div id="di-activity" class="di-activity"></div></section>
+              <section class="di-panel"><div class="di-panel-head"><h2>Peak hours</h2><span>Local time</span></div><div id="di-hours" class="di-bars"></div></section>
+              <section class="di-panel"><div class="di-panel-head"><h2>Where people are active</h2><span>Reported timezone</span></div><div id="di-regions" class="di-list"></div></section>
+              <section class="di-panel di-wide"><div class="di-panel-head"><h2>Devices</h2><span>Verified sessions</span></div><div id="di-devices" class="di-list"></div></section>
+              <section class="di-panel di-wide"><div class="di-panel-head"><h2>Bug reports</h2><span>Latest 100</span></div><div id="di-bugs" class="di-list"></div></section>
+              <section class="di-panel di-wide"><div class="di-panel-head"><h2>Errors</h2><span>Last 7 days · latest 100</span></div><div id="di-errors" class="di-list"></div></section>
+            </div>
+            <p class="di-footnote">First seen means the first verified backend visit. Timezone is an approximate location, and activity is counted only while the app is open and visible. Earlier browser-only use is unavailable.</p>
+          </div>
+        </div>
+      </section>
       <section class="view" id="view-settings" style="display:none;"></section>
 
       <!-- ══════════ EMAIL AUTOMATION VIEW ══════════ -->
@@ -2467,7 +2535,7 @@
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:12px;">
           <div>
             <h1 class="view-title">Email Automation</h1>
-            <p class="view-subtitle">Personalized bulk emails with gender-aware salutations & full sent history.</p>
+            <p class="view-subtitle">Connect your sender, choose leads, preview the message, then send a measured batch.</p>
           </div>
           <!-- Compose / Sent Tabs -->
           <div style="display:flex;gap:4px;background:var(--do-t4,rgba(255,255,255,.06));border:1px solid var(--do-border,rgba(255,255,255,.1));border-radius:10px;padding:4px;">
@@ -2480,8 +2548,30 @@
               📤 Sent
               <span id="email-sent-badge" style="background:#0b57d0;color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:99px;min-width:18px;text-align:center;"></span>
             </button>
+            <button class="email-tab-btn" data-tab="inbox" onclick="showEmailTab('inbox')" type="button">Inbox</button>
           </div>
         </div>
+
+        <section class="email-setup-guide" aria-labelledby="email-guide-title">
+          <div><span class="email-guide-kicker">GOOGLE CONNECTION</span><h2 id="email-guide-title">Your Gmail, ready in a few steps</h2>
+            <p id="email-guide-message" role="status">Checking your connection…</p></div>
+          <div class="email-guide-actions">
+            <button type="button" id="email-guide-connect" onclick="EmailCtrl.connectAccount()">Sign in with Google</button>
+            <button type="button" onclick="EmailCtrl.checkConnection(true)">Check connection</button>
+            <button type="button" id="email-guide-voice" aria-pressed="false" onclick="EmailCtrl.toggleGuideVoice()">Voice guide off</button>
+            <button type="button" id="email-guide-console" hidden onclick="window.open('https://console.cloud.google.com/apis/credentials','_blank','noopener,noreferrer')">Open Google setup</button>
+          </div>
+          <p class="email-guide-note">Google sign-in opens in a new tab. Only you can approve Gmail access. The app checks the connection when you return.</p>
+          <details class="email-guide-owner"><summary>App owner: one-time Google setup</summary><p>Enable Gmail API, create a Web OAuth client, and add your backend's <code>/api/v1/connectors/oauth/google_workspace/callback</code> as the redirect URL. Configure client ID, secret, public backend URL, and credential encryption key on the backend. Add Gmail send and read scopes to Google's consent screen.</p></details>
+        </section>
+
+        <section id="email-inbox-panel" class="email-inbox-panel" style="display:none" aria-labelledby="email-inbox-title">
+          <div class="email-inbox-heading"><div><span class="email-guide-kicker">CONNECTED MAILBOX</span><h2 id="email-inbox-title">Inbox</h2><p>Only messages you open here are shown. AI reads a selected message only when you ask for a summary.</p></div>
+            <form id="email-inbox-search" onsubmit="event.preventDefault(); EmailCtrl.loadInbox()"><label for="email-inbox-query">Search mail</label><input id="email-inbox-query" type="search" placeholder="Search your Gmail" maxlength="200"><button type="submit">Search</button></form></div>
+          <div id="email-inbox-status" role="status">Open Inbox to load recent mail.</div>
+          <div class="email-inbox-grid"><div id="email-inbox-list" class="email-inbox-list" aria-label="Messages"></div>
+            <article class="email-inbox-message" aria-live="polite"><div id="email-inbox-detail">Choose a message to read it.</div><button type="button" id="email-inbox-summarize" hidden onclick="EmailCtrl.summarizeSelected()">Summarize with AI</button><div id="email-inbox-summary" role="status"></div></article></div>
+        </section>
 
         <!-- ──────────── COMPOSE PANEL ──────────── -->
         <div id="email-compose-panel">
@@ -2503,7 +2593,7 @@
                   <input type="text" id="email-to-recipients" class="gmail-input-bare"
                     placeholder="Recipients auto-selected from Target & Send panel" disabled
                     style="background:transparent;cursor:not-allowed;flex:1;">
-                  <span class="gmail-input-right" onclick="toggleCcBccFields()"
+                  <span class="gmail-input-right gmail-cc-bcc-toggle" onclick="toggleCcBccFields()"
                     style="cursor:pointer;color:#0b57d0;font-weight:600;white-space:nowrap;">Cc Bcc</span>
                 </div>
 
@@ -2525,7 +2615,7 @@
                 <!-- Spacious Luxury Body Editor -->
                 <div id="email-body-rich" class="gmail-editor gmail-exact-editor" contenteditable="true"
                   style="min-height:320px;outline:none;border-bottom:1px solid #f1f3f4;padding:16px 0;font-size:14px;line-height:1.6;">
-                  <p>Hi {Name},</p><p><br></p><p>We are <b>{MyCompany}</b>, a leading provider of professional Security &amp; Housekeeping staff.</p><p><br></p><p>We noticed that <b>{Company}</b> in {City} may benefit from our reliable and well-trained manpower services.</p><p><br></p><p>Could we schedule a brief call to discuss your requirements?</p>
+                  <p>Hi {Name},</p><p><br></p><p>I'm reaching out from <b>{MyCompany}</b>. We help teams in {City} with {JobTitle}.</p><p><br></p><p>Would someone at <b>{Company}</b> be open to a short conversation about your current needs?</p><p><br></p><p>Best regards,</p>
                 </div>
 
                 <!-- Rich custom signature editor -->
@@ -2605,45 +2695,15 @@
             <!-- Sidebar: Target & Send + Sender Gmail Account Setup -->
             <div class="email-sidebar-card" style="display:flex;flex-direction:column;gap:14px;padding:18px 20px;">
               
-              <!-- Sender Account (User Friendly Gmail Input) -->
-              <div style="background:var(--do-t4,rgba(11,87,208,.04));border:1px solid rgba(11,87,208,.16);border-radius:14px;padding:14px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-                  <span style="font-size:13px;font-weight:700;color:var(--do-blue,#0b57d0);display:flex;align-items:center;gap:5px;">
-                    ✉️ Sender Gmail Account
-                  </span>
-                  <button onclick="EmailCtrl.copyGasScriptCode()" style="font-size:10px;font-weight:600;background:rgba(11,87,208,.1);color:#0b57d0;border:none;border-radius:6px;padding:3px 8px;cursor:pointer;" title="Copy 1-click Google Apps Script code">
-                    📋 GAS Code
-                  </button>
-                </div>
-                
-                <input type="email" id="email-sender-address-input" placeholder="e.g. yourname@gmail.com" 
-                  style="width:100%;font-size:12px;padding:8px 10px;border-radius:8px;border:1px solid #cbd5e1;background:#fff;margin-bottom:8px;outline:none;"
-                  onchange="EmailCtrl.saveSenderAddressFromPage()">
-
-                <div style="display:flex;gap:6px;margin-bottom:8px;">
-                  <button onclick="EmailCtrl.saveSenderAddressFromPage()" style="flex:1;font-size:11px;font-weight:600;background:#0b57d0;color:#fff;border:none;border-radius:8px;padding:6px 8px;cursor:pointer;">
-                    💾 Save Gmail ID
-                  </button>
-                  <button id="email-ping-btn" onclick="pingEmailWebhook()" style="flex:1;font-size:11px;font-weight:600;background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:6px 8px;cursor:pointer;">
-                    🔌 Test Status
-                  </button>
-                </div>
-
-                <!-- Custom Webhook URL Toggle (Advanced) -->
-                <details style="font-size:11px;color:var(--gray-600);cursor:pointer;">
-                  <summary style="font-weight:600;color:var(--do-blue,#0b57d0);user-select:none;">⚙️ Advanced Webhook URL</summary>
-                  <div style="margin-top:6px;">
-                    <input type="text" id="email-sender-webhook-input" placeholder="Paste custom GAS Webhook URL (optional)" 
-                      style="width:100%;font-size:11px;padding:6px 8px;border-radius:6px;border:1px solid #cbd5e1;background:#fff;margin-bottom:6px;outline:none;"
-                      onchange="EmailCtrl.saveWebhookFromPage()">
-                    <button onclick="EmailCtrl.saveWebhookFromPage()" style="width:100%;font-size:10px;font-weight:600;background:var(--gray-200);color:var(--gray-800);border:none;border-radius:6px;padding:4px;cursor:pointer;">
-                      Save Custom Webhook
-                    </button>
-                  </div>
-                </details>
-
-                <div style="font-size:10px;color:var(--gray-500);margin-top:6px;line-height:1.3;">
-                  Emails sent from your Gmail will appear in your <b>Sent</b> folder.
+              <div class="outreach-account">
+                <h3>Sender account</h3>
+                <p>Enter your email, then connect that same Google account. Sending starts only after Google confirms it.</p>
+                <label for="email-sender-address-input">Email address</label>
+                <input type="email" id="email-sender-address-input" autocomplete="email" placeholder="you@company.com">
+                <div id="email-account-status" class="outreach-status" role="status">Checking connection…</div>
+                <div class="outreach-account-actions">
+                  <button type="button" id="email-connect-btn" onclick="EmailCtrl.connectAccount()">Connect Google</button>
+                  <button type="button" onclick="EmailCtrl.checkConnection(true)">Refresh status</button>
                 </div>
               </div>
 
@@ -2657,8 +2717,8 @@
               <div class="form-group" style="margin-bottom:0;">
                 <label style="font-size:11px;font-weight:600;margin-bottom:2px;display:block;">Target Leads</label>
                 <select id="email-target" onchange="updateEmailPreview()" style="width:100%;padding:6px 10px;border-radius:8px;font-size:12px;">
-                  <option value="uncontacted">All Uncontacted Leads</option>
-                  <option value="all">All Leads (Including Contacted)</option>
+                  <option value="uncontacted">Leads not emailed yet</option>
+                  <option value="all">All leads with email</option>
                 </select>
               </div>
 
@@ -2685,7 +2745,7 @@
 
               <!-- Send button + Cancel -->
               <button id="email-send-btn" class="btn-primary" style="width:100%;justify-content:center;font-size:13px;font-weight:700;background:linear-gradient(135deg,#0b57d0,#7c3aed);border-radius:12px;box-shadow:0 4px 16px rgba(11,87,208,.3);padding:10px 14px;border:none;cursor:pointer;margin-top:2px;" onclick="startEmailAutomation()">
-                ▶&nbsp;&nbsp;Start Sending Emails
+                Send this batch
               </button>
 
               <button id="email-cancel-btn" class="btn-secondary" style="width:100%;justify-content:center;font-size:12px;border-radius:12px;display:none;border-color:#dc2626;color:#dc2626;padding:8px 14px;" onclick="cancelEmailAutomation()">
@@ -2694,13 +2754,12 @@
 
               <!-- Secondary utility buttons -->
               <button id="email-test-btn" onclick="sendTestEmail()" style="width:100%;padding:7px 6px;font-size:11px;font-weight:600;border-radius:8px;border:1.5px solid rgba(11,87,208,.35);background:rgba(11,87,208,.07);color:#0b57d0;cursor:pointer;" title="Send a preview email to yourself first">
-                🧪 Send Test Email
+                Send test to myself
               </button>
 
 
               <div style="font-size:10px;color:var(--gray-500);text-align:center;line-height:1.4;">
-                Emails sent from your Gmail via GAS Webhook.<br>
-                CC &amp; BCC included in every email sent.
+                Each recipient gets a separate email. Only Gmail-confirmed sends are marked sent.
               </div>
 
 
@@ -2718,7 +2777,9 @@
           </div>
         </div>
 
-        <!-- ──────────── SENT TAB PANEL ──────────── -->
+        <details class="outreach-alternative">
+          <summary>Use a Microsoft Outlook account instead</summary>
+          <p>Outlook has its own Microsoft connection and campaign controls.</p>
         <section id="outlook-setup-section" class="outlook-setup-card" aria-labelledby="outlook-setup-title">
           <div class="outlook-setup-header"><div><div id="outlook-setup-title" class="outlook-title">Outlook sending</div><div class="outlook-subtitle">Secure Microsoft Graph is the default. Classic Outlook is an optional Windows-only fallback.</div></div><span id="outlook-connection-badge" class="outlook-status-badge">Not connected</span></div>
           <div class="outlook-grid">
@@ -2739,6 +2800,7 @@
           <div class="outlook-compose-row"><div class="outlook-field-row"><label for="outlook-subject">Subject template</label><input id="outlook-subject" class="outlook-input" value="A quick idea for {Company}" maxlength="200"></div><div class="outlook-field-row"><label for="outlook-body">HTML email template</label><div id="outlook-body" class="outlook-editor outlook-body-editor" contenteditable="true"><p>Hi {Name},</p><p>We help <strong>{Company}</strong> with reliable security and housekeeping staffing in {City}.</p><p>Could we schedule a brief call?</p></div></div><div class="outlook-token-row"><button data-outlook-token="{Name}">{Name}</button><button data-outlook-token="{Company}">{Company}</button><button data-outlook-token="{City}">{City}</button><button data-outlook-token="{Industry}">{Industry}</button></div><div id="outlook-preview" class="outlook-preview"><span>Preview will appear here.</span></div></div>
           <div class="outlook-runbar"><div class="outlook-run-actions"><button id="outlook-send-test-btn" class="outlook-secondary">Send test to me</button><button id="outlook-send-btn" class="outlook-primary">Send Emails</button><button id="outlook-pause-btn" class="outlook-secondary" disabled>Pause</button><button id="outlook-resume-btn" class="outlook-secondary" disabled>Resume</button><button id="outlook-stop-btn" class="outlook-danger" disabled>Stop</button><button id="outlook-retry-btn" class="outlook-secondary">Retry failed</button></div><div class="outlook-progress"><div class="outlook-progress-track"><div id="outlook-progress-bar"></div></div><span id="outlook-progress-text">0 queued · 0 sent · 0 failed</span></div></div><div id="outlook-log" class="outlook-log"><div class="outlook-empty">No Outlook queue activity yet.</div></div>
         </section>
+        </details>
 
         <div id="email-sent-panel" style="display:none;">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
@@ -2764,7 +2826,7 @@
       <section class="view" id="view-whatsapp">
         <div class="view-header" style="margin-bottom: 16px;">
           <h1 class="view-title">WhatsApp Automation</h1>
-          <p class="view-subtitle">Send personalized WhatsApp messages &amp; brochures automatically using single-tab recycled queue dispatch.</p>
+          <p class="view-subtitle">Prepare a personal message for each lead, send from your signed-in WhatsApp Web account, then confirm it here.</p>
         </div>
 
         <div class="email-layout whatsapp-layout" style="display: grid; grid-template-columns: 1fr 360px; gap: 24px; align-items: start;">
@@ -2790,7 +2852,7 @@
               <!-- Company Brochure Attachment Bar -->
               <div style="background:rgba(37,211,102,0.05); border:1px solid rgba(37,211,102,0.25); border-radius:14px; padding:16px;">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-                  <span style="font-size:13.5px; font-weight:700; color:#128c7e; display:flex; align-items:center; gap:6px;">
+                  <span class="wa-accent-text" style="font-size:13.5px; font-weight:700; color:#128c7e; display:flex; align-items:center; gap:6px;">
                     📎 Company Brochure &amp; Catalog Attachment
                   </span>
                   <span style="font-size:11px; color:#15803d; font-weight:600;">Appended to all messages</span>
@@ -2800,10 +2862,6 @@
                   <input type="text" id="whatsapp-brochure-url" placeholder="Paste Brochure Link (e.g. https://yourcompany.com/brochure.pdf)" 
                     style="flex:1; font-size:13px; padding:10px 12px; border-radius:8px; border:1px solid #cbd5e1; outline:none; background:#fff;"
                     onchange="saveWhatsappBrochure()">
-                  <input type="file" id="whatsapp-brochure-file-input" accept=".pdf,.doc,.docx,image/*" style="display:none;" onchange="handleWhatsappBrochureFile(event)">
-                  <button type="button" onclick="document.getElementById('whatsapp-brochure-file-input').click()" style="font-size:12px; font-weight:600; background:#f1f5f9; color:#334155; border:1px solid #cbd5e1; border-radius:8px; padding:10px 14px; cursor:pointer; white-space:nowrap;">
-                    📂 Upload File
-                  </button>
                   <button type="button" onclick="saveWhatsappBrochure()" style="font-size:12px; font-weight:600; background:#25D366; color:#fff; border:none; border-radius:8px; padding:10px 16px; cursor:pointer; white-space:nowrap;">
                     💾 Save
                   </button>
@@ -2827,44 +2885,30 @@
             <h3 style="font-size: 16px; font-weight: 700; color: #202124; margin-bottom: 16px; display: flex; align-items: center; justify-content: space-between;">
               <span style="display:flex; align-items:center; gap:8px;">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#25D366" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
-                Batch Automation
+                Review queue
               </span>
               <span style="font-size:11px; color:#128c7e; cursor:pointer; font-weight:600;" onclick="openWhatsappWeb()">WhatsApp Web ↗</span>
             </h3>
-
-            <!-- Sender Reference Number -->
-            <div class="form-group" style="margin-bottom: 16px;">
-              <label style="font-size: 12px; font-weight: 600; color: #5f6368; display:block; margin-bottom:4px;">
-                Sender Mobile Number (Optional)
-              </label>
-              <input type="text" id="whatsapp-sender-num" placeholder="e.g. +919876543210" style="width:100%; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; outline: none; font-size:13px;">
-            </div>
 
             <!-- Target Audience -->
             <div class="form-group" style="margin-bottom: 16px;">
               <label style="font-size: 12px; font-weight: 600; color: #5f6368; display:block; margin-bottom:4px;">Target Audience</label>
               <div style="font-size: 14px; font-weight: 600; color: var(--gray-800); background: rgba(37,211,102,0.08); padding: 12px; border-radius: 8px; border: 1px solid rgba(37,211,102,0.25); display:flex; justify-content:space-between; align-items:center;">
-                <span>New Leads with Phone:</span>
-                <span id="wa-eligible-count" style="color: #128c7e; font-size:16px; font-weight:700;">0</span>
+                <span>Not messaged yet:</span>
+                <span class="wa-accent-text" id="wa-eligible-count" style="color: #128c7e; font-size:16px; font-weight:700;">0</span>
               </div>
             </div>
 
-            <!-- Delay Interval Slider (6-7s per lead default) -->
-            <div class="form-group" style="margin-bottom: 16px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <label style="font-size: 12px; font-weight: 600; color: #5f6368;">Auto Delay (Single Tab Recycled)</label>
-                <span class="range-val" id="wa-delay-val" style="font-size:12px; font-weight:700; color:#128c7e;">6 sec</span>
-              </div>
-              <input type="range" id="wa-delay-size" min="4" max="15" value="6" step="1" 
-                oninput="document.getElementById('wa-delay-val').textContent = this.value + ' sec'" style="width:100%;">
-              <div style="font-size:10px; color:#64748b; margin-top:3px;">6s delay keeps RAM load low &amp; prevents tab buildup.</div>
+            <div class="outreach-preview">
+              <strong>Message preview</strong>
+              <p id="whatsapp-preview-box">Leads with valid phone numbers will appear here.</p>
             </div>
 
             <!-- Batch Size Slider -->
             <div class="form-group" style="margin-bottom: 20px;">
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                 <label style="font-size: 12px; font-weight: 600; color: #5f6368;">Batch Size</label>
-                <span class="range-val" id="wa-batch-val" style="font-size:12px; font-weight:700; color:#128c7e;">10</span>
+                <span class="range-val wa-accent-text" id="wa-batch-val" style="font-size:12px; font-weight:700; color:#128c7e;">10</span>
               </div>
               <input type="range" id="wa-batch-size" min="1" max="50" value="10" 
                 oninput="document.getElementById('wa-batch-val').textContent = this.value" style="width:100%;">
@@ -2873,8 +2917,7 @@
             <!-- Single Tab Auto-Runner Queue UI (active during automation) -->
             <div id="wa-queue-ui" style="display: none; background: #f0fdf4; border: 1px solid #bbf7d0; padding: 16px; border-radius: 12px; margin-bottom: 20px;">
               <div style="font-weight: 700; color: #166534; margin-bottom: 6px; font-size:14px; display:flex; justify-content:space-between;" id="wa-queue-status">
-                <span>Sending: 0 / 10</span>
-                <span id="wa-queue-timer" style="color:#059669; font-weight:600;">⏱️ Next in 6s</span>
+                <span>Reviewing 0 / 10</span>
               </div>
               <div style="font-size: 12px; color: #15803d; margin-bottom: 12px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" id="wa-queue-current-lead">
                 Next: ...
@@ -2885,13 +2928,16 @@
                 <div id="wa-progress-bar" style="height:100%; width:0%; background:#25D366; transition:width 0.3s ease;"></div>
               </div>
 
-              <div style="display:flex; gap:8px;">
-                <button id="wa-pause-btn" class="btn-secondary" onclick="WhatsAppCtrl.togglePause()" style="flex:1; font-size:12px; padding:8px; border-color:#25D366; color:#166534; font-weight:600;">
-                  ⏸️ Pause
-                </button>
-                <button class="btn-secondary" onclick="stopWhatsappQueue()" style="flex:1; font-size:12px; padding:8px; border-color:#ef4444; color:#dc2626; font-weight:600;">
-                  ⏹️ Stop Batch
-                </button>
+              <label class="outreach-consent" for="wa-consent-confirm">
+                <input id="wa-consent-confirm" type="checkbox">
+                <span>This lead agreed to receive WhatsApp messages from us.</span>
+              </label>
+
+              <div class="outreach-queue-actions">
+                <button id="wa-open-btn" class="btn-primary" type="button" onclick="WhatsAppCtrl.openCurrent()">Open current chat</button>
+                <button id="wa-confirm-btn" class="btn-secondary" type="button" onclick="WhatsAppCtrl.confirmCurrent()">I sent it</button>
+                <button class="btn-secondary" type="button" onclick="WhatsAppCtrl.skipCurrent()">Skip</button>
+                <button class="btn-secondary" type="button" onclick="stopWhatsappQueue()">Stop</button>
               </div>
             </div>
 
@@ -2900,11 +2946,11 @@
               style="width: 100%; justify-content: center; font-size: 15px; font-weight:700; padding: 14px; border-radius: 12px; background: linear-gradient(135deg, #25D366, #128c7e); border: none; display: flex; color:white; box-shadow: 0 4px 16px rgba(37,211,102,0.35); cursor:pointer;" 
               onclick="startWhatsappBatch()">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:8px"><path d="M22 2L11 13"></path><path d="M22 2L15 22L11 13L2 9L22 2Z"></path></svg>
-              🚀 Start Automatic WhatsApp Batch
+              Review WhatsApp batch
             </button>
 
             <div style="font-size:11px; color:#15803d; margin-top:12px; line-height:1.4; text-align:center; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:8px 10px; font-weight:500;">
-              🛡️ <b>Anti-Ban Protection Active:</b> Uses 1 recycled tab, human delay jitter (+1-3s), &amp; auto-rest breaks so your WhatsApp number stays 100% safe.
+              WhatsApp Web opens a prepared chat. Send it there, then confirm here to continue. Opening a chat does not prove delivery.
             </div>
           </div>
         </div>
@@ -2947,6 +2993,48 @@
 
           <div class="pg-grid" id="plugins-grid" aria-live="polite"></div>
 
+        </div>
+      </section>
+
+      <section class="view" id="view-connectors" aria-labelledby="connectors-title">
+        <div class="cx-page">
+          <header class="cx-header">
+            <div>
+              <h1 id="connectors-title">Connectors</h1>
+              <p>Connect your work apps and schedule actions from one place.</p>
+            </div>
+            <button type="button" id="cx-refresh" class="cx-button cx-button-secondary">Refresh</button>
+          </header>
+          <p id="cx-status" class="cx-status" role="status" aria-live="polite">Checking connections...</p>
+          <div class="cx-tools">
+            <label class="cx-search-label" for="cx-search">Search apps</label>
+            <input id="cx-search" type="search" placeholder="Search connectors" autocomplete="off">
+            <div class="cx-filters" role="group" aria-label="Filter connectors">
+              <button type="button" class="cx-filter active" data-filter="all" aria-pressed="true">All</button>
+              <button type="button" class="cx-filter" data-filter="connected" aria-pressed="false">Connected</button>
+              <button type="button" class="cx-filter" data-filter="setup" aria-pressed="false">Needs setup</button>
+            </div>
+          </div>
+          <div id="cx-grid" class="cx-grid" aria-live="polite"></div>
+
+          <section class="cx-actions" aria-labelledby="cx-actions-title">
+            <div class="cx-section-heading">
+              <h2 id="cx-actions-title">Publish &amp; automate</h2>
+              <p>Send now or schedule for later. A connected account is required.</p>
+            </div>
+            <form id="cx-action-form" class="cx-action-form">
+              <label>App<select id="cx-action-provider" required><option value="">Choose an app</option><option value="telegram">Telegram message</option><option value="slack">Slack message</option><option value="gmail">Gmail email</option><option value="github">GitHub issue</option><option value="facebook">Facebook Page post</option><option value="instagram">Instagram photo</option></select></label>
+              <label>Destination<input id="cx-action-target" type="text" maxlength="256" placeholder="Chat ID, channel ID, email, or owner/repo"></label>
+              <label class="cx-subject-field">Subject / title<input id="cx-action-subject" type="text" maxlength="200" placeholder="Email subject or issue title"></label>
+              <label class="cx-media-field" hidden>Public image URL<input id="cx-action-media" type="url" maxlength="2048" placeholder="https://example.com/photo.jpg"></label>
+              <label class="cx-message-field">Message<textarea id="cx-action-message" rows="4" maxlength="4096" required placeholder="Write your message"></textarea></label>
+              <label>Schedule (optional)<input id="cx-action-time" type="datetime-local"></label>
+              <button type="submit" id="cx-action-submit" class="cx-button cx-button-primary">Run now</button>
+            </form>
+            <p id="cx-action-status" class="cx-status" role="status" aria-live="polite"></p>
+            <div class="cx-section-heading cx-history-heading"><h2>Recent actions</h2></div>
+            <div id="cx-jobs" class="cx-jobs"></div>
+          </section>
         </div>
       </section>
 
@@ -3225,47 +3313,56 @@
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js" defer></script>
   <!-- Local credentials only; keeps API keys out of the application source. -->
+  <script src="desktop-config.js"></script>
   <script src="config.js?v=1.0" defer></script>
-  <script src="memory.js?v=1.0" defer></script>
-  <script src="lead-jobs-client.js?v=1.0" defer></script>
-  <script src="ai-chat-client.js?v=1.1" defer></script>
+  <script src="memory.js?v=2.0&build=1004complete" defer></script>
+  <script src="lead-jobs-client.js?v=1.5&r=1004live&lead-quality=1005j" defer></script>
+  <script src="ai-chat-client.js?v=1.4&r=1001security" defer></script>
   <link rel="stylesheet" href="clavis-keyvault.css?v=1.1">
-  <script src="clavis-keyvault.js?v=1.0&r=0926" defer></script>
-  <script src="clavis-keyvault-ui.js?v=1.0" defer></script>
-  <script src="clavis-direct.js?v=1.4" defer></script>
-  <script src="clavis-nano.js?v=1.0" defer></script>
+  <script src="clavis-keyvault.js?v=2.0&r=1001security" defer></script>
+  <script src="clavis-keyvault-ui.js?v=1.1&r=0927" defer></script>
+  <script src="clavis-direct.js?v=2.0&r=1001security&voice-fix=1005i" defer></script>
+  <script src="clavis-nano.js?v=1.0&r=rudra1003" defer></script>
   <script src="clavis-emotional-engine.js?v=1.0" defer></script>
   <script src="google-sheets-client.js?v=1.0" defer></script>
-  <script src="lead-candidate-domain.js?v=1.2&r=0926" defer></script>
+  <script src="clavis-request-intent.js?v=1004intent&guide-defaults=1005final&voice-fix=1005i" defer></script>
+  <script src="lead-candidate-domain.js?v=1005defaults&guide-defaults=1005final" defer></script>
   <script src="agent.js?v=1.0" defer></script>
-  <script src="real-scraper.js?v=1.2&r=0926" defer></script>
+  <script src="apify-leads.js?v=1.2&r=1004live" defer></script>
+  <script src="real-scraper.js?v=1.7&r=1004live&guide-defaults=1005final&lead-quality=1005j&island=1006&finish=1006e" defer></script>
   <script src="clavis-enrichment-engine.js?v=1.0" defer></script>
-  <script src="chat.js?v=1.4" defer></script>
+  <script src="chat.js?v=1.8&r=1003lead&build=1004complete&guide-defaults=1005final" defer></script>
   <script src="jarvis_skills.js?v=1.1&r=0926" defer></script>
-  <script src="jarvis.js?v=1.7&r=0926" defer></script>
+  <script src="jarvis.js?guide=1005&v=1.8&r=1001latency&build=1004complete&guide-defaults=1005final&voice-fix=1005i&island=1006" defer></script>
   <script src="device-account.js?v=1.0" defer></script>
   <script src="button-feedback.js?v=1.0" defer></script>
-  <script src="cloud-sync.js?v=1.1" defer></script>
-  <script src="supabase-auth.js?v=1.0" defer></script>
-  <script src="auth-antigravity.js?v=1.5" defer></script>
+  <script src="cloud-sync.js?v=2.0&build=1004complete" defer></script>
+  <script src="supabase-auth.js?v=2.2&r=1001security" defer></script>
+  <script src="auth-antigravity.js?v=2.1&r=0930workspace&guide-defaults=1005final" defer></script>
   <script src="auth.js?v=1.0" defer></script>
-  <script src="app.js?v=1.8" defer></script>
-  <script src="notifications.js?v=1.3" defer></script>
+  <script src="crm-bridge.js?v=1.1&r=1006" defer></script>
+  <script src="crm-business.js?v=1.0&r=1005business&island=1006" defer></script>
+  <script src="crm-insights.js?v=1.0&r=1006" defer></script>
+  <script src="page-crm.js?v=1.1&r=1006" defer></script>
+  <script src="page-textbee.js?v=1.0&r=1004sms&build=1004complete" defer></script>
+    <script src="app.js?v=2.5&r=1004settings&guide-defaults=1005final&perf=1006" defer></script>
+  <script src="notifications.js?v=1.4&r=1005business" defer></script>
   <!-- self-heal.js installs safe shims for inline handlers and repairs minor
        runtime state. It was written but never included, so none of it ran and
        handlers like closeMacDialog() threw "not defined" on click. -->
   <script src="self-heal.js?v=1.0" defer></script>
-  <script src="ui-hardening.js?v=1.3" defer></script>
+    <script src="ui-hardening.js?v=1.5&r=1004settings" defer></script>
   <script src="diagnostics.js?v=1.1" defer></script>
   <script src="diagnostics-ui.js?v=1.0" defer></script>
   <script src="plugin-core.js?v=1.0" defer></script>
   <script src="plugin-manifests.js?v=1.0" defer></script>
   <script src="page-plugins.js?v=1.0" defer></script>
-  <script src="page-leads.js?v=1.1" defer></script>
-  <script src="page-agent.js?v=1.2" defer></script>
+  <script src="page-leads.js?v=1.1&scopefix=1003f&build=1004complete" defer></script>
+  <script src="page-agent.js?v=1005defaults&guide-defaults=1005final&finish=1006e" defer></script>
+  <script src="india-location-picker.js?v=1005defaults&guide-defaults=1005final" defer></script>
   <script src="page-excel.js?v=1.0" defer></script>
   <script src="page-analytics.js?v=1.0" defer></script>
-  <script src="page-email.js?v=1.1" defer></script>
+  <script src="page-email.js?v=1.2&scopefix=1003f&build=1004complete" defer></script>
   <link rel="stylesheet" href="outlook-email.css?v=1.0">
 
   <!-- COMPOSER OVERHAUL: click fix + unified design + macOS motion layer -->
@@ -3273,14 +3370,14 @@
   <link rel="stylesheet" href="clavis-reliability.css?v=1.0">
   <!-- MUST STAY LAST among base styles. theme-flow.css overrides the palette,
        typography and motion of every stylesheet above it. -->
-  <link rel="stylesheet" href="theme-flow.css?v=1.9&rev=6.0">
+  <link rel="stylesheet" href="theme-flow.css?v=1.9&rev=6.0&scopefix=1003f">
   <link rel="stylesheet" href="jarvis-studio-polish.css?v=1.3">
   <link rel="stylesheet" href="clavis-voice-polish.css?v=1.1">
   <link rel="stylesheet" href="clavis-live.css?v=1.1">
-  <link rel="stylesheet" href="clavis-canvas.css?v=1.3&r=0926">
+  <link rel="stylesheet" href="clavis-canvas.css?v=1.4&r=1002map&lead-quality=1005j">
   <link rel="stylesheet" href="clavis-header-declutter.css?v=1.0">
   <link rel="stylesheet" href="clavis-confirm-hud.css?v=2.0">
-  <!-- CLAVIS STAGE v2: voice-first Clavis page + floating Task HUD.
+  <!-- RUDRA24 AI STAGE v2: voice-first Rudra24 AI page + floating Task HUD.
        Both are scoped to #view-jarvis / #clavis-task-hud and hang off the
        .clavis-stage-v2 class that clavis-task-hud.js adds to <html>, so
        localStorage.clavis_stage_v2 = 'off' reverts the whole redesign. -->
@@ -3289,46 +3386,49 @@
   <!-- APPLE-POLISH: design system, motion language, state & a11y layer.
        Loaded LAST so it definitively wins the cascade over all earlier styles. -->
   <link rel="stylesheet" href="apple-polish.css?v=3.0">
-  <!-- CLAVIS POLISH v3: crystal-clear floating window, composer cleanup,
+  <!-- RUDRA24 AI POLISH v3: crystal-clear floating window, composer cleanup,
        sidebar hover, unified theme transition, Apple spring animations.
        MUST be the absolute last stylesheet in the document. -->
-  <link rel="stylesheet" href="clavis-polish-v3.css?v=1.1">
+  <link rel="stylesheet" href="clavis-polish-v3.css?v=1.2">
   <!-- APPLE-POLISH runtime. Must load BEFORE jarvis_ui.js: it restores the
        globals whose absence threw at jarvis_ui.js:1867 and killed the last
        506 lines of that file (command palette, side panel, more menu, file
        upload, Excel enrichment, bindJarvisUIButtons). -->
-  <script src="apple-polish.js?v=1.0" defer></script>
+  <script src="composer-sizing.js?v=1.0&r=1006perf&perf-final=1006c" defer></script>
+  <script src="apple-polish.js?v=1.2&r=1006perf&perf-final=1006c" defer></script>
   <script src="outlook-email.js?v=1.0" defer></script>
-  <script src="page-whatsapp.js?v=1.0" defer></script>
+  <script src="page-whatsapp.js?v=1.0&build=1004complete&perf=1006" defer></script>
   <script src="page-accounts.js?v=1.0" defer></script>
   <script src="candidate-actors.js?v=1.1" defer></script>
-  <script src="page-candidates.js?v=1.6" defer></script>
-  <script src="clavis-barge-in.js?v=1.1&r=0926" defer></script>
-  <script src="clavis-local-speech.js?v=2.3&r=0926" defer></script>
-  <script src="clavis-audio-trigger.js?v=2.3" defer></script>
-  <script src="clavis-canvas.js?v=1.6&r=0926c" defer></script>
-  <script src="clavis-live.js?v=3.9&r=0926c" defer></script>
+  <script src="page-candidates.js?guide=1005&v=1.6&guide-defaults=1005final&perf=1006" defer></script>
+  <script src="clavis-barge-in.js?v=1.1&r=0926&voice-fix=1005i" defer></script>
+  <script src="clavis-worklet.js?v=1.0" defer></script>
+  <script src="clavis-local-speech.js?v=2.5&r=1002worklet" defer></script>
+  <script src="clavis-audio-trigger.js?v=2.6&r=1002worklet" defer></script>
+  <script src="clavis-canvas.js?v=1.9&r=1002map&lead-quality=1005j&island=1006&mapfix=1007" defer></script>
+  <script src="clavis-live.js?guide=1005&v=3.26&r=1002token&guide-defaults=1005final" defer></script>
   <script src="clavis-cognition.js?v=1.0" defer></script>
   <script src="clavis-confirm-hud.js?v=1.0" defer></script>
   <script src="clavis-task-hud.js?v=1.0" defer></script>
-  <script src="clavis-mind.js?v=1.1" defer></script>
+  <script src="clavis-mind.js?v=1.1&r=rudra1003" defer></script>
   <script src="clavis-pc.js?v=1.1" defer></script>
   <script src="clavis-browser.js?v=1.0" defer></script>
   <script src="clavis-prompt-master.js?v=1.1" defer></script>
-  <script src="clavis-app-map.js?v=1.0&r=0926" defer></script>
+  <script src="clavis-app-map.js?v=1.2&r=0929actions&guide-defaults=1005final&perf=1006" defer></script>
+  <script src="app-guide.js?v=1005guide4&guide-defaults=1005business&perf=1006" defer></script>
   <script src="clavis-voice-nav.js?v=1.2&r=0926" defer></script>
-  <script src="clavis-commands.js?v=1.1&r=0926" defer></script>
+  <script src="clavis-commands.js?v=1.2&r=1002voice" defer></script>
   <script src="clavis-suggestions.js?v=1.1" defer></script>
-  <script src="clavis-proactive.js?v=1.2" defer></script>
+  <script src="clavis-proactive.js?island=1006&v=1.4&r=0930workspace" defer></script>
   <script src="clavis-vision.js?v=1.1" defer></script>
-  <script src="clavis-boot-greet.js?v=1.1" defer></script>
-  <script src="clavis-voice.js?v=1.4&r=0926" defer></script>
-  <script src="jarvis_ui.js?v=1.15&r=0926d" defer></script>
-  <!-- Clavis orb v4: single-pass WebGL, round by construction (the old strands-orb.js drew a square whenever its glass pass failed). Same window.StrandsOrb API. -->
-  <script src="clavis-orb.js?v=4.0" defer></script>
+  <script src="clavis-boot-greet.js?v=1.2&r=0930workspace" defer></script>
+  <script src="clavis-voice.js?v=1.8&r=1002worklet&voice-fix=1005i" defer></script>
+  <script src="jarvis_ui.js?guide=1005&v=1.27&r=1004feedback&build=1004complete&guide-defaults=1005final&voice-fix=1005i&perf=1006&island=1006" defer></script>
+  <!-- Rudra24 AI orb v4: single-pass WebGL, round by construction (the old strands-orb.js drew a square whenever its glass pass failed). Same window.StrandsOrb API. -->
+  <script src="clavis-orb.js?v=4.1" defer></script>
   <script src="app-shortcuts.js?v=1.0" defer></script>
-  <script src="clavis-manual.js?v=1.2" defer></script>
-  <script src="voice_ai.js?v=1.0" defer></script>
+  <script src="clavis-manual.js?v=1.3&r=1005business" defer></script>
+  <script src="toughtongue-studio.js?v=2" defer></script>
   <script src="nexus-enhancements.js?v=2.1" defer></script>
   <script>
     // Audio Context Setup for Ambient Sounds
@@ -3949,7 +4049,7 @@
       });
     }
 
-    applyEdgeScroll('sidebar', 'sidebar-nav-scroll');
+    // sidebar-hover-scroll.js is the sole sidebar scroll owner.
     /* Settings content is parsed just after this bootstrap block. Attach it
        after DOM construction so edge-hover scrolling works there as well. */
     if (document.readyState === 'loading') {
@@ -4003,7 +4103,7 @@
        Lives outside the normal view routing system.
        Activated by showView('settings') hook in app.js.
   ═══════════════════════════════════════════════════════════ -->
-  <div id="settings-overlay" class="settings-overlay" aria-modal="true" role="dialog" aria-label="System Settings">
+  <div id="settings-overlay" class="settings-overlay" aria-modal="true" role="dialog" aria-label="System Settings" aria-hidden="true" inert>
     <div id="settings-backdrop" class="settings-backdrop" onclick="closeSettingsModal()"></div>
 
     <div id="settings-modal" class="settings-modal">
@@ -4014,7 +4114,7 @@
           <button class="smodal-dot smodal-dot-close" title="Close Settings" onclick="closeSettingsModal()">
             <svg width="6" height="6" viewBox="0 0 8 8" fill="none"><path d="M1 1l6 6M7 1L1 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
-          <button class="smodal-dot smodal-dot-minimize" title="Hide / show sidebar" onclick="toggleSettingsModalCollapse()">
+          <button class="smodal-dot smodal-dot-minimize" title="Hide / show sidebar" aria-controls="settings-modal-nav" aria-expanded="true" onclick="toggleSettingsModalCollapse()">
             <svg width="6" height="2" viewBox="0 0 8 2" fill="none"><path d="M1 1h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
           </button>
           <button class="smodal-dot smodal-dot-expand" title="Toggle Expand" onclick="toggleSettingsModalExpand()">
@@ -4104,6 +4204,14 @@
               <svg class="smodal-nav-icon" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
               <span>About</span>
             </button>
+            <button class="smodal-nav-item" type="button" id="report-bug-settings" onclick="closeSettingsModal(); ProductInsights.openReport()">
+              <svg class="smodal-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><path d="M7 5 5 3M13 5l2-2M4 9H2m16 0h-2M6 8a4 4 0 0 1 8 0v6a4 4 0 0 1-8 0V8Zm0 3h8M5 15l-2 2m12-2 2 2"/></svg>
+              <span>Report a bug</span>
+            </button>
+            <button class="smodal-nav-item" type="button" onclick="closeSettingsModal(); location.hash = '#developer'; ProductInsights.loadDashboard()">
+              <svg class="smodal-nav-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" aria-hidden="true"><rect x="2" y="3" width="16" height="14" rx="2"/><path d="M5 12V9m5 3V6m5 6v-2"/></svg>
+              <span>Developer login</span>
+            </button>
           </div>
 
         </nav>
@@ -4153,9 +4261,9 @@
             <div class="smodal-field">
               <div class="smodal-field-left">
                 <label class="smodal-label">App / Agent Name</label>
-                <span class="smodal-hint">Shown on the login card header (e.g. "Neural Lead Intelligence")</span>
+                <span class="smodal-hint">App name shown during the sign-in transition.</span>
               </div>
-              <input type="text" id="settings-app-name" class="smodal-input" placeholder="Neural Lead Intelligence" style="max-width:260px;" />
+              <input type="text" id="settings-app-name" class="smodal-input" placeholder="Rudra24 AI &amp; Leads" style="max-width:260px;" />
             </div>
 
             <div style="margin-top:20px; display:flex; gap:10px; align-items:center;">
@@ -4252,7 +4360,7 @@
                 <span class="smodal-hint">Minimise animations and transitions</span>
               </div>
               <label class="smodal-switch">
-                <input type="checkbox" id="sm-reduce-motion">
+                <input type="checkbox" id="sm-reduce-motion" onchange="window.lxSetAppearance && lxSetAppearance('motion', this.checked ? 'reduced' : 'full')">
                 <span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span>
               </label>
             </div>
@@ -4263,7 +4371,7 @@
                 <span class="smodal-hint">Dense spacing for more content</span>
               </div>
               <label class="smodal-switch">
-                <input type="checkbox" id="sm-compact">
+                <input type="checkbox" id="sm-compact" onchange="window.lxSetAppearance && lxSetAppearance('density', this.checked ? 'compact' : 'comfortable')">
                 <span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span>
               </label>
             </div>
@@ -4349,7 +4457,7 @@
                 <label class="smodal-label">Sidebar Width</label>
                 <span class="smodal-hint"><span id="sm-sidebar-w-val">215</span>px · content follows automatically</span>
               </div>
-              <input type="range" class="smodal-range" id="sm-sidebar-width" min="200" max="320" step="4" value="215" oninput="window.lxSetAppearance && lxSetAppearance('sidebarWidth', this.value)">
+              <input type="range" class="smodal-range" id="sm-sidebar-width" min="210" max="230" step="1" value="220" oninput="window.lxSetAppearance && lxSetAppearance('sidebarWidth', this.value)">
             </div>
 
             <div class="smodal-field smodal-field-range">
@@ -4556,6 +4664,24 @@
               <div class="smodal-stat"><span class="smodal-stat-val" id="usage-runs">—</span><span class="smodal-stat-lbl">Runs</span></div>
             </div>
 
+            <!-- Enhanced Usage Dashboard: Heatmap & Insights -->
+            <div class="smodal-insights-board" style="display: flex; gap: 16px; margin: 24px 0;">
+              <div class="smodal-heatmap-card" style="flex: 2; background: var(--cc-surface-2, rgba(0,0,0,0.03)); border-radius: 14px; padding: 16px; border: 1px solid var(--cc-line, rgba(0,0,0,0.08));">
+                <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--cc-ink-2);">Activity Heatmap</h3>
+                <div id="usage-heatmap" style="display: grid; grid-template-columns: repeat(12, 1fr); gap: 4px; height: 80px;">
+                  <!-- dynamically filled -->
+                </div>
+              </div>
+              <div class="smodal-plugins-card" style="flex: 1; background: var(--cc-surface-2, rgba(0,0,0,0.03)); border-radius: 14px; padding: 16px; border: 1px solid var(--cc-line, rgba(0,0,0,0.08));">
+                <h3 style="margin: 0 0 12px; font-size: 13px; font-weight: 600; color: var(--cc-ink-2);">Most Used Tools</h3>
+                <ul id="usage-tools-list" style="margin: 0; padding: 0; list-style: none; font-size: 13px; color: var(--cc-ink);">
+                  <li style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>Apify Scraper</span><b id="ut-apify">-</b></li>
+                  <li style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>Places API</span><b id="ut-places">-</b></li>
+                  <li style="display: flex; justify-content: space-between; margin-bottom: 6px;"><span>Web Reader</span><b id="ut-reader">-</b></li>
+                </ul>
+              </div>
+            </div>
+
             <div class="smodal-field smodal-field-range">
               <div class="smodal-field-left">
                 <label class="smodal-label">Default Lead Count</label>
@@ -4735,6 +4861,7 @@
                 <label class="smodal-label">Dedup Strategy</label>
               </div>
               <select id="dedup-field" class="smodal-select">
+                <option value="multi-criteria">Combined matching</option>
                 <option value="company+type" selected>Company + Type</option>
                 <option value="email">Email Address</option>
                 <option value="phone">Phone Number</option>
@@ -4783,6 +4910,7 @@
 
           <!-- API KEYS -->
           <section class="smodal-section" id="smsc-api">
+            <button type="button" class="btn-secondary" onclick="window.closeSettingsModal?.(); window.ClavisSetup?.open({provider:'apify'});">Open unified AI &amp; Apify setup</button>
             <div class="smodal-section-header">
               <h2 class="smodal-section-title">API Keys</h2>
               <p class="smodal-section-desc">Manage keys for Groq, OpenAI, DeepSeek and NVIDIA with auto-rotation</p>
@@ -4831,7 +4959,7 @@
 
             <div class="smodal-actions">
               <button class="smodal-btn-primary" onclick="saveSettings()">Save Keys</button>
-              <button class="smodal-btn-secondary" onclick="if(window.showToast) showToast('API Health: All Providers Responding', 'success')">Test Connection</button>
+              <button class="smodal-btn-secondary" onclick="checkSettingsKeySetup(this)">Check saved keys</button>
             </div>
           </section>
 
@@ -4898,7 +5026,7 @@
             <div class="smodal-field">
               <div class="smodal-field-left">
                 <label class="smodal-label">Hands-Free Mode</label>
-                <span class="smodal-hint">Always-listen wake words: Clavis, Hey buddy, or custom phrases</span>
+                <span class="smodal-hint">Always-listen wake words: Rudra24 AI, Hey buddy, or custom phrases</span>
               </div>
               <label class="smodal-switch">
                 <input type="checkbox" id="sm-hands-free" onchange="if(typeof toggleHandsFreeSetting === 'function') toggleHandsFreeSetting(this.checked)">
@@ -4911,7 +5039,7 @@
                 <label class="smodal-label" for="clavis-wake-words">Wake Words</label>
                 <span class="smodal-hint">Comma-separated phrases. Browser microphone support is required.</span>
               </div>
-              <input id="clavis-wake-words" class="smodal-input" type="text" value="Clavis, Hey buddy, Hi pal" placeholder="Clavis, Hey buddy">
+              <input id="clavis-wake-words" class="smodal-input" type="text" value="Rudra, Hey Rudra" placeholder="Rudra, Hey Rudra">
             </div>
 
             <div class="smodal-field">
@@ -4928,12 +5056,21 @@
 
               <div class="smodal-field">
                 <div class="smodal-field-left">
-                  <label class="smodal-label">Voice engine</label>
-                  <span class="smodal-hint">Google Gemini · cloud speech, one API key, both languages</span>
+                  <label class="smodal-label" for="sm-tts-model">Voice engine</label>
+                  <span class="smodal-hint">Fish Audio is primary; Gemini and device speech are automatic fallbacks.</span>
                 </div>
-                <select id="sm-tts-model" class="smodal-select">
-                  <option value="gemini" selected>Gemini</option>
+                <select id="sm-tts-model" class="smodal-select" onchange="localStorage.setItem('clavis_tts_provider', this.value)">
+                  <option value="fish_audio" selected>Fish Audio · primary, Gemini fallback</option>
+                  <option value="gemini">Gemini</option>
                 </select>
+              </div>
+
+              <div class="smodal-field">
+                <div class="smodal-field-left">
+                  <label class="smodal-label" for="sm-fish-voice-id">Fish Audio voice model ID</label>
+                  <span class="smodal-hint">Paste a voice/model ID from Fish Audio. Fish TTS falls back to Gemini if this is empty or unavailable.</span>
+                </div>
+                <input id="sm-fish-voice-id" class="smodal-input" type="text" autocomplete="off" spellcheck="false" placeholder="Fish Audio voice model ID" onchange="localStorage.setItem('clavis_fish_voice_id', this.value.trim())">
               </div>
 
               <div class="smodal-field">
@@ -4944,7 +5081,7 @@
               <div class="smodal-field">
                 <div class="smodal-field-left">
                   <label class="smodal-label">Voice ID <span class="smodal-hint">(beta)</span></label>
-                  <span class="smodal-hint" id="sm-voiceid-hint">Register your voice once — background voices are ignored unless they say “Clavis”.</span>
+                  <span class="smodal-hint" id="sm-voiceid-hint">Register your voice once — background voices are ignored unless they say “Rudra”.</span>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center;">
                   <button type="button" class="smodal-btn-primary" id="sm-voiceid-btn" onclick="window.ClavisEar?.voiceId?.openEnroll?.().then(function(){ if (typeof window.clavisSyncVoiceIdUi==='function') window.clavisSyncVoiceIdUi(); })">Register my voice</button>
@@ -4963,11 +5100,11 @@
               <div class="smodal-field">
                 <div class="smodal-field-left">
                   <label class="smodal-label" for="sm-live-patience">Listening patience</label>
-                  <span class="smodal-hint">How long Clavis waits when you pause mid-sentence before it answers</span>
+                  <span class="smodal-hint">How long Rudra24 AI waits when you pause mid-sentence before it answers</span>
                 </div>
                 <select id="sm-live-patience" class="smodal-select" onchange="window.ClavisLive?.setPatience?.(this.value)">
-                  <option value="750">Quick</option>
-                  <option value="1100" selected>Natural (like ChatGPT voice)</option>
+                  <option value="750" selected>Quick</option>
+                  <option value="1100">Natural (like ChatGPT voice)</option>
                   <option value="1600">Very patient</option>
                 </select>
               </div>
@@ -5039,11 +5176,11 @@
 
             <div class="smodal-field">
               <div class="smodal-field-left">
-                <label class="smodal-label">Encrypt Local Storage</label>
-                <span class="smodal-hint">Encrypt API keys in IndexedDB</span>
+                <label class="smodal-label">API key encryption</label>
+                <span class="smodal-hint">Provider keys are encrypted in your account’s backend vault</span>
               </div>
               <label class="smodal-switch">
-                <input type="checkbox" id="sm-encryption" checked>
+                <input type="checkbox" id="sm-encryption" checked disabled>
                 <span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span>
               </label>
             </div>
@@ -5062,7 +5199,7 @@
               <label class="smodal-label smodal-label-danger">Danger Zone</label>
               <div class="smodal-actions" style="margin-top: 8px;">
                 <button class="smodal-btn-danger" onclick="clearAllData()">Clear Database</button>
-                <button class="smodal-btn-danger" onclick="if(confirm('Reset all settings?')) { localStorage.clear(); location.reload(); }">Reset All</button>
+                <button class="smodal-btn-secondary" onclick="if(confirm('Reset appearance and lead preferences? Leads, accounts and API keys will be kept.')) { window.ClavisAppearance?.reset(); window.lxResetAppearance?.(); window.AppSettings?.reset(); }">Reset preferences</button>
               </div>
             </div>
           </section>
@@ -5076,11 +5213,11 @@
 
             <div class="smodal-field">
               <div class="smodal-field-left">
-                <label class="smodal-label">GPU Acceleration</label>
-                <span class="smodal-hint">Hardware-accelerated transforms</span>
+                <label class="smodal-label">Hardware acceleration</label>
+                <span class="smodal-hint">Managed by your browser or desktop app</span>
               </div>
               <label class="smodal-switch">
-                <input type="checkbox" id="sm-gpu-accel" checked>
+                <input type="checkbox" id="sm-gpu-accel" checked disabled>
                 <span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span>
               </label>
             </div>
@@ -5088,10 +5225,10 @@
             <div class="smodal-field">
               <div class="smodal-field-left">
                 <label class="smodal-label">Frame Rate</label>
+                <span class="smodal-hint">Browser-managed; use Motion Level to reduce animation</span>
               </div>
-              <select id="sm-fps" class="smodal-select">
-                <option value="60" selected>60 FPS (Default)</option>
-                <option value="30">30 FPS (Power Save)</option>
+              <select id="sm-fps" class="smodal-select" disabled>
+                <option value="auto" selected>Automatic</option>
               </select>
             </div>
 
@@ -5110,7 +5247,7 @@
             <div class="smodal-info-rows">
               <div class="smodal-info-row">
                 <span class="smodal-info-label">Application</span>
-                <span class="smodal-info-val" id="about-app-name">Clavis AI Acquisition Platform</span>
+                <span class="smodal-info-val" id="about-app-name">Rudra24 AI Acquisition Platform</span>
               </div>
               <!-- The ONLY place in the app where the maker is named. Do not
                    surface this string anywhere else in the UI. -->
@@ -5274,16 +5411,20 @@
 
     function el(id) { return document.getElementById(id); }
 
-    // Same rule app.js uses to show the app shell: a Supabase session, or a
-    // local run (localhost / file / CLAVIS_LOCAL_MODE) where there is none.
+    // Settings are available only to a signed-in account.
     function settingsAllowed() {
-      if (window.SupabaseAuth?.getSession?.()) return true;
-      if (window.CLAVIS_LOCAL_MODE || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return true;
-      const shell = el('app-shell');
-      return Boolean(shell && shell.style.display !== 'none' && getComputedStyle(shell).display !== 'none');
+      return Boolean(window.SupabaseAuth?.getSession?.()) && !window.SupabaseAuth?.isRecoveryMode?.();
     }
 
-    function openSettingsModal() {
+    let settingsReturnFocus = null;
+    let settingsCloseTimer = 0;
+    let settingsExitCleanup = null;
+    async function openSettingsModal() {
+      if (window.SupabaseAuth && !window.SupabaseAuth.isInitialized()) {
+        const requestedHash = window.location.hash;
+        try { await window.SupabaseAuth.init(); } catch (_) { /* Keep the verified-session gate below. */ }
+        if (requestedHash === '#settings' && window.location.hash !== requestedHash) return;
+      }
       const isLoggedIn = settingsAllowed();
       const overlay = el('settings-overlay');
       if (!isLoggedIn) {
@@ -5296,8 +5437,22 @@
         return;
       }
       if (!overlay) return;
+      overlay.__rudraGeneration = (overlay.__rudraGeneration || 0) + 1;
+      overlay.__rudraMotion?.cancel();
+      overlay.__rudraClosing = false;
+      const wasOpen = overlay.classList.contains('open');
+      if (!wasOpen) settingsReturnFocus = document.activeElement;
+      overlay.removeAttribute('inert');
+      overlay.setAttribute('aria-hidden', 'false');
+      clearTimeout(settingsCloseTimer);
+      if (settingsExitCleanup) settingsExitCleanup();
       overlay.classList.remove('closing');
       overlay.classList.add('open');
+      if (!wasOpen && window.RudraMotionUI) overlay.__rudraMotion = window.RudraMotionUI.surface(overlay.querySelector('.settings-modal'), true, .8);
+      if (!overlay.contains(document.activeElement)) {
+        const closeButton = overlay.querySelector('.smodal-dot-close');
+        if (closeButton) closeButton.focus({ preventScroll: true });
+      }
       try {
         if (typeof loadSettingsToUI === 'function') loadSettingsToUI();
         if (typeof refreshSettingsMemoryStats === 'function') refreshSettingsMemoryStats();
@@ -5313,7 +5468,7 @@
         // Sync app name
         const appNameInput = document.getElementById('settings-app-name');
         if (appNameInput) {
-          appNameInput.value = localStorage.getItem('skylark-app-name') || 'Neural Lead Intelligence';
+          appNameInput.value = localStorage.getItem('skylark-app-name') || 'Rudra24 AI & Leads';
         }
         // Sync dark mode toggle
         const darkToggle = document.getElementById('sm-darkmode');
@@ -5324,6 +5479,8 @@
         if (petToggle && window.NexusPet) petToggle.checked = window.NexusPet.isEnabled();
         // Sync sound theme + volume
         if (window.SoundFX) {
+          const soundsEl = document.getElementById('sm-sounds');
+          if (soundsEl && SoundFX.isEnabled) soundsEl.checked = SoundFX.isEnabled();
           const stEl = document.getElementById('sm-sound-theme');
           if (stEl && SoundFX.getTheme) stEl.value = SoundFX.getTheme();
           const svEl = document.getElementById('sm-sound-volume');
@@ -5336,21 +5493,68 @@
         }
       } catch (e) { console.warn('[Settings] load error:', e); }
       const active = overlay.querySelector('.smodal-section.active');
-      if (!active) settingsNavTo('appearance', overlay.querySelector('.smodal-nav-item[data-section="appearance"]'));
+      settingsNavTo(active ? active.id.replace('smsc-', '') : 'appearance');
+      overlay.querySelectorAll('.smodal-field').forEach(function (field) {
+        const label = field.querySelector('.smodal-label');
+        const input = field.querySelector('input, select, textarea');
+        if (label && input && input.id && !label.htmlFor) label.htmlFor = input.id;
+      });
+      document.dispatchEvent(new Event('settingsOpened'));
     }
 
     function closeSettingsModal() {
       const overlay = el('settings-overlay');
       if (!overlay) return;
       if (!overlay.classList.contains('open')) return;
+      if (window.RudraMotionUI && !overlay.__rudraFinalizing) {
+        if (overlay.__rudraClosing) return;
+        overlay.__rudraClosing = true;
+        const ticket = ++overlay.__rudraGeneration;
+        overlay.__rudraMotion?.cancel();
+        overlay.__rudraMotion = window.RudraMotionUI.surface(overlay.querySelector('.settings-modal'), false, .52);
+        const finishMotion = () => {
+          if (ticket !== overlay.__rudraGeneration) return;
+          overlay.__rudraFinalizing = true;
+          closeSettingsModal();
+          overlay.__rudraFinalizing = false;
+          overlay.__rudraClosing = false;
+        };
+        if (overlay.__rudraMotion) overlay.__rudraMotion.finished.then(finishMotion, finishMotion);
+        else finishMotion();
+        return;
+      }
+      document.dispatchEvent(new Event('settingsClosed'));
       overlay.classList.add('closing');
       overlay.classList.remove('open');
-      setTimeout(function () { overlay.classList.remove('closing'); }, 180);
+      overlay.setAttribute('aria-hidden', 'true');
+      overlay.setAttribute('inert', '');
+      if (settingsReturnFocus && settingsReturnFocus.isConnected) settingsReturnFocus.focus({ preventScroll: true });
+      const finish = function (event) {
+        if (event && (event.target !== overlay || event.propertyName !== 'opacity')) return;
+        clearTimeout(settingsCloseTimer);
+        overlay.removeEventListener('transitionend', finish);
+        settingsExitCleanup = null;
+        if (!overlay.classList.contains('open')) overlay.classList.remove('closing');
+      };
+      settingsExitCleanup = function () {
+        overlay.removeEventListener('transitionend', finish);
+        settingsExitCleanup = null;
+      };
+      overlay.addEventListener('transitionend', finish);
+      // Fallback for backgrounds where transitionend can be suspended.
+      const motion = getComputedStyle(overlay);
+      const durations = motion.transitionDuration.split(',').map(v => parseFloat(v) * (v.includes('ms') ? 1 : 1000));
+      const delays = motion.transitionDelay.split(',').map(v => parseFloat(v) * (v.includes('ms') ? 1 : 1000));
+      const exitMs = Math.max(...durations.map((v, i) => v + (delays[i % delays.length] || 0)));
+      settingsCloseTimer = setTimeout(finish, exitMs + 80);
     }
 
     function settingsNavTo(section, btn) {
       const overlay = el('settings-overlay');
       if (!overlay) return;
+      const current = overlay.querySelector('.smodal-section.active');
+      const content = overlay.querySelector('.smodal-content');
+      if (content && current?.id !== 'smsc-' + section) content.scrollTo({ top: 0, behavior: 'instant' });
       overlay.querySelectorAll('.smodal-section').forEach(function (s) {
         s.classList.toggle('active', s.id === 'smsc-' + section);
       });
@@ -5358,6 +5562,9 @@
         b.classList.toggle('active', b.dataset.section === section);
       });
       if (btn) btn.classList.add('active');
+      overlay.querySelectorAll('.smodal-nav-item[data-section]').forEach(function (item) {
+        item.setAttribute('aria-current', item.dataset.section === section ? 'page' : 'false');
+      });
 
       const miniTitle = document.getElementById('smodal-mini-title');
       if (miniTitle) {
@@ -5379,18 +5586,29 @@
       if (!modal || !nav) return;
       modal.classList.remove('minimized', 'maximized');
       const on = !modal.classList.contains('nav-collapsed');
+      nav.toggleAttribute('inert', on);
+      modal.querySelector('.smodal-dot-minimize').setAttribute('aria-expanded', String(!on));
+      if (matchMedia('(max-width: 640px)').matches) {
+        clearTimeout(modal._navT);
+        ['width', 'max-width', 'min-width', 'transition'].forEach(k => modal.style.removeProperty(k));
+        ['margin-left', 'opacity', 'pointer-events', 'transition'].forEach(k => nav.style.removeProperty(k));
+        delete modal._navExpandedW;
+        modal.classList.toggle('nav-collapsed', on);
+        return;
+      }
       const W = modal.getBoundingClientRect().width;
       const navW = on ? nav.getBoundingClientRect().width : (modal._navW || 220);
       if (on) modal._navW = navW;
+      if (!modal._navExpandedW) modal._navExpandedW = on ? W : W + navW;
       const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      const ms = reduce ? 1 : 560, ease = 'cubic-bezier(.32,.72,0,1)';
+      const ms = reduce ? 1 : 680, ease = 'cubic-bezier(.4,0,.2,1)';
       const set = (n, k, v) => n.style.setProperty(k, v, 'important');
-      set(modal, 'transition', `width ${ms}ms ${ease}, max-width ${ms}ms ${ease}, min-width ${ms}ms ${ease}`);
+      set(modal, 'transition', `width ${ms}ms ${ease}, max-width ${ms}ms ${ease}, min-width ${ms}ms ${ease}, translate ${reduce ? 1 : 520}ms ${ease}, opacity ${reduce ? 1 : 520}ms ${ease}`);
       set(nav, 'transition', `margin-left ${ms}ms ${ease}, opacity ${on ? 200 : 360}ms ease ${on ? 0 : 180}ms`);
       set(modal, 'width', W + 'px'); set(modal, 'max-width', 'none'); set(modal, 'min-width', '0px');
       void modal.offsetWidth;                       // start from where it is
       modal.classList.toggle('nav-collapsed', on);
-      set(modal, 'width', Math.round(on ? W - navW : W + navW) + 'px');
+      set(modal, 'width', Math.round(on ? modal._navExpandedW - navW : modal._navExpandedW) + 'px');
       set(nav, 'margin-left', on ? (-navW) + 'px' : '0px');
       set(nav, 'opacity', on ? '0' : '1');
       set(nav, 'pointer-events', on ? 'none' : 'auto');
@@ -5399,6 +5617,7 @@
         if (on) return;                              // collapsed keeps its width
         ['width', 'max-width', 'min-width', 'transition'].forEach((k) => modal.style.removeProperty(k));
         ['margin-left', 'opacity', 'pointer-events', 'transition'].forEach((k) => nav.style.removeProperty(k));
+        delete modal._navExpandedW;
       }, ms + 60);
     }
 
@@ -5408,6 +5627,9 @@
       if (modal.classList.contains('nav-collapsed')) {        // back to the normal layout first
         const nav = modal.querySelector('.smodal-nav');
         modal.classList.remove('nav-collapsed'); clearTimeout(modal._navT);
+        delete modal._navExpandedW;
+        if (nav) nav.removeAttribute('inert');
+        modal.querySelector('.smodal-dot-minimize').setAttribute('aria-expanded', 'true');
         ['width', 'max-width', 'min-width', 'transition'].forEach((k) => modal.style.removeProperty(k));
         if (nav) ['margin-left', 'opacity', 'pointer-events', 'transition'].forEach((k) => nav.style.removeProperty(k));
       }
@@ -5415,16 +5637,33 @@
       modal.classList.remove('minimized');
     }
 
-    // Escape closes the panel
+    // Keep focus inside the visible dialog and return it on close.
     document.addEventListener('keydown', function (e) {
+      const overlay = el('settings-overlay');
+      if (!overlay || !overlay.classList.contains('open') || e.target.closest?.('.rudra-select-menu')) return;
       if (e.key === 'Escape') {
-        const overlay = el('settings-overlay');
-        if (overlay && overlay.classList.contains('open')) closeSettingsModal();
+        if (overlay.querySelector('select:open') || e.target.tagName === 'OPTION') {
+          e.stopImmediatePropagation(); return; // Let the native picker dismiss before other Escape handlers.
+        }
+        closeSettingsModal(); e.preventDefault(); return;
       }
-    });
+      if (e.key !== 'Tab') return;
+      const controls = Array.from(overlay.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'))
+        .filter(node => !node.disabled && !node.closest('[inert]') && node.getClientRects().length && getComputedStyle(node).visibility !== 'hidden');
+      const first = controls[0], last = controls[controls.length - 1];
+      if (!first) return;
+      if (e.shiftKey && (document.activeElement === first || !overlay.contains(document.activeElement))) {
+        last.focus(); e.preventDefault();
+      } else if (!e.shiftKey && (document.activeElement === last || !overlay.contains(document.activeElement))) {
+        first.focus(); e.preventDefault();
+      }
+    }, true);
 
     // Deep-link: opening the app on #settings shows the panel (only if logged in)
-    function handleSettingsDeepLink() {
+    async function handleSettingsDeepLink() {
+      if ((window.location.hash || '').toLowerCase() !== '#settings') return;
+      try { await window.SupabaseAuth?.init(); } catch (_) { /* The existing sign-in gate handles failure. */ }
+      if ((window.location.hash || '').toLowerCase() !== '#settings') return;
       const isLoggedIn = settingsAllowed();
       if (!isLoggedIn) {
         const overlay = el('settings-overlay');
@@ -5448,12 +5687,6 @@
     } else {
       handleSettingsDeepLink();
     }
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', handleSettingsDeepLink);
-    } else {
-      handleSettingsDeepLink();
-    }
-
     // Expose globals used by inline handlers + app.js
     window.openSettingsModal = openSettingsModal;
     window.closeSettingsModal = closeSettingsModal;
@@ -5465,18 +5698,18 @@
 
 
 
-  <script src="design-overhaul.js?v=3.0" defer></script>
-  <script src="premium-effects.js?v=1.0" defer></script>
-  <script src="apple-polish.js?v=1.1" defer></script>
-  <script src="luxury-ui.js?v=1.0" defer></script>
-  <script src="provisioning.js?v=1.0" defer></script>
+  <script src="design-overhaul.js?v=3.1" defer></script>
+  <script src="premium-effects.js?v=1.0&perf=1006" defer></script>
+
+  <script src="luxury-ui.js?v=1.3&r=1006perf&perf-final=1006c" defer></script>
+  <script src="provisioning.js?v=1.0&guide-defaults=1005final" defer></script>
   <script src="app-settings.js?v=1.2" defer></script>
   <script src="dev-mode.js?v=1.0" defer></script>
-  <script src="nexus-experience.js?v=1.1" defer></script>
-  <script src="luxury-sound.js?v=2.1" defer></script>
-  <script src="lead-suggestions.js?v=1.2" defer></script>
-  <script src="page-dashboard.js?v=1.2" defer></script>
-  <script src="smooth-scroll.js?v=1.1" defer></script>
+  <script src="nexus-experience.js?v=1.2&perf=1006" defer></script>
+  <script src="luxury-sound.js?v=2.2&r=1006ambient" defer></script>
+  <script src="lead-suggestions.js?v=1.3&perf=1006" defer></script>
+  <script src="page-dashboard.js?v=1.2&r=0929polish" defer></script>
+  <script src="smooth-scroll.js?v=1.1&perf=1006" defer></script>
 
   <!-- Dashboard auto-init when view shown -->
   <script>
@@ -5522,57 +5755,124 @@
       });
     })();
   </script>
-  <!-- Clavis Studio minimal pass — loaded last so it wins the cascade -->
+  <!-- Rudra24 AI Studio minimal pass — loaded last so it wins the cascade -->
   <link rel="stylesheet" href="clavis-refine.css?v=2.0">
-  <link rel="stylesheet" href="clavis-task-surface.css?v=2.1&r=0926">
+  <link rel="stylesheet" href="clavis-task-surface.css?v=2.2&r=1002drag">
   <link rel="stylesheet" href="clavis-viewport.css?v=3.0">
-  <link rel="stylesheet" href="clavis-sidebar.css?v=1.0">
+  <link rel="stylesheet" href="clavis-sidebar.css?v=1.1">
+  <link rel="stylesheet" href="rudra-rail.css?v=1.0&rail=1007">
   <link rel="stylesheet" href="clavis-aurora.css?v=10.0">
   <link rel="stylesheet" href="clavis-chat.css?v=2.2">
-  <script src="clavis-task-model.js?v=2.0" defer></script>
-  <script src="clavis-task-controller.js?v=2.2&r=0926" defer></script>
-  <script src="clavis-task-surface.js?v=2.7&r=0926c" defer></script>
-  <script src="clavis-aurora.js?v=8.2&r=0926b" defer></script>
+  <script src="clavis-task-model.js?v=2.0&build=1004complete" defer></script>
+  <script src="clavis-task-controller.js?guide=1005&v=2.6&r=1004live&guide-defaults=1005final&finish=1006e" defer></script>
+  <script src="clavis-task-surface.js?v=3.3&r=1004live&perf=1006" defer></script>
+  <script src="clavis-aurora.js?build=1004complete&v=2.0&r=1004motion&perf=1006" defer></script>
   <script src="clavis-chat.js?v=2.2" defer></script>
-  <!-- CLAVIS LUXE: theme reveal, rail motion, icons, dark mode, floating-window deep dive + image
+  <!-- RUDRA24 AI LUXE: theme reveal, rail motion, icons, dark mode, floating-window deep dive + image
        lightbox. Additive only — delete these two lines to return to the previous look. -->
-  <link rel="stylesheet" href="clavis-luxe.css?v=2.3">
-  <!-- CLAVIS IQ: ghost completion, smart follow-ups, and the slow
+  <link rel="stylesheet" href="clavis-luxe.css?v=2.5&r=1004nav">
+  <!-- RUDRA24 AI IQ: ghost completion, smart follow-ups, and the slow
        blur-to-clear motion of the Peek Task window. Loaded last so it
        wins the cascade; delete these four lines to revert. -->
   <link rel="stylesheet" href="clavis-motion.css?v=1.1">
   <link rel="stylesheet" href="clavis-window-refine.css?v=1.1">
   <link rel="stylesheet" href="clavis-composer-iq.css?v=1.2">
   <script src="clavis-pencil.js?v=1.1" defer></script>
-  <script src="clavis-luxe.js?v=2.5&r=0926" defer></script>
+  <script src="clavis-luxe.js?v=2.8&r=0930images&scopefix=1003f&perf=1006" defer></script>
   <script src="clavis-intelligence.js?v=1.2" defer></script>
-  <script src="clavis-composer-iq.js?v=1.2" defer></script>
+  <script src="clavis-composer-iq.js?v=1.3&perf=1006" defer></script>
   <script src="clavis-peek-iq.js?v=1.2" defer></script>
-  <!-- CLAVIS EAR / INTENT / AUTOMATION (2026-09-24): hears only sir (self-echo
+  <!-- RUDRA24 AI EAR / INTENT / AUTOMATION (2026-09-24): hears only sir (self-echo
        guard, voice ID, smarter barge-in), a Siri-style live caption instead of
        typing speech into the composer, a fast local intent layer (close map /
        close everything / short commands) and PC + website automation.
        clavis-olive.css: rich olive-green buttons. Loaded last to win the cascade. -->
-  <link rel="stylesheet" href="clavis-ear.css?v=1.4&r=0926">
+  <link rel="stylesheet" href="clavis-ear.css?v=1.8&r=1004conveyor">
   <link rel="stylesheet" href="clavis-olive.css?v=1.1">
   <link rel="stylesheet" href="clavis-silk.css?v=1.2">
-  <script src="clavis-ear.js?v=1.4&r=0926" defer></script>
-  <script src="clavis-intent.js?v=1.6&r=0926b" defer></script>
-  <script src="clavis-automation.js?v=1.1&r=0926" defer></script>
-  <script src="clavis-business.js?v=1.1" defer></script>
-  <!-- CLAVIS SETUP + FINAL POLISH (2026-09-24): guided key setup popup (few clicks,
+  <script src="clavis-ear.js?v=2.1&r=1004conveyor&voice-fix=1005i" defer></script>
+  <script src="clavis-intent.js?v=1.7&r=1002map" defer></script>
+  <script src="clavis-automation.js?v=1.2&r=1002voice" defer></script>
+  <script src="clavis-business.js?v=1.2&r=0929buyers" defer></script>
+  <!-- RUDRA24 AI SETUP + FINAL POLISH (2026-09-24): guided key setup popup (few clicks,
        links to free keys, auto-check), and the last-word visual polish layer. -->
-  <link rel="stylesheet" href="clavis-setup.css?v=1.1">
+  <link rel="stylesheet" href="clavis-setup.css?v=2.1&r=1002lead">
   <link rel="stylesheet" href="clavis-final.css?v=1.0">
-  <script src="clavis-setup.js?v=1.1&r=0926" defer></script>
-  <!-- CLAVIS × CLAUDE LOOK (2026-09-24): ivory ground, serif headlines, soft white
+  <script src="clavis-setup.js?island=1006&v=2.3&r=1002lead" defer></script>
+  <!-- RUDRA24 AI × CLAUDE LOOK (2026-09-24): ivory ground, serif headlines, soft white
        cards, rounded dialogs with one long soft shadow, butter-smooth expo-out
        motion, and Claude-style hover cards on the sidebar. Loaded last so it
        wins; delete these two lines to return to the previous look. -->
-  <link rel="stylesheet" href="clavis-claude.css?v=1.0">
-  <link rel="stylesheet" href="clavis-manual.css?v=1.5">
-  <script src="clavis-claude.js?v=1.1" defer></script>
+  <link rel="stylesheet" href="clavis-claude.css?v=1.1&r=1004icons">
+  <link rel="stylesheet" href="clavis-manual.css?v=2.7&r=1004motion&lead-quality=1005j">
+  <script src="clavis-claude.js?v=1.2&r=0929voice&perf=1006" defer></script>
   <!-- One icon family everywhere: Feather (bundled). Delete to restore the old icons. -->
-  <script src="clavis-icons.js?v=1.0" defer></script>
+  <script src="clavis-icons.js?v=1.0&island=1006" defer></script>
+
+  <!-- Sarvam voice calling agent: engine + page + look -->
+  <link rel="stylesheet" href="sarvam-calling.css?v=4">
+  <script src="sarvam-calling.js?v=2" defer></script>
+  <script src="sarvam-calling-ui.js?v=3" defer></script>
+  <link rel="stylesheet" href="developer-insights.css?v=1.0">
+  <link rel="stylesheet" href="clavis-voice-refine.css?v=1.2&r=0929voice">
+  <script src="developer-insights.js?v=1.0" defer></script>
+
+  <!-- RUDRA24 AI ENTERPRISE PASS (2026-09-30) — loaded absolutely last.
+       clavis-enterprise.css : the Rudra24 AI toolbar can't be crowded or written
+         over any more, the live caption is Rudra24 AI-page-only, and one slow
+         expo-out curve runs every transition in the app.
+       clavis-ahead.js       : the "one step ahead" layer — after every
+         outcome Rudra24 AI already has the obvious next action ready, and a bare
+         "haan" runs it without a model call.
+       Delete these two lines to return to the previous behaviour. -->
+  <link rel="stylesheet" href="clavis-enterprise.css?v=1.7&r=1002jank">
+  <script src="clavis-ahead.js?v=2.0&r=1006island" defer></script>
+  <link rel="stylesheet" href="rudra-brand.css?v=2">
+  <link rel="stylesheet" href="connectors.css?v=1">
+  <script src="rudra-locales.js?v=1" defer></script>
+  <script src="rudra-i18n.js?v=14&r=1006perf" defer></script>
+  <script src="connectors.js?v=2" defer></script>
+
+  <!-- OPERATOR CONSOLE (2026-10-01) — Ctrl/Cmd + Shift + O.
+       The guard is the server: /api/v1/limits/admin/* answers 404 unless the
+       signed-in e-mail is in CLAVIS_ADMIN_EMAILS. Hiding this script would
+       protect nothing, so it does not pretend to. -->
+  <link rel="stylesheet" href="clavis-operator.css?v=1.0">
+  <script src="clavis-operator.js?v=1.0" defer></script>
+
+  <!-- The sign-in screen, in the same quiet Claude language as boot.html and
+       the rest of the app. Loaded last so it settles the cascade over
+       auth-antigravity.css without that file being rewritten. -->
+  <link rel="stylesheet" href="rudra-auth-claude.css?v=1.1">
+  <!-- Floating-window motion + calm pass (2026-10-02). Loaded last on purpose:
+       every .cts-* layer above it is one it is meant to settle. -->
+  <link rel="stylesheet" href="clavis-task-polish.css?v=1.2&r=1002table&scopefix=1003f">
+  <link rel="stylesheet" href="outreach-pages.css?v=2">
+
+  <!-- THE LAST LAYER: type weights, one scrollbar, the motion ladder, real
+       shadows, the topbar globe and the map's floating chips. Loaded after
+       every other sheet on purpose — delete these two lines to go back. -->
+  <link rel="stylesheet" href="clavis-refined.css?v=1.0">
+
+  <!-- THE SKIN: cream page, Instrument Serif display, Claude-style
+       restraint. Last sheet in, so it owns the --cc-* tokens. -->
+  <link rel="stylesheet" href="clavis-cream.css?v=1.0">
+  <link rel="stylesheet" href="rudra-readability.css?v=1.4">
+  <link rel="stylesheet" href="rudra-flow.css?v=1.3&r=1006finish2">
+  <link rel="stylesheet" href="crm.css?v=1.0&r=1004crm2">
+  <link rel="stylesheet" href="crm-business.css?v=1.0&r=1005business">
+  <link rel="stylesheet" href="crm-insights.css?v=1.0&r=1006">
+  <link rel="stylesheet" href="rudra-motion-ui.css?v=1.0&r=1006f">
+  <script src="rudra-motion-ui.js?v=1.1&rail=1007" defer></script>
+  <link rel="stylesheet" href="quiet-entry.css?v=1004composer">
+  <link rel="stylesheet" href="composer-refine.css?v=1004refine">
+  <link rel="stylesheet" href="chat-claude.css?v=1004chat">
+  <link rel="stylesheet" href="app-guide.css?v=1005guide2&guide-defaults=1005logo">
+  <link rel="stylesheet" href="perf-fix.css?v=1.0">
+  <script defer src="chat-flow.js?v=1004flow"></script>
+  <script src="sidebar-hover-scroll.js?v=1.1&rail=1007" defer></script>
+  <script src="clavis-globe.js?v=1.0&island=1006" defer></script>
+  <script src="clavis-metro.js?v=1.0" defer></script>
+  <script src="clavis-voice-button.js?v=1.0&voice-fix=1005i" defer></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 /* ============================================================
  * clavis-keyvault-ui.js  ·  The two-click key experience
  * ------------------------------------------------------------
- * One panel, one job: know whether Clavis can think right now, and
+ * One panel, one job: know whether Rudra24 AI can think right now, and
  * fix it in two clicks if it cannot.
  *
  *   Open console  →  paste  →  verified & live.
@@ -59,7 +59,7 @@
       '<header class="kv-head">' +
       '  <div class="kv-head-text">' +
       '    <h2 class="kv-title">Keys</h2>' +
-      '    <p class="kv-sub">Stored encrypted on this device. Clavis falls through them in order.</p>' +
+      '    <p class="kv-sub">Stored encrypted on this device. Rudra24 AI falls through them in order.</p>' +
       '  </div>' +
       '  <button type="button" class="kv-close" aria-label="Close">' + icon('x') + '</button>' +
       '</header>' +
@@ -111,7 +111,7 @@
       '    <div class="kv-paste">' +
       '      <input type="password" class="kv-input" spellcheck="false" autocomplete="off"' +
       '             placeholder="Paste key here" aria-label="Paste ' + esc(p.label) + ' key">' +
-      '      <button type="button" class="kv-save" data-save="' + esc(id) + '">Save</button>' +
+      '      <button type="button" class="kv-save" data-save="' + esc(id) + '">Check & Save</button>' +
       '    </div>' +
       '    <p class="kv-msg" role="status"></p>' +
       '  </div>' +
@@ -127,13 +127,42 @@
     if (!snap) return;
 
     var list = panel.querySelector('.kv-list');
+
+    // Save current input state before innerHTML wipes it
+    var activeId = null;
+    var activeVal = '';
+    var wasFocused = false;
+    if (list) {
+      var activeInput = list.querySelector('.kv-add.is-open .kv-input');
+      if (activeInput) {
+        activeId = activeInput.closest('.kv-row').dataset.provider;
+        activeVal = activeInput.value;
+        wasFocused = (doc.activeElement === activeInput);
+      }
+    }
+
     var order = snap.chain.filter(function (p) { return snap.providers[p]; });
     list.innerHTML = order.map(function (id, i) { return row(id, snap.providers[id], i); }).join('');
+
+    // Restore input state
+    if (activeId && list) {
+      var newRow = list.querySelector('.kv-row[data-provider="' + activeId + '"]');
+      if (newRow) {
+        var box = newRow.querySelector('.kv-add');
+        box.classList.add('is-open');
+        var inp = box.querySelector('.kv-input');
+        if (inp) {
+          inp.value = activeVal;
+          if (wasFocused) inp.focus();
+        }
+      }
+    }
 
     var note = panel.querySelector('.kv-foot-note');
     if (!snap.anyKey) note.textContent = 'No key yet. Groq takes about a minute and is free.';
     else if (snap.allSpent) note.textContent = 'Every key is out of quota. Add one above, or wait for the daily reset.';
-    else note.textContent = 'Clavis tries these top to bottom. If one runs dry it moves to the next on its own.';
+    else if (snap.providers.fish_audio) note.textContent = 'Fish Audio keys power speech only. Text AI providers rotate independently for assistant replies.';
+    else note.textContent = 'Rudra24 AI tries these top to bottom. If one runs dry it moves to the next on its own.';
 
     wire(list);
   }
@@ -182,16 +211,19 @@
     Vault().add(provider, key).then(function (res) {
       input.value = '';
       msg.dataset.tone = 'ok';
-      msg.textContent = res.warn
+      var text = res.warn
         ? 'Saved as ' + res.mask + '. Could not reach the provider to confirm, but it should work.'
         : 'Saved as ' + res.mask + ' and verified.' + (res.synced ? ' Synced to your account.' : '');
+      msg.textContent = text;
+      if (window.showToast) window.showToast(text, 'success');
       dismissRefuel();
     }).catch(function (err) {
       msg.dataset.tone = 'bad';
       msg.textContent = err.message || 'That key did not work.';
+      if (window.showToast) window.showToast(err.message || 'That key did not work.', 'error');
     }).then(function () {
       btn.disabled = false;
-      btn.textContent = 'Save';
+      btn.textContent = 'Check & Save';
     });
   }
 
@@ -214,6 +246,7 @@
     if (!panel) return;
     backdrop.classList.remove('is-open');
     panel.classList.remove('is-open');
+    panel.querySelectorAll('.kv-input').forEach(function (input) { input.value = ''; input.type = 'password'; });
     try { lastFocus && lastFocus.focus(); } catch (_) {}
   }
 
@@ -229,7 +262,7 @@
       '<div class="kv-refuel-body">' +
       '  <span class="kv-refuel-title">' + esc(detail.label) + ' is out of quota</span>' +
       '  <span class="kv-refuel-sub">' +
-      (detail.anyLive ? 'Clavis switched to your next key and carried on.' : 'Add a key to keep going — it takes about a minute.') +
+      (detail.anyLive ? 'Rudra24 AI switched to your next key and carried on.' : 'Add a key to keep going — it takes about a minute.') +
       '  </span>' +
       '</div>' +
       '<div class="kv-refuel-acts">' +

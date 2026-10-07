@@ -39,9 +39,9 @@
   /* One motion vocabulary for the whole rail. */
   --csb-spring:    cubic-bezier(0.16, 1, 0.3, 1);   /* settles, no overshoot */
   --csb-out:       cubic-bezier(0.2, 0, 0, 1);
-  --csb-rail:      450ms;   /* fluid Apple-grade width spring */
-  --csb-label-out: 100ms;   /* labels leave first */
-  --csb-label-in:  220ms;
+  --csb-rail:      240ms;   /* snappy: was 450ms, felt laggy */
+  --csb-label-out: 80ms;    /* labels leave first */
+  --csb-label-in:  160ms;
   --csb-tap:       120ms;
 }
 html[data-theme="dark"] {
@@ -344,13 +344,10 @@ html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .chevron-arrow {
   opacity: 1;
   transform: translateX(0);
   transition:
-    opacity var(--csb-label-in) var(--csb-out) 100ms,
-    transform var(--csb-label-in) var(--csb-spring) 100ms !important;
+    opacity var(--csb-label-in) var(--csb-out) 40ms,
+    transform var(--csb-label-in) var(--csb-spring) 40ms !important;
 }
-/* a light stagger so the list "unrolls" instead of blinking on */
-html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > *:nth-child(-n+4)  { transition-delay: 110ms !important; }
-html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > *:nth-child(n+5)   { transition-delay: 140ms !important; }
-html:not(#_) body:not(#_) #sidebar:not(#__):not(#___) .sidebar-nav > *:nth-child(n+10)  { transition-delay: 170ms !important; }
+/* stagger removed: 110-170ms delays made sidebar expand feel laggy */
 
 html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-item > span,
 html:not(#_) body:not(#_) #sidebar.collapsed:not(.au-peek):not(#__):not(#___) .nav-sub-item > span,

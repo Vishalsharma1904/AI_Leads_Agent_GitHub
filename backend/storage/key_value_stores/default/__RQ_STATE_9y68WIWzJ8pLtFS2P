@@ -1,0 +1,31 @@
+{
+  "sequence_counter": 21,
+  "forefront_sequence_counter": 0,
+  "forefront_requests": {},
+  "regular_requests": {
+    "http://metafrone.com": 5,
+    "http://www.actcomputers.in": 6,
+    "https://appicia.com": 7,
+    "https://ezulix.com": 8,
+    "https://www.q3tech.com": 9,
+    "https://healic.in": 10,
+    "https://www.akoode.com/contact-us": 11,
+    "https://www.akoode.com/about-us": 12,
+    "https://www.daffodilsw.com/banking/loan-servicing-management-solutions": 13,
+    "https://www.daffodilsw.com/custom-inventory-management-software": 14,
+    "https://www.syansoft.com/contact-us": 15,
+    "https://www.syansoft.com/about": 16,
+    "https://www.orangemantra.com/smart-automated-application/smart-warehouse-solutions": 17,
+    "https://www.orangemantra.com/industries/manufacturing/supply-chain-management": 18,
+    "https://pioneeresolutions.com/contact.html": 19,
+    "https://pioneeresolutions.com/about.html": 20
+  },
+  "in_progress_requests": [],
+  "handled_requests": [
+    "https://www.akoode.com",
+    "https://www.daffodilsw.com",
+    "https://pioneeresolutions.com",
+    "https://www.syansoft.com",
+    "https://www.orangemantra.com"
+  ]
+}

@@ -1,5 +1,5 @@
 /* ============================================================
-   clavis-aurora.css — Clavis AI Studio, editorial pass
+   clavis-aurora.css — Rudra24 AI Studio, editorial pass
    ------------------------------------------------------------
    Loaded LAST, after clavis-sidebar.css. Three jobs:
 
@@ -906,7 +906,7 @@ html body .cts-note { font-family: var(--au-read) !important; font-size: var(--a
 html body .cts-stats dd { font-family: var(--au-sans) !important; font-weight: 550 !important; }
 
 /* ── 3e. Intent-specific furniture ──────────────────────────── */
-/* Chips: the filters Clavis actually understood from the ask.
+/* Chips: the filters Rudra24 AI actually understood from the ask.
    They are the fastest way to show "I got what you meant". */
 html body .cts-chips {
   display: flex; flex-wrap: wrap; gap: 5px;
@@ -2397,7 +2397,7 @@ html body .cts-head img, html body .cts-head svg { pointer-events: none; }
 /* ============================================================
    8. ONE COMPOSER
    ------------------------------------------------------------
-   Clavis AI, Client AI and Candidate AI each shipped their own
+   Rudra24 AI, Client AI and Candidate AI each shipped their own
    composer, in two different stylesheets, with different radii,
    padding, button sizes and easing. They are one component. It
    is written once, here, and the three pages are three entries

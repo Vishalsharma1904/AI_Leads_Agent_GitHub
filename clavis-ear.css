@@ -1,43 +1,48 @@
 /* ============================================================
  * clavis-ear.css · the live caption + Voice ID sheet
  * ------------------------------------------------------------
- * What sir says appears under the top-right buttons as OPEN text:
- * no pill, no bubble, no card. Each new word arrives with a soft
- * blur-to-clear rise; older words fade out through a top mask so a
- * long sentence takes three lines at most. Interim words sit a touch
- * softer and "settle" to full ink when the sentence is final.
+ * What sir says sits in the top-right corner as OPEN text: no
+ * pill, no bubble, no card, right-aligned to the page gutter.
+ * The newest word TYPES itself in at the right edge one soft
+ * character at a time; the words before it glide left (FLIP, set
+ * in clavis-ear.js) so the whole sentence is visible while he
+ * talks. Two lines, never three — older words leave through a
+ * top fade. The word being spoken right now carries the ink;
+ * spoken ones sit a touch softer, and "settle" when it is final.
  * ============================================================ */
 
 #clavis-ear-caption {
   --ce-ink: #1f2a17;
-  --ce-glow: 0 0 14px rgba(255, 253, 244, 0.95), 0 0 2px rgba(255, 253, 244, 0.9);
+  --ce-glow: none;
   --ce-dot: var(--olive-600, #5a6b2f);
   --ce-fresh: var(--olive-600, #4a6b35);
   --ce-veil: rgba(250, 248, 241, 0.82);
+  --ce-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --ce-shift: 580ms;
   position: fixed;
   top: 96px;
   right: 16px;
   z-index: 2147482000;
   display: flex;
-  flex-direction: row-reverse;
-  align-items: flex-start;
+  flex-direction: row-reverse;   /* the listening dot rides the right edge */
+  align-items: flex-end;         /* …level with the line he is on */
+  justify-content: flex-start;
   gap: 9px;
-  max-width: min(460px, calc(100vw - 32px));
+  width: min(400px, calc(100vw - 32px));
   pointer-events: none;
   opacity: 0;
-  transform: translateY(-6px);
-  filter: blur(6px);
+  transform: translateY(-2px);
+  filter: none;
   transition:
-    opacity 0.42s cubic-bezier(0.22, 0.9, 0.24, 1),
-    transform 0.42s cubic-bezier(0.22, 0.9, 0.24, 1),
-    filter 0.42s cubic-bezier(0.22, 0.9, 0.24, 1);
-  will-change: opacity, transform, filter;
+    opacity 320ms cubic-bezier(0.23, 1, 0.32, 1),
+    transform 320ms cubic-bezier(0.23, 1, 0.32, 1),
+    filter 320ms cubic-bezier(0.23, 1, 0.32, 1);
 }
 html[data-theme="dark"] #clavis-ear-caption {
   --ce-fresh: #c9dba0;
   --ce-veil: rgba(16, 18, 14, 0.72);
   --ce-ink: #f4efdf;
-  --ce-glow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.55);
+  --ce-glow: none;
   --ce-dot: var(--olive-400, #9aae5b);
 }
 @media (prefers-color-scheme: dark) {
@@ -45,7 +50,7 @@ html[data-theme="dark"] #clavis-ear-caption {
     --ce-fresh: #c9dba0;
     --ce-veil: rgba(16, 18, 14, 0.72);
     --ce-ink: #f4efdf;
-    --ce-glow: 0 1px 14px rgba(0, 0, 0, 0.6), 0 0 2px rgba(0, 0, 0, 0.55);
+    --ce-glow: none;
     --ce-dot: var(--olive-400, #9aae5b);
   }
 }
@@ -54,79 +59,81 @@ html[data-theme="dark"] #clavis-ear-caption {
 
 /* A feathered frosted veil — no card edge, just enough calm behind the
    words that they stay readable over the page, the orb or a map. */
-#clavis-ear-caption::before {
-  content: "";
-  position: absolute;
-  inset: -16px -22px -16px -26px;
-  z-index: -1;
-  border-radius: 28px;
-  background: radial-gradient(closest-side, var(--ce-veil), transparent);
-  -webkit-backdrop-filter: blur(14px) saturate(1.2);
-          backdrop-filter: blur(14px) saturate(1.2);
-  -webkit-mask-image: radial-gradient(closest-side, #000 62%, transparent);
-          mask-image: radial-gradient(closest-side, #000 62%, transparent);
-  opacity: 0;
-  transition: opacity 0.5s cubic-bezier(0.22, 0.9, 0.24, 1);
-  pointer-events: none;
-}
-#clavis-ear-caption.is-in::before { opacity: 1; }
-#clavis-ear-caption.is-idle::before { opacity: 0; }
 #clavis-ear-caption.is-out {
   opacity: 0;
-  transform: translateY(-8px);
-  filter: blur(8px);
-  transition-duration: 0.52s;
+  transform: translateY(-10px);
+  filter: none;
+  transition-duration: 0.15s;
+  transition-timing-function: cubic-bezier(0.32, 0, 0.24, 1);
 }
 #clavis-ear-caption.is-dropped .ce-line { opacity: 0.35; transition: opacity 0.2s; }
 
-/* Newest line stays; overflow leaves through the top, softly. */
+/* Two lines, bottom-anchored: the line he is on stays at the bottom and
+   anything older slides out through the top fade. */
 #clavis-ear-caption .ce-clip {
+  position: relative;
   display: flex;
-  flex-direction: column-reverse;
-  max-height: calc(1.45em * 2 + 0.35em);
-  padding-top: 0.35em;
+  flex-direction: column;
+  align-items: flex-end;
+  justify-content: flex-end;
+  /* Shrink to the gutter rather than to the sentence: the line inside is
+     nowrap, so without min-width:0 this box grows to max-content and the words
+     spill past the caption's own right-hand edge instead of being clipped. */
+  flex: 1 1 auto;
+  min-width: 0;
+  max-height: 2.9em;
   overflow: hidden;
-  font: 500 16px/1.45 Inter, "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 500 15.5px/1.45 Inter, "SF Pro Text", system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "ss01", "cv11";
-  /* Only words scrolling out through the top fade — the two visible lines stay crisp. */
-  -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 0.35em);
-          mask-image: linear-gradient(to bottom, transparent 0, #000 0.35em);
+  /* Words leaving to the left dissolve instead of meeting a hard cut. The ramp
+     sits over empty gutter, which is why the caption's width above is definite. */
+  -webkit-mask-image: linear-gradient(to right, transparent 0, #000 72px);
+          mask-image: linear-gradient(to right, transparent 0, #000 72px);
 }
 #clavis-ear-caption .ce-line {
   margin: 0;
+  /* cxCharIn enters each character from 0.26em to the right of where it lands.
+     Flush against the clip edge that overshoot is outside overflow:hidden, and
+     the word being spoken was sliced down its last glyph for the whole reveal. */
+  padding-right: 0.34em;
   text-align: right;
   letter-spacing: -0.006em;
   color: var(--ce-ink);
   text-shadow: var(--ce-glow);
-  opacity: 0.8;
-  transition: opacity 0.32s ease;
-  text-wrap: pretty;
+  /* Last on purpose, and `text-wrap: pretty` is gone from this rule: that
+     shorthand also writes text-wrap-mode, so sitting below `nowrap` it quietly
+     turned wrapping back on and the conveyor wrapped to three lines — whose
+     top two then overflowed out of the clip, taking the opening words with them. */
+  white-space: nowrap;
 }
-#clavis-ear-caption.is-settled .ce-line { opacity: 1; }
-
+/* Words already said sit back a touch; the one being said right now is
+   the only one at full ink. */
 #clavis-ear-caption .ce-w {
   display: inline-block;
-  animation:
-    ceWordIn 0.62s cubic-bezier(0.22, 1, 0.36, 1) both,
-    ceFresh 1.3s ease-out both;
+  margin-left: 0.28em;
+  opacity: 0.66;
+  /* The glide is JS-driven (FLIP). It owns this transform, so nothing
+     else may animate it — no keyframes here. */
+  transition: transform var(--ce-shift) var(--ce-ease), opacity 340ms ease;
 }
-/* Each new word lands in olive and settles to ink — you can see which
-   words just arrived without anything flashing. */
-@keyframes ceFresh {
-  from { color: var(--ce-fresh); }
-  to   { color: var(--ce-ink); }
+#clavis-ear-caption .ce-w:first-child { margin-left: 0; }
+#clavis-ear-caption .ce-w.ce-now { opacity: 1; }
+#clavis-ear-caption .ce-c {
+  animation: ceType 200ms ease-out both;
 }
-@keyframes ceWordIn {
-  from { opacity: 0; filter: blur(8px); transform: translateY(7px) scale(0.98); letter-spacing: 0.02em; }
-  to   { opacity: 1; filter: blur(0);   transform: none; }
+/* The typewriter: one character at a time, soft, never a hard blink. */
+@keyframes ceType {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-/* A single breathing dot while Clavis listens — no container. */
+/* A single breathing dot while Rudra24 AI listens — no container. It sits on the
+   baseline of the line he is speaking. */
 #clavis-ear-caption .ce-dot {
   flex: none;
   width: 7px;
   height: 7px;
-  margin-top: 0.62em;
+  margin-bottom: 0.52em;
   border-radius: 50%;
   background: var(--ce-dot);
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent);
@@ -137,19 +144,22 @@ html[data-theme="dark"] #clavis-ear-caption {
 #clavis-ear-caption.is-listening .ce-dot {
   opacity: 1;
   transform: none;
-  animation: ceBreath 1.6s ease-in-out infinite;
+  animation: ceBreath 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
 }
 @keyframes ceBreath {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent); }
-  50%      { box-shadow: 0 0 0 6px color-mix(in srgb, var(--ce-dot) 0%, transparent); }
+  0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent); }
+  50%      { transform: scale(1.18); box-shadow: 0 0 0 6px color-mix(in srgb, var(--ce-dot) 0%, transparent); }
 }
 
 @media (max-width: 640px) {
-  #clavis-ear-caption { max-width: calc(100vw - 24px); }
+  #clavis-ear-caption { width: calc(100vw - 24px); }
   #clavis-ear-caption .ce-clip { font-size: 14.5px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  #clavis-ear-caption, #clavis-ear-caption .ce-w { transition: opacity 0.2s; animation: none; filter: none; transform: none; }
+  #clavis-ear-caption, #clavis-ear-caption .ce-w {
+    transition: opacity 0.2s; animation: none; filter: none; transform: none;
+  }
+  #clavis-ear-caption .ce-c { animation: none; opacity: 1; }
   #clavis-ear-caption.is-listening .ce-dot { animation: none; }
 }
 

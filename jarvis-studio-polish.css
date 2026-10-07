@@ -1,5 +1,5 @@
 /* ============================================================
- * CLAVIS AI STUDIO — targeted polish pass
+ * RUDRA24 AI AI STUDIO — targeted polish pass
  * Scope: #view-jarvis only. The orb (#orb-container / .clavis-liquid-orb /
  * #orbCanvas / .jarvis-hud-*) is deliberately untouched — everything else
  * (top bar, side panel, chat scroll, input, lists) gets scrollbar styling,
@@ -122,11 +122,11 @@ html[data-theme="dark"] #view-jarvis .jarvis-skills-list::-webkit-scrollbar-thum
 }
 
 /* ============================================================
- * CLAVIS CALM SURFACE — editorial interaction pass
+ * RUDRA24 AI CALM SURFACE — editorial interaction pass
  * The live app is vanilla HTML/CSS, so this keeps the existing DOM and
  * behavior while applying the same semantic, composable treatment we use
  * for a component system: one accent, quiet surfaces, clear focus, and
- * explicit responsive touch sizing. The liquid orb remains the Clavis cue.
+ * explicit responsive touch sizing. The liquid orb remains the Rudra24 AI cue.
  * ============================================================ */
 #view-jarvis.active {
   --clavis-ink: #20282d;
@@ -265,7 +265,7 @@ html[data-theme="dark"] #view-jarvis.active .jarvis-status-pill {
 }
 
 /* ============================================================
-   CLAVIS DYNAMIC STAGE & SPACE MANAGEMENT (EMPTY vs ACTIVE CHAT)
+   RUDRA24 AI DYNAMIC STAGE & SPACE MANAGEMENT (EMPTY vs ACTIVE CHAT)
    - Empty State: Full spacious hero, breathing orb with organic levitation,
      ambient glowing aura, clean typography and Claude prompt starters.
    - Active Chat State: Smooth macOS spring transition collapses hero into
@@ -506,7 +506,7 @@ html[data-theme="dark"] #clavis-feature-tip-pill:hover {
 }
 
 #view-jarvis.active.has-messages .jarvis-center-orb-wrapper::after {
-  content: 'Clavis Active · Realtime Neural Companion';
+  content: 'Rudra24 AI Active · Realtime Neural Companion';
   font-size: 11.5px;
   font-weight: 600;
   letter-spacing: 0.02em;
@@ -815,7 +815,7 @@ html[data-theme="dark"] #view-jarvis.active .chat-message.user .chat-bubble {
 
 
 /* ============================================================
-   CLAVIS RESPONSIVE & ANTI-BLUR SVG SYSTEM
+   RUDRA24 AI RESPONSIVE & ANTI-BLUR SVG SYSTEM
    - Fixes all button clickability, active states, and hover feedback
    - Crisp SVG rendering across Retina and standard displays
    - Mobile / Tablet / Desktop adaptive grid and off-canvas drawer

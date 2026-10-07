@@ -1,5 +1,5 @@
 /*
- * Clavis cognition guardrails.
+ * Rudra24 AI cognition guardrails.
  *
  * The fast path: a cheap dedupe gate on raw signals, so one physical event or
  * a double click never becomes multiple assistant turns. The full attention /

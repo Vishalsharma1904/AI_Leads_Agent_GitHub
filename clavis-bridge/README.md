@@ -1,15 +1,15 @@
-# Clavis PC Bridge
+# Rudra24 AI PC Bridge
 
-A tiny local helper that lets Clavis (a browser page) actually control your PC —
+A tiny local helper that lets Rudra24 AI (a browser page) actually control your PC —
 open apps, save to Notepad, and take real OS screenshots. A browser tab **cannot**
 do these on its own; this bridge is the missing piece.
 
 ## Start it
 
 Double-click **`Start-Bridge.bat`** (or run `node bridge.js`). Keep the window
-open — closing it revokes Clavis's PC access. Needs Node.js (already installed).
+open — closing it revokes Rudra24 AI's PC access. Needs Node.js (already installed).
 
-Once running, Clavis auto-detects it. Say:
+Once running, Rudra24 AI auto-detects it. Say:
 - "screenshot le lo" — captures the whole screen (all monitors)
 - "notepad me likho: kal 5 baje meeting" — saves + opens in Notepad
 - "youtube khol do" / "open spotify" — opens sites and apps
@@ -19,7 +19,7 @@ Once running, Clavis auto-detects it. Say:
 - "screen pe kya likha hai" — reads/extracts the screen (needs a vision AI key)
 - "is website ke baare me batao" — briefs you on the page in your browser tab
 
-With **`Start-Bridge-With-Control.bat`** (mouse/keyboard control on) Clavis can
+With **`Start-Bridge-With-Control.bat`** (mouse/keyboard control on) Rudra24 AI can
 also *type into* apps and run small tasks:
 - "notepad kholo aur likho kal 5 baje meeting" — opens a fresh note, types it
 - "word me likho …" / "open excel and type …" — focuses the window, then types
@@ -49,7 +49,7 @@ clipboard to paste, screenshot → pick-a-screen capture.
 | POST   | `/pc-control` | `{ action, … }`         | mouse / keyboard (**control mode only**) |
 | POST   | `/pc-window`  | `{ action, handle?/title? }` | list / focus / min / max / close windows (**control mode only**) |
 
-`/ping` reports `version` and `features` so Clavis knows which of these a
+`/ping` reports `version` and `features` so Rudra24 AI knows which of these a
 running bridge has; an older bridge keeps working through `/open`.
 
 ## Security

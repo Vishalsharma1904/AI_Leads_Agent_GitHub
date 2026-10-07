@@ -2,7 +2,7 @@
  * clavis-appearance.js · make the UI yours
  * ------------------------------------------------------------
  * Settings → Appearance gains what ChatGPT/Claude offer and a bit more:
- *   · themes     Clavis (untouched default), Claude-warm, Sage,
+ *   · themes     Rudra24 AI (untouched default), Claude-warm, Sage,
  *                Midnight, Graphite, Paper (minimal)
  *   · accent     swatches + a free colour picker (buttons, send, focus)
  *   · surfaces   sidebar/top bar, background sheet and text colours,
@@ -21,24 +21,53 @@
 
   const KEY = 'clavis_appearance_v1';
   const THEMES = {
-    clavis: { name: 'Clavis', light: {}, dark: {} },
+    flow: {
+      name: 'Flow green',
+      light: { shell: '#034F46', sheet: '#FFFFEB', ink: '#1C211D', accent: '#034F46' },
+      dark: { shell: '#034F46', sheet: '#17231F', ink: '#F7F8EE', accent: '#9AC9B7' },
+      font: 'flow',
+    },
+    /* The default look: warm ivory page, deep-forest accent, Instrument
+       Serif for display. Set HERE rather than in a stylesheet because this
+       module writes the --cc-* tokens with a 9-id selector and would have
+       overridden any sheet that tried. Anyone who has picked a theme in
+       Settings keeps theirs — only the untouched default changes. */
+    clavis: {
+      name: 'Rudra24 AI',
+      light: { shell: '#FEFDF5', sheet: '#FCFAE8', ink: '#1C1B12', accent: '#0E4D3C' },
+      dark:  { shell: '#1E1D15', sheet: '#17160F', ink: '#F5F2E3', accent: '#5FB593' },
+      font: 'editorial',
+    },
+    default: { name: 'Default', light: {}, dark: {} },
+    light: { name: 'Light', light: { shell: '#FFFFFF', sheet: '#F9FAFB', ink: '#111827', accent: '#3B82F6' }, dark: { shell: '#1F2937', sheet: '#111827', ink: '#F9FAFB', accent: '#60A5FA' } },
+    soft: { name: 'Soft', light: { shell: '#FDFBF7', sheet: '#F5F3ED', ink: '#3D3B38', accent: '#A1947C' }, dark: { shell: '#2B2A28', sheet: '#21201E', ink: '#E3E1DC', accent: '#C4B79D' } },
+    pastel: { name: 'Pastel', light: { shell: '#FDF8FA', sheet: '#F9F1F5', ink: '#4A3D44', accent: '#D6A1BD' }, dark: { shell: '#2D2529', sheet: '#221B1E', ink: '#EBDDE4', accent: '#E3A9C7' } },
+    warm: { name: 'Warm', light: { shell: '#FDF7F3', sheet: '#FAF3ED', ink: '#42332A', accent: '#D97757' }, dark: { shell: '#261C16', sheet: '#1C130D', ink: '#EADCD2', accent: '#E88B6C' } },
+    cool: { name: 'Cool', light: { shell: '#F3F7FD', sheet: '#EEF4FA', ink: '#2A3642', accent: '#578CD9' }, dark: { shell: '#121A26', sheet: '#0C111A', ink: '#C3D0E0', accent: '#6C9BE8' } },
+    minimal: { name: 'Minimal', light: { shell: '#FFFFFF', sheet: '#FFFFFF', ink: '#111111', accent: '#111111' }, dark: { shell: '#000000', sheet: '#050505', ink: '#EEEEEE', accent: '#EEEEEE' }, minimal: true },
+    dark: { name: 'Dark', light: { shell: '#212529', sheet: '#343A40', ink: '#F8F9FA', accent: '#495057' }, dark: { shell: '#111111', sheet: '#1A1A1A', ink: '#FFFFFF', accent: '#555555' } },
+    midnight: { name: 'Midnight', light: { shell: '#E9EDF5', sheet: '#FFFFFF', ink: '#141B2D', accent: '#2F4B8C' }, dark: { shell: '#0D121E', sheet: '#141A2A', ink: '#E8ECF5', accent: '#7D9BE0' } },
+    custom: { name: 'Custom', light: {}, dark: {} },
     claude: { name: 'Claude warm', light: { shell: '#F0EEE6', sheet: '#FAF9F5', ink: '#141413', accent: '#C96442' }, dark: { shell: '#1F1E1D', sheet: '#262624', ink: '#F5F4EE', accent: '#D97757' }, font: 'anthropic' },
     sage: { name: 'Sage', light: { shell: '#EEF1EA', sheet: '#FBFCF8', ink: '#1E2A1E', accent: '#2F5233' }, dark: { shell: '#131914', sheet: '#1A211B', ink: '#EEF2EA', accent: '#6C9D72' } },
-    midnight: { name: 'Midnight', light: { shell: '#E9EDF5', sheet: '#FFFFFF', ink: '#141B2D', accent: '#2F4B8C' }, dark: { shell: '#0D121E', sheet: '#141A2A', ink: '#E8ECF5', accent: '#7D9BE0' } },
     graphite: { name: 'Graphite', light: { shell: '#ECECEC', sheet: '#FFFFFF', ink: '#1A1A1A', accent: '#2B2B2B' }, dark: { shell: '#141414', sheet: '#1C1C1C', ink: '#EDEDED', accent: '#D6D6D6' } },
     paper: { name: 'Paper', light: { shell: '#FFFFFF', sheet: '#FFFFFF', ink: '#111111', accent: '#111111' }, dark: { shell: '#0B0B0B', sheet: '#0F0F0F', ink: '#F2F2F2', accent: '#F2F2F2' }, minimal: true },
   };
   const ACCENTS = [['Olive', '#2F5233'], ['Blue', '#2563EB'], ['Green', '#15803D'], ['Yellow', '#CA8A04'], ['Pink', '#DB2777'], ['Orange', '#EA580C'], ['Purple', '#7C3AED'], ['Clay', '#C96442'], ['Graphite', '#262626']];
   const FONTS = {
-    clavis: { name: 'Clavis (default)' },
+    flow: { name: 'Flow (Figtree + EB Garamond)', sans: "'Figtree', system-ui, sans-serif", serif: "'EB Garamond', Georgia, serif" },
+    clavis: { name: 'Rudra24 AI (default)' },
     anthropic: { name: 'Anthropic-style (Inter + Source Serif)', sans: "'Inter', system-ui, sans-serif", serif: "'Source Serif 4', 'Newsreader', Georgia, serif", load: 'Source+Serif+4:ital,opsz,wght@0,8..60,300..700;1,8..60,300..700' },
-    editorial: { name: 'Editorial (Figtree + Instrument Serif)', sans: "'Figtree', system-ui, sans-serif", serif: "'Instrument Serif', Georgia, serif" },
+    // `load` was missing, so this pair named two webfonts and fetched
+    // neither — every "editorial" screen quietly fell back to Georgia.
+    editorial: { name: 'Editorial (Inter + Instrument Serif)', sans: "'Inter', 'CX Sans', system-ui, sans-serif", serif: "'Instrument Serif', 'CX Serif', Georgia, serif", load: 'Inter:wght@300..700&family=Instrument+Serif:ital@0;1' },
     jakarta: { name: 'Modern (Plus Jakarta Sans)', sans: "'Plus Jakarta Sans', system-ui, sans-serif", serif: "'Newsreader', Georgia, serif" },
     system: { name: 'System (fastest)', sans: "-apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif", serif: "Georgia, 'Times New Roman', serif" },
   };
 
-  const read = () => { try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } };
-  const write = (v) => { try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (_) {} };
+  let pendingState = null;
+  const read = () => { if (pendingState) return pendingState; try { return JSON.parse(localStorage.getItem(KEY) || '{}') || {}; } catch (_) { return {}; } };
+  const write = (v) => { pendingState = null; try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (_) {} };
   const themeNow = () => (document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light');
   const isHex = (c) => /^#[0-9a-f]{6}$/i.test(String(c || ''));
 
@@ -75,35 +104,51 @@
     const base = (THEMES[st.theme] || THEMES.clavis)[t] || {};
     const custom = (st.custom && st.custom[t]) || {};
     return {
+      theme: st.theme || 'clavis',
       shell: custom.shell || base.shell || null,
       sheet: custom.sheet || base.sheet || null,
       ink: custom.ink || base.ink || null,
       accent: st.accent || base.accent || null,
-      font: st.font || (THEMES[st.theme] || {}).font || 'clavis',
-      minimal: st.minimal != null ? !!st.minimal : !!(THEMES[st.theme] || {}).minimal,
+      // Fall back to THEMES.clavis, exactly as the palette above does.
+      // `|| {}` meant a user who had never picked a theme got the default
+      // PALETTE but not the default FONT — the theme's own typography
+      // silently never applied.
+      font: st.font || (THEMES[st.theme] || THEMES.clavis).font || 'clavis',
+      minimal: st.minimal != null ? !!st.minimal : !!(THEMES[st.theme] || THEMES.clavis).minimal,
     };
   }
 
   function css(e) {
     const H = 'html.cx-ap';
+    // clavis-claude.css paints everything from --cc-* variables with an
+    // 8-id selector; a 9-id selector here lets his picks still win.
+    const V = 'html.cx-ap:not(#cc#cc#cc#cc#cc#cc#cc#cc#cc)';
     const out = [];
+    if (e.theme === 'flow') {
+      const navInk = luminance(e.shell) > 0.42 ? '#15261F' : '#FFFFFF';
+      out.push(`${V} { --flow-nav-ink: ${navInk} !important; }`);
+    }
     if (isHex(e.shell)) {
       out.push(`${H} body, ${H} #sidebar, ${H} .sidebar, ${H} .topbar { background: ${e.shell} !important; background-image: none !important; }`);
       out.push(`${H} { --shell-canvas: ${e.shell}; }`);
+      out.push(`${V} { --cc-shell: ${e.shell} !important; }`);
     }
     if (isHex(e.sheet)) {
       out.push(`${H} .views-container, ${H} #main-scroll-area, ${H} .main-content { background: ${e.sheet} !important; background-image: none !important; }`);
       out.push(`${H} { --shell-panel: ${e.sheet}; --background: ${e.sheet}; }`);
+      out.push(`${V} { --cc-sheet: ${e.sheet} !important; }`);
     }
     if (isHex(e.ink)) {
       const soft = luminance(e.ink) > 0.5 ? 'rgba(255,255,255,0.66)' : 'rgba(0,0,0,0.62)';
       out.push(`${H} { --foreground: ${e.ink}; --do-t1: ${e.ink}; --do-t2: ${soft}; }`);
       out.push(`${H} body, ${H} .views-container, ${H} .view, ${H} #sidebar .nav-item, ${H} .topbar { color: ${e.ink} !important; }`);
+      out.push(`${V} { --cc-ink: ${e.ink} !important; --cc-ink-2: ${e.ink} !important; }`);
     }
     if (isHex(e.accent)) {
       const [h, s, l] = hexToHsl(e.accent);
       const light = luminance(e.accent) > 0.42;
       const on = light ? '#111111' : '#F7F3E8';
+      out.push(`${V} { --cc-accent: ${e.accent} !important; --cc-accent-hover: ${hsl(h, s, l - 5)} !important; --cc-on-accent: ${on} !important; --cc-accent-ink: ${e.accent} !important; --cc-accent-soft: color-mix(in srgb, ${e.accent} 11%, transparent) !important; }`);
       out.push(`${H} { --olive-950: ${hsl(h, s, l - 18)}; --olive-900: ${hsl(h, s, l - 12)}; --olive-800: ${hsl(h, s, l - 6)}; --olive-700: ${e.accent}; --olive-600: ${hsl(h, s, l + 6)}; --olive-500: ${hsl(h, s, l + 13)}; --olive-400: ${hsl(h, s * 0.9, l + 24)}; --olive-100: ${mix(e.accent, 0.88)}; --cream: ${on}; --cream-hi: ${on}; --ap-accent: ${e.accent}; }`);
       out.push(`${H} :focus-visible { outline-color: ${e.accent} !important; }`);
       out.push(`${H} #sidebar .nav-item.active { box-shadow: inset 2px 0 0 ${e.accent} !important; }`);
@@ -112,6 +157,7 @@
     const f = FONTS[e.font];
     if (f && f.sans) {
       out.push(`${H} { --flow-sans: ${f.sans}; }`);
+      out.push(`${V} { --cc-sans: ${f.sans} !important; --cc-serif: ${f.serif} !important; }`);
       out.push(`${H} body, ${H} button, ${H} input, ${H} textarea, ${H} select, ${H} .nav-item, ${H} .smodal { font-family: ${f.sans} !important; }`);
       out.push(`${H} h1, ${H} h2, ${H} .jarvis-greeting, ${H} .do-dash-greeting-title, ${H} .smodal-section-title, ${H} .cts-title { font-family: ${f.serif} !important; letter-spacing: -0.01em; }`);
     }
@@ -142,27 +188,46 @@
     el.textContent = text;
     document.documentElement.classList.toggle('cx-ap', !!text);
     document.documentElement.toggleAttribute('data-minimal', !!e.minimal);
+    document.documentElement.toggleAttribute('data-rudra-flow', e.theme === 'flow');
     ensureFont(e);
     sync();
   }
 
-  function set(patch) {
+  function set(patch, previewOnly = false) {
     const st = read();
     Object.assign(st, patch);
-    write(st);
+    if (previewOnly) pendingState = st; else write(st);
     apply();
     return effective();
   }
-  function setCustom(which, color) {
+  function setCustom(which, color, previewOnly = false) {
     const st = read();
     const t = themeNow();
     st.custom = st.custom || {};
     st.custom[t] = st.custom[t] || {};
     if (color) st.custom[t][which] = color; else delete st.custom[t][which];
-    write(st);
+    if (previewOnly) pendingState = st; else write(st);
     apply();
   }
   function reset() { write({}); apply(); }
+
+  // Activate this user-requested experiment once, retaining the complete
+  // previous appearance. Later reloads respect theme choices and restores.
+  const EXPERIMENT_KEY = 'clavis_flow_experiment_v1';
+  function startExperiment() {
+    try {
+      if (localStorage.getItem(EXPERIMENT_KEY)) return;
+      localStorage.setItem(EXPERIMENT_KEY, JSON.stringify({ previous: read() }));
+      write({ theme: 'flow' });
+    } catch (_) { pendingState = { theme: 'flow' }; }
+  }
+  function restoreExperiment() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(EXPERIMENT_KEY) || '{}');
+      write(saved.previous || {});
+    } catch (_) { write({}); }
+    apply();
+  }
 
   /* ── Settings → Appearance ─────────────────────────────────── */
   function row(label, hint, control) {
@@ -175,13 +240,13 @@
     const box = document.createElement('div');
     box.id = 'cx-ap-panel';
     box.innerHTML =
-      row('Theme', 'Pure colour sets — Clavis keeps the original look',
+      row('Theme', 'Choose a palette for your workspace',
         `<div class="cx-ap-themes">${Object.entries(THEMES).map(([id, t]) => {
           const l = t.light, d = t.dark;
           return `<button type="button" class="cx-ap-theme" data-theme-id="${id}" title="${t.name}"><span class="cx-ap-sw" style="background:linear-gradient(135deg, ${l.shell || '#FAF7F1'} 0 50%, ${d.shell || '#171717'} 50% 100%)"><i style="background:${l.accent || '#2F5233'}"></i></span><em>${t.name}</em></button>`;
         }).join('')}</div>`) +
       row('Accent', 'Buttons, send, focus and highlights',
-        `<div class="cx-ap-accents">${ACCENTS.map(([n, c]) => `<button type="button" class="cx-ap-dot" data-accent="${c}" title="${n}" style="background:${c}"></button>`).join('')}<label class="cx-ap-pick" title="Any colour"><input type="color" id="cx-ap-accent"></label></div>`) +
+        `<div class="cx-ap-accents">${ACCENTS.map(([n, c]) => `<button type="button" class="cx-ap-dot" data-accent="${c}" title="${n}" style="background:${c}"></button>`).join('')}<label class="cx-ap-pick" title="Any colour"><input type="color" id="cx-ap-accent"></label><button type="button" class="cx-ap-clear" id="cx-ap-accent-reset">Reset</button></div>`) +
       row('Sidebar &amp; top bar', 'Picked for the current light/dark mode', `<input type="color" data-custom="shell" class="cx-ap-color"><button type="button" class="cx-ap-clear" data-clear="shell">Reset</button>`) +
       row('Background', 'The main sheet behind every page', `<input type="color" data-custom="sheet" class="cx-ap-color"><button type="button" class="cx-ap-clear" data-clear="sheet">Reset</button>`) +
       row('Text', 'Main text colour', `<input type="color" data-custom="ink" class="cx-ap-color"><button type="button" class="cx-ap-clear" data-clear="ink">Reset</button>`) +
@@ -189,20 +254,32 @@
         `<select id="cx-ap-font-sel" class="smodal-select">${Object.entries(FONTS).map(([id, f]) => `<option value="${id}">${f.name}</option>`).join('')}</select>`) +
       row('Minimal', 'Flatter surfaces, no shadows or decoration',
         `<label class="smodal-switch"><input type="checkbox" id="cx-ap-minimal"><span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span></label>`) +
-      row('Reset', 'Back to the original Clavis look', `<button type="button" class="cx-ap-clear" id="cx-ap-reset">Reset appearance</button>`);
+      row('Experiment', 'Return to your look before Flow green', `<button type="button" class="cx-ap-clear" id="cx-ap-restore">Restore previous look</button>`) +
+      row('Reset', 'Back to the original Rudra24 AI look', `<button type="button" class="cx-ap-clear" id="cx-ap-reset">Reset appearance</button>`);
     if (head && head.nextSibling) sec.insertBefore(box, head.nextSibling); else sec.appendChild(box);
 
     box.addEventListener('click', (ev) => {
       const th = ev.target.closest('[data-theme-id]');
       if (th) { const st = read(); st.theme = th.dataset.themeId; delete st.accent; delete st.custom; delete st.minimal; delete st.font; write(st); apply(); return; }
-      const dot = ev.target.closest('[data-accent]');
+      // The document root also has data-accent (for the legacy theme).
+      // Only a swatch inside this panel is an accent selection.
+      const dot = ev.target.closest('.cx-ap-dot[data-accent]');
       if (dot) { set({ accent: dot.dataset.accent }); return; }
       const clr = ev.target.closest('[data-clear]');
       if (clr) { setCustom(clr.dataset.clear, null); return; }
       if (ev.target.id === 'cx-ap-reset') reset();
+      if (ev.target.id === 'cx-ap-restore') restoreExperiment();
+      if (ev.target.id === 'cx-ap-accent-reset') { set({ accent: null }); return; }
     });
-    box.querySelector('#cx-ap-accent').addEventListener('input', (ev) => set({ accent: ev.target.value }));
-    box.querySelectorAll('[data-custom]').forEach((inp) => inp.addEventListener('input', () => setCustom(inp.dataset.custom, inp.value)));
+    const acc = box.querySelector('#cx-ap-accent');
+    if (acc) {
+      acc.addEventListener('input', (ev) => set({ accent: ev.target.value }, true));
+      acc.addEventListener('change', (ev) => set({ accent: ev.target.value }, false));
+    }
+    box.querySelectorAll('[data-custom]').forEach((inp) => {
+      inp.addEventListener('input', () => setCustom(inp.dataset.custom, inp.value, true));
+      inp.addEventListener('change', () => setCustom(inp.dataset.custom, inp.value, false));
+    });
     box.querySelector('#cx-ap-font-sel').addEventListener('change', (ev) => set({ font: ev.target.value }));
     box.querySelector('#cx-ap-minimal').addEventListener('change', (ev) => set({ minimal: ev.target.checked }));
 
@@ -237,7 +314,7 @@
     box.querySelectorAll('[data-accent]').forEach((b) => b.classList.toggle('is-on', (e.accent || '').toLowerCase() === b.dataset.accent.toLowerCase()));
     const cs = getComputedStyle(document.body);
     const toHex = (rgb) => { const m = String(rgb).match(/\d+/g); return m ? '#' + m.slice(0, 3).map((v) => (+v).toString(16).padStart(2, '0')).join('') : '#000000'; };
-    const set = (sel, v) => { const i = box.querySelector(sel); if (i) i.value = v; };
+    const set = (sel, v) => { const i = box.querySelector(sel); if (i && document.activeElement !== i) i.value = v; };
     set('[data-custom="shell"]', e.shell || toHex(getComputedStyle(document.getElementById('sidebar') || document.body).backgroundColor));
     set('[data-custom="sheet"]', e.sheet || toHex(getComputedStyle(document.querySelector('.views-container') || document.body).backgroundColor));
     set('[data-custom="ink"]', e.ink || toHex(cs.color));
@@ -262,6 +339,7 @@
 
   // Theme switches (light/dark) change which custom set applies.
   new MutationObserver(() => apply()).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+  startExperiment();
   apply();
   document.addEventListener('click', () => setTimeout(mount, 80), { passive: true });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount, { once: true }); else setTimeout(mount, 0);

@@ -37,7 +37,7 @@
   var CATS = {
     general: { label: 'General', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/>' },
     nav:     { label: 'Navigation', icon: '<path d="M3 12l9-9 9 9"/><path d="M5 10v10a1 1 0 001 1h12a1 1 0 001-1V10"/>' },
-    jarvis:  { label: 'Clavis AI', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>' },
+    jarvis:  { label: 'Rudra24 AI', icon: '<circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>' },
     data:    { label: 'Data & Export', icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>' }
   };
 
@@ -46,7 +46,7 @@
     { id: 'open-shortcuts', cat: 'general', name: 'Open Shortcuts', desc: 'Shortcut hub & command palette',
       keys: [[MOD, 'K']], icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>',
       action: function () { toggleShortcuts(); } },
-    { id: 'new-chat', cat: 'general', name: 'New Chat', desc: 'Fresh Clavis conversation',
+    { id: 'new-chat', cat: 'general', name: 'New Chat', desc: 'Fresh Rudra24 AI conversation',
       keys: [[MOD, 'N']], icon: '<path d="M12 5v14M5 12h14"/>',
       action: function () { closeOverlays(); window.ChatHistory.newChat(); } },
     { id: 'chat-history', cat: 'general', name: 'Chat History', desc: 'Browse all previous conversations',
@@ -66,7 +66,7 @@
     { id: 'nav-leads', cat: 'nav', name: 'Leads Database', desc: 'All leads in Data Hub', keys: [[MOD, '2']],
       icon: '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/><path d="M3 12c0 1.66 4 3 9 3s9-1.34 9-3"/>',
       action: function () { runNav('leads'); } },
-    { id: 'nav-jarvis', cat: 'nav', name: 'Client AI', desc: 'Clavis AI Studio chat', keys: [[MOD, '3']],
+    { id: 'nav-jarvis', cat: 'nav', name: 'Client AI', desc: 'Rudra24 AI Studio chat', keys: [[MOD, '3']],
       icon: '<circle cx="12" cy="5" r="2"/><circle cx="5" cy="19" r="2"/><circle cx="19" cy="19" r="2"/><path d="M12 7v8M5 19l5-4M19 19l-5-4"/>',
       action: function () { runNav('chat'); } },
     { id: 'nav-email', cat: 'nav', name: 'Email Automation', desc: 'Personalized bulk email campaigns', keys: [[MOD, '4']],
@@ -85,11 +85,11 @@
       icon: '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>',
       action: function () { runNav('accounts'); } },
 
-    /* ── Clavis AI ── */
+    /* ── Rudra24 AI ── */
     { id: 'j-voice', cat: 'jarvis', name: 'Voice Input', desc: 'Push-to-talk microphone', keys: [[MOD, '⇧', 'V']],
       icon: '<path d="M12 2a3 3 0 00-3 3v7a3 3 0 006 0V5a3 3 0 00-3-3z"/><path d="M19 10v2a7 7 0 01-14 0v-2"/><line x1="12" y1="19" x2="12" y2="23"/><line x1="8" y1="23" x2="16" y2="23"/>',
       action: function () { closeOverlays(); if (typeof window.startJarvisVoiceInput === 'function') window.startJarvisVoiceInput(); } },
-    { id: 'j-stop', cat: 'jarvis', name: 'Stop Generation', desc: 'Abort Clavis reply instantly', keys: [[MOD, '⇧', 'X']],
+    { id: 'j-stop', cat: 'jarvis', name: 'Stop Generation', desc: 'Abort Rudra24 AI reply instantly', keys: [[MOD, '⇧', 'X']],
       icon: '<rect x="6" y="6" width="12" height="12" rx="2"/>',
       action: function () { closeOverlays(); if (typeof window.stopJarvisGeneration === 'function') window.stopJarvisGeneration(); } },
 
@@ -319,7 +319,7 @@
   function convPreview(conv) {
     var last = conv.messages[conv.messages.length - 1];
     var t = last ? last.text : '';
-    return (last && last.role === 'user' ? 'You: ' : 'Clavis: ') + t.replace(/\s+/g, ' ').trim().slice(0, 90);
+    return (last && last.role === 'user' ? 'You: ' : 'Rudra24 AI: ') + t.replace(/\s+/g, ' ').trim().slice(0, 90);
   }
   function timeAgo(ts) {
     var s = Math.floor((Date.now() - ts) / 1000);
@@ -389,7 +389,7 @@
     var list = $('ch-convs');
     if (!list) return;
     if (!chConvs.length) {
-      list.innerHTML = '<div class="ch-empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><div>Abhi koi chat history nahi hai.<br>Clavis se baat karein — sab chats yahan save hongi.</div></div>';
+      list.innerHTML = '<div class="ch-empty-state"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><div>Abhi koi chat history nahi hai.<br>Rudra24 AI se baat karein — sab chats yahan save hongi.</div></div>';
       return;
     }
 
@@ -553,7 +553,7 @@
     if (container) container.innerHTML = '';
     var welcome = $('jarvis-welcome');
     if (welcome) welcome.style.display = 'flex';
-    if (typeof window.setJarvisStatus === 'function') window.setJarvisStatus('online', 'Clavis Online');
+    if (typeof window.setJarvisStatus === 'function') window.setJarvisStatus('online', 'Rudra24 AI Online');
     toast('success', '✨ New Chat', 'Nayi conversation shuru ho gayi.');
   }
 

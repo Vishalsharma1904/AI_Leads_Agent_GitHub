@@ -13,11 +13,25 @@
   function wireCard(card) {
     if (card._cmWired) return;
     card._cmWired = true;
+    var expandable = Boolean(card.querySelector('.desktop-notif-detail, .desktop-notif-actions')) || (card.querySelector('.desktop-notif-body')?.textContent.length || 0) > 110;
+    if (!expandable) return;
+    card.classList.add('has-more');
+    var title = card.querySelector('.desktop-notif-title');
+    if (!title) return;
+    var trigger = document.createElement('button');
+    trigger.type = 'button'; trigger.className = 'desktop-notif-expand';
+    trigger.textContent = title.textContent; trigger.setAttribute('aria-expanded', 'false');
+    title.replaceWith(trigger);
+    function toggle(force) {
+      var expanded = force === undefined ? !card.classList.contains('is-expanded') : force;
+      card.classList.toggle('is-expanded', expanded); trigger.setAttribute('aria-expanded', String(expanded));
+      pile(card.parentElement);
+    }
     card.addEventListener('click', function (e) {
       if (e.target.closest('.desktop-notif-close-btn') || e.target.closest('.desktop-notif-btn') || e.target.closest('a')) return;
-      card.classList.toggle('is-expanded');
-      pile(card.parentElement);
+      toggle();
     });
+    card.addEventListener('keydown', function (e) { if (e.key === 'Escape' && card.classList.contains('is-expanded')) { e.preventDefault(); toggle(false); trigger.focus(); } });
   }
 
   /* The pile: each card tucks under the one above it so exactly 8 px of it
@@ -60,9 +74,9 @@
     /* Wake */
     { group: 'Wake',
       items: [
-        { phrase: '"Clavis" ya "Hey Buddy"',  desc: 'Clavis ko jagao — har kaam se pehle yahi bolo' },
-        { phrase: '"Thodi der chup ho jao"',   desc: 'Clavis so jayega, agle wake tak chup rahega' },
-        { phrase: '"Suno" ya orb tap',         desc: 'Chup Clavis ko wapas jagao' }
+        { phrase: '"Rudra" ya "Hey Buddy"',  desc: 'Rudra24 AI ko jagao — har kaam se pehle yahi bolo' },
+        { phrase: '"Thodi der chup ho jao"',   desc: 'Rudra24 AI so jayega, agle wake tak chup rahega' },
+        { phrase: '"Suno" ya orb tap',         desc: 'Chup Rudra24 AI ko wapas jagao' }
       ]
     },
     /* Navigation */
@@ -70,7 +84,7 @@
       items: [
         { phrase: '"Dashboard dikhao"',        desc: 'Dashboard pe jao' },
         { phrase: '"Leads pe jao"',            desc: 'Leads Database kholo' },
-        { phrase: '"Chat AI" / "Jarvis"',      desc: 'Clavis AI Studio mein jao' },
+        { phrase: '"Chat AI" / "Jarvis"',      desc: 'Rudra24 AI Studio mein jao' },
         { phrase: '"Settings kholo"',          desc: 'System Settings window kholo' },
         { phrase: '"Map kholo"',               desc: 'Maps panel open karo' }
       ]
@@ -96,7 +110,7 @@
       items: [
         { phrase: '"Band karo" / "Close karo"', desc: 'Open window ya panel band karo' },
         { phrase: '"Settings band karo"',       desc: 'Settings modal close karo' },
-        { phrase: '"Sab band karo"',            desc: 'Clavis ka screen clear karo' }
+        { phrase: '"Sab band karo"',            desc: 'Rudra24 AI ka screen clear karo' }
       ]
     }
   ];
@@ -117,8 +131,8 @@
 
     return '<div class="sc-manual-wrap">' +
       '<div class="sc-manual-banner">' +
-        '<p class="sc-manual-quote">Bass apni awaaz se control karo &mdash; bolo aur Clavis sun lega</p>' +
-        '<span class="sc-manual-sub">Tap any command row to speak it · &ldquo;Clavis&rdquo; se pehle wake karo</span>' +
+        '<p class="sc-manual-quote">Bass apni awaaz se control karo &mdash; bolo aur Rudra24 AI sun lega</p>' +
+        '<span class="sc-manual-sub">Tap any command row to speak it · &ldquo;Rudra24 AI&rdquo; se pehle wake karo</span>' +
       '</div>' +
       '<div class="cvm-table">' + rows + '</div>' +
     '</div>';
@@ -139,7 +153,7 @@
       wrap.innerHTML = buildManualHTML();
       _manualPanel = wrap;
 
-      // Click-to-speak: speak the phrase via Clavis if possible
+      // Click-to-speak: speak the phrase via Rudra24 AI if possible
       wrap.addEventListener('click', function (e) {
         var row = e.target.closest('.cvm-row');
         if (!row) return;
@@ -166,7 +180,8 @@
 
   function watchShortcutsGrid() {
     var grid = document.getElementById('sc-grid');
-    if (!grid) return;
+    if (!grid || grid.__cmGuideObserved) return;
+    grid.__cmGuideObserved = true;
 
     // Inject once now
     injectManual();
@@ -213,10 +228,10 @@
     } catch (_) {}
   }
 
-  /* Peek window greeting: a suggestion pill fills the composer. */
+  /* Peek suggestions run through the same task route as a typed command. */
   document.addEventListener('click', function (e) {
     var b = e.target.closest && e.target.closest('#clavis-task-surface [data-fill]');
-    if (b && window.ClavisTaskSurface) window.ClavisTaskSurface.fillComposer(b.getAttribute('data-fill'));
+    if (b && window.ClavisTaskSurface) window.ClavisTaskSurface.submitFollowUp(b.getAttribute('data-fill'));
   });
 
   /* ── Init ────────────────────────────────────────────────── */

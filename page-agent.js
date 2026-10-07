@@ -6,8 +6,8 @@
 'use strict';
 
 const AgentCtrl = {
-  selectedLocations: ['Delhi NCR', 'Mumbai', 'Bengaluru'],
-  selectedIndustries: new Set(['Hotels & Hospitality', 'Hospitals & Healthcare', 'Corporate IT Parks & Tech Hubs', 'Malls & Retail Chains', 'Factories & Manufacturing']),
+  selectedLocations: ['Delhi NCR'],
+  selectedIndustries: new Set(['Hotels & Hospitality', 'Hospitals & Healthcare', 'IT Parks & Tech Companies', 'Shopping Malls & Retail', 'Factories & Manufacturing']),
   batchSize: 3,
   isRunning: false,
   targetCount: null,   // set by chat for an exact-count run
@@ -91,11 +91,13 @@ const AgentCtrl = {
       const allIndustries = (window.IndustryDB && typeof window.IndustryDB.getNames === 'function')
         ? window.IndustryDB.getNames()
         : [];
-      this.selectedIndustries = new Set(requestedIndustries.length ? requestedIndustries : allIndustries);
+      const configuredBuyers = window.ClavisBusiness?.buyerQueries?.() || [];
+      const buyerSectors = configuredBuyers.length ? configuredBuyers : (allIndustries.length ? allIndustries : this.getDefaults().industries);
+      this.selectedIndustries = new Set(requestedIndustries.length ? requestedIndustries : buyerSectors);
       this.renderIndustryGrid();
     }
     if (count && Number.isFinite(+count)) {
-      // Policy: never fewer than 20, never more than 100
+      // Preserve the explicit request within the supported 1–100 range.
       this.targetCount = Math.max(1, Math.min(100, parseInt(count, 10)));
     }
     if (Array.isArray(serviceTypes) && serviceTypes.length) {
@@ -111,6 +113,7 @@ const AgentCtrl = {
   },
 
   init() {
+    this.loadDefaults();
     this.renderLocationChips();
     this.renderIndustryGrid();
     this.updateBatchInfo();
@@ -121,7 +124,10 @@ const AgentCtrl = {
   bindEvents() {
     const locInput = document.getElementById('location-input');
     if (locInput) {
-      locInput.addEventListener('keydown', (e) => this.handleLocationKeydown(e));
+      if (!locInput.__bound) {
+        locInput.__bound = true;
+        locInput.addEventListener('keydown', (e) => this.handleLocationKeydown(e));
+      }
     }
     const batchRange = document.getElementById('batch-size');
     if (batchRange) {
@@ -136,11 +142,46 @@ const AgentCtrl = {
 
     wrapper.innerHTML = this.selectedLocations.map((loc, idx) => `
       <span class="location-chip">
-        <span>${loc}</span>
-        <button type="button" class="chip-remove-btn" onclick="AgentCtrl.removeLocation(${idx})">✕</button>
+        <span>${String(loc).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</span>
+        <button type="button" class="chip-remove-btn" aria-label="Remove location ${idx + 1}" onclick="AgentCtrl.removeLocation(${idx})">✕</button>
       </span>
     `).join('');
     this.updateBatchInfo();
+  },
+
+  getDefaults() {
+    const defaultLocations = [window.SKYLARK_CONFIG?.DEFAULT_CITY || 'Delhi NCR'];
+    const saved = window.UserStorage?.getJSON('agent_search_defaults', null);
+    if (saved && Array.isArray(saved.locations) && Array.isArray(saved.industries)) {
+      const clean = values => [...new Set(values.filter(v => typeof v === 'string').map(v => v.trim().slice(0, 100)).filter(Boolean))].slice(0, 20);
+      const aliases = { 'Corporate IT Parks & Tech Hubs': 'IT Parks & Tech Companies', 'Malls & Retail Chains': 'Shopping Malls & Retail' };
+      const locations = clean(saved.locations), industries = clean(saved.industries).map(v => aliases[v] || v);
+      return { locations: locations.length ? locations : defaultLocations, industries: industries.length ? industries : ['ALL'] };
+    }
+    return { locations: defaultLocations, industries: ['Hotels & Hospitality', 'Hospitals & Healthcare', 'IT Parks & Tech Companies', 'Shopping Malls & Retail', 'Factories & Manufacturing'] };
+  },
+
+  loadDefaults() {
+    if (this.isRunning) return;
+    const saved = this.getDefaults();
+    this.selectedLocations = [...saved.locations];
+    this.selectedIndustries = new Set(saved.industries);
+  },
+
+  saveDefaults() {
+    window.UserStorage?.setJSON('agent_search_defaults', { locations: [...this.selectedLocations], industries: [...this.selectedIndustries] });
+  },
+
+  addLocation(value) {
+    const name = String(value || '').trim().slice(0, 100);
+    if (!name || this.selectedLocations.some(loc => loc.toLowerCase() === name.toLowerCase())) return;
+    if ((window.LeadCandidateDomain?.expandLocations([...this.selectedLocations, name]) || [...this.selectedLocations, name]).length > 20) {
+      window.showToast?.('warning', 'Location limit', 'Choose up to 20 search areas per run. Delhi NCR counts as 12 areas.');
+      return;
+    }
+    this.selectedLocations.push(name);
+    this.saveDefaults();
+    this.renderLocationChips();
   },
 
   handleLocationKeydown(e) {
@@ -149,18 +190,20 @@ const AgentCtrl = {
       const input = e.target;
       const val = input.value.trim().replace(/^,+|,+$/g, '');
       if (val && !this.selectedLocations.includes(val)) {
-        this.selectedLocations.push(val);
+        this.addLocation(val);
         input.value = '';
         this.renderLocationChips();
       }
     } else if (e.key === 'Backspace' && !e.target.value && this.selectedLocations.length > 0) {
       this.selectedLocations.pop();
+      this.saveDefaults();
       this.renderLocationChips();
     }
   },
 
   removeLocation(idx) {
     this.selectedLocations.splice(idx, 1);
+    this.saveDefaults();
     this.renderLocationChips();
   },
 
@@ -174,8 +217,8 @@ const AgentCtrl = {
       : {
         'Hotels & Hospitality': { icon: 'ðŸ¨', desc: 'Hotels, resorts, banquet halls' },
         'Hospitals & Healthcare': { icon: 'ðŸ¥', desc: 'Hospitals, clinics, labs' },
-        'Corporate IT Parks & Tech Hubs': { icon: 'ðŸ’»', desc: 'Tech parks, IT campuses' },
-        'Malls & Retail Chains': { icon: 'ðŸ›ï¸', desc: 'Shopping malls, retail chains' },
+        'IT Parks & Tech Companies': { icon: 'ðŸ’»', desc: 'Tech parks, IT campuses' },
+        'Shopping Malls & Retail': { icon: 'ðŸ›ï¸', desc: 'Shopping malls, retail chains' },
         'Factories & Manufacturing': { icon: 'ðŸ­', desc: 'Industrial plants, manufacturing units' },
         'Warehouses & Logistics': { icon: 'ðŸ“¦', desc: 'Fulfillment centers, transport hubs' },
         'Residential Societies': { icon: 'ðŸ—ï¸', desc: 'Gated apartments, townships' },
@@ -228,19 +271,22 @@ const AgentCtrl = {
     } else {
       this.selectedIndustries.add(name);
     }
+    this.saveDefaults();
     this.renderIndustryGrid();
   },
 
   selectAllIndustries() {
     const all = (window.IndustryDB && typeof window.IndustryDB.getNames === 'function')
       ? window.IndustryDB.getNames()
-      : ['Hotels & Hospitality', 'Hospitals & Healthcare', 'Corporate IT Parks & Tech Hubs', 'Malls & Retail Chains', 'Factories & Manufacturing', 'Warehouses & Logistics', 'Residential Societies', 'Schools & Universities', 'Banks & Corporate Offices'];
+      : ['Hotels & Hospitality', 'Hospitals & Healthcare', 'IT Parks & Tech Companies', 'Shopping Malls & Retail', 'Factories & Manufacturing', 'Warehouses & Logistics', 'Residential Societies', 'Schools & Universities', 'Banks & Corporate Offices'];
     this.selectedIndustries = new Set(all);
+    this.saveDefaults();
     this.renderIndustryGrid();
   },
 
   clearAllIndustries() {
     this.selectedIndustries.clear();
+    this.saveDefaults();
     this.renderIndustryGrid();
   },
 
@@ -248,10 +294,11 @@ const AgentCtrl = {
     this.selectedIndustries = new Set([
       'Hotels & Hospitality',
       'Hospitals & Healthcare',
-      'Corporate IT Parks & Tech Hubs',
-      'Malls & Retail Chains',
+      'IT Parks & Tech Companies',
+      'Shopping Malls & Retail',
       'Factories & Manufacturing'
     ]);
+    this.saveDefaults();
     this.renderIndustryGrid();
   },
 
@@ -347,16 +394,17 @@ const AgentCtrl = {
   // â”€â”€ Run Pipeline â”€â”€
   async startPipeline() {
     if (this.isRunning) {
-      if (window.MiningPipeline && typeof window.MiningPipeline.abort === 'function') {
-        window.MiningPipeline.abort();
-      }
-      this.isRunning = false;
-      this.updateBtnState(false);
-      this.log('warn', 'ðŸ›‘ Pipeline halted by user.');
+      window.RealScraper?.abort?.();
+      this.log('warn', 'Stopping lead search; collected leads will remain available.');
       return;
     }
 
-    const locations = this.selectedLocations.length > 0 ? this.selectedLocations : ['Delhi NCR', 'Mumbai'];
+    const locations = window.LeadCandidateDomain?.expandLocations(this.selectedLocations) || [...this.selectedLocations];
+    if (!locations.length) {
+      window.showToast?.('warning', 'Location required', 'Choose a city, state or Delhi NCR before searching.');
+      document.getElementById('location-input')?.focus();
+      return;
+    }
     const industries = Array.from(this.selectedIndustries);
 
     if (industries.length === 0) {
@@ -408,8 +456,25 @@ const AgentCtrl = {
       if (badge) { badge.className = 'progress-status-badge error'; badge.textContent = 'Engine Missing'; }
       return;
     }
+    if (engine.isRunning?.()) {
+      this.isRunning = false;
+      this.updateBtnState(false);
+      window.showToast?.('info', 'Lead search running', 'The current search will finish before another starts.');
+      return;
+    }
 
-    // Count policy: if the user named a number, honour it within 20–100.
+    const activeTask = window.ClavisTask?.current?.();
+    const leadTaskId = activeTask && !['completed', 'failed'].includes(activeTask.phase) && activeTask.mode === 'leads'
+      ? activeTask.id
+      : window.ClavisTask?.begin?.(`Generate leads in ${locations.join(', ')}`, { source: 'composer', display: 'window' });
+    const leadTask = window.ClavisTask?.Store?.get?.(leadTaskId);
+    if (leadTask) {
+      leadTask.display = 'window';
+      leadTask._onCancel = () => { engine.abort(); return true; };
+    }
+    window.ClavisTaskSurface?.show?.();
+
+    // Count policy: if the user named a number, honour it within 1–100.
     // If they named nothing, deliver exactly the default (20).
     const requested = this.targetCount || (window.AppSettings?.defaultCount?.()) || 20;
     const targetCount = Math.max(1, Math.min(100, parseInt(requested, 10) || 20));
@@ -424,18 +489,18 @@ const AgentCtrl = {
 
     engine.setCallbacks({
       // Real-time narration for the desk pet / chat status card
-      onStatus: (s) => emit('nexus:agentstatus', s),
+      onStatus: (s) => emit('nexus:agentstatus', { ...s, taskId: leadTaskId }),
       onLog: (type, msg) => this.log(type, msg),
       onPhase: (phase, status, pct) => {
         this.setPhaseState(phase, status, pct);
         if (status !== 'done' && PHASE_LABELS[phase]) {
-          emit('nexus:scrapeprogress', { phase, status, pct, label: PHASE_LABELS[phase] });
+          emit('nexus:scrapeprogress', { phase, status, pct, label: PHASE_LABELS[phase], taskId: leadTaskId });
         }
       },
       onLead: (lead) => {
         const contact = lead.phone || lead.email || 'no direct contact found';
         this.log('success', `  ✔ <b>${lead.company}</b> — ${lead.city} · ${contact}`);
-        emit('nexus:agentstatus', { text: `Got ${lead.company}`, step: 5, lead: true });
+        emit('nexus:agentstatus', { text: `Got ${lead.company}`, step: 5, lead: true, taskId: leadTaskId });
       },
       onComplete: (summary) => {
         const totalFound = summary?.total || summary?.added || (summary?.leads ? summary.leads.length : 0);
@@ -448,20 +513,23 @@ const AgentCtrl = {
           if (badge) { badge.className = 'progress-status-badge error'; badge.textContent = 'No Leads Found'; }
           this.log('error', `No contactable leads found matching the criteria in this location.`);
           window.showToast?.('error', 'No Leads Found', 'Could not find contactable leads matching your search.');
-          emit('nexus:scrapedone', { ok: false, added: 0, requested: summary?.requested || targetCount });
+          emit('nexus:scrapedone', { ok: false, added: 0, requested: summary?.requested || targetCount, taskId: leadTaskId });
           return;
         }
         emit('nexus:scrapedone', {
           ok: true,
-          added: summary.added || totalFound,
+          added: summary.added ?? totalFound,
           requested: summary.requested || targetCount,
           total: totalFound,
-          completeContacts: summary.completeContacts || totalFound,
-          leads: Array.isArray(summary.leads) ? summary.leads : []
+          completeContacts: summary.completeContacts ?? (summary.leads || []).filter(lead => lead.website && lead.email && lead.phone).length,
+          leads: Array.isArray(summary.leads) ? summary.leads : [],
+          stopped: !!summary.stopped,
+          exported: !!summary.exported,
+          taskId: leadTaskId
         });
         if (badge) {
           badge.className = 'progress-status-badge done';
-          badge.textContent = 'Completed';
+          badge.textContent = summary.stopped ? 'Stopped' : 'Completed';
         }
         this.renderRunSummary({
           added: summary.added || totalFound,
@@ -470,9 +538,9 @@ const AgentCtrl = {
           elapsed: summary.elapsed || '0',
           tokenUsed: totalFound
         });
-        emit('nexus:agentstatus', { text: `Your data is ready — ${totalFound} leads downloaded`, step: 7, finished: true });
-        window.showToast?.('success', '✅ Your data is ready',
-          `${totalFound} verified leads · Excel downloaded automatically`);
+        emit('nexus:agentstatus', { text: `${totalFound} leads ready to preview and download`, step: 7, finished: true, taskId: leadTaskId });
+        window.showToast?.('success', summary.stopped ? 'Search stopped' : 'Your data is ready',
+          `${totalFound} verified leads · preview and download available`);
         window.LeadsCtrl?.init?.();
         window.DashboardCtrl?.init?.();
       },
@@ -486,7 +554,7 @@ const AgentCtrl = {
           badge.textContent = 'Error';
         }
         this.log('error', `Scrape failed: ${err}`);
-        emit('nexus:scrapedone', { ok: false, error: String(err) });
+        emit('nexus:scrapedone', { ok: false, error: String(err), taskId: leadTaskId });
         if (window.showToast) {
           window.showToast('error', 'Scrape Failed', String(err));
         }

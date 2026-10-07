@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS VOICE NAVIGATION (clavis-voice-nav.js)
+ *  RUDRA24 AI VOICE NAVIGATION (clavis-voice-nav.js)
  *  In-app navigation & verbal control — Hindi/English/Hinglish
  *  Handles app page switching, lead generation, filtering,
  *  exporting, settings, theme toggle, image fetch, and task surface.
@@ -44,15 +44,23 @@
       action: () => switchToView('leads')
     },
 
-    // 3. Clavis AI Studio / Jarvis
+    // 3. Rudra24 AI Studio / Jarvis
     {
       name: 'clavis',
       patterns: [
         /\b(clavis (tab|ai|studio|page|pe|par|me|ko|kholo|jao|open karo)|open clavis|go to clavis|clavis open|ai studio)\b/i,
-        /\b(jarvis tab|ai tab|assistant tab|chat tab|chat kholo)\b/i
+        /\b(jarvis tab|ai tab|assistant tab)\b/i
       ],
-      speak: 'Clavis AI Studio khol raha hoon.',
+      speak: 'Rudra24 AI Studio khol raha hoon.',
       action: () => switchToView('jarvis')
+    },
+
+    // 3b. Client AI (lead chat) — "chat tab" is this page, not Rudra24 AI Studio
+    {
+      name: 'chat',
+      patterns: [/\b(chat tab|chat kholo|client (ai|tab|page|chat)( kholo)?)\b/i],
+      speak: 'Client AI khol raha hoon.',
+      action: () => switchToView('chat')
     },
 
     // 4. Analytics
@@ -225,7 +233,7 @@
           if (q && (q.name || q.subject)) said = q.name || q.subject;
         } catch (e) {}
 
-        // Forward to Clavis Luxe research or composer
+        // Forward to Rudra24 AI Luxe research or composer
         if (window.ClavisLuxe && typeof window.ClavisLuxe.researchImages === 'function') {
           window.ClavisLuxe.researchImages(topic);
           return { handled: true, spoken: `${said} ki photos dikha raha hoon.` };
@@ -396,7 +404,7 @@
   const VARIANTS = {
     dashboard: ['Dashboard khol raha hoon.', 'Yeh raha aapka dashboard, sir.', 'Dashboard par chalte hain.', 'Overview samne hai, sir.'],
     leads: ['Leads page par ja raha hoon.', 'Aapki leads yeh rahi.', 'Leads khol di, sir.', 'Leads database samne hai.'],
-    clavis: ['Clavis Studio khol raha hoon.', 'Main yahin hoon, sir.', 'Studio samne hai.'],
+    clavis: ['Rudra24 AI Studio khol raha hoon.', 'Main yahin hoon, sir.', 'Studio samne hai.'],
     analytics: ['Analytics khol raha hoon.', 'Numbers yeh rahe, sir.', 'Analytics par chalte hain.'],
     email: ['Email page khol raha hoon.', 'Inbox samne hai, sir.', 'Email outreach khol diya.'],
     whatsapp: ['WhatsApp page par ja raha hoon.', 'WhatsApp khol diya, sir.'],
@@ -422,6 +430,12 @@
     const raw = String(text || '').trim();
     const t = norm(raw);
     if (!t) return { handled: false };
+
+    // The live app map knows every tab / button / Settings section by name.
+    try {
+      const hit = window.ClavisAppMap?.resolve?.(raw);
+      if (hit) return { handled: true, spoken: hit.run(), navigate: hit.id };
+    } catch (e) { console.warn('[ClavisVoiceNav] app map error', e); }
 
     for (const cmd of NAV_COMMANDS) {
       if (cmd.actionWithMatch) {

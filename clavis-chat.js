@@ -34,7 +34,7 @@
       input: 'chat-input',
       send: 'chat-send-btn',
       stop: 'chat-stop-btn',
-      sub: 'Ask for leads by city, industry or role — Clavis searches live sources and returns verified rows.'
+      sub: 'Ask for leads by city, industry or role — Rudra24 AI searches live sources and returns verified rows.'
     },
     {
       view: 'view-candidate-ai',
@@ -44,7 +44,7 @@
       send: 'btn-candidate-ai-send',
       stop: null,
       status: 'candidate-ai-status',
-      sub: 'Name a role and a city — Clavis reads live job portals and brings back real candidates.'
+      sub: 'Name a role and a city — Rudra24 AI reads live job portals and brings back real candidates.'
     }
   ];
 
@@ -490,7 +490,7 @@
 
     /* The composer — its height, its empty flag, its physics — is
        owned by installComposer() in clavis-aurora.js, which runs the
-       same code for this page, Candidate AI and the Clavis studio.
+       same code for this page, Candidate AI and the Rudra24 AI studio.
        Two implementations of one component is how they drifted apart
        in the first place, so there is only the one. */
 
@@ -510,7 +510,7 @@
   var KNOWN = [
     {
       re: /sign in before using ai chat|AI_AUTH_REQUIRED/i,
-      title: 'Clavis is running without the backend',
+      title: 'Rudra24 AI is running without the backend',
       text: 'The hosted AI proxy needs a sign-in. Connect a provider key instead and this chat works locally.',
       label: 'Open AI setup',
       run: function () { if (typeof global.openKeySettings === 'function') global.openKeySettings(); }

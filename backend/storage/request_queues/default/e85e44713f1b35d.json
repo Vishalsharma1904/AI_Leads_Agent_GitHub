@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.syansoft.com",
+  "url": "https://www.syansoft.com",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": "https://www.syansoft.com/",
+  "handled_at": "2026-10-05 06:48:55.382324+00:00"
+}

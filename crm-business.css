@@ -1,0 +1,17 @@
+.crm-business-queues{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin:22px 0}
+.crm-business-queues button{display:flex;flex-direction:column;gap:10px;align-items:flex-start;min-height:90px;border:1px solid var(--crm-border,#dfe2d4);background:var(--crm-surface,#fffff4);border-radius:12px;padding:15px;color:inherit;text-align:left}
+.crm-business-queues strong{font-family:var(--font-heading,'EB Garamond',serif);font-size:30px;font-weight:500}
+.crm-business-queues button[aria-pressed="true"]{background:color-mix(in srgb,var(--accent,#005349) 9%,var(--crm-surface,#fffff4));border-color:var(--accent,#005349)}
+.crm-business details summary,.crm-business-editor summary{cursor:pointer;font-family:var(--font-heading,'EB Garamond',serif);font-size:23px;padding:12px 0}
+.crm-business .crm-section{margin:20px 0}.crm-business-choices{display:flex;flex-wrap:wrap;gap:8px}.crm-business-choices label{display:flex;flex-direction:row;align-items:center;gap:8px;border:1px solid var(--crm-border,#dfe2d4);padding:8px 12px;border-radius:9px;cursor:pointer}
+.crm-business .crm-tasks>li{align-items:center;gap:20px}.crm-business .crm-tasks>li>button{align-self:center;flex:0 0 auto}.crm-business .crm-task-actions{align-items:flex-start}
+.crm-business-choices label:has(input:checked){background:color-mix(in srgb,var(--accent,#005349) 9%,transparent);border-color:var(--accent,#005349)}
+.crm-business-choices input,.crm-business-check input{width:16px!important;min-height:16px!important;accent-color:var(--accent,#005349)}
+.crm-business-check{display:flex!important;flex-direction:row!important;align-items:center;gap:10px}.crm-business-editor{border-bottom:1px solid var(--crm-border,#dfe2d4);padding-bottom:22px;margin-bottom:24px}
+.crm-business fieldset,.crm-business-editor fieldset{border:0;padding:0;margin:0}.crm-business-editor legend{font-size:13px;margin-bottom:8px}.crm-business-notice{padding:18px 0;border-bottom:1px solid var(--crm-border,#dfe2d4)}.crm-business-notice p,.crm-business .crm-tasks p{white-space:pre-wrap;overflow-wrap:anywhere}.crm-business-notice time{font-size:12px;opacity:.7}
+.desktop-notif-expand{all:unset;cursor:pointer;font-family:var(--font-heading,'EB Garamond',serif);font-size:15px;flex:1;color:inherit!important}.desktop-notif-expand:focus-visible{outline:1px solid currentColor;outline-offset:3px;border-radius:3px}
+html body .desktop-notification-card .desktop-notif-detail{white-space:pre-wrap;overflow-wrap:anywhere;max-height:0;overflow:hidden;opacity:0;transition:max-height 280ms cubic-bezier(.2,.8,.2,1),opacity 180ms ease!important}
+html body .desktop-notification-card.is-expanded .desktop-notif-detail{max-height:260px;overflow:auto;opacity:1;margin-top:8px!important}
+html body .desktop-notification-card.is-expanded .desktop-notif-body{-webkit-line-clamp:unset!important;white-space:pre-wrap;max-height:220px;overflow:auto!important}
+@media(prefers-reduced-motion:reduce){html body .desktop-notification-card .desktop-notif-detail{transition:none!important}html body .desktop-notification-card.is-expanded .desktop-notif-actions{animation:none!important}}
+@media(max-width:600px){.crm-business-queues{grid-template-columns:repeat(2,minmax(0,1fr))}.crm-business .crm-tasks li{flex-wrap:wrap}.crm-business-choices label{flex:1;min-width:120px}}

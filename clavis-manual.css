@@ -98,7 +98,7 @@
   border-color: rgba(60,120,80,.20) !important;
   color: #3a6e4a !important;
 }
-/* Clavis AI → soft lavender */
+/* Rudra24 AI → soft lavender */
 #shortcuts-modal .sc-section[data-cat="jarvis"] .sc-section-icon,
 #shortcuts-modal .sc-section[data-cat="jarvis"] .sc-row-icon {
   background: rgba(100,80,160,.08) !important;
@@ -380,16 +380,16 @@ html[data-theme="dark"] .sc-manual-sub { color: #6a6660; }
 @media (min-width: 769px) {
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar {
     width: var(--sidebar-expanded, 220px) !important;
-    min-width: var(--sidebar-expanded, 220px) !important;
-    max-width: var(--sidebar-expanded, 220px) !important;
+    min-width: 0 !important;
+    max-width: none !important;
     transform: none !important;
-    transition: width 620ms cubic-bezier(.22,1,.36,1), min-width 620ms cubic-bezier(.22,1,.36,1),
-      max-width 620ms cubic-bezier(.22,1,.36,1), background-color 240ms ease, box-shadow 240ms ease !important;
+    transition: width 680ms cubic-bezier(.4,0,.2,1), background-color 180ms ease !important;
     overflow: hidden !important;
-    will-change: width;
+    will-change: auto;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed:not(.au-peek) {
-    width: 64px !important; min-width: 64px !important; max-width: 64px !important;
+    width: 64px !important;
+    transition-duration: 680ms, 180ms !important;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed.au-peek {
     box-shadow: none !important; z-index: 60 !important;
@@ -397,30 +397,85 @@ html[data-theme="dark"] .sc-manual-sub { color: #6a6660; }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content {
     margin-left: var(--sidebar-expanded, 220px) !important;
     width: calc(100% - var(--sidebar-expanded, 220px)) !important;
-    max-width: calc(100% - var(--sidebar-expanded, 220px)) !important;
+    max-width: none !important;
     transform: none !important;
-    transition: margin-left 620ms cubic-bezier(.22,1,.36,1), width 620ms cubic-bezier(.22,1,.36,1),
-      max-width 620ms cubic-bezier(.22,1,.36,1) !important;
+    transition: margin-left 680ms cubic-bezier(.4,0,.2,1), width 680ms cubic-bezier(.4,0,.2,1) !important;
+    will-change: auto;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed:not(.au-peek) ~ #main-content {
-    margin-left: 64px !important; width: calc(100% - 64px) !important; max-width: calc(100% - 64px) !important;
+    margin-left: 64px !important; width: calc(100% - 64px) !important;
+    transition-duration: 680ms, 680ms !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed.au-peek ~ #main-content {
+    margin-left: var(--sidebar-expanded, 220px) !important;
+    width: calc(100% - var(--sidebar-expanded, 220px)) !important;
+    transition: margin-left 680ms cubic-bezier(.4,0,.2,1), width 680ms cubic-bezier(.4,0,.2,1) !important;
   }
   html.sidebar-resizing:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar,
   html.sidebar-resizing:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content {
     transition: none !important;
   }
-  /* labels: fade only — no stagger, no slide, no width games */
+  /* Labels fade without moving or blurring during the rail transition. */
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) {
     transform: none !important;
-    transition: opacity 320ms cubic-bezier(.22,1,.36,1) 160ms, color 180ms ease !important;
+    filter: none !important;
+    transition: opacity 220ms ease 80ms, color 180ms ease !important;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.collapsed:not(.au-peek) :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) {
-    transition: opacity 140ms ease 0ms, color 180ms ease !important;
+    filter: none !important;
+    transition: opacity 150ms ease, color 180ms ease !important;
   }
 }
 @media (prefers-reduced-motion: reduce) {
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar,
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content { transition-duration: 1ms !important; }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) { filter: none !important; }
+}
+html body .mobile-sidebar-trigger { display: none !important; }
+@media (max-width: 768px) {
+  html:not(#m):not(#m) body:not(#m) #main-content .mobile-sidebar-trigger {
+    display: inline-flex !important;
+    width: 32px !important;
+    height: 32px !important;
+    flex: 0 0 32px !important;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 8px;
+    background: transparent !important;
+    color: inherit;
+    cursor: pointer;
+  }
+  html body .mobile-sidebar-trigger span {
+    display: block;
+    width: 15px;
+    height: 1.5px;
+    border-radius: 1px;
+    background: currentColor;
+  }
+  html body .mobile-sidebar-trigger:focus-visible { outline: 2px solid currentColor; outline-offset: 2px; }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar {
+    width: min(86vw, var(--sidebar-expanded, 220px)) !important;
+    min-width: 0 !important;
+    max-width: none !important;
+    transform: translateX(-100%) !important;
+    transition: transform 460ms cubic-bezier(.16,1,.3,1) !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.mobile-open {
+    transform: translateX(0) !important;
+  }
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+    transition: none !important;
+  }
+}
+@media (max-width: 768px) and (prefers-reduced-motion: reduce) {
+  html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar { transition-duration: 1ms !important; }
 }
 
 /* ── 10. Voice bar: compact pill at the top of the sheet ───────── */
@@ -465,6 +520,43 @@ html body .ccv.is-expanded.is-left {
 }
 html body .ccv.is-expanded .ccv-map { height: auto; }
 html body .ccv-backdrop.is-on { z-index: 2147482050; cursor: zoom-out; }
+
+/* Map is one uninterrupted canvas. Controls and trip details float over it. */
+html body .ccv[data-kind="map"]:not(.is-expanded) {
+  height: var(--ccv-h, min(440px, var(--ccv-maxh, 440px)));
+}
+html body .ccv[data-kind="map"] .ccv-head {
+  position: absolute; z-index: 6; top: 12px; left: 12px;
+  width: min(536px, calc(100% - 24px)); box-sizing: border-box;
+  padding: 9px 10px 9px 14px; border: 1px solid var(--ccv-line);
+  border-radius: 12px; background: var(--ccv-bg);
+  box-shadow: 0 4px 20px rgba(20, 20, 19, .1);
+}
+html body .ccv[data-kind="map"] .ccv-headtext { cursor: pointer; }
+html body .ccv[data-kind="map"] .ccv-kicker { font-size: 9px; }
+html body .ccv[data-kind="map"] .ccv-title { font-size: 19px; }
+html body .ccv[data-kind="map"] .ccv-body { min-height: 0; overflow: hidden; }
+html body .ccv[data-kind="map"] .ccv-map { height: 100%; min-height: 0; flex: 1 1 auto; }
+html body .ccv[data-kind="map"] .ccv-foot { display: none; }
+html body .ccv[data-kind="map"]:not(.is-expanded) .ccv-locate { top: 75px; }
+@media (max-width: 720px) {
+  html body .ccv[data-kind="map"]:not(.is-expanded) { top: var(--ccv-top, 180px); bottom: auto; right: 16px; height: var(--ccv-maxh, 320px); }
+  html body .ccv[data-kind="map"] .ccv-head { width: calc(100% - 24px); }
+  html body .ccv[data-kind="map"] .ccv-title { font-size: 16px; }
+  html body .ccv[data-kind="map"] .ccv-seg { margin-right: 0; }
+  html body .ccv[data-kind="map"] .ccv-seg button { padding: 6px; font-size: 11px; }
+  html body .ccv[data-kind="map"] .ccv-route { max-height: 58%; }
+}
+html body .ccv[data-kind="map"].is-expanded,
+html body .ccv[data-kind="map"].is-expanded.is-left {
+  --ccv-square: min(calc(100vw - 48px), calc(100dvh - 48px));
+  top: calc((100dvh - var(--ccv-square)) / 2); bottom: auto;
+  left: calc((100vw - var(--ccv-square)) / 2); right: auto;
+  width: var(--ccv-square); height: var(--ccv-square); max-height: none;
+}
+html body .ccv[data-kind="map"].is-expanded .ccv-head { top: 16px; left: 16px; width: min(560px, calc(100% - 80px)); }
+html body .ccv[data-kind="map"].is-expanded .ccv-locate { top: 18px; right: 18px; }
+html body .ccv[data-kind="map"] .ccv-route-pick { top: 80px; }
 
 /* ── 12. Peek window: idle greeting + calmer pipeline ────────────── */
 #clavis-task-surface .cts-idle { padding: 6px 2px 4px; animation: cts-idle-in 560ms cubic-bezier(.16,1,.3,1) both; }
@@ -540,7 +632,7 @@ html:not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b) .ja
 /* every button presses the same way */
 html:not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b) body button:active:not(:disabled) { scale: .97; }
 /* keyboard focus: quiet but visible */
-html:not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b) body :is(button, [role="button"], a, input, select, textarea):focus-visible {
+html:not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b) body :is(button, [role="button"], a, input, select, textarea):not(:is(#jarvis-input, #chat-input, #candidate-ai-input, .cts-composer-input)):focus-visible {
   outline: 2px solid rgba(47,82,51,.45) !important;
   outline-offset: 2px !important;
 }
@@ -568,7 +660,7 @@ html[data-theme="dark"]:not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):not(#b):
    Same family, softer: a gentler olive, warmer ivory wells, lighter
    hairlines, and four pastel tints (sage · clay · lavender · sky) used
    only as quiet backgrounds, never as loud fills.                    */
-html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) {
+html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) {
   --cc-shell: #F5F3EE;
   --cc-sheet: #FAF9F5;
   --cc-sunk: #F2EFE8;
@@ -615,27 +707,26 @@ html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .do
 
 /* ── 15. Pop-up windows: slow, soft, butter-smooth in & out ──────── */
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay {
-  transition: opacity 520ms cubic-bezier(.22,1,.36,1) !important;
+  transition: opacity 260ms ease !important;
 }
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay:not(.open),
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay.closing {
-  transition: opacity 340ms cubic-bezier(.4,0,.2,1) !important;
+  transition: opacity 220ms ease !important;
 }
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay .settings-modal {
   transition: opacity 280ms cubic-bezier(.4,0,.2,1), translate 340ms cubic-bezier(.4,0,.2,1), scale 340ms cubic-bezier(.4,0,.2,1) !important;
 }
-html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay:not(.open) .settings-modal { translate: 0 12px; scale: .965; opacity: 0; }
+html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay:not(.open) .settings-modal { translate: 0 8px; scale: .985; opacity: 0; }
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) .settings-overlay.open .settings-modal {
   translate: 0 0; scale: 1; opacity: 1;
-  transition: opacity 460ms cubic-bezier(.22,1,.36,1), translate 760ms cubic-bezier(.16,1,.3,1), scale 760ms cubic-bezier(.16,1,.3,1) !important;
+  transition: opacity 260ms ease, translate 360ms cubic-bezier(.2,.8,.2,1), scale 360ms cubic-bezier(.2,.8,.2,1) !important;
 }
 @keyframes pz-dialog-in {
-  0%   { opacity: 0; translate: 0 20px; scale: .955; filter: blur(4px); }
-  60%  { filter: blur(0); }
-  100% { opacity: 1; translate: 0 0; scale: 1; filter: blur(0); }
+  from { opacity: 0; translate: 0 8px; scale: .985; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
 }
 html:not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p):not(#p) :is(.cx-setup-root.is-open .cx-setup-dialog, .modal-overlay.open .modal-card, .mac-settings-overlay.active > .mac-dialog, .jarvis-modal-overlay[aria-hidden="false"] .jarvis-modal, .pg-modal .pg-modal-card, #clavis-voiceid-sheet.is-in .cv-card) {
-  animation: pz-dialog-in 760ms cubic-bezier(.16,1,.3,1) backwards !important;
+  animation: pz-dialog-in 360ms cubic-bezier(.2,.8,.2,1) backwards !important;
 }
 @keyframes pz-pop-in  { from { opacity: 0; translate: 0 -8px; scale: .95; filter: blur(3px); } to { opacity: 1; translate: 0 0; scale: 1; filter: blur(0); } }
 @keyframes pz-pop-up  { from { opacity: 0; translate: 0 8px;  scale: .95; filter: blur(3px); } to { opacity: 1; translate: 0 0; scale: 1; filter: blur(0); } }
@@ -691,15 +782,6 @@ html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not
   translate: 0 -1px;
 }
 
-/* composer: a soft pillow under the input */
-html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.jarvis-input-container, .claude-input-container) {
-  box-shadow: 0 0 0 .5px rgba(60,48,30,.10), 0 2px 4px -2px rgba(60,48,30,.05), 0 14px 32px -18px rgba(60,48,30,.18) !important;
-  transition: box-shadow 420ms cubic-bezier(.22,1,.36,1) !important;
-}
-html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.jarvis-input-container, .claude-input-container):focus-within {
-  box-shadow: 0 0 0 .5px rgba(63,96,69,.28), 0 0 0 4px rgba(63,96,69,.07), 0 18px 40px -20px rgba(60,48,30,.22) !important;
-}
-
 /* olive buttons: a coloured, soft drop — never a black one */
 html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .pg-btn-primary, .enr-btn-primary, .generate-leads-btn, .desktop-notif-btn--primary) {
   box-shadow: var(--pz-sh-olive) !important;
@@ -727,4 +809,190 @@ html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not
 }
 html[data-theme="dark"]:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(.jarvis-input-container, .claude-input-container, .desktop-notification-card) {
   box-shadow: 0 0 0 .5px rgba(255,255,255,.08), 0 16px 36px -16px rgba(0,0,0,.65) !important;
+}
+
+/* Visual focus surfaces own the centre of the screen. clavis-claude.js parks
+   the live HUD below the topbar by default; that inline position used to put
+   it above the photo lightbox (its z-index is intentionally higher). Park it
+   in the empty top gutter while a photo/map is focused so it never covers the
+   content or steals the visual focus. */
+html.clavis-display-focus:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #clavis-live-hud.clh.clh-top {
+  top: 16px !important;
+  left: max(16px, calc(64px + env(safe-area-inset-left, 0px))) !important;
+  bottom: auto !important;
+  width: min(360px, calc(100vw - 32px)) !important;
+  transform: translate(0, 0) scale(.94) !important;
+  transform-origin: top left !important;
+  transition: opacity 260ms var(--cc-ease), transform 260ms var(--cc-ease), top 260ms var(--cc-ease), left 260ms var(--cc-ease) !important;
+}
+@media (max-width: 768px) {
+  html.clavis-display-focus:not(#cc#cc#cc#cc#cc#cc#cc#cc) body #clavis-live-hud.clh {
+    top: 12px !important;
+    left: 16px !important;
+    width: calc(100vw - 32px) !important;
+  }
+}
+
+/* Workspace polish: share the AI/Settings palette without changing page structure. */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) {
+  color: var(--cc-ink); --foreground: var(--cc-ink); --muted-foreground: var(--cc-mute); --border: var(--cc-line-2);
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.view-header, .pg-head) {
+  text-align: left !important; align-items: flex-start !important; gap: 16px; margin-bottom: 24px !important; padding-bottom: 20px !important; border-bottom: 1px solid var(--cc-line) !important; flex-wrap: wrap;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.view-title, .pg-head h1, .do-dash-greeting-title) {
+  font-family: var(--cc-serif) !important; font-size: clamp(24px, 2.3vw, 30px) !important; font-weight: 450 !important; line-height: 1.2 !important; letter-spacing: -.025em !important; color: var(--cc-ink) !important; margin: 0 0 8px !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.view-subtitle, .pg-head p, .do-dash-greeting-sub) {
+  font-family: var(--cc-sans) !important; font-size: 14px !important; font-style: normal !important; font-weight: 400 !important; color: var(--cc-mute) !important; line-height: 1.6 !important; max-width: 70ch; margin: 0 !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.view-header-actions, .pg-head-actions, .do-quick-actions) {
+  gap: 8px !important; flex-wrap: wrap;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-card, .do-chart-wrap, .stat-card, .chart-card, .analytics-card, .agent-config-card, .agent-progress-card, .email-sidebar-card, .gmail-compose-card, .table-container, .recent-leads-card, .pg-card, .pg-stat, .card, .outlook-setup-card) {
+  background: var(--cc-surface) !important; background-image: none !important; border: 1px solid var(--cc-line) !important; border-radius: 12px !important; box-shadow: none !important; backdrop-filter: none !important; min-width: 0;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-card, .stat-card, .analytics-card, .pg-card, .pg-stat):hover {
+  transform: none !important; translate: none !important; box-shadow: none !important; border-color: var(--cc-line-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-icon-wrap, .pg-avatar) {
+  background: var(--cc-sunk) !important; background-image: none !important; color: var(--cc-mute) !important; border-radius: 8px !important; box-shadow: none !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-trend, .do-status-badge, .pg-cap) {
+  background: transparent !important; color: var(--cc-mute) !important; border-radius: 4px !important; font-size: 12px !important; line-height: 1.5;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-card, .pg-stat) {
+  padding: 20px !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-num, .pg-stat-value) {
+  font-variant-numeric: tabular-nums; font-weight: 500 !important; letter-spacing: -.025em;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.chart-card-header, .card-header) {
+  background: transparent !important; border-bottom-color: var(--cc-line) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.card-title, .chart-card h3, .analytics-card h3, .email-sidebar-card h3, .agent-config-card h3, .pg-card-title) {
+  color: var(--cc-ink) !important; font-family: var(--cc-sans) !important; font-size: 15px !important; font-weight: 600 !important; line-height: 1.5;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.filter-bar, .pg-toolbar) {
+  background: transparent !important; border: 0 !important; box-shadow: none !important; padding: 0 0 16px !important; border-radius: 0 !important; gap: 12px;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.filter-chips, .pg-filters) {
+  gap: 8px !important; flex-wrap: wrap;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.filter-select, .form-input, .form-select, .form-textarea, .search-input-wrap input, .pg-search, .pg-search input) {
+  background: var(--cc-sheet) !important; color: var(--cc-ink) !important; border-color: var(--cc-line-2) !important; border-radius: 8px !important; box-shadow: none !important; font-family: var(--cc-sans) !important; font-size: 13px !important; min-height: 36px;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) .pg-search input {
+  border: 0 !important; min-width: 0;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(input, textarea)::placeholder {
+  color: var(--cc-mute) !important; opacity: 1;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.btn-secondary, .do-quick-btn, .pg-btn, .pg-chip, .filter-clear-btn) {
+  box-shadow: none !important; background-image: none !important; border-radius: 8px !important; font-family: var(--cc-sans) !important; font-size: 13px !important; font-weight: 500 !important; min-height: 36px; transform: none !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.pg-btn--ghost, .pg-chip) {
+  background: transparent !important; color: var(--cc-ink-2) !important; border: 1px solid var(--cc-line-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.pg-chip.is-active, .service-type-card.active, .service-type-card[data-selected="true"]) {
+  background: var(--cc-accent-soft) !important; color: var(--cc-accent-ink) !important; border-color: var(--cc-accent-ink) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) .pg-btn--primary {
+  background: var(--cc-accent) !important; color: var(--cc-on-accent) !important; border: 1px solid transparent !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.pg-badge--ready, .pg-badge--accent) {
+  background: var(--cc-sunk) !important; color: var(--cc-ink-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.pg-card-desc, .pg-card-meta, .pg-stat-label) {
+  color: var(--cc-mute) !important; line-height: 1.6 !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) .pg-health-dot {
+  box-shadow: none !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) .table-container {
+  overflow-x: auto;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) table {
+  border-collapse: collapse; width: 100%; font-size: 13px;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) th {
+  background: var(--cc-sheet) !important; color: var(--cc-mute) !important; font-size: 12px !important; font-weight: 500 !important; text-transform: none !important; letter-spacing: 0 !important; padding: 13px 16px !important; border-bottom: 1px solid var(--cc-line-2) !important; white-space: nowrap;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) td {
+  border-bottom-color: var(--cc-line) !important; padding: 14px 16px !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) tbody tr:hover {
+  background: var(--cc-hover) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--cc-accent-ink) !important; outline-offset: 3px !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) button:disabled {
+  opacity: .5 !important; cursor: not-allowed !important; transform: none !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) #excel-dropzone {
+  background: var(--cc-sheet) !important; border: 1px dashed var(--cc-line-3) !important; color: var(--cc-mute) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) #excel-dropzone p {
+  color: var(--cc-mute) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.service-type-card, .industry-card) {
+  box-shadow: none !important; border-radius: 8px !important;
+}
+@media (max-width: 760px) {
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-dashboard-grid, .stats-grid, .analytics-grid) { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 12px !important; }
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.view-header-actions, .pg-head-actions) { justify-content: flex-start !important; }
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) .pg-grid { grid-template-columns: minmax(0, 1fr) !important; }
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) > div[style*="grid-template-columns"] { grid-template-columns: minmax(0, 1fr) !important; }
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.do-stat-card, .pg-stat) { padding: 16px !important; }
+}
+@media (max-width: 480px) {
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.view-header-actions, .pg-head-actions) { width: 100%; }
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) :is(.btn-secondary, .btn-primary, .pg-btn, .pg-chip, .filter-select) { min-height: 44px; }
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-dashboard, #view-leads, #view-candidate-db, #view-agent, #view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-plugins, #view-tokens, #view-voice-ai) .search-input-wrap { min-width: 0 !important; width: 100%; }
+}
+
+
+/* Provider-specific surfaces use the same theme, including their dark state. */
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body .view {
+  --do-t1: var(--cc-ink); --do-t2: var(--cc-ink-2); --do-t3: var(--cc-mute);
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body :is(#view-email, #view-whatsapp) :is(.email-provider-switch, .gmail-header, .outlook-panel, .outlook-compose-row, .outlook-runbar, .outlook-log, .outlook-editor-tools) {
+  background: var(--cc-sheet) !important; color: var(--cc-ink) !important; border-color: var(--cc-line) !important; box-shadow: none !important; border-radius: 8px !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-email :is(.email-provider-tab, .email-tab-btn) {
+  background: transparent !important; color: var(--cc-mute) !important; min-width: 0 !important; min-height: 36px; box-shadow: none !important; transform: none !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-email :is(.email-provider-tab.is-active, .email-tab-active) {
+  background: var(--cc-accent-soft) !important; color: var(--cc-accent-ink) !important; border-color: var(--cc-line-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-email .email-provider-icon {
+  background: var(--cc-sunk) !important; color: var(--cc-ink-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-email :is(.outlook-input, .outlook-editor, .outlook-preview) {
+  background: var(--cc-surface) !important; color: var(--cc-ink) !important; border-color: var(--cc-line-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-email :is(.outlook-title, .outlook-panel-title, .outlook-field-row label, .outlook-account, .outlook-preview-subject) {
+  color: var(--cc-ink-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-email :is(.outlook-primary, .outlook-secondary) {
+  background: var(--cc-accent) !important; color: var(--cc-on-accent) !important; border-color: transparent !important; box-shadow: none !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-accounts h2 {
+  font: 450 28px/1.25 var(--cc-serif) !important; color: var(--cc-ink) !important; background: none !important; -webkit-text-fill-color: currentColor !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-accounts :is(a, [style*="color:#60a5fa"], [style*="color:#f1f5f9"]) {
+  color: var(--cc-ink-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-accounts [style*="background:rgba(59,130,246"] {
+  background: var(--cc-sheet) !important; border-color: var(--cc-line-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-accounts span[style*="background:#3b82f6"] {
+  background: var(--cc-sunk) !important; color: var(--cc-ink-2) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-excel .email-sidebar-card > div > div:first-child > div:first-child {
+  background: var(--cc-sunk) !important; color: var(--cc-mute) !important;
+}
+html:not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s):not(#s) body #view-excel :is(.email-sidebar-card svg, #excel-dropzone svg) {
+  stroke: var(--cc-mute) !important;
 }

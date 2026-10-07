@@ -1,0 +1,412 @@
+/* ============================================================
+ * clavis-final.css · loaded LAST — the Rudra24 AI screen, finished
+ * ------------------------------------------------------------
+ * 1. Motion tokens
+ * 2. Orb: circle safety net, honest size (no .94 squish), press/hover
+ * 3. Ambient glow behind the orb (round, breathes with state)
+ * 4. Header status: one pill, one coloured dot
+ * 5. Suggestion chip under the orb
+ * 6. Composer
+ * 7. Toasts (right side)
+ * 8. Floating task panel (#clavis-task-surface)
+ * 9. Reduced motion
+ *
+ * Specificity: `html:not(#_)×3 body:not(#_)×3` (6 IDs) beats the
+ * 3-ID "hands off the orb" rule in clavis-aurora.css and the 4-ID
+ * rules in clavis-luxe.css. Everything animates transform/opacity only.
+ * ============================================================ */
+
+/* ── 1. Motion tokens ─────────────────────────────────────── */
+:root {
+  --cx-ease-out: cubic-bezier(.16, 1, .3, 1);
+  --cx-ease-spring: cubic-bezier(.34, 1.3, .64, 1);
+  --cx-ease-in: cubic-bezier(.4, 0, 1, 1);
+  --cx-t1: 180ms;
+  --cx-t2: 280ms;
+  --cx-t3: 420ms;
+
+  --cx-orb: clamp(150px, 22vh, 220px);
+  --cx-orb-top: 18px;
+  --cx-ink: #1A1917;
+  --cx-mute: #6B6862;
+  --cx-hair: rgba(26, 25, 23, .09);
+  --cx-hair-2: rgba(26, 25, 23, .06);
+  --cx-fill: rgba(26, 25, 23, .035);
+  --cx-olive: #2F5233;
+  --cx-focus: rgba(47, 82, 51, .38);
+
+  --cx-dot-idle: #A8A29E;
+  --cx-dot-awake: #7FA37F;
+  --cx-dot-listen: #2FA25B;
+  --cx-dot-think: #E3A21A;
+  --cx-dot-speak: #7C3AED;
+  --cx-dot-error: #D0493C;
+}
+html[data-theme="dark"] {
+  --cx-ink: #F4F2EE;
+  --cx-mute: #A8A39B;
+  --cx-hair: rgba(255, 255, 255, .10);
+  --cx-hair-2: rgba(255, 255, 255, .06);
+  --cx-fill: rgba(255, 255, 255, .045);
+  --cx-focus: rgba(156, 196, 150, .45);
+  --cx-dot-idle: #78736C;
+  --cx-dot-speak: #A78BFA;
+}
+@media (max-height: 700px) {
+  :root { --cx-orb: clamp(130px, 23vh, 180px); --cx-orb-top: 12px; }
+}
+
+/* ── 2. Orb ───────────────────────────────────────────────── */
+/* Belt and braces: the shader is already round, but if anything ever
+   paints a rectangle in here, it gets cut to a circle. The clip-path
+   sits on the children, not the container, so the focus ring (an
+   outline on the container) is not clipped away. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container {
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  isolation: isolate !important;
+  contain: none !important;
+  -webkit-tap-highlight-color: transparent;
+  cursor: pointer !important;
+  outline: 2px solid transparent;
+  outline-offset: 4px;
+  transform: none !important;
+  transition:
+    translate var(--cx-t3) var(--cx-ease-out),
+    scale var(--cx-t1) var(--cx-ease-out),
+    outline-color var(--cx-t1) var(--cx-ease-out) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container > * {
+  border-radius: 50% !important;
+  clip-path: circle(50% at 50% 50%) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container > canvas {
+  display: block !important;
+  width: 100% !important;
+  height: 100% !important;
+}
+/* Old glow pseudos on the orb would now be clipped into a disc — the
+   glow lives on the wrapper instead (section 3). */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container::before,
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container::after { display: none !important; }
+
+/* Honest size in the empty state. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis:not(.has-messages) #orb-container {
+  width: var(--cx-orb) !important;
+  height: var(--cx-orb) !important;
+  min-width: var(--cx-orb) !important;
+  min-height: var(--cx-orb) !important;
+  max-width: var(--cx-orb) !important;
+  max-height: var(--cx-orb) !important;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 auto !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis:not(.has-messages) .jarvis-center-orb-wrapper {
+  padding-top: var(--cx-orb-top) !important;
+}
+
+/* Hover lifts, press sinks. `translate`/`scale` are their own
+   properties, so they never fight any transform another file sets. */
+@media (hover: hover) {
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container:hover { translate: 0 -2px; }
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container:active { scale: .97; translate: 0 0; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container:focus { outline-color: transparent; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container:focus-visible { outline: 2px solid var(--cx-focus) !important; outline-offset: 5px !important; }
+
+/* ── 3. Ambient glow behind the orb ───────────────────────── */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper { position: relative !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper > * { position: relative; z-index: 1; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper::before {
+  content: "" !important;
+  display: block !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: calc(var(--cx-orb-top) + var(--cx-orb) / 2) !important;
+  width: calc(var(--cx-orb) * 2.2) !important;
+  height: calc(var(--cx-orb) * 2.2) !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  background: radial-gradient(closest-side,
+    rgba(124, 58, 237, .15) 0%,
+    rgba(236, 98, 72, .08) 38%,
+    rgba(6, 182, 212, .045) 58%,
+    rgba(255, 255, 255, 0) 100%) !important;
+  pointer-events: none !important;
+  z-index: 0 !important;
+  opacity: .8;
+  scale: 1;
+  transform: translate(-50%, -50%);
+  animation: cx-glow-breathe 5.2s ease-in-out infinite;
+  transition: opacity var(--cx-t3) var(--cx-ease-out), scale var(--cx-t3) var(--cx-ease-out);
+  filter: none !important;
+}
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper::before {
+  background: radial-gradient(closest-side,
+    rgba(150, 110, 255, .22) 0%,
+    rgba(236, 98, 72, .09) 40%,
+    rgba(6, 182, 212, .05) 60%,
+    rgba(0, 0, 0, 0) 100%) !important;
+}
+@keyframes cx-glow-breathe {
+  0%, 100% { transform: translate(-50%, -50%) scale(.96); }
+  50%      { transform: translate(-50%, -50%) scale(1.04); }
+}
+html[data-clavis-awake="asleep"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper::before {
+  opacity: .42; scale: .94; animation-duration: 8s;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper:has(#orb-container[data-orb-state="LISTENING"])::before { opacity: 1; scale: 1.1; animation-duration: 3.6s; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper:has(#orb-container[data-orb-state="THINKING"])::before  { opacity: .95; scale: 1.04; animation-duration: 2.8s; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper:has(#orb-container[data-orb-state="SPEAKING"])::before  { opacity: 1; scale: 1.14; animation-duration: 2.2s; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper:has(#orb-container[data-orb-state="ERROR"])::before     { opacity: .5; scale: .95; }
+/* With a conversation on screen the orb is small; the halo steps back. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis.has-messages .jarvis-center-orb-wrapper::before { opacity: 0 !important; animation: none; }
+
+/* ── 4. Header status: one pill, one dot ──────────────────── */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .clavis-header-brand-wrap {
+  gap: 0 !important;
+  align-items: center !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-ai-title-top { margin-right: 12px !important; letter-spacing: -.01em; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill,
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-mic-live-status {
+  display: inline-flex !important;
+  align-items: center !important;
+  height: 26px !important;
+  min-height: 0 !important;
+  margin: 0 !important;
+  background: var(--cx-fill) !important;
+  border: 1px solid var(--cx-hair) !important;
+  box-shadow: none !important;
+  color: var(--cx-mute) !important;
+  font-size: 12.5px !important;
+  font-weight: 500 !important;
+  line-height: 1 !important;
+  letter-spacing: 0 !important;
+  white-space: nowrap;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: background-color var(--cx-t2) var(--cx-ease-out), color var(--cx-t2) var(--cx-ease-out) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill {
+  gap: 7px !important;
+  padding: 0 10px 0 10px !important;
+  border-radius: 999px 0 0 999px !important;
+  border-right: 0 !important;
+  color: var(--cx-ink) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-mic-live-status {
+  gap: 0 !important;
+  padding: 0 11px 0 10px !important;
+  border-radius: 0 999px 999px 0 !important;
+  position: relative;
+}
+/* hairline divider between the two halves */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-mic-live-status::before {
+  content: "";
+  position: absolute; left: 0; top: 7px; bottom: 7px; width: 1px;
+  background: var(--cx-hair);
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-mic-live-status:hover { background: var(--cx-hair-2) !important; color: var(--cx-ink) !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-mic-live-status:focus-visible { outline: 2px solid var(--cx-focus) !important; outline-offset: 2px; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .clavis-live-mic-dot { display: none !important; }
+
+/* The one dot. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill::before {
+  content: "" !important;
+  display: block !important;
+  position: static !important;
+  flex: 0 0 auto;
+  width: 7px !important;
+  height: 7px !important;
+  margin: 0 !important;
+  border-radius: 50% !important;
+  background: var(--cx-dot, var(--cx-dot-awake)) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cx-dot, var(--cx-dot-awake)) 18%, transparent) !important;
+  opacity: 1 !important;
+  transform: none;
+  animation: none;
+  transition: background-color var(--cx-t2) var(--cx-ease-out), box-shadow var(--cx-t2) var(--cx-ease-out) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill::after { display: none !important; }
+/* asleep first, live states after — later wins at equal weight */
+html[data-clavis-awake="asleep"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill,
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill.idle { --cx-dot: var(--cx-dot-idle); }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill:is(.listening, .awake, .interrupted),
+html:not(#_):not(#_):not(#_):has(#orb-container[data-orb-state="LISTENING"]) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill { --cx-dot: var(--cx-dot-listen); }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill.thinking,
+html:not(#_):not(#_):not(#_):has(#orb-container[data-orb-state="THINKING"]) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill { --cx-dot: var(--cx-dot-think); }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill.speaking,
+html:not(#_):not(#_):not(#_):has(#orb-container[data-orb-state="SPEAKING"]) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill { --cx-dot: var(--cx-dot-speak); }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill:is(.error, .offline, .unavailable),
+html:not(#_):not(#_):not(#_):has(#orb-container[data-orb-state="ERROR"]) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill { --cx-dot: var(--cx-dot-error); }
+/* live states pulse the dot gently */
+html:not(#_):not(#_):not(#_):has(#orb-container:is([data-orb-state="LISTENING"], [data-orb-state="THINKING"], [data-orb-state="SPEAKING"])) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill::before {
+  animation: cx-dot-pulse 1.6s var(--cx-ease-out) infinite;
+}
+@keyframes cx-dot-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(.78); opacity: .72; }
+}
+
+/* ── 5. Suggestion chip under the orb ─────────────────────── */
+/* jarvis_ui.js fades it to 0 + 3px down, swaps the text after 180 ms,
+   then fades back — timing matched so it reads as one crossfade. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill {
+  gap: 8px !important;
+  padding: 6px 14px 6px 12px !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--cx-hair-2) !important;
+  background: rgba(255, 255, 255, .55) !important;
+  box-shadow: 0 1px 2px rgba(26, 25, 23, .03) !important;
+  color: var(--cx-mute) !important;
+  font-size: 13px !important;
+  font-weight: 450 !important;
+  letter-spacing: 0 !important;
+  cursor: pointer;
+  filter: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition:
+    opacity var(--cx-t1) var(--cx-ease-out),
+    transform var(--cx-t2) var(--cx-ease-out),
+    background-color var(--cx-t1) var(--cx-ease-out),
+    border-color var(--cx-t1) var(--cx-ease-out),
+    color var(--cx-t1) var(--cx-ease-out) !important;
+}
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill { background: rgba(255, 255, 255, .04) !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill:hover {
+  border-color: var(--cx-hair) !important;
+  background: rgba(255, 255, 255, .9) !important;
+  color: var(--cx-ink) !important;
+}
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill:hover { background: rgba(255, 255, 255, .08) !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill .clavis-tip-icon { font-size: 12.5px; opacity: .85; filter: none !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill .clavis-tip-text { color: inherit !important; }
+
+/* ── 6. Composer ──────────────────────────────────────────── */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-input-container {
+  border-radius: 20px !important;
+  border: 1px solid var(--cx-hair) !important;
+  box-shadow:
+    0 1px 2px rgba(26, 25, 23, .04),
+    0 10px 28px -14px rgba(26, 25, 23, .16) !important;
+  transition:
+    border-color var(--cx-t2) var(--cx-ease-out),
+    box-shadow var(--cx-t2) var(--cx-ease-out) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-input-container:hover {
+  border-color: rgba(26, 25, 23, .13) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-input-container:focus-within {
+  border-color: rgba(47, 82, 51, .34) !important;
+  box-shadow:
+    0 0 0 4px rgba(47, 82, 51, .09),
+    0 1px 2px rgba(26, 25, 23, .04),
+    0 14px 34px -16px rgba(26, 25, 23, .20) !important;
+}
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-input-container {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px -14px rgba(0, 0, 0, .6) !important;
+}
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-input-container:hover { border-color: rgba(255, 255, 255, .16) !important; }
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-input-container:focus-within {
+  border-color: rgba(156, 196, 150, .40) !important;
+  box-shadow: 0 0 0 4px rgba(156, 196, 150, .10), 0 12px 30px -14px rgba(0, 0, 0, .6) !important;
+}
+
+/* ── 7. Toasts ────────────────────────────────────────────── */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) .desktop-notification-card {
+  border-radius: 16px !important;
+  border: 1px solid var(--cx-hair-2) !important;
+  box-shadow:
+    0 1px 2px rgba(26, 25, 23, .05),
+    0 14px 36px -14px rgba(26, 25, 23, .22) !important;
+}
+html[data-theme="dark"]:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) .desktop-notification-card {
+  box-shadow: 0 1px 2px rgba(0, 0, 0, .4), 0 16px 40px -14px rgba(0, 0, 0, .7) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) .desktop-notification-card :is(strong, h4, .title, .desktop-notification-title) {
+  letter-spacing: -.005em;
+}
+
+/* ── 8. Floating task panel ───────────────────────────────── */
+/* Enter: expo-out from 10px below at .97. Exit: faster, and it
+   actually fades now — visibility waits for the fade instead of
+   snapping the panel away on the first frame. */
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface {
+  transform-origin: top right;
+  transition:
+    opacity var(--cx-t1) var(--cx-ease-in),
+    transform var(--cx-t1) var(--cx-ease-in),
+    visibility 0s linear var(--cx-t1),
+    height var(--cx-t3) var(--cx-ease-out),
+    width var(--cx-t3) var(--cx-ease-out),
+    border-radius var(--cx-t3) var(--cx-ease-out),
+    box-shadow var(--cx-t3) var(--cx-ease-out) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface:not(.is-open) {
+  transform: translateY(8px) scale(.97);
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface:not(.is-open) * { visibility: inherit !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface.is-open {
+  transition:
+    opacity var(--cx-t2) var(--cx-ease-out),
+    transform var(--cx-t3) var(--cx-ease-out),
+    visibility 0s linear 0s,
+    height var(--cx-t3) var(--cx-ease-out),
+    width var(--cx-t3) var(--cx-ease-out),
+    border-radius var(--cx-t3) var(--cx-ease-out),
+    box-shadow var(--cx-t3) var(--cx-ease-out) !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface:is(.is-dragging, .is-moved.is-dragging) { transition: none !important; }
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface .cts-head-label {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  letter-spacing: -.005em !important;
+}
+html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface .cts-body {
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── 9. Reduced motion ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis .jarvis-center-orb-wrapper::before,
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #jarvis-status-pill::before {
+    animation: none !important;
+  }
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #orb-container:hover { translate: none; }
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface,
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface.is-open,
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #clavis-task-surface:not(.is-open) {
+    transform: none !important;
+    transition: opacity var(--cx-t1) linear, visibility 0s linear var(--cx-t1) !important;
+  }
+  html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) #view-jarvis #clavis-feature-tip-pill { transition: opacity var(--cx-t1) linear !important; transform: none !important; }
+}
+
+/* ── Key-setup card (replaces the old purple Groq paste box) ── */
+html body #view-jarvis #clavis-brain-card.cx-brain-card {
+  display: flex; align-items: center; gap: 12px;
+  margin: 16px auto 0; max-width: 460px; width: calc(100% - 32px);
+  padding: 12px 12px 12px 16px; text-align: left; cursor: pointer;
+  font: inherit; color: inherit;
+  background: color-mix(in srgb, var(--olive-500, #5b6b3a) 7%, var(--cream, #fbf8f1));
+  border: 1px solid color-mix(in srgb, var(--olive-500, #5b6b3a) 22%, transparent);
+  border-radius: 16px;
+  box-shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px -14px rgba(60,50,20,.25);
+  transition: transform var(--cx-dur-2, 280ms) var(--cx-ease-out, cubic-bezier(.16,1,.3,1)), box-shadow var(--cx-dur-2, 280ms) var(--cx-ease-out, cubic-bezier(.16,1,.3,1));
+  animation: cxBrainIn 420ms var(--cx-ease-out, cubic-bezier(.16,1,.3,1)) both;
+}
+html body #view-jarvis #clavis-brain-card.cx-brain-card:hover { transform: translateY(-1px); box-shadow: 0 2px 4px rgba(0,0,0,.05), 0 14px 30px -16px rgba(60,50,20,.35); }
+html body #view-jarvis #clavis-brain-card.cx-brain-card:active { transform: scale(.985); }
+html body #view-jarvis #clavis-brain-card.cx-brain-card:focus-visible { outline: 2px solid var(--olive-500, #5b6b3a); outline-offset: 3px; }
+#clavis-brain-card .cx-brain-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #d9a23a; box-shadow: 0 0 0 4px rgba(217,162,58,.18); }
+#clavis-brain-card .cx-brain-text { flex: 1; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+#clavis-brain-card .cx-brain-text b { font-size: 13.5px; font-weight: 650; }
+#clavis-brain-card .cx-brain-text small { font-size: 12px; opacity: .68; }
+#clavis-brain-card .cx-brain-cta { flex: none; padding: 8px 14px; border-radius: 11px; font-size: 12.5px; font-weight: 650; color: #fff; background: var(--olive-600, #4a5a2c); }
+html[data-theme="dark"] body #view-jarvis #clavis-brain-card.cx-brain-card { background: rgba(255,255,255,.04); border-color: rgba(255,255,255,.1); }
+@keyframes cxBrainIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { html body #view-jarvis #clavis-brain-card.cx-brain-card { animation: none; transition: none; } }

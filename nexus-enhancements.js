@@ -48,12 +48,14 @@
 
   function updateBranding() {
     var el = document.getElementById('logo-brand-text');
-    if (el) {
-      el.textContent = 'Clavis AI';
+    // write only when different: a same-text write is still a DOM mutation
+    // that woke a dozen observers and a full style recalc every 400 ms
+    if (el && el.textContent !== 'Rudra24 AI') {
+      el.textContent = 'Rudra24 AI';
     }
     var sub = document.querySelector('#sidebar .logo-sub');
-    if (sub) {
-      sub.textContent = 'Clavis AI Agent';
+    if (sub && sub.textContent !== 'Rudra24 AI Agent') {
+      sub.textContent = 'Rudra24 AI Agent';
     }
   }
 
@@ -267,7 +269,6 @@
       // Sync CSS variable for main-content margin-left tracking
       var targetW = collapsed ? '62px' : (root.style.getPropertyValue('--sidebar-expanded') || '220px');
       root.style.setProperty('--sidebar-current', targetW);
-      root.style.setProperty('--main-left', targetW);
       localStorage.setItem('lx-sidebar-collapsed', String(collapsed));
       updateBranding();
     }

@@ -1,0 +1,10 @@
+.ag-logo-emblem {
+  width: 92px !important;
+  height: 60px !important;
+  background: transparent !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  animation: none !important;
+}
+.ag-logo-emblem img { width: 92px; height: 60px; object-fit: contain; }
+.sidebar-brand-row > img { flex-shrink: 0; object-fit: contain; }

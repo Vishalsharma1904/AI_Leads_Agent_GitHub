@@ -1,4 +1,4 @@
-"""Read a public web page for Clavis — in the background, nothing on screen.
+"""Read a public web page for Rudra24 AI — in the background, nothing on screen.
 
 POST /api/v1/web/read {url, screenshot?, follow_contact?}
 
@@ -325,7 +325,7 @@ async def _commons_images(client: httpx.AsyncClient, q: str, n: int) -> list[dic
 
 @router.get("/images")
 async def image_search(q: str, n: int = 9):
-    """Pictures for Clavis's display: web image search, Wikimedia as backup."""
+    """Pictures for Rudra24 AI's display: web image search, Wikimedia as backup."""
     q = q.strip()[:200]
     if not q:
         raise HTTPException(status_code=400, detail="Empty image query.")

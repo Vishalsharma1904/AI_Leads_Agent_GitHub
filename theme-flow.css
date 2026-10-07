@@ -62,7 +62,7 @@ html[data-theme="light"] {
   --foreground:  #111111 !important;
   --card:        #FFFFFF !important;
   --border:      rgba(17, 17, 17, 0.12) !important;
-  --primary:     var(--flow-green) !important;
+  --primary:     #31543A !important;
   --gray-400:    #6E6A63 !important;
   --gray-600:    #4A4741 !important;
 
@@ -72,8 +72,8 @@ html[data-theme="light"] {
   --do-border-strong: rgba(17, 17, 17, 0.2) !important;
   --do-t1:            #111111 !important;
   --do-t2:            #4A4741 !important;
-  --do-t3:            #857F76 !important;
-  --do-blue:          var(--flow-green) !important;
+  --do-t3:            #68665F !important;
+  --do-blue:          #31543A !important;
   --do-blue-soft:     var(--flow-green-soft) !important;
   --do-card-bg:       #FFFFFF !important;
   --do-card-border:   rgba(17, 17, 17, 0.12) !important;
@@ -624,8 +624,8 @@ html[data-theme="dark"] #app-shell { background: var(--shell-canvas) !important;
 
 /* Explicit collapsed rule as a safety net, in case :has() is unavailable or a
    script changes the width without updating the custom property. */
-:root:has(#sidebar.collapsed) .main-content,
-:root:has(#sidebar.collapsed) #main-content { margin-left: 68px !important; }
+html.rudra-rail-legacy .main-content,
+html.rudra-rail-legacy #main-content { margin-left: 68px !important; }
 
 #main-content.full-width,
 .main-content.full-width { margin-left: 0 !important; }
@@ -1074,8 +1074,8 @@ html[data-theme="dark"] .chat-message.user .chat-bubble {
 }
 
 /* The collapsed rail and content must use the same geometry token. */
-:root:has(#sidebar.collapsed) .main-content,
-:root:has(#sidebar.collapsed) #main-content {
+html.rudra-rail-legacy .main-content,
+html.rudra-rail-legacy #main-content {
   margin-left: var(--sidebar-current, var(--sidebar-collapsed, 62px)) !important;
 }
 
@@ -3657,8 +3657,8 @@ html[data-theme='dark'] .views-container {
 }
 
 /* ═══════════════════════════════════════════════════════════════
-   CLAVIS MINIMAL SURFACE
-   Keep this final so the Clavis route has one predictable geometry contract.
+   RUDRA24 AI MINIMAL SURFACE
+   Keep this final so the Rudra24 AI route has one predictable geometry contract.
    It removes the inset-card treatment, restores the conversation composer,
    and keeps every secondary surface inside a real scroll container.
    ═══════════════════════════════════════════════════════════════ */
@@ -4070,7 +4070,7 @@ html[data-theme="dark"] #view-jarvis.active .jarvis-center-orb-wrapper { backgro
 }
 
 /* ============================================================
-   CLAVIS LIQUID ORB — smooth moving-gradient orb (ChatGPT-style)
+   RUDRA24 AI LIQUID ORB — smooth moving-gradient orb (ChatGPT-style)
    Replaces the particle-canvas visual. Colors drift continuously
    inside a circular mask; state (idle/listening/thinking/speaking)
    is read from #orb-container[data-orb-state] and only changes
@@ -4141,7 +4141,7 @@ html[data-theme="dark"] #view-jarvis.active .jarvis-center-orb-wrapper { backgro
 }
 
 /* ============================================================
-   CLAVIS HEADER DECLUTTER — the old row was 8 full-text pills
+   RUDRA24 AI HEADER DECLUTTER — the old row was 8 full-text pills
    wide and ate most of the header. Now: 3 icon-only mode toggles
    + New Chat + a single "More" overflow menu for everything else.
    ============================================================ */

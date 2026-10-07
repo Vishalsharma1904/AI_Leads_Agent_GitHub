@@ -7499,7 +7499,7 @@ html[data-theme="light"] .switch .slider {
   .toast, .toast.visible, .jarvis-wrapper * { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
 }
 
-/* Clavis voice panel: provider voices sit beside device voices without
+/* Rudra24 AI voice panel: provider voices sit beside device voices without
    making the panel wider or stealing space from the chat surface. */
 .jarvis-wrapper .clavis-cloud-voice-section { margin: 0 0 10px; padding: 9px; border: 1px solid #e7ebee; border-radius: 10px; background: #fafcfd; }
 .jarvis-wrapper .clavis-cloud-voice-heading { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; color: #394150; font-size: 11px; font-weight: 700; }
@@ -7533,3 +7533,17 @@ html[data-theme="dark"] .jarvis-wrapper .clavis-recognition-language small { col
 
 
 
+body, .cts-body, .clavis-chat, .kv-panel {
+  font-family: var(--font-sans);
+  font-weight: var(--fw-regular);
+  letter-spacing: var(--ls-normal);
+  line-height: var(--lh-normal);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1, h2, h3, .cts-header-label, .kv-title {
+  font-weight: var(--fw-semibold);
+  letter-spacing: var(--ls-tight);
+  line-height: var(--lh-tight);
+}

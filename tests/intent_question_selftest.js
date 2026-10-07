@@ -1,0 +1,10 @@
+const fs=require('fs'),vm=require('vm'),assert=require('assert');
+const c={window:{}};vm.createContext(c);vm.runInContext(fs.readFileSync('clavis-request-intent.js','utf8'),c);
+const questions=['Kya ham har ek industry ke liye leads generate kr sakte hain using my AI?','क्या हम हर industry के लिए leads generate कर सकते हैं?','What can my AI do?','How do I generate leads in Delhi?','Explain scraping mode','Do not generate leads, explain the process','Can we send messages using Android?','Tell me about \"generate 20 leads\"','How many saved leads do I have?'];
+const actions=['Generate 20 hotel leads in Delhi','Can you find 20 leads in Delhi?','Mujhe 10 leads chahiye','Delhi ki leads nikalo','Generate leads for all industries','दिल्ली से 20 leads निकालो','Can we find leads? If yes find 10 in Delhi'];
+for(const t of questions)assert.equal(c.window.ClavisRequestIntent.classify(t).answerOnly,true,t);
+for(const t of actions)assert.equal(c.window.ClavisRequestIntent.classify(t).answerOnly,false,t);
+vm.runInContext(fs.readFileSync('lead-candidate-domain.js','utf8'),c);
+for(const t of questions)assert.equal(c.window.LeadCandidateDomain.parseRequest(t).isSearch,false,t);
+for(const f of ['jarvis.js','jarvis_ui.js','clavis-task-controller.js','page-crm.js','page-textbee.js','crm-bridge.js','app.js'])new vm.Script(fs.readFileSync(f,'utf8'),{filename:f});
+console.log('Intent question/action fixtures, deterministic search gate, JS syntax: passed');

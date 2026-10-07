@@ -1,0 +1,548 @@
+/* ============================================================
+ * clavis-refined.css · THE LAST LAYER (loads after clavis-claude.css)
+ * ------------------------------------------------------------
+ * Four jobs, nothing else:
+ *   1. Type   — Claude's weight ladder. Nothing thicker than 500,
+ *               headings sit at 440 in the serif. Sleek, not spindly.
+ *   2. Chrome — one thin scrollbar for the whole app (20 files were
+ *               each drawing their own; last one loaded wins, so it
+ *               may as well be a good one).
+ *   3. Motion — one duration ladder + one curve. Slow in, quick out.
+ *   4. Depth  — the floating windows had a 0.28-alpha shadow and read
+ *               as flat stickers. Layered now: contact + mid + ambient.
+ *
+ * Specificity hack `html:not(#cc…)` is the house pattern — earlier
+ * layers are full of !important and this has to outrank them.
+ * ============================================================ */
+
+:root {
+  /* Duration ladder. Enter slow (the eye follows), exit quick (the eye
+     has already moved on). Exit is ~55% of enter, everywhere. */
+  --rf-t1: 140ms;   /* colour / hover — must feel instant */
+  --rf-t2: 240ms;   /* chips, toggles, small state */
+  --rf-t3: 380ms;   /* menus, dropdowns, popovers */
+  --rf-t4: 560ms;   /* panels, sheets, windows opening */
+  --rf-t5: 820ms;   /* first paint, hero, globe->map morph */
+  --rf-out: 200ms;  /* every exit */
+
+  /* One curve for entrances (expo-out: fast start, long settle — this is
+     what reads as "buttery"), one for exits, one for position swaps. */
+  --rf-ease:      cubic-bezier(.16, 1, .3, 1);
+  --rf-ease-out:  cubic-bezier(.4, 0, 1, 1);
+  --rf-ease-flip: cubic-bezier(.32, .72, 0, 1);
+  --rf-ease-soft: cubic-bezier(.22, .61, .36, 1);
+
+  /* Depth. Three stops each: hairline contact, short mid, long ambient.
+     A single big blur is what made the old windows look pasted on. */
+  --rf-sh-sm:  0 0 0 .5px rgba(20,20,19,.07), 0 1px 2px rgba(20,20,19,.05), 0 4px 10px -3px rgba(20,20,19,.10);
+  --rf-sh-pop: 0 0 0 .5px rgba(20,20,19,.08), 0 2px 5px -1px rgba(20,20,19,.06), 0 10px 24px -6px rgba(20,20,19,.14), 0 28px 60px -18px rgba(20,20,19,.22);
+  --rf-sh-win: 0 0 0 .5px rgba(20,20,19,.09), 0 3px 8px -2px rgba(20,20,19,.07), 0 16px 36px -10px rgba(20,20,19,.16), 0 48px 100px -28px rgba(20,20,19,.32);
+  --rf-sh-lift:0 0 0 .5px rgba(20,20,19,.10), 0 6px 14px -4px rgba(20,20,19,.10), 0 24px 52px -14px rgba(20,20,19,.22), 0 60px 120px -32px rgba(20,20,19,.36);
+}
+
+:root[data-theme="dark"], html.dark, body.dark {
+  --rf-sh-sm:  0 0 0 .5px rgba(255,255,255,.06), 0 1px 2px rgba(0,0,0,.4), 0 4px 10px -3px rgba(0,0,0,.5);
+  --rf-sh-pop: 0 0 0 .5px rgba(255,255,255,.07), 0 2px 5px -1px rgba(0,0,0,.4), 0 10px 24px -6px rgba(0,0,0,.55), 0 28px 60px -18px rgba(0,0,0,.7);
+  --rf-sh-win: 0 0 0 .5px rgba(255,255,255,.08), 0 3px 8px -2px rgba(0,0,0,.45), 0 16px 36px -10px rgba(0,0,0,.6), 0 48px 100px -28px rgba(0,0,0,.8);
+  --rf-sh-lift:0 0 0 .5px rgba(255,255,255,.09), 0 6px 14px -4px rgba(0,0,0,.5), 0 24px 52px -14px rgba(0,0,0,.65), 0 60px 120px -32px rgba(0,0,0,.85);
+}
+
+/* ---------- 1. TYPE ----------------------------------------------------
+ * Geist is variable 100-900, so these are real interpolated weights, not
+ * the browser faking a bold. Claude's ladder: body 400, emphasis 500,
+ * headings 440 in the serif with the tracking pulled in. A 700 heading
+ * is what made this app look like a dashboard instead of a document. */
+
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) button,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) input,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) textarea,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) select {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-synthesis-weight: none;   /* never let the browser fake a bolder cut */
+}
+
+/* Headings: serif, light, tracked in. Size drives the tracking — big text
+   needs it pulled tighter or it reads loose. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h1,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h2,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h3 {
+  font-weight: 440 !important;
+  letter-spacing: -.021em !important;
+  line-height: 1.22 !important;
+  font-variation-settings: 'opsz' 32;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h4,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h5,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h6 {
+  font-weight: 500 !important;
+  letter-spacing: -.012em !important;
+  line-height: 1.3 !important;
+}
+
+/* The cap. Anything that asked for 600/700/800 gets 500 — that is the
+   whole "not thick" request in one rule. Scoped to text-bearing elements
+   so icon fonts and the logo keep their own weight. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(p, span, div, li, td, th, label, button, a, strong, b, dt, summary, figcaption):not(.lx-i):not([class*="icon"]):not([class*="logo"]) {
+  font-synthesis-weight: none;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) strong,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) b {
+  font-weight: 540 !important;
+  letter-spacing: -.003em;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) button,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .btn,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) [role="button"] {
+  font-weight: 480 !important;
+  letter-spacing: -.006em !important;
+}
+/* Body copy: the 1.65 line-height is what makes long answers readable. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) p,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) li {
+  line-height: 1.65;
+  letter-spacing: -.0035em;
+}
+
+/* ---------- 2. SCROLLBAR -----------------------------------------------
+ * One bar, 11px of gutter with a 5px thumb floating inside it (the
+ * transparent border + background-clip trick). Track stays invisible so
+ * it never draws a grey channel down the side of the page. */
+
+/* Both of these inherit, so the root is enough. The same rule written as
+   `html:not(#cc…) *` made the browser evaluate an eight-ID :not() against
+   every one of ~4,800 nodes on this page, twice over, for no gain. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--cc-ink, #141413) 17%, transparent) transparent;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar { width: 11px; height: 11px; background: transparent; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-track,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-corner { background: transparent; border: 0; box-shadow: none; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--cc-ink, #141413) 15%, transparent);
+  border: 3px solid transparent;
+  background-clip: content-box;
+  border-radius: 99px;
+  /* colour only — a transition on anything else here fights the scroll */
+  transition: background-color var(--rf-t2) var(--rf-ease);
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in srgb, var(--cc-ink, #141413) 30%, transparent);
+  background-clip: content-box;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-thumb:active {
+  background-color: color-mix(in srgb, var(--cc-ink, #141413) 42%, transparent);
+  background-clip: content-box;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-button { display: none; width: 0; height: 0; }
+
+/* Scroll feel. `contain` is the one that kills the rubber-band jolt when a
+   list hits its end and hands the scroll to the page behind it. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.chat-scroll, .messages, [class*="-scroll"], [class*="-list"], [class*="-body"]) {
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+/* ---------- 3. MOTION ---------------------------------------------------
+ * NOT narrowing transition-property globally, on purpose.
+ *
+ * The obvious move is to force every element onto compositor-only
+ * properties and declare `transition: all` the cause of the jitter. It
+ * would also have silently broken ~65 transitions that work: the composer
+ * textarea auto-grow, the settings accordion max-height slide, the voice
+ * wave bars, the modal resize. They animate height legitimately, this
+ * sheet loads last and outranks them, so they would simply stop.
+ *
+ * The jitter was two specific animations and they are fixed where they
+ * live (clavis-canvas.js openWindow). Narrow a widget when that widget
+ * needs it; never the whole document. */
+
+/* Menus, dropdowns, popovers: slow in with a touch of lift + blur-clear,
+   quick out. The blur->clear is what makes it feel like it resolves into
+   place rather than being switched on. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.context-menu, .dropdown-menu, .lx-menu,
+  .topbar-profile-menu, .cand-source-menu, .jarvis-composer-dropdown,
+  [role="menu"], [role="listbox"]) {
+  transform-origin: top center;
+  transition:
+    opacity var(--rf-out) var(--rf-ease-out),
+    transform var(--rf-out) var(--rf-ease-out),
+    filter var(--rf-out) var(--rf-ease-out) !important;
+  will-change: opacity, transform;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.context-menu, .dropdown-menu, .lx-menu,
+  .topbar-profile-menu, .cand-source-menu, .jarvis-composer-dropdown,
+  [role="menu"], [role="listbox"]):is(.open, .is-open, .show, .visible, [data-open="true"]) {
+  transition:
+    opacity var(--rf-t3) var(--rf-ease),
+    transform var(--rf-t3) var(--rf-ease),
+    filter var(--rf-t3) var(--rf-ease) !important;
+}
+
+/* Buttons: press has to land in under ~120ms or it feels disconnected
+   from the finger. Release can take its time. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) button:active,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) [role="button"]:active {
+  transition-duration: 90ms !important;
+}
+
+/* ---------- 4. DEPTH ----------------------------------------------------
+ * The canvas windows (map + peek) were a single soft blur at .28 alpha.
+ * Re-point their token at the layered stack so they sit above the page
+ * instead of printing on it. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .ccv { box-shadow: var(--rf-sh-win) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .ccv.is-expanded { box-shadow: var(--rf-sh-lift) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.context-menu, .dropdown-menu, .lx-menu,
+  .topbar-profile-menu, .jarvis-composer-dropdown, [role="menu"]) {
+  box-shadow: var(--rf-sh-pop) !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(#cc#cc#cc#cc#cc#cc#cc#cc) *,
+  html:not(#cc#cc#cc#cc#cc#cc#cc#cc) *::before,
+  html:not(#cc#cc#cc#cc#cc#cc#cc#cc) *::after {
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* ---------- 5. THE GLOBE ------------------------------------------------
+ * A 30px earth in the topbar that turns, slowly, forever. Built from one
+ * repeating landmass tile sliding under a clipped circle — that read as a
+ * sphere far better than a wireframe did, and it is one composited layer
+ * instead of a dozen animated ellipses.
+ *
+ * Shading sells it: continents slide on a flat disc, then a radial
+ * gradient puts the light top-left and a second one darkens the limb.
+ * ponytail: 28s/turn is deliberate — fast enough to notice on a second
+ * look, slow enough that it never pulls the eye off the conversation. */
+
+.rf-globe-btn {
+  --rf-globe-size: 30px;
+  position: relative;
+  flex: 0 0 auto;
+  width: var(--rf-globe-size);
+  height: var(--rf-globe-size);
+  padding: 0;
+  margin: 0 2px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  isolation: isolate;
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--rf-t3) var(--rf-ease), filter var(--rf-t3) var(--rf-ease);
+}
+.rf-globe-btn:hover { transform: scale(1.09); }
+.rf-globe-btn:active { transform: scale(.95); transition-duration: 90ms; }
+.rf-globe-btn:focus-visible {
+  outline: 2px solid var(--cc-accent, #4f583b);
+  outline-offset: 3px;
+}
+
+/* the sphere */
+.rf-globe {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--cc-accent, #4f583b);
+  box-shadow:
+    inset 0 0 0 .5px rgba(255,255,255,.22),
+    0 1px 2px rgba(20,20,19,.18),
+    0 3px 8px -2px rgba(20,20,19,.22);
+  transform: translateZ(0);          /* own layer — the tile slides on the GPU */
+}
+
+/* landmasses: one tile, repeated, sliding one tile-width per cycle so the
+   seam never lands anywhere visible */
+.rf-globe::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='100' viewBox='0 0 100 100'%3E%3Cg fill='%23ffffff'%3E%3Cpath d='M8 26c6-5 15-4 19 1 4 5 2 11-4 13-7 2-15-1-18-6-2-4 0-6 3-8z'/%3E%3Cpath d='M31 54c8-6 18-3 21 4 3 7-2 14-10 14-8 1-15-4-14-11 0-3 1-5 3-7z'/%3E%3Cpath d='M53 16c9-3 18 3 18 10 0 6-5 11-13 11-7 0-12-5-11-12 0-4 3-7 6-9z'/%3E%3Cpath d='M71 45c7-4 16 1 17 8 1 7-4 12-11 12s-13-5-12-12c1-4 3-6 6-8z'/%3E%3Cpath d='M44 77c6-3 13 1 13 6 1 5-4 9-10 9s-10-4-9-9c1-3 3-5 6-6z'/%3E%3Cpath d='M85 71c5-2 10 1 10 6 0 4-5 7-9 6-4-1-7-5-6-8 1-2 3-4 5-4z'/%3E%3Cpath d='M13 67c5-2 11 1 11 6s-4 7-9 7c-5-1-8-4-7-8 0-2 2-4 5-5z'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 50% 100%;
+  background-repeat: repeat-x;
+  opacity: .88;
+  animation: rf-globe-spin 28s linear infinite;
+  will-change: background-position;
+}
+
+/* light top-left, limb darkening bottom-right — this is the only reason
+   a flat disc of blobs reads as a ball */
+.rf-globe::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 32% 26%, rgba(255,255,255,.44) 0%, rgba(255,255,255,.14) 28%, transparent 54%),
+    radial-gradient(circle at 72% 78%, rgba(0,0,0,.34) 0%, transparent 58%);
+  pointer-events: none;
+}
+
+@keyframes rf-globe-spin {
+  from { background-position-x: 0; }
+  to   { background-position-x: -100%; }   /* exactly one tile → seamless */
+}
+
+/* a breath of light around it on hover, never a glow */
+.rf-globe-btn::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border-radius: 50%;
+  background: radial-gradient(circle, color-mix(in srgb, var(--cc-accent, #4f583b) 26%, transparent) 0%, transparent 68%);
+  opacity: 0;
+  z-index: -1;
+  transition: opacity var(--rf-t3) var(--rf-ease);
+}
+.rf-globe-btn:hover::after { opacity: 1; }
+
+/* map already open → the globe reads as "on" and slows to half speed */
+.rf-globe-btn.is-live .rf-globe { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--cc-accent, #4f583b) 70%, #fff), 0 2px 6px rgba(20,20,19,.2); }
+.rf-globe-btn.is-live .rf-globe::before { animation-duration: 56s; }
+
+/* the morph clone: a globe that grows into the map panel's box. It flies
+   above everything and must never catch a pointer. */
+.rf-morph {
+  position: fixed;
+  z-index: 2147482500;
+  pointer-events: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--cc-accent, #4f583b);
+  will-change: transform, border-radius, opacity;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-globe::before { animation: none; }
+}
+
+/* ---------- 6. MAP CONTEXT CHIPS ---------------------------------------
+ * These live INSIDE the map, bottom-left, floating on the tiles. Putting
+ * them in the window footer is what created the dead white strip. */
+
+.rf-mapchips {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;   /* the gap between chips stays draggable map */
+}
+/* !important and the :not(#cc…) hack, both needed: a generic `button`
+   rule in an earlier sheet was stamping 7px corners and killing the blur
+   on anything shaped like a button. Measured, not guessed. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .rf-mapchip,
+.rf-mapchip {
+  pointer-events: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 27px !important;
+  padding: 0 11px !important;
+  border: .5px solid rgba(20,20,19,.10);
+  border-radius: 999px !important;
+  /* Deliberately NOT backdrop-filter. These chips sit on top of a live
+     WebGL map, and a blur there has to be re-composited every single frame
+     the map moves — that is the lag while panning. 96% opaque reads as
+     frosted and costs nothing. */
+  background: color-mix(in srgb, var(--cc-surface, #fff) 96%, transparent) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  color: var(--cc-ink, #141413);
+  font-family: var(--cc-sans);
+  font-size: 11.5px !important;
+  font-weight: 480;
+  letter-spacing: -.005em;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  box-shadow: 0 1px 2px rgba(20,20,19,.08), 0 4px 12px -3px rgba(20,20,19,.14);
+  transition: transform var(--rf-t2) var(--rf-ease), background-color var(--rf-t2) var(--rf-ease), box-shadow var(--rf-t2) var(--rf-ease);
+}
+.rf-mapchip:hover { transform: translateY(-1px); background: var(--cc-surface, #fff); box-shadow: 0 2px 4px rgba(20,20,19,.1), 0 8px 20px -4px rgba(20,20,19,.2); }
+.rf-mapchip:active { transform: translateY(0) scale(.97); transition-duration: 90ms; }
+.rf-mapchip[disabled] { opacity: .5; pointer-events: none; }
+.rf-mapchip svg { width: 12px; height: 12px; flex: 0 0 auto; opacity: .62; }
+.rf-mapchip.is-busy { opacity: .62; pointer-events: none; }
+
+:root[data-theme="dark"] .rf-mapchip, html.dark .rf-mapchip {
+  border-color: rgba(255,255,255,.1);
+  box-shadow: 0 1px 2px rgba(0,0,0,.4), 0 4px 12px -3px rgba(0,0,0,.5);
+}
+
+/* ---------- 7. METRO ITINERARY -----------------------------------------
+ * Laid out the way a rider reads a journey: the three numbers that decide
+ * it, then one block per train with the change called out between them. */
+
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .ccv-route-btns { display: flex; gap: 8px; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .ccv-route-btns > * { flex: 1 1 0; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .ccv-metro-btn.is-busy { opacity: .55; pointer-events: none; }
+
+.ccv-metro { margin-top: 10px; }
+.ccv-mhead {
+  display: flex; gap: 14px; padding: 10px 0 12px;
+  border-bottom: 1px solid var(--cc-line, rgba(20,20,19,.08));
+}
+.ccv-mhead span { display: flex; flex-direction: column; gap: 2px; }
+.ccv-mhead b { font-family: var(--cc-serif); font-size: 19px; font-weight: 440; letter-spacing: -.02em; line-height: 1.1; }
+.ccv-mhead small { font-size: 11px; color: var(--cc-mute, #6b6b68); }
+
+.ccv-mlegs { list-style: none; margin: 10px 0 0; padding: 0; }
+.ccv-mlegs li { position: relative; padding: 0 0 0 26px; }
+
+/* the line down the left is the journey; each stop hangs off it */
+.ccv-mleg { display: flex; gap: 10px; align-items: flex-start; padding-block: 9px; }
+.ccv-mleg::before {
+  content: ''; position: absolute; left: 7px; top: 0; bottom: 0; width: 3px;
+  border-radius: 2px; background: var(--mline, var(--cc-accent, #4f583b));
+}
+.ccv-mleg > div { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.ccv-mleg b { font-size: 13px; font-weight: 520; letter-spacing: -.006em; }
+.ccv-mleg small { font-size: 11.5px; color: var(--cc-mute, #6b6b68); }
+.ccv-mline {
+  flex: 0 0 auto; align-self: flex-start;
+  padding: 2px 8px; border-radius: 999px;
+  background: var(--mline, var(--cc-accent, #4f583b));
+  color: #fff; font-size: 10.5px; font-weight: 560; letter-spacing: .01em;
+  white-space: nowrap;
+}
+.ccv-mchange, .ccv-mwalk {
+  padding-block: 7px; font-size: 11.5px; color: var(--cc-mute, #6b6b68);
+}
+.ccv-mchange b, .ccv-mwalk b { color: var(--cc-ink, #141413); font-weight: 520; }
+.ccv-mchange::before, .ccv-mwalk::before {
+  content: ''; position: absolute; left: 4px; top: 50%; translate: 0 -50%;
+  width: 9px; height: 9px; border-radius: 50%;
+  border: 2px solid var(--cc-line-3, rgba(20,20,19,.26)); background: var(--cc-surface, #fff);
+}
+
+/* line chips when the two ends are not on one line */
+.ccv-mchips { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-top: 5px; }
+.ccv-marrow { color: var(--cc-faint, rgba(20,20,19,.35)); font-size: 12px; }
+
+/* ---------- 8. VOICE BUTTON --------------------------------------------
+ * Three bars that move ONLY while Rudra is speaking. A top-bar icon that
+ * animates forever is noise, and it pins a compositor layer for the life
+ * of the page for nothing. */
+
+.rf-voice-btn {
+  position: relative;
+  flex: 0 0 auto;
+  width: 30px; height: 30px;
+  padding: 0; margin: 0 2px;
+  border: 0; border-radius: 9px;
+  background: transparent;
+  color: var(--cc-ink, #141413);
+  cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color var(--rf-t2) var(--rf-ease), transform var(--rf-t2) var(--rf-ease), color var(--rf-t2) var(--rf-ease);
+}
+.rf-voice-btn:hover { background: var(--cc-sunk, rgba(20,20,19,.05)); }
+.rf-voice-btn:active { transform: scale(.94); transition-duration: 90ms; }
+.rf-voice-btn:focus-visible { outline: 2px solid var(--cc-accent, #4f583b); outline-offset: 2px; }
+
+.rf-vwave { display: flex; align-items: center; gap: 2.5px; height: 15px; }
+.rf-vwave i {
+  display: block; width: 2.5px; border-radius: 2px;
+  background: currentColor;
+  height: 6px;
+  transform-origin: center;
+  transition: height var(--rf-t2) var(--rf-ease), opacity var(--rf-t2) var(--rf-ease);
+}
+.rf-vwave i:nth-child(1) { height: 7px; }
+.rf-vwave i:nth-child(2) { height: 13px; }
+.rf-vwave i:nth-child(3) { height: 9px; }
+
+/* speaking: scaleY only — height would relayout three times a frame */
+.rf-voice-btn.is-live .rf-vwave i { animation: rf-vbar 900ms var(--rf-ease-soft) infinite; }
+.rf-voice-btn.is-live .rf-vwave i:nth-child(2) { animation-delay: 140ms; }
+.rf-voice-btn.is-live .rf-vwave i:nth-child(3) { animation-delay: 280ms; }
+.rf-voice-btn.is-live { color: var(--cc-accent, #4f583b); }
+@keyframes rf-vbar {
+  0%, 100% { transform: scaleY(.55); }
+  50%      { transform: scaleY(1.25); }
+}
+
+/* muted: bars fade back, the slash draws itself across them */
+.rf-vmute {
+  position: absolute; inset: 0; margin: auto;
+  width: 19px; height: 19px;
+  opacity: 0;
+  stroke-dasharray: 22; stroke-dashoffset: 22;
+  transition: opacity var(--rf-t2) var(--rf-ease), stroke-dashoffset var(--rf-t3) var(--rf-ease);
+  pointer-events: none;
+}
+.rf-voice-btn.is-off .rf-vmute { opacity: 1; stroke-dashoffset: 0; }
+.rf-voice-btn.is-off .rf-vwave i { opacity: .3; }
+.rf-voice-btn.is-off { color: var(--cc-mute, #6b6b68); }
+
+/* ---------- the menu ---------- */
+.rf-vmenu {
+  position: fixed;
+  z-index: 2147482600;
+  min-width: 244px;
+  padding: 10px;
+  border: .5px solid var(--cc-line, rgba(20,20,19,.1));
+  border-radius: 14px;
+  background: var(--cc-surface, #fff);
+  box-shadow: var(--rf-sh-pop);
+  font-family: var(--cc-sans);
+  transform-origin: top right;
+}
+.rf-vhead {
+  font-family: var(--cc-serif); font-size: 14px; font-weight: 440;
+  letter-spacing: -.014em; padding: 2px 4px 8px;
+}
+.rf-vrow { display: flex; align-items: center; gap: 8px; padding: 6px 4px; }
+.rf-vlabel { flex: 0 0 68px; font-size: 12px; color: var(--cc-mute, #6b6b68); }
+
+.rf-vseg {
+  display: flex; gap: 2px; padding: 2px;
+  background: var(--cc-sunk, rgba(20,20,19,.05));
+  border-radius: 9px;
+}
+.rf-vseg button {
+  border: 0; border-radius: 7px; padding: 4px 11px;
+  background: transparent; color: var(--cc-mute, #6b6b68);
+  font-family: inherit; font-size: 12px; font-weight: 480; cursor: pointer;
+  transition: background-color var(--rf-t2) var(--rf-ease), color var(--rf-t2) var(--rf-ease);
+}
+.rf-vseg button.on { background: var(--cc-surface, #fff); color: var(--cc-ink, #141413); box-shadow: 0 1px 2px rgba(20,20,19,.1); }
+
+.rf-vrange { flex: 1 1 auto; accent-color: var(--cc-accent, #4f583b); min-width: 0; }
+.rf-vval { flex: 0 0 auto; font-size: 11.5px; color: var(--cc-mute, #6b6b68); font-variant-numeric: tabular-nums; }
+.rf-vsel {
+  flex: 1 1 auto; min-width: 0;
+  border: .5px solid var(--cc-line, rgba(20,20,19,.12));
+  border-radius: 8px; padding: 5px 7px;
+  background: var(--cc-surface, #fff); color: var(--cc-ink, #141413);
+  font-family: inherit; font-size: 12px;
+}
+.rf-vmore {
+  width: 100%; margin-top: 6px;
+  border: 0; border-radius: 9px; padding: 8px;
+  background: var(--cc-sunk, rgba(20,20,19,.05)); color: var(--cc-ink, #141413);
+  font-family: inherit; font-size: 12px; font-weight: 480; cursor: pointer;
+  transition: background-color var(--rf-t2) var(--rf-ease);
+}
+.rf-vmore:hover { background: var(--cc-line, rgba(20,20,19,.1)); }
+
+@media (prefers-reduced-motion: reduce) {
+  .rf-voice-btn.is-live .rf-vwave i { animation: none; }
+}

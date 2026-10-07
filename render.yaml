@@ -1,0 +1,114 @@
+# One-click deploy of the Rudra24 AI backend.
+#
+# Why host it at all: with the API on a server, the desktop app has no Python,
+# no venv, no PowerShell and no .bat to trigger — it opens and works. The API
+# keys and the daily limits stay on this side, where a customer cannot reach
+# them, which is the only way either of those can actually hold.
+#
+# Render reads this file from the repo root. Blueprint → New → connect repo.
+# Everything marked sync:false is typed once in the Render dashboard.
+services:
+  - type: web
+    name: rudra24-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: starter           # free tier sleeps; a sleeping API looks like a broken app
+    region: singapore       # closest to India
+    healthCheckPath: /health
+    autoDeploy: false       # deploy when you say so, not on every push
+    envVars:
+      - key: APP_ENV
+        value: production
+
+      # Production refuses SQLite on purpose — one file on one disk is not a
+      # place to keep customers' billing rows.
+      - key: DATABASE_URL
+        fromDatabase:
+          name: rudra24-db
+          property: connectionString
+
+      # Tables come from backend/migrations/*.sql in production, not from
+      # create_all. Run them once against this database, then leave this false.
+      - key: AUTO_CREATE_SCHEMA
+        value: "false"
+
+      # The desktop app serves itself on localhost:3210 and calls this API from
+      # there, so that origin must be allowed or every request fails CORS.
+      - key: CORS_ORIGINS
+        value: http://localhost:3210,http://localhost:3000,http://127.0.0.1:3000
+      - key: ALLOWED_HOSTS
+        sync: false         # your API hostname, e.g. rudra24-api.onrender.com
+
+      # Vault key for the encrypted provider credentials. Generate once with
+      # `python -c "import secrets;print(secrets.token_hex(32))"`.
+      # CHANGING IT MAKES EVERY SAVED API KEY UNREADABLE.
+      - key: CREDENTIAL_MASTER_KEY
+        generateValue: true
+
+      # OAuth callback base URL, e.g. https://rudra24-api.onrender.com
+      - key: CONNECTOR_PUBLIC_BASE_URL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: SLACK_CLIENT_ID
+        sync: false
+      - key: SLACK_CLIENT_SECRET
+        sync: false
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false
+      - key: META_APP_ID
+        sync: false
+      - key: META_APP_SECRET
+        sync: false
+
+      # Auth
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_PUBLISHABLE_KEY
+        sync: false
+      - key: SUPABASE_SECRET_KEY
+        sync: false
+      - key: SUPABASE_JWKS_URL
+        sync: false
+      - key: SUPABASE_REDIRECT_URL
+        value: http://localhost:3210/
+
+      # Who may open the operator console. Everyone else gets a 404.
+      - key: CLAVIS_ADMIN_EMAILS
+        sync: false
+
+      # Platform API keys — set these and every customer runs on yours without
+      # ever seeing one. A customer who saves their own key overrides it.
+      - key: SARVAM_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: APIFY_API_TOKEN
+        sync: false
+
+      # Payments
+      - key: RAZORPAY_KEY_ID
+        sync: false
+      - key: RAZORPAY_KEY_SECRET
+        sync: false
+      - key: RAZORPAY_WEBHOOK_SECRET
+        sync: false
+
+      # The Docker image already ships Chromium, so never let it re-download
+      # one at runtime on a read-only container.
+      - key: CLAVIS_AUTO_INSTALL_BROWSER
+        value: "false"
+
+databases:
+  - name: rudra24-db
+    plan: basic-256mb
+    region: singapore

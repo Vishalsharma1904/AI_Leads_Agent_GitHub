@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Clavis Confirm HUD — Phase 1 of the requested voice-first/Task-HUD redesign,
+"""Rudra24 AI Confirm HUD — Phase 1 of the requested voice-first/Task-HUD redesign,
 scoped narrowly per the user's own choice: implement window.clavisConfirm() /
 window.clavisConfirmAnswer(), which were referenced (in jarvis_skills.js's
 send_email flow, in index.html's #clavis-confirm-dialog markup, and in a
@@ -67,7 +67,7 @@ class Patcher:
 
 
 CONFIRM_CSS = r'''/* ============================================================
- * CLAVIS CONFIRM HUD (clavis-confirm-hud.css)
+ * RUDRA24 AI CONFIRM HUD (clavis-confirm-hud.css)
  * ------------------------------------------------------------
  * Restyles the existing #clavis-confirm-dialog (already in index.html,
  * already wired to window.clavisConfirmAnswer()) into a compact,
@@ -193,7 +193,7 @@ CONFIRM_CSS = r'''/* ===========================================================
 
 
 CONFIRM_JS = r'''/**
- * CLAVIS CONFIRM HUD (clavis-confirm-hud.js)
+ * RUDRA24 AI CONFIRM HUD (clavis-confirm-hud.js)
  * --------------------------------------------------------------
  * Implements window.clavisConfirm() / window.clavisConfirmAnswer().
  * Both names were already referenced elsewhere in the app --
@@ -236,7 +236,7 @@ CONFIRM_JS = r'''/**
     return new Promise((resolve) => {
       resolvePending = resolve;
       previousFocus = document.activeElement;
-      kicker.textContent = opts.kicker || 'Clavis';
+      kicker.textContent = opts.kicker || 'Rudra';
       title.textContent = opts.title || 'Confirm';
       desc.textContent = message || '';
       okBtn.textContent = opts.okLabel || 'OK';
@@ -344,7 +344,7 @@ def patch_clavis_mind():
         "      });\n"
         "      const summary = Object.entries(args).slice(0, 6)\n"
         "        .map(([k, v]) => `  ${k}: ${String(v).slice(0, 120)}`).join('\\n');\n"
-        "      const ok = window.confirm(`Clavis wants to run a high-risk action.\\n\\nAction: ${name}\\nRisk level: ${riskLevel}/4\\n${summary ? `\\n${summary}\\n` : ''}\\nAllow it?`);\n"
+        "      const ok = window.confirm(`Rudra24 AI wants to run a high-risk action.\\n\\nAction: ${name}\\nRisk level: ${riskLevel}/4\\n${summary ? `\\n${summary}\\n` : ''}\\nAllow it?`);\n"
         "      api.emit({ type: 'safety.confirmation_resolved', source: 'tool', importance: 0.4, metadata: { tool: name, approved: ok } });\n"
         "      return ok\n"
         "        ? { allowed: true, riskLevel, reason: 'owner approved' }\n"
@@ -372,7 +372,7 @@ def patch_clavis_mind():
         "        .map(([k, v]) => `  ${k}: ${String(v).slice(0, 120)}`).join('\\n');\n"
         "      const confirmFn = window.clavisConfirm || ((msg) => Promise.resolve(window.confirm(msg)));\n"
         "      const ok = await confirmFn(`Action: ${name}\\nRisk level: ${riskLevel}/4${summary ? `\\n${summary}` : ''}`, {\n"
-        "        title: 'Clavis wants to run a high-risk action',\n"
+        "        title: 'Rudra24 AI wants to run a high-risk action',\n"
         "        okLabel: 'Allow', cancelLabel: 'Deny', danger: riskLevel >= 4,\n"
         "      });\n"
         "      api.emit({ type: 'safety.confirmation_resolved', source: 'tool', importance: 0.4, metadata: { tool: name, approved: ok } });\n"
@@ -407,7 +407,7 @@ def main():
         raise SystemExit(f"{RED}Missing:{OFF} {', '.join(missing)}")
 
     print("=" * 60)
-    print(" Clavis Confirm HUD (Task-HUD Phase 1, first slice)")
+    print(" Rudra24 AI Confirm HUD (Task-HUD Phase 1, first slice)")
     print("=" * 60)
     n = 0
     n += write_new_files()

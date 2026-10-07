@@ -1,8 +1,8 @@
 /**
  * ============================================================
- *  CLAVIS BOOT GREETING (clavis-boot-greet.js)
+ *  RUDRA24 AI BOOT GREETING (clavis-boot-greet.js)
  *
- *  When the app opens, Clavis greets the user proactively with a
+ *  When the app opens, Rudra24 AI greets the user proactively with a
  *  time-aware, context-aware spoken + chat-bubble greeting.
  *
  *  DESIGN GOALS:
@@ -11,6 +11,8 @@
  *    - Remembers last greeting to NEVER repeat the same one back-to-back
  *    - Uses day-of-week, return frequency, and session gap for context
  *    - One greeting per app-open session (won't re-greet on page nav)
+ *    - 2026-09: boot par koi LLM / Rudra24 AI Live nahi — ek chhoti local line,
+ *      din me ek baar (clavis_boot_greet_day). Keys bachani hain.
  * ============================================================
  */
 'use strict';
@@ -123,7 +125,7 @@ window.ClavisBootGreet = (() => {
     ],
   };
 
-  // ── OFFER LINES (what help Clavis is offering) ──────────
+  // ── OFFER LINES (what help Rudra24 AI is offering) ──────────
   // These are the "how may I help you" variations — the real soul of the feature
   const OFFERS = [
     'Boliye sir, kaise madad karun?',
@@ -262,7 +264,7 @@ window.ClavisBootGreet = (() => {
     const VISUAL_TITLES = {
       early_morning: [
         `Subah subah, ${honorific}! Main hoon.`,
-        `Early start, ${honorific}! Clavis ready.`,
+        `Early start, ${honorific}! Rudra24 AI ready.`,
         `${honorific}, itni subah? Respect!`,
       ],
       morning: [
@@ -324,75 +326,74 @@ window.ClavisBootGreet = (() => {
   }
 
   // ── DELIVER THE SPOKEN BOOT GREETING ───────────────────
+  // Boot par ab koi LLM call nahi, aur ClavisLive.start({trigger:'boot'}) bhi
+  // nahi (wo mic stream khol deta tha aur 10 min tak quota khata tha). Bas ek
+  // chhoti local line, din me ek hi baar, aur batata hai ki jagana kaise hai.
+  const LS_GREET_DAY = 'clavis_boot_greet_day';
+  const SHORT_LINES = {
+    morning: [
+      'Good morning sir, main yahin hoon — kaam ho to bas \'Rudra\' boliye.',
+      'Suprabhat sir. Jab chahiye, \'Rudra\' boliye — main sun lunga.',
+    ],
+    afternoon: [
+      'Good afternoon sir, main yahin hoon — kaam ho to bas \'Rudra\' boliye.',
+      'Namaste sir. Kuch chahiye to \'Rudra\' bol dijiye.',
+    ],
+    evening: [
+      'Good evening sir, main yahin hoon — kaam ho to bas \'Rudra\' boliye.',
+      'Shaam ho gayi sir. Jab zaroorat ho, \'Rudra\' boliye.',
+    ],
+    night: [
+      'Sir, raat ho gayi — main yahin hoon, kaam ho to \'Rudra\' boliye.',
+      'Good night sir. Kuch chahiye to bas \'Rudra\' boliye.',
+    ],
+  };
+  function shortLine() {
+    const h = new Date().getHours();
+    const part = h >= 4 && h < 12 ? 'morning' : h < 17 && h >= 12 ? 'afternoon' : h >= 17 && h < 21 ? 'evening' : 'night';
+    return pick(SHORT_LINES[part]);
+  }
+  function todayKey() {
+    const d = new Date();
+    return `${d.getFullYear()}-${d.getMonth() + 1}-${d.getDate()}`;
+  }
+
   let _greeted = false;
 
   async function deliverBootGreeting() {
     // Only greet once per page session
     if (_greeted) return;
     if (sessionStorage.getItem(LS_GREETED_SESSION) === 'true') return;
+    if (!window.ClavisVoiceState?.isClavisWorkspace?.()) return;
     _greeted = true;
     sessionStorage.setItem(LS_GREETED_SESSION, 'true');
 
-    // Update the visual text first
+    // Visual heading har open par (local, free).
     updateVisualGreeting();
 
-    // Compose the spoken greeting: Clavis's own words when a brain is
-    // connected (time of day, what's new, never the same line twice),
-    // the local templates only as a fallback.
-    let greeting = compose();
-    try {
-      if (window.ClavisDirect?.hasKey?.() && !window.ClavisLive?.isAvailable?.()) {
-        const recent = JSON.parse(localStorage.getItem('clavis_recent_greetings') || '[]');
-        const hour = new Date().getHours();
-        const part = hour < 5 ? 'late night' : hour < 12 ? 'morning' : hour < 17 ? 'afternoon' : hour < 21 ? 'evening' : 'night';
-        const ask = window.ClavisDirect.complete({
-          model: 'groq/openai/gpt-oss-20b', max_tokens: 90, temperature: 0.9,
-          messages: [
-            { role: 'system', content: 'You are Clavis, the calm, warm, quietly witty personal AI of the owner ("sir"), who runs a security and housekeeping staffing business in India. Write ONE short spoken greeting (max 22 words) for the moment he opens the app. Natural conversational Hindi in Devanagari script, English business words in Roman letters. No emoji, no stock phrases, no questions like "how can I help". It may mention one useful thing to start with.' },
-            { role: 'user', content: `It is ${part} (${new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })}). Do NOT reuse any of these earlier greetings: ${recent.join(' | ') || 'none'}` },
-          ],
-        });
-        const out = await Promise.race([ask, new Promise((r) => setTimeout(() => r(null), 3500))]);
-        const line = String(out?.choices?.[0]?.message?.content || '').replace(/["“”]/g, '').trim();
-        if (line && line.length < 220) {
-          greeting = line;
-          localStorage.setItem('clavis_recent_greetings', JSON.stringify([line, ...recent].slice(0, 6)));
-        }
-      }
-    } catch (_) { /* templates it is */ }
+    // Bolna sirf din me ek baar.
+    let spokeToday = false;
+    try { spokeToday = localStorage.getItem(LS_GREET_DAY) === todayKey(); } catch (_) {}
+    if (spokeToday) return;
 
+    const greeting = shortLine();
     // Small delay to let the page settle and feel natural
     await new Promise(r => setTimeout(r, 1800));
 
-    // Update the visual welcome greeting text cleanly without injecting chat bubbles
-    // Chat messages should only appear when the user actively initiates a conversation.
-    try {
-      const welcome = document.getElementById('jarvis-welcome-text');
-      if (welcome && greeting) {
-        welcome.textContent = greeting;
-      }
-    } catch (_) {}
-
-    // Speak it aloud (only if speech is enabled). With Clavis Live, the greeting
-    // is Clavis's own words in its real voice (time of day + today's context),
-    // not this template — and the link sleeps again if sir doesn't answer.
-    const speechEnabled = localStorage.getItem('jarvis_speech_enabled') !== 'false';
-    const liveReady = speechEnabled && window.ClavisLive?.isAvailable?.()
-      && localStorage.getItem('clavis_mic_permission_granted') === 'true';
-    if (liveReady) {
-      Promise.resolve(window.ClavisLive.start({ trigger: 'boot' })).then((ok) => {
-        if (!ok) { try { window.speakJarvisText?.(greeting); } catch (_) {} }
-      });
-    } else if (speechEnabled) {
-      try { window.speakJarvisText?.(greeting); } catch (_) {}
+    if (!window.ClavisVoiceState?.isClavisWorkspace?.()) {
+      _greeted = false;
+      sessionStorage.removeItem(LS_GREETED_SESSION);
+      return;
     }
-    // No AI Studio key yet -> one friendly "Get free key" toast (once per session).
-    if (!liveReady) setTimeout(() => { try { window.ClavisLive?.promptKey?.(); } catch (_) {} }, 7000);
 
-    // Feed cognitive core
-    window.ClavisMind?.noteClavisTurn?.(greeting);
+    const speechEnabled = localStorage.getItem('jarvis_speech_enabled') !== 'false';
+    if (!speechEnabled) return;
+    try { localStorage.setItem(LS_GREET_DAY, todayKey()); } catch (_) {}
+    try { window.speakJarvisText?.(greeting); } catch (_) {}
 
-    console.log('[ClavisBootGreet] Delivered:', greeting);
+    // Feed cognitive core (local only)
+    try { window.ClavisMind?.noteClavisTurn?.(greeting); } catch (_) {}
+    console.debug('[ClavisBootGreet] Delivered:', greeting);
   }
 
   // ── AUTO-TRIGGER ───────────────────────────────────────
@@ -408,6 +409,7 @@ window.ClavisBootGreet = (() => {
     } else {
       boot();
     }
+    window.addEventListener('clavis:workspace-change', deliverBootGreeting);
   }
 
   init();

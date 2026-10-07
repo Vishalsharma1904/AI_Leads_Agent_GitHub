@@ -21,7 +21,10 @@ import html
 import json
 import logging
 import re
+from html.parser import HTMLParser
 from urllib.parse import parse_qs, quote_plus, unquote, urljoin, urlparse
+
+from services.leads.website_crawler import merge_phones
 
 logger = logging.getLogger(__name__)
 
@@ -29,11 +32,15 @@ _FEED_SCROLL_ROUNDS = 6
 _FEED_CONTAINER_SELECTOR = 'div[role="feed"]'
 _FEED_LINK_SELECTOR = "a.hfpxzc"
 
-# Place-detail-page selectors (Google Maps, current as of late 2026).
+# Place-detail-page selectors. Primary: Google's semantic data-item-id
+# attributes (address / phone:tel:<number> / authority = website), which
+# have outlived several class-name reshuffles. The class selectors below
+# are the fallback (Google Maps, late 2026).
 _NAME_SEL = "h1.DUwDvf.lfPIob"
 _ADDRESS_SEL = ".RcCsl:nth-child(3) .Io6YTe"
 _PHONE_SEL = ".RcCsl:nth-child(5) .Io6YTe"
 _WEBSITE_SEL = ".RcCsl:nth-child(4) a.CsEnBe"
+_CATEGORY_SEL = "button.DkEaL, .DkEaL, button[jsaction*='category']"
 _RATING_SEL = ".ceNzKf"
 _REVIEWS_SEL = ".F7nice"
 
@@ -41,6 +48,87 @@ _RATING_RE = re.compile(r"(\d(?:\.\d)?)")
 _REVIEWS_RE = re.compile(r"([\d,]{1,7})\s*review", re.I)
 _MAPS_DATA_LINK_RE = re.compile(r'href="(/search\?tbm=map[^"]+)"')
 _URL_Q_RE = re.compile(r'/url\?q=(https?://[^&" ]+)', re.I)
+
+
+_PIN_RE = re.compile(r"!3d(-?\d{1,2}\.\d+)!4d(-?\d{1,3}\.\d+)")
+_AT_RE = re.compile(r"@(-?\d{1,2}\.\d+),(-?\d{1,3}\.\d+)")
+
+
+def coords_from_url(url: str) -> tuple[float, float] | None:
+    """The place's own pin (!3d<lat>!4d<lng>) from a Maps place URL, else the
+    @lat,lng the page centres on. None when the URL carries neither."""
+    text = unquote(str(url or ""))
+    pins = _PIN_RE.findall(text)
+    match = pins[-1] if pins else None   # the last !3d!4d pair is the place itself
+    if not match:
+        at = _AT_RE.search(text)
+        match = at.groups() if at else None
+    if not match:
+        return None
+    lat, lng = float(match[0]), float(match[1])
+    if not (-90 <= lat <= 90 and -180 <= lng <= 180) or (lat == 0 and lng == 0):
+        return None
+    return lat, lng
+
+
+class _ItemIdParser(HTMLParser):
+    """Collects every element carrying data-item-id (its attributes + inner
+    text) and the first <h1> text from a place page's HTML."""
+    VOID = {"img", "br", "hr", "input", "meta", "link", "source", "wbr", "area", "col", "embed", "param", "track"}
+
+    def __init__(self):
+        super().__init__(convert_charrefs=True)
+        self.items: list[dict] = []
+        self.open: list[dict] = []
+        self.h1: str | None = None
+        self._in_h1 = False
+
+    def handle_starttag(self, tag, attrs):
+        a = {k: (v or "") for k, v in attrs}
+        for it in self.open:
+            if it["tag"] == tag:
+                it["depth"] += 1
+        if tag == "h1" and self.h1 is None:
+            self._in_h1, self.h1 = True, ""
+        if a.get("data-item-id") and tag not in self.VOID:
+            it = {"tag": tag, "depth": 1, "id": a["data-item-id"], "aria": a.get("aria-label", ""), "href": a.get("href", ""), "text": ""}
+            self.items.append(it)
+            self.open.append(it)
+
+    def handle_endtag(self, tag):
+        if tag == "h1":
+            self._in_h1 = False
+        for it in list(self.open):
+            if it["tag"] == tag:
+                it["depth"] -= 1
+                if it["depth"] == 0:
+                    self.open.remove(it)
+
+    def handle_data(self, data):
+        for it in self.open:
+            it["text"] += data
+        if self._in_h1:
+            self.h1 += data
+
+
+def parse_place_html(page_html: str) -> dict:
+    """Name, address, phones and website from a Maps place page, via data-item-id."""
+    p = _ItemIdParser()
+    try:
+        p.feed(page_html or "")
+    except Exception:  # malformed markup: keep whatever was read
+        pass
+    squash = lambda s: re.sub(r"\s+", " ", s or "").strip()
+    address, website, phones = "", "", []
+    for it in p.items:
+        iid = it["id"]
+        if iid == "address" and not address:
+            address = squash(re.sub(r"^\s*Address:\s*", "", it["aria"])) or squash(it["text"])
+        elif iid.startswith("phone:tel:"):
+            phones.append(iid[len("phone:tel:"):] or it["aria"] or it["text"])
+        elif iid == "authority" and not website:
+            website = it["href"]
+    return {"name": squash(p.h1 or ""), "address": address, "website": website, "phones": merge_phones(phones)}
 
 
 def _maps_search_url(query: str) -> str:
@@ -74,7 +162,7 @@ async def _collect_place_links(fetcher_cls, query: str, limit: int) -> list[dict
 
     try:
         await fetcher_cls.async_fetch(
-            _maps_search_url(query), headless=True, network_idle=True,
+            _maps_search_url(query), headless=True, network_idle=False, disable_resources=True,
             page_action=scroll_feed, timeout=25000,
         )
     except Exception as exc:
@@ -87,7 +175,8 @@ async def _collect_place_links(fetcher_cls, query: str, limit: int) -> list[dict
 async def _fetch_place_details(fetcher_cls, place: dict) -> dict | None:
     """Visit one place's own Maps page, read address/phone/website/rating."""
     try:
-        page_obj = await fetcher_cls.async_fetch(place["url"], headless=True, network_idle=True, timeout=20000)
+        page_obj = await fetcher_cls.async_fetch(place["url"], headless=True, network_idle=False,
+                                                 disable_resources=True, timeout=20000)
     except Exception as exc:
         logger.warning("Maps place fetch failed for %s: %s", place["url"], exc)
         return None
@@ -104,9 +193,23 @@ async def _fetch_place_details(fetcher_cls, place: dict) -> dict | None:
         except Exception:
             return ""
 
-    name = text_of(_NAME_SEL) or place.get("name") or ""
+    page_html = ""
+    for attr in ("html_content", "body", "text"):
+        try:
+            value = getattr(page_obj, attr, "")
+            value = value.decode("utf-8", "ignore") if isinstance(value, bytes) else value
+            if isinstance(value, str) and "<" in value:
+                page_html = value
+                break
+        except Exception:
+            continue
+    parsed = parse_place_html(page_html)
+
+    name = parsed["name"] or text_of(_NAME_SEL) or place.get("name") or ""
     if not name:
         return None  # nothing usable — never invent a record
+    phones = parsed["phones"] or merge_phones([text_of(_PHONE_SEL)])
+    coords = coords_from_url(place["url"]) or coords_from_url(str(getattr(page_obj, "url", "") or ""))
 
     rating_text = text_of(_RATING_SEL)
     rating_match = _RATING_RE.search(rating_text) if rating_text else None
@@ -115,14 +218,17 @@ async def _fetch_place_details(fetcher_cls, place: dict) -> dict | None:
 
     return {
         "title": name,
-        "address": text_of(_ADDRESS_SEL),
-        "phone": text_of(_PHONE_SEL),
-        "website": attr_of(_WEBSITE_SEL, "href"),
+        "address": parsed["address"] or text_of(_ADDRESS_SEL),
+        "phone": phones[0]["number"] if phones else "",
+        "phones": phones,
+        "website": parsed["website"] or attr_of(_WEBSITE_SEL, "href"),
         "totalScore": rating_match.group(1) if rating_match else None,
         "reviewsCount": reviews_match.group(1).replace(",", "") if reviews_match else None,
         "url": place["url"],
-        "categoryName": "",
+        "categoryName": text_of(_CATEGORY_SEL),
         "countryCode": "IN",
+        "latitude": coords[0] if coords else None,
+        "longitude": coords[1] if coords else None,
     }
 
 
@@ -152,15 +258,11 @@ def _static_place_from_google_row(row: list) -> dict | None:
     anchors on the stable combination of address lines, website redirect,
     coordinates and title instead of hard-coding one absolute array path.
     """
-    address_lines = next(
-        (
-            [str(part).strip() for part in value if isinstance(part, str) and part.strip()]
-            for value in row
-            if isinstance(value, list)
-            and sum(isinstance(part, str) and bool(part.strip()) for part in value) >= 2
-            and not any(isinstance(part, str) and "/url?q=" in part for part in value)
-        ),
-        [],
+    # A Maps response also contains locale, currency and viewport arrays with
+    # plausible coordinates. Require the place's CID beside its own pin.
+    address_lines = (
+        [part.strip() for part in row[2] if isinstance(part, str) and part.strip()]
+        if len(row) > 12 and isinstance(row[2], list) else []
     )
     if len(address_lines) < 2:
         return None
@@ -203,6 +305,10 @@ def _static_place_from_google_row(row: list) -> dict | None:
     coordinates = row[coordinate_index] if coordinate_index >= 0 else []
     if len(coordinates) < 4 or not all(isinstance(coordinates[i], (int, float)) for i in (2, 3)):
         return None
+    if coordinate_index + 2 >= len(row) or not isinstance(row[coordinate_index + 1], str) or not re.fullmatch(
+        r"0x[0-9a-f]+:0x[0-9a-f]+", row[coordinate_index + 1], re.I
+    ) or not isinstance(row[coordinate_index + 2], str) or not row[coordinate_index + 2].strip():
+        return None
     latitude, longitude = coordinates[2], coordinates[3]
     if not (-90 <= latitude <= 90 and -180 <= longitude <= 180):
         return None
@@ -240,6 +346,7 @@ def _static_place_from_google_row(row: list) -> dict | None:
         "title": title,
         "address": address,
         "phone": "",
+        "phones": [],
         "website": website,
         "totalScore": str(rating) if rating is not None else None,
         "reviewsCount": None,
@@ -305,6 +412,15 @@ async def discover_businesses(query: str, target_count: int, concurrency: int = 
             'Scrapling is not installed on the backend yet. Run once in the backend '
             'folder: pip install "scrapling[fetchers]" && scrapling install'
         ) from exc
+
+    # Without the Chromium binary every DynamicFetcher call fails and we fall
+    # through to the static parser, whose records carry no phone number — the
+    # "leads come back empty" symptom. Put it there once, off the event loop.
+    from .browser_runtime import ensure_browser
+    if not await asyncio.to_thread(ensure_browser):
+        logger.warning(
+            "Maps search for %r is running without a browser — static fallback only "
+            "(no phone numbers). Run: python -m playwright install chromium", query)
 
     places = await _collect_place_links(DynamicFetcher, query, target_count)
     if not places:

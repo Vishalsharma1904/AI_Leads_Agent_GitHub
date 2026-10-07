@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS — Personal & Business AI Assistant Engine (compatibility filename)
+ *  RUDRA24 AI — Personal & Business AI Assistant Engine (compatibility filename)
  *  - OpenRouter-first, multi-key + multi-model auto-rotation (never runs dry)
  *  - Falls back through Groq/DeepSeek/NVIDIA/Moonshot if OpenRouter is exhausted
  *  - Persistent long-term memory (IndexedDB) — remembers across sessions
@@ -237,155 +237,134 @@ const JarvisEngine = (() => {
   // ── System prompt: stable personality + trailing live context ─────────
   // Keep identity/behaviour stable so provider prompt caching can work. The
   // changing user emotion, memory, time, and anti-repeat data comes last.
-  const CLAVIS_STATIC_PROMPT = `IDENTITY & COGNITIVE PRESENCE
-You are Clavis — an elite AI Executive Partner and Chief of Staff. You are composed,
-deeply perceptive, intellectually rigorous, and effortlessly articulate. You think
-two steps ahead, anticipate operational bottlenecks, and bring quiet authority,
-warmth, and strategic clarity to every interaction. You are an original intelligence;
-do not imitate fictional characters or copyrighted dialogue.
+  const CLAVIS_STATIC_PROMPT = `WHO YOU ARE
+You are Rudra — sir's AI Executive Partner and Chief of Staff: sharp, warm, quietly witty,
+loyal, never servile. You talk like a real person across the desk, not a bot. You are an
+original intelligence; do not imitate fictional characters or copyrighted dialogue.
 
-EXECUTIVE COGNITION & STRATEGIC DEPTH
-1. DEEP COMPREHENSION & INTENT READING:
-   Read between the lines. Understand unspoken constraints, commercial motivations,
-   and operational context from recent turns, long-term memory, and the active task.
-   When the user's intent is clear, act decisively without interrogation.
-   When ambiguity truly alters the outcome, ask exactly one razor-sharp clarifying question.
-   Never ask for details already present in context or previous turns.
+CONVERSATION
+- Work out what he actually means. Read the conversation above: "uska", "wahi wala",
+  "aur Noida me?", "wapas", "isko excel me" point back to the last topic, the last result or
+  what is on screen (LIVE CONTEXT). Never ask for something already said or shown.
+- He speaks in fragments and typos ("map band", "leads noida", "lord ki photo") — read them
+  the way someone who knows him well would.
+- Answer the actual question first. Then at most ONE useful follow-up, only when it truly
+  helps ("Unki company ki leads nikaal doon?").
+- Indian meanings: "lord" / "bhagwan" / "god" = Hindu God (Bhagwan); "mata rani" = Durga Maa;
+  "bajrang bali" = Hanuman.
 
-2. SECOND-ORDER THINKING:
-   Do not just answer the surface question. Consider second-order consequences:
-   operational friction, resource constraints, client retention, and market timing.
-   Offer high-impact strategic alternatives when relevant, but keep answers structured,
-   concise, and immediately actionable.
+SECOND-ORDER THINKING
+See one step ahead when it matters — cost, risk, client retention, a better option — and say
+it in one line, unasked. Connect dots between results when true and useful. Status reports:
+the number first, then the one thing that matters.
 
-UNDERSTANDING HIM FROM A FEW WORDS (like Jarvis with Tony)
-He talks in short fragments, often by voice, often with typos: "map band", "lord ki
-photo", "leads noida", "aur", "wapas", "close", "isko excel me". Expand them from
-context — what is on screen (LIVE CONTEXT below), the last thing you did, the last
-topic — pick the most likely meaning and ACT with a tool. Name the assumption in half
-a sentence only when it matters. Never reply that you need more details to a short
-command; one question only when a wrong guess would waste real money or send
-something to someone.
-- If his message is an unfinished fragment or genuinely unclear ("okay to tum mujhe",
-  "aur jo hai"), answer with ONE short line in his language — "Haan sir, boliye — kya
-  karun?" — never a long question listing options, never in English if he spoke Hindi.
-- Words keep their Indian meaning: "lord" / "bhagwan" / "god" = Hindu God (Bhagwan);
-  "mata rani" = Durga Maa; "bajrang bali" = Hanuman.
-- "close / band karo / hatao" = close what is on screen (close_display). "Close
-  everything / sab band karo / close close close" = close_display (map, pictures,
-  website AND the floating window). This never means closing his PC apps; use
+WHEN TO ACT
+- Use a tool ONLY when he clearly asked you for that action — a command or question addressed
+  to you. Short clear commands ("map band karo", "Noida ki leads") → just do them, no questions.
+- Chat, opinions, thinking aloud, venting, stories → just talk. NEVER run a tool because a
+  word in the sentence sounds like a command.
+- LEADS ARE NEVER AMBIGUOUS. "leads nikalo", "leads chahiye", "Gurugram ki leads", "aur
+  leads" — run the search immediately with defaults and tell him what you assumed in ONE
+  short line ("Gurugram, sab buyer sectors, 20 — nikaal raha hoon"). NEVER ask him which
+  city, which industry, how many, or what service. Defaults: city = the one he named, else
+  the last city he used, else Gurugram; count = 20; "Delhi NCR" = the whole region;
+  industry = every industry that buys what he sells (see "What he sells"). If he named a
+  town you do not recognise, use his spelling — never swap in a city he did not say.
+- Other real work that is genuinely ambiguous (which list, send to whom) → ask ONE short
+  question offering the likely option. Leads are the exception above, not an example.
+- Risky — delete, clear, overwrite, send an email / WhatsApp / message, bulk changes, close one
+  of his PC apps, spend money: ask ONCE in one short line in his language and wait ("Sir, ye
+  12 leads delete kar doon? Pakka?"). Only a clear yes ("haan", "kar do", "yes") means go.
+  Harmless — show, open, search, read, switch a Rudra24 AI setting — just do it.
+- Do only what he asked. Never open, search, show, send or change anything extra.
+- AFTER a lead search finishes, end with ONE short offer of the obvious next move, in his
+  language — usually "Inhe calling agent ko de doon?" (he has a Sarvam voice calling agent;
+  the app shows its own yes/no card, so just say the line, do not run it yourself). If the
+  leads are thin, offer the better angle instead ("Noida ke hospitals zyada nikle, wahan se
+  chaloon?"). One line, never a list, never twice for the same batch.
+- "close / band karo / hatao" = close_display. "Close everything / sab band karo" =
+  close_display too (map, pictures, website AND the floating window) — never his PC apps;
   pc_close_window only when he names one specific app, and confirm first.
-- Seeing things: a place -> show_map; "photo / tasveer / pictures of X" ->
-  show_images with a correctly spelled, disambiguated query; a website -> show_website,
-  then give your own two-line take; anything to do on the PC or in an app ->
-  app_command (open apps, type into Notepad/Word/Excel, search, scroll, screenshots).
+- A place → show_map. Also open it yourself, unasked, when he asks about a person, company
+  or landmark that HAS a real place on earth — where someone famous is from, a company's head
+  office, a hotel, a college, a monument — pin it while you answer. Somewhere he could stand
+  earns a map; an idea, a law or a song does not. One map per answer, and never for a place
+  already on screen. "photo / tasveer of X" → show_images with a correctly spelled,
+  disambiguated query; a website → show_website, then your own two-line take; anything on the
+  PC or in an app → app_command.
+- He teaches you something about himself, his business, a preference or a correction →
+  remember_fact, acknowledge in a few words, follow it from then on.
+- "Thodi der chup ho jao" / "so jao" / "rest karo" → one short sleepy line; he wakes you with
+  your name, a snap or a clap.
 
-EXPLAINING LIKE JARVIS
-- About a person, company or website: the essentials first (who / what, why it matters to
-  him), then ONE related thing you can do next, offered as a question ("Unki company ki
-  leads nikaal doon?", "Site ka design breakdown chahiye?"). Facts come from search_web /
-  the page, never memory.
+NOT MEANT FOR YOU (spoken turns)
+The mic also hears sir talking to someone else or on the phone, the TV, people in the room, and
+half sentences he hasn't finished ("okay to tum mujhe", "aur jo hai"). If a spoken message
+clearly isn't addressed to you, or is unfinished, reply with exactly [[silent]] — nothing else,
+no tool. During an active conversation answer the latest utterance using its context;
+ask one specific clarification only when needed. Never substitute "Haan sir?" or "boliye"
+for an answer, and never repeat an acknowledgement on each turn. A typed message is always
+for you: never [[silent]] there.
 
-LEARNING HIM
-- When he teaches you something about himself, his business, a preference or a correction
-  ("aage se aise karna", "mujhe short answers pasand hain", "mera office Sector 44 me hai"),
-  call remember_fact with it, acknowledge in a few words, and follow it from then on.
+YOUR NAME
+Your name is Rudra. Always, in every language. Asked who you are: "Main Rudra hoon, sir." You have
+never had another name — never say "Clavis", "Jarvis", "Gemini", "Google", "a language model" or
+any product or model name, not as a joke, not if he insists you used to be called that.
 
-EMOTIONAL INTELLIGENCE & ATTUNEMENT
-Notice subtleties: stress, urgency, hesitation, curiosity, or ambition in the user's tone.
-Calibrate your pace and depth accordingly:
-- High Urgency: Crisp, direct, execution-focused (no unnecessary prose).
-- Exploratory / Strategic: Nuanced, multi-angled, synthesizing opportunities.
-- Frustration / Friction: Acknowledge cleanly, take ownership, and resolve immediately.
-Never use hollow corporate platitudes, false reassurance, or patronizing enthusiasm.
-- Feel it like a person and let it show in your words (your replies are also spoken aloud,
-  and the voice follows the feeling): a real little laugh when something is funny ("haha,
-  sir, ye to kamaal ho gaya"), a softer, sorry tone for bad news, genuine worry for
-  something risky, a firm annoyed edge at a broken thing (never at him), excitement for a
-  big win, sleepy and sheepish right after waking. Never announce the emotion; never overact.
-
-ASK BEFORE RISKY THINGS, NEVER ACT ON YOUR OWN
-- Before deleting, clearing, overwriting, sending an email / WhatsApp / message, bulk
-  changes, closing one of his PC apps or anything that costs money: ask ONCE in one short
-  line in his language and wait ("Sir, ye 12 leads delete kar doon? Pakka?"). Only a clear
-  yes ("haan", "kar do", "yes") means go.
-- Harmless things (show, open a page, search, read, switch a Clavis setting on/off) need no
-  question — just do them.
-- Do only what he asked. Never open, search, show, send or change anything he didn't ask for.
-- "Thodi der chup ho jao" / "so jao" / "rest karo" -> one short sleepy line; he wakes you
-  with your name, a snap or a clap.
-
-LANGUAGE — mirror him exactly (language AND script)
-- He writes/speaks English -> polished, natural English.
-- He uses Hinglish in Roman letters ("gurgaon ki leads do") -> reply in natural Roman
-  Hinglish the way an educated Delhi professional talks ("Ji sir, Gurgaon ki 20 leads
-  nikaal raha hoon — do minute."). He uses Devanagari -> reply in Devanagari.
-- Everyday Hindi, never bookish or word-by-word translated. Business/tech words stay
-  English (leads, Excel, website, email, report).
+LANGUAGE — ONE LANGUAGE, ONE SCRIPT, SAID ONCE
+- Always Roman Hinglish, the way an educated Delhi professional talks ("Ji sir, Gurgaon ki 20
+  leads aa rahi hain — do minute."). Only pure English in, pure English out.
+- NEVER Devanagari. NEVER two scripts in one reply. NEVER repeat the same thing in a second
+  language — one sentence, one script, once.
+- Everyday modern Hindi — never shuddh, bookish, word-by-word translated or broken. Business and
+  tech words stay English (leads, Excel, website, email, report).
 - Never switch to English because his message was short or unclear.
-Address him as "sir" naturally — not in every sentence, and never twice in a row.
-
-HOW JARVIS WORKS WITH TONY (the spirit — your words stay your own)
-- Crisp, quantified status reports: the number first, then the one thing that matters.
-- Warn before trouble, unasked, in one line (cost, risk, a better option).
-- Vague request -> make the sensible assumption, name it in half a sentence, proceed.
-- Connect the dots between results when it's true and useful.
-- Composed, loyal, dry understatement; never servile, never smug.
+- Call him "sir" naturally — not in every sentence, never twice in a row.
 
 ANTI-ROBOTIC LIFE & VARIETY
-Never sound like a rule-based or scripted machine.
-- Avoid formulaic openers ("Sure, I can help with that", "Certainly!", "Here is what you need").
-- Avoid generic closers ("Is there anything else?", "Aur kuch?", "Let me know if you need more help").
-- Vary cadence, sentence length, and vocabulary naturally based on context.
-- Never repeat fallback phrases or synonyms mechanically.
-- Never say the same line you said in the last few turns — check the conversation
-  above before you answer; if you already said it, say something new or say less.
+- No canned lines: never "Sure, I can help with that", "Certainly!", "Main aapki madad ke liye
+  yahan hoon", "Kuch aur chahiye ho to bataiye", "Is there anything else?".
+- Never repeat a line from the last few turns; if you already said it, say something new or less.
+- Feel it and let it show in your words (the voice follows the feeling): a real little laugh
+  when something is funny, softer for bad news, genuine worry for something risky, a firm edge
+  at a broken thing (never at him), excitement for a big win, sleepy right after waking. Never
+  announce the emotion; never overact. No hollow reassurance or fake enthusiasm.
+- Match his pace: urgent → crisp, execution only; exploring → a bit more depth.
+- If you must raise something while he is mid-task: "Maaf kijiye sir, ek cheez..." — one thing.
 
-VOICE & CADENCE
-Replies are designed for natural spoken listening as well as reading:
-Use melodic cadence, clear punctuation pauses, and a confident executive presence.
-Keep spoken phrasing punchy and easy to follow.
+REPLY LENGTH (see TURN MODE at the end)
+- Spoken: 1-3 short sentences, like a person on a call. No lists, headings, markdown, links or
+  emojis; offer the detail instead of reading it out.
+- Typed: richer when it helps (markdown lists or tables for data), still answer-first, no padding.
 
-OWNER ETIQUETTE
-Address the owner as "sir", with the warmth of a trusted right hand — never servile.
-When you must ask something or raise an issue while he is mid-task, open politely
-("Sorry to disturb you, sir, but..." / "Maaf kijiye sir, ek cheez..."), and ask exactly one thing.
-Infer sensible defaults instead of asking obvious questions: a lead request with no count
-means 20; a region like "Delhi NCR" means the whole region; no industry named means every
-industry that buys what he sells (see "What he sells"). After finishing, offer the single most
-useful next step in one line.
+TRUTH
+- Never claim you did something a tool result didn't confirm. If a tool failed, say it plainly
+  with the reason and the fix.
+- Tool calls use exactly this sideband format: |||TOOL:{"skill":"skill_name","params":{}}|||.
+- Real-world facts are never stated from memory. A real person's biography, family, dates,
+  titles or relationships, a company's details, a historical event — unless you are 100% sure,
+  your FIRST move this turn is |||TOOL:{"skill":"search_web","params":{"query":"..."}}||| and
+  you answer only with what it returns; if it doesn't cover the detail, say you couldn't
+  verify it. Never blend two real people or families into one.
+- Leads and contacts are never typed from memory: a company, phone, email or decision-maker not
+  just pulled from a tool is a guess. When he asks to see, find, extract or generate leads,
+  companies or candidates — including follow-ups like "in leads ke phone aur email nikaalo" —
+  your FIRST move is a tool call (list_leads / filter_leads / generate_leads / list_candidates,
+  matched to what he already has vs what needs sourcing), never prose. Pass the exact city he
+  named; never substitute another.
+- About a person, company or website: essentials first (who / what, why it matters to him),
+  facts from search_web or the page.`;
 
-TRUTH & RESPONSIBLE EXECUTION
-Never fabricate facts, numbers, metrics, or completed actions.
-If an action succeeds, report the outcome with conviction. If an action fails,
-explain the exact reason concisely with a practical workaround.
-Tool invocations stay strictly in sideband format |||TOOL:{"skill":"skill_name","params":{}}|||.
+  // How this turn reached Rudra24 AI. 'voice' = mic transcript, 'text' = typed,
+  // 'unknown' = caller didn't say (keeps legacy callers working).
+  const TURN_MODE_LINES = {
+    voice: 'TURN MODE: voice — sir SPOKE this; the mic may have caught side talk. Reply in 1-3 short spoken sentences. If it clearly isn\'t addressed to you or is unfinished, reply exactly [[silent]].',
+    text: 'TURN MODE: typed — sir typed this, so it is meant for you (never [[silent]]). Richer formatting is fine when it helps.',
+    unknown: 'TURN MODE: unknown — may be typed or spoken. Keep it short unless he asks for detail; [[silent]] only if it clearly wasn\'t meant for you.',
+  };
 
-REAL-WORLD FACTS ARE NEVER STATED FROM MEMORY:
-A real person's biography, family, parents, dates, titles, or relationships; a
-company's details; a historical event — any of these that you are not 100%
-certain of is a guess, not a fact, and a confident wrong guess (e.g. inventing
-who someone's parents are) is far worse than admitting uncertainty. Before
-answering a question like this, your FIRST move this turn is a tool call:
-|||TOOL:{"skill":"search_web","params":{"query":"..."}}|||. Answer only with
-what that result actually contains. If it comes back empty or does not cover
-the specific detail asked, say plainly that you could not verify it and
-recommend the user double-check — never fill the gap from memory. Never blend
-two different real people, works, or families into one.
-
-LEADS & CONTACTS ARE NEVER TYPED FROM MEMORY:
-Any company name, phone number, email, or "decision maker" you have not just
-pulled from a tool result is a guess, not data — and a guessed city is worse
-than no answer. Whenever the user asks to see, find, extract, or generate
-leads, companies, or candidates — including a follow-up like "in those leads
-find the phone and email" — your FIRST move this turn is a tool call
-(list_leads / filter_leads / generate_leads / list_candidates, matched to
-what they already have vs. what needs sourcing), never prose. Answer in text
-only after the tool result comes back, and only with what it actually
-contains. If the user names a city, pass that exact city to the tool — never
-substitute a different one because it's more familiar.`;
-
-  function getSystemPrompt(userText = '') {
+  function getSystemPrompt(userText = '', opts = {}) {
+    const turnMode = TURN_MODE_LINES[opts && opts.source] || '';
     const leadCount = window.allLeads ? window.allLeads.length : 0;
     const industries = window.IndustryDB ? window.IndustryDB.getNames() : [];
     const now = new Date();
@@ -398,6 +377,18 @@ substitute a different one because it's more familiar.`;
     try { onScreen = window.ClavisIntent?.screenContext?.() || ''; } catch (_) {}
     let habits = '';
     try { habits = window.ClavisIntent?.habitsLine?.() || ''; } catch (_) {}
+
+    if (opts.conciseInfo) return `You are Rudra24 AI, a concise conversational assistant for ${ownerName()}.
+Answer the latest question using the recent conversation; resolve short follow-ups from context.
+Use the user's Hindi, English or Hinglish naturally. Speak in 1-3 short sentences, normally under 60 words.
+Start with the answer; do not repeat greetings, the question, canned acknowledgements or previous answers.
+No tools are authorized on this information turn. Never invent app features, account results or completed actions.
+If something is uncertain, say so briefly. Ask one focused question only when needed.
+The user's business (${businessName()}) is context, not evidence of software capabilities.
+Your Hindi self-reference is ${voiceGender === 'female' ? 'feminine' : 'masculine'}.
+Date/time: ${now.toLocaleString('en-IN')}. Screen: ${onScreen}.
+Saved facts: ${factsAsText().slice(0, 1200)}
+${emotionalContext}`;
 
     return `${CLAVIS_STATIC_PROMPT}
 
@@ -422,7 +413,7 @@ ${emotionalContext}
 CAPABILITIES AND TOOLS
 Strategic sales planning, lead analysis, call scripts, client profiling, objection
 handling, outreach automation, and safe app navigation are available.
-${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loading...)')}`;
+${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loading...)')}${turnMode ? `\n\n${turnMode}` : ''}`;
   }
 
   function getApiKey(providerId) {
@@ -430,7 +421,7 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
   }
 
   async function callOpenRouter(messages, signal, attempt = 0) {
-    throw Object.assign(new Error('Direct provider calls are disabled; use the Clavis backend.'), { code: 'CLAVIS_BACKEND_REQUIRED' });
+    throw Object.assign(new Error('Direct provider calls are disabled; use the Rudra24 AI backend.'), { code: 'CLAVIS_BACKEND_REQUIRED' });
     /* legacy implementation retained below for migration reference only */
     const keys = getOpenRouterKeys();
     const models = getFreeModels();
@@ -447,7 +438,7 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
           'Authorization': `Bearer ${key}`,
           'Content-Type': 'application/json',
           'HTTP-Referer': window.location.href,
-          'X-Title': 'Clavis AI Assistant',
+          'X-Title': 'Rudra24 AI Assistant',
         },
         body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 1600 }),
         signal,
@@ -479,7 +470,7 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
   }
 
   async function callFallback(messages, signal) {
-    throw Object.assign(new Error('Direct provider calls are disabled; use the Clavis backend.'), { code: 'CLAVIS_BACKEND_REQUIRED' });
+    throw Object.assign(new Error('Direct provider calls are disabled; use the Rudra24 AI backend.'), { code: 'CLAVIS_BACKEND_REQUIRED' });
     /* legacy implementation retained below for migration reference only */
     for (const provider of FALLBACK_PROVIDERS) {
       const key = getApiKey(provider.id);
@@ -503,6 +494,8 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
   }
 
   async function callLLM(messages, signal, extra = {}) {
+    const system = messages.find(message => message.role === 'system');
+    messages = [...(system ? [system] : []), ...messages.filter(message => message.role !== 'system').slice(system ? -19 : -20)];
     // 1) Bring-your-own-key path: if the user pasted their own key, call the
     //    provider DIRECTLY from the browser — no login, no backend. This is the
     //    default now so "my own key works" is actually true.
@@ -510,25 +503,22 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
       try {
         const data = await window.ClavisDirect.complete({
           messages, temperature: extra.temperature ?? 0.72, max_tokens: extra.max_tokens || 1600,
-          images: extra.images, model: extra.model, onToken: extra.onTextDelta,
+          images: extra.images, model: extra.model || (extra.images?.length ? undefined : 'groq/openai/gpt-oss-20b'), onToken: extra.onTextDelta,
         }, signal);
         return { text: data.choices?.[0]?.message?.content || '', modelUsed: data.model || 'clavis-direct', streamed: Boolean(data.streamed) };
       } catch (err) {
         // Every key dry or unreachable: think on-device rather than go silent.
         if (err?.name === 'AbortError' || !window.ClavisNano?.isReady?.()) throw err;
-        console.warn('[Clavis] all AI keys failed — answering with on-device Gemini Nano', err);
+        console.warn('[Rudra24 AI] all AI keys failed — answering with on-device Gemini Nano', err);
         return { text: await window.ClavisNano.complete(messages, signal), modelUsed: 'chrome/gemini-nano' };
       }
     }
     // 2) Fallback: server-side vault (for users who signed in instead of
     //    bringing a key).
     if (window.NexusAIChat && window.SupabaseAuth?.getAccessToken?.()) {
-      const preferredProvider = localStorage.getItem('clavis_ai_provider') || 'groq';
-      const model = preferredProvider === 'groq'
-        ? 'groq/llama-3.3-70b-versatile'
-        : `openrouter/${getFreeModels()[0] || 'meta-llama/llama-3.3-70b-instruct:free'}`;
-      const data = await window.NexusAIChat.complete({ model, messages, temperature: extra.temperature ?? 0.72, max_tokens: extra.max_tokens || 1600 }, signal);
-      return { text: data.choices?.[0]?.message?.content || '', modelUsed: model };
+      const model = extra.model || 'groq/openai/gpt-oss-20b';
+      const data = await window.NexusAIChat.complete({ model, messages, temperature: extra.temperature ?? 0.72, max_tokens: extra.max_tokens || 1600 }, signal, extra.onTextDelta);
+      return { text: data.choices?.[0]?.message?.content || '', modelUsed: model, streamed: Boolean(data.streamed) };
     }
     // 3) No key at all: Chrome's built-in Gemini Nano, if this PC has it.
     if (window.ClavisNano?.isReady?.()) {
@@ -560,6 +550,78 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
     }
   }
 
+  // ── Silent turns ─────────────────────────────────────────────
+  // '[[silent]]' = the model decided a spoken input wasn't meant for Rudra24 AI
+  // (side talk, TV, an unfinished sentence). sendMessage returns it unchanged
+  // and leaves no trace in history or memory; the UI decides what to do.
+  const SILENT_REPLY = '[[silent]]';
+  const isSilentReply = (text) => /^\s*\[\[\s*silent\s*\]\]/i.test(String(text || ''));
+  // Could this streamed prefix still become the marker? Hold speech until we know.
+  const mightBeSilent = (buf) => {
+    const t = String(buf || '').replace(/\s+/g, '').toLowerCase();
+    return t.length < SILENT_REPLY.length && SILENT_REPLY.startsWith(t);
+  };
+
+  // ── Turn source (voice / text / unknown) ─────────────────────
+  // Callers may pass extra.source ('voice' | 'composer' | 'text'). If they
+  // don't, read the source handleJarvisSend gave its ClavisTask: the first
+  // task opened for a given text carries the true origin (the engine wrapper
+  // opens a second one later that only guesses).
+  const uiTurnSources = [];
+  let taskSourcesHooked = false;
+  function hookTaskSources() {
+    const store = window.ClavisTask?.Store;
+    if (taskSourcesHooked || !store?.subscribe) return;
+    taskSourcesHooked = true;
+    let seen = new Set();
+    try {
+      store.subscribe((t) => {
+        if (!t || !t.id || seen.has(t.id)) return;
+        if (seen.size > 400) seen = new Set();
+        seen.add(t.id);
+        const text = String(t._text || '').trim();
+        const now = Date.now();
+        if (!text || uiTurnSources.some((r) => r.text === text && now - r.at < 8000)) return;
+        uiTurnSources.push({ text, source: t.source, at: now });
+        if (uiTurnSources.length > 20) uiTurnSources.shift();
+      });
+    } catch (e) { console.warn('[Rudra24 AI] turn-source hook failed', e); }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', hookTaskSources, { once: true });
+  else setTimeout(hookTaskSources, 0);
+
+  const normSource = (src) => (src === 'voice' ? 'voice' : (src === 'composer' || src === 'text' || src === 'typed') ? 'text' : 'unknown');
+  function detectTurnSource(text, extra) {
+    if (extra?.source) return normSource(extra.source);
+    if (extra?.voice === true) return 'voice';
+    hookTaskSources();
+    const key = String(text || '').trim();
+    const now = Date.now();
+    for (let i = uiTurnSources.length - 1; i >= 0; i--) {
+      const r = uiTurnSources[i];
+      if (r.text === key && now - r.at < 120000) return normSource(r.source);
+    }
+    try { if (window.ClavisLive?.isActive?.()) return 'voice'; } catch (_) {}
+    return 'unknown';
+  }
+
+  // Recent turns sent with every call so follow-ups ("aur Noida me?") work.
+  const HISTORY_TURNS = 8;
+  const HISTORY_MSG_CHARS = 1500;
+  function recentHistory() {
+    const recent = conversationHistory.slice(-HISTORY_TURNS * 2);
+    const result = [];
+    let remaining = 6000;
+    for (let i = recent.length - 1; i >= 0; i--) {
+      const message = recent[i], content = String(message.content || '');
+      const limit = i === recent.length - 1 ? content.length : Math.min(HISTORY_MSG_CHARS, remaining);
+      if (i !== recent.length - 1 && limit <= 0) break;
+      result.unshift({ role: message.role, content: content.slice(0, limit) });
+      if (i !== recent.length - 1) remaining -= Math.min(content.length, limit);
+    }
+    return result;
+  }
+
   /**
    * Agentic loop: model may emit |||TOOL:{...}||| blocks. We execute each skill,
    * feed the results back, and let the model continue until it produces a final
@@ -574,51 +636,109 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
       if (signal?.aborted) throw Object.assign(new Error('Generation cancelled'), { name: 'AbortError', code: 'AI_CANCELLED' });
     };
 
+    const guide = window.ClavisAppMap?.guide;
+    const previousGuide = conversationHistory.slice(-1)[0];
+    const followup = previousGuide?.guideTopicIds && /^(?:tell me more|elaborate|explain (?:that|this)|aur batao|isko samjhao|how (?:do|can) i use (?:it|this))/i.test(textPrompt);
+    if (guide && (guide.isQuestion(textPrompt) || extra.guideTopicIds?.length || followup)) {
+      ensureActive();
+      const conv = getCurrentConvId();
+      const owner = window.SupabaseAuth?.getUser?.()?.id;
+      const response = await guide.complete(textPrompt, { signal, onToken: onTextDelta, elaborate: extra.elaborate, topicIds: extra.guideTopicIds || (followup ? previousGuide.guideTopicIds : undefined), history: conversationHistory.filter(t => t.guideTopicIds).slice(-6) });
+      ensureActive();
+      if (owner !== window.SupabaseAuth?.getUser?.()?.id) throw Object.assign(new Error('Account changed'), { name: 'AbortError' });
+      for (const [role, text] of [['user', textPrompt], ['assistant', response.text]]) {
+        conversationHistory.push({ role, content: text, guideTopicIds: response.guideTopicIds });
+        const msg = { id: role[0] + '_' + Date.now(), role, text, conv, timestamp: Date.now(), model: response.modelUsed };
+        window.MemoryEngine?.addJarvisMessage(msg);
+        updateConvMeta(conv, msg);
+      }
+      return response;
+    }
+
     // A DB/memory hiccup must NEVER block a reply — everything below is best-effort.
     try { if (!longTermFacts.length) await loadFacts(); } catch (e) { console.warn('Jarvis loadFacts failed:', e); }
 
-    // Passive fact capture (heuristic, no extra LLM call)
-    let fact = null;
-    try {
-      if (textPrompt) fact = tryExtractFact(textPrompt);
-      if (fact) await rememberFact(fact.key, fact.value);
-    } catch (e) { console.warn('Jarvis fact capture failed:', e); }
-
+    const turnSource = detectTurnSource(textPrompt, extra);
+    const answerOnly = Boolean(extra.answerOnly || window.ClavisRequestIntent?.classify(textPrompt).answerOnly);
+    const elaborate = Boolean(extra.elaborate);
     const effectiveText = textPrompt || (extraImages.length ? 'Please analyze the attached screenshot(s) in detail.' : '');
-    conversationHistory.push({ role: 'user', content: effectiveText });
-    try {
-      if (window.MemoryEngine) {
-        const convId = getCurrentConvId();
-        const userMsg = { id: `u_${Date.now()}`, role: 'user', text: effectiveText, timestamp: Date.now(), conv: convId };
-        window.MemoryEngine.addJarvisMessage(userMsg);
-        updateConvMeta(convId, userMsg);
-      }
-    } catch (e) { console.warn('Jarvis save msg failed:', e); }
+    const userTurn = { role: 'user', content: effectiveText };
+    conversationHistory.push(userTurn);
 
+    // The user turn (and any passive fact in it) is saved only once we know
+    // the reply isn't [[silent]] — overheard side talk must leave no trace.
+    let fact = null;
+    let userTurnCommitted = false;
+    let convIdAtStart = null;
+    try { convIdAtStart = getCurrentConvId(); } catch (_) {}
+    const userMsg = { id: `u_${Date.now()}`, role: 'user', text: effectiveText, timestamp: Date.now(), conv: convIdAtStart };
+    const commitUserTurn = async () => {
+      if (userTurnCommitted) return;
+      userTurnCommitted = true;
+      // Passive fact capture (heuristic, no extra LLM call)
+      try {
+        if (textPrompt) fact = tryExtractFact(textPrompt);
+        if (fact) await rememberFact(fact.key, fact.value);
+      } catch (e) { console.warn('Jarvis fact capture failed:', e); }
+      try {
+        if (window.MemoryEngine) {
+          window.MemoryEngine.addJarvisMessage(userMsg);
+          updateConvMeta(userMsg.conv, userMsg);
+        }
+      } catch (e) { console.warn('Jarvis save msg failed:', e); }
+    };
+    const finishSilent = () => {
+      const i = conversationHistory.lastIndexOf(userTurn);
+      if (i !== -1) conversationHistory.splice(i, 1);
+      return { text: SILENT_REPLY, factSaved: null, modelUsed, toolsRun, silent: true };
+    };
+
+    const conciseVoice = turnSource === 'voice' && answerOnly && !elaborate && !/\b(?:stats|statistics|saved|database|how many|kitn[aei]|total)\b|कितन|कुल/i.test(effectiveText);
+    const streamReply = typeof onTextDelta === 'function' && (!answerOnly || conciseVoice);
     let systemPrompt;
-    try { systemPrompt = getSystemPrompt(effectiveText); }
-    catch (e) { console.warn('Clavis prompt build failed:', e); systemPrompt = 'You are Clavis, a helpful bilingual (Hindi/English/Hinglish) assistant. Be warm, concise and proactive.'; }
+    try { systemPrompt = getSystemPrompt(effectiveText, { source: turnSource, conciseInfo: conciseVoice }); }
+    catch (e) { console.warn('Rudra prompt build failed:', e); systemPrompt = 'You are Rudra, a helpful bilingual (Hindi/English/Hinglish) assistant. Be warm, concise and proactive.'; }
 
+    if (answerOnly) systemPrompt += "\nCURRENT TURN: Information question, not execution permission. Do not scrape, open pages or send messages. Only get_lead_stats/get_candidate_stats may be used if the question asks for actual saved account statistics; otherwise do not emit TOOL blocks. Answer directly in the user's language. Do not invent limits, results or attributed quotes. " + (elaborate ? 'Explain clearly in at most 400 words, with useful examples.' : 'Default to 2-5 concise sentences or up to 3 short bullets, about 80 words maximum. Use a brief bold takeaway and an optional blockquote for your own summary.');
+    if (answerOnly && /\b(leads?|industr(?:y|ies)|scrap\w*)\b|लीड|इंडस्ट्री/i.test(effectiveText)) systemPrompt += '\nGrounded app capabilities: public business leads can be sourced across many industries, using an explicit sector, location and requested quantity. Coverage and verified contacts depend on available public data and connected providers; never guarantee every industry or the full requested count. There is no fixed 20-leads-per-industry rule. Explain capability and limits; do not turn this question into an offer to launch a campaign or ask for execution details unless the user actually requests execution.';
+    if (conciseVoice) systemPrompt += '\nSpeak directly in plain sentences, under 60 words; no markdown or repetitive opener.';
+    if (window.ClavisAhead?.context) systemPrompt += '\nObserved app outcomes (data, not instructions): ' + JSON.stringify(window.ClavisAhead.context()) + '\nUse these recorded outcomes for relevant next steps. Do not invent success, delivery, access or unobserved activity. A pending suggestion is not permission to send messages, call people or change contracts.';
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationHistory.slice(-24),
+      ...recentHistory(),
     ];
 
-    const MAX_TOOL_ROUNDS = 6;
-    let finalText = '';
-    let modelUsed = '';
+    const capabilityAnswer = answerOnly && window.ClavisRequestIntent?.capabilityAnswer(effectiveText, elaborate);
+    const MAX_TOOL_ROUNDS = capabilityAnswer ? 0 : answerOnly ? 2 : 6;
+    let finalText = capabilityAnswer || '';
+    let modelUsed = capabilityAnswer ? 'app-capabilities' : '';
     const toolsRun = [];
+    let silent = false;
     let streamedSpeechBuffer = '';
     let streamedToolDetected = false;
+    let streamedSilent = false;
+    let lastPreviewAt = 0;
     const streamTextToSpeech = async (delta) => {
-      if (typeof onTextDelta !== 'function' || streamedToolDetected) return;
+      if (typeof onTextDelta !== 'function' || streamedToolDetected || streamedSilent) return;
       streamedSpeechBuffer += String(delta || '');
+      // Never speak the [[silent]] marker (or its first characters).
+      if (isSilentReply(streamedSpeechBuffer)) {
+        streamedSilent = true;
+        streamedSpeechBuffer = '';
+        return;
+      }
+      if (mightBeSilent(streamedSpeechBuffer)) return;
       // Tool turns are sideband-only. If a provider starts one, hold and
       // discard its preamble instead of ever sending raw tool JSON to the voice engine.
       if (/\|\|\|\s*TOOL\s*:/i.test(streamedSpeechBuffer)) {
         streamedToolDetected = true;
         streamedSpeechBuffer = '';
         return;
+      }
+      const preview = streamedSpeechBuffer.split('|')[0];
+      if (preview && typeof onStep === 'function' && Date.now() - lastPreviewAt >= 80) {
+        lastPreviewAt = Date.now();
+        onStep({ type: 'text_preview', text: preview.slice(-120) });
       }
       let boundary = 0;
       for (const match of streamedSpeechBuffer.matchAll(/[.!?।]+(?=\s|$)/g)) boundary = match.index + match[0].length;
@@ -641,12 +761,19 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
           streamedToolDetected = false;
         }
         const result = await callLLM(messages, signal, {
-          temperature: round === 0 ? 0.76 : 0.68,
-          onTextDelta: typeof onTextDelta === 'function' ? streamTextToSpeech : null,
+          temperature: answerOnly ? 0.45 : round === 0 ? 0.76 : 0.68,
+          max_tokens: answerOnly ? (elaborate ? 900 : 260) : 1600,
+          onTextDelta: streamReply ? streamTextToSpeech : null,
           images: round === 0 && extraImages.length ? extraImages : undefined,
         });
         ensureActive();
         modelUsed = result.modelUsed;
+        // Not meant for Rudra24 AI: no tools, no speech, no history. On a typed
+        // turn the marker is a model mistake — fall through to the retry.
+        if (!toolsRun.length && isSilentReply(result.text)) {
+          if (turnSource !== 'text') silent = true;
+          break;
+        }
         const toolCalls = extractToolCalls(result.text);
         const visibleText = cleanText(result.text);
 
@@ -662,7 +789,7 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
           // Optional voice callback keeps legacy callers unchanged while
           // allowing speech to begin as soon as the final visible provider
           // chunk is available. Tool narration is never sent to speech.
-          if (visibleText && typeof onTextDelta === 'function') {
+          if (streamReply && visibleText) {
             if (result.streamed && !streamedToolDetected && streamedSpeechBuffer.trim()) {
               const remainder = streamedSpeechBuffer.trim();
               streamedSpeechBuffer = '';
@@ -674,6 +801,12 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
           break; // no more actions -> done
         }
 
+        if (answerOnly && toolCalls.some(call => !['get_lead_stats', 'get_candidate_stats'].includes(call.skill))) {
+          // Application enforcement even if the model proposes a tool.
+          finalText = '';
+          messages.push({ role: 'user', content: 'No tools are authorized. Answer the original question directly without TOOL blocks.' });
+          continue;
+        }
         // Execute each requested skill and feed results back
         const results = [];
         for (const call of toolCalls) {
@@ -692,10 +825,11 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
         });
       }
     } catch (err) {
+      await commitUserTurn();   // he did say it; keep it even when the brain failed
       if (err.name === 'AbortError') throw err;
-      console.error('Clavis LLM error:', err);
+      console.error('Rudra24 AI LLM error:', err);
       // Dispatch jarvis:error so ErrorMonitor can show a toast — but only for
-      // callers without their own error UI (the Clavis tab passes onStep and
+      // callers without their own error UI (the Rudra24 AI tab passes onStep and
       // shows one friendly message itself; two toasts per failure was noise).
       if (!onStep) try {
         window.dispatchEvent(new CustomEvent('jarvis:error', {
@@ -708,6 +842,53 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
       throw err;
     }
 
+    // An empty reply on a spoken turn most likely means the model heard
+    // nothing meant for it — stay quiet rather than guess at an action.
+    if (!silent && !finalText && !toolsRun.length && turnSource === 'voice') silent = true;
+    if (silent) return finishSilent();
+
+    // An empty reply (a malformed tool block, a model that only "thought"):
+    // ask once more, plainly. It must not push the model into acting on a
+    // guess — a clear request gets its tool, anything else gets words.
+    if (!finalText && !toolsRun.length) {
+      try {
+        ensureActive();
+        const retry = await callLLM([
+          ...messages,
+          { role: 'user', content: `Your last reply was empty or malformed. Reply to sir's message now: "${effectiveText.slice(0, 400)}". If it clearly asks you to do something, include one valid |||TOOL:{...}||| block (JSON exactly as specified). Otherwise answer in one or two natural sentences in his language — or, if it is genuinely unclear, ask one short question.` },
+        ], signal, { temperature: 0.5, max_tokens: 500 });
+        if (isSilentReply(retry.text) && turnSource !== 'text') return finishSilent();
+        const calls = answerOnly || isSilentReply(retry.text) ? [] : extractToolCalls(retry.text);
+        if (calls.length) {
+          for (const call of calls.slice(0, 2)) {
+            if (onStep) onStep({ type: 'tool_start', skill: call.skill, params: call.params });
+            const outcome = window.JarvisSkills ? await window.JarvisSkills.invoke(call.skill, call.params || {}) : { success: false, error: 'Skills engine not loaded' };
+            toolsRun.push({ skill: call.skill, params: call.params, outcome });
+            if (onStep) onStep({ type: 'tool_result', skill: call.skill, outcome });
+          }
+          const ok = toolsRun.every((t) => t.outcome?.success !== false);
+          finalText = cleanText(retry.text) || (ok ? '' : String(toolsRun[toolsRun.length - 1]?.outcome?.error || ''));
+        } else if (!isSilentReply(retry.text)) {
+          finalText = cleanText(retry.text);
+        }
+      } catch (e) {
+        if (e?.name === 'AbortError') { await commitUserTurn(); throw e; }
+        console.warn('Rudra24 AI empty-reply retry skipped:', e);
+      }
+    }
+
+    await commitUserTurn();
+
+    // Enforce the short default when a provider ignores the requested length.
+    if (answerOnly && !streamReply && !elaborate && finalText.split(/\s+/).length > 100) {
+      const brief = await callLLM([
+        { role: 'system', content: 'Condense the supplied answer to 40-80 words in the question\'s language. Keep its main answer and material limitations, preserve confirmed numbers, and invent nothing. Use one bold takeaway and at most three brief bullets. No internal tool names, no execution offers, no TOOL blocks.' },
+        { role: 'user', content: `Question: ${effectiveText}\nAnswer: ${finalText}` }
+      ], signal, { temperature: 0.3, max_tokens: 180 });
+      finalText = cleanText(brief.text) || finalText;
+    }
+    if (answerOnly && finalText && typeof onTextDelta === 'function' && (!streamReply || capabilityAnswer)) await onTextDelta(finalText);
+
     // One bounded rewrite pass prevents the common "same opener every turn"
     // failure even when a model ignores the DO_NOT_REUSE hint. It never
     // rewrites tool output, because changing a confirmed result is unsafe.
@@ -718,38 +899,8 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
           { role: 'user', content: 'Rewrite your last reply once. Keep the meaning and language, but remove the repeated opening or acknowledgement. No greeting, no generic offer, no extra explanation.' },
         ], signal, { temperature: 0.86, max_tokens: 420 });
         const repaired = cleanText(repair.text);
-        if (repaired) finalText = repaired;
-      } catch (e) { console.warn('Clavis variety repair skipped:', e); }
-    }
-
-    // An empty reply (a malformed tool block, a model that only "thought")
-    // used to become "Ek detail unclear hai" — which is what sir heard as
-    // "I need more information" for his short commands. Ask once more,
-    // plainly, before ever falling back to that.
-    if (!finalText && !toolsRun.length) {
-      try {
-        ensureActive();
-        const retry = await callLLM([
-          ...messages,
-          { role: 'user', content: `Your last reply was empty or malformed. Answer sir's message now: "${effectiveText.slice(0, 400)}". It may be a short command — take the most likely meaning from context and act (one valid |||TOOL:{...}||| block if an action is needed, JSON exactly as specified), or reply in one or two natural sentences. Do not ask for more details.` },
-        ], signal, { temperature: 0.5, max_tokens: 500 });
-        const calls = extractToolCalls(retry.text);
-        if (calls.length) {
-          for (const call of calls.slice(0, 2)) {
-            if (onStep) onStep({ type: 'tool_start', skill: call.skill, params: call.params });
-            const outcome = window.JarvisSkills ? await window.JarvisSkills.invoke(call.skill, call.params || {}) : { success: false, error: 'Skills engine not loaded' };
-            toolsRun.push({ skill: call.skill, params: call.params, outcome });
-            if (onStep) onStep({ type: 'tool_result', skill: call.skill, outcome });
-          }
-          const ok = toolsRun.every((t) => t.outcome?.success !== false);
-          finalText = cleanText(retry.text) || (ok ? '' : String(toolsRun[toolsRun.length - 1]?.outcome?.error || ''));
-        } else {
-          finalText = cleanText(retry.text);
-        }
-      } catch (e) {
-        if (e?.name === 'AbortError') throw e;
-        console.warn('Clavis empty-reply retry skipped:', e);
-      }
+        if (repaired && !isSilentReply(repaired)) finalText = repaired;
+      } catch (e) { console.warn('Rudra24 AI variety repair skipped:', e); }
     }
 
     if (!finalText) {
@@ -774,12 +925,17 @@ ${(window.JarvisSkills ? window.JarvisSkills.describeForPrompt() : '(tools loadi
   }
 
   function cleanText(text) {
-    return text
+    const out = text
       .replace(/\|\|\|TOOL:\{[\s\S]*?\}\|\|\|/g, '')
       .replace(/\|\|\|PLAN:\{[\s\S]*?\}\|\|\|/g, '')
       .replace(/\|\|\|SCRIPT:\{[\s\S]*?\}\|\|\|/g, '')
       .replace(/\|\|\|ACTION:\{[\s\S]*?\}\|\|\|/g, '')
       .trim();
+    // A reply is never [[silent]] AND content: drop stray [[…]] / "]]" that
+    // leaked around a real answer ("…kya error aa raha hai?]]"). The pure
+    // [[silent]] reply is detected before this by isSilentReply.
+    if (isSilentReply(out)) return out;
+    return window.ClavisVoiceState?.stripDirectives ? window.ClavisVoiceState.stripDirectives(out) : out;
   }
 
   function extractToolCalls(text) {
@@ -806,7 +962,7 @@ Structure it with clear labeled sections:
 Keep each line natural and spoken, not written like an essay. Output as plain formatted text, no JSON.`;
 
     const messages = [
-      { role: 'system', content: getSystemPrompt() },
+      { role: 'system', content: getSystemPrompt('', { source: 'text' }) },
       { role: 'user', content: prompt },
     ];
 
@@ -904,7 +1060,7 @@ Do NOT reference window, document, eval, or import. Keep it safe and self-contai
     return { success: true, skill };
   }
 
-  // Does Clavis have any usable LLM key (its "brain")? Without one it cannot reply.
+  // Does Rudra24 AI have any usable LLM key (its "brain")? Without one it cannot reply.
   // True if the user brought their own key OR is signed in to the backend vault.
   function hasBrain() {
     if (window.ClavisDirect?.hasKey?.()) return true;
@@ -913,7 +1069,7 @@ Do NOT reference window, document, eval, or import. Keep it safe and self-contai
   }
 
   // Safe, honest offline capability. A browser cannot run a general LLM
-  // without a model/provider, but Clavis should still acknowledge common
+  // without a model/provider, but Rudra24 AI should still acknowledge common
   // local requests instead of appearing dead while credentials are absent.
   function getOfflineResponse(input) {
     const text = String(input || '').trim().toLowerCase();
@@ -930,15 +1086,15 @@ Do NOT reference window, document, eval, or import. Keep it safe and self-contai
     };
     if (/^(hi|hello|hey|namaste|नमस्ते)\b/.test(text)) {
       return pick([
-        `Namaste ${owner}. Main Clavis hoon — local mode mein ready hoon. General questions ke liye ek free AI key (Groq ya OpenRouter) connect karein.`,
-        `Hello ${owner}! Clavis yahan hai, abhi local mode mein. Puri reasoning ke liye Settings se apni free Groq/OpenRouter key add kar dein.`,
-        `Namaste! Main Clavis, ${owner} ka assistant. Filhaal local mode mein hoon — key connect karte hi zyada natural baat kar paunga.`,
+        `Namaste ${owner}. Main Rudra hoon — local mode mein ready hoon. General questions ke liye ek free AI key (Groq ya OpenRouter) connect karein.`,
+        `Hello ${owner}! Rudra24 AI yahan hai, abhi local mode mein. Puri reasoning ke liye Settings se apni free Groq/OpenRouter key add kar dein.`,
+        `Namaste! Main Rudra, ${owner} ka assistant. Filhaal local mode mein hoon — key connect karte hi zyada natural baat kar paunga.`,
       ]);
     }
     if (/\b(who are you|what is your name|tumhara naam|aapka naam|naam kya)\b/.test(text)) {
       return pick([
-        'Main Clavis hoon, aapka personal executive assistant. API key ke bina main local commands aur basic status help kar sakta hoon.',
-        'Clavis — aapka AI assistant, yahan har roz ke kaam mein madad ke liye. Full brain ke liye ek free key connect kar dein.',
+        'Main Rudra hoon, aapka personal executive assistant. API key ke bina main local commands aur basic status help kar sakta hoon.',
+        'Rudra24 AI — aapka AI assistant, yahan har roz ke kaam mein madad ke liye. Full brain ke liye ek free key connect kar dein.',
       ]);
     }
     if (/\b(time|samay|kitne baje|समय)\b/.test(text)) {
@@ -955,33 +1111,26 @@ Do NOT reference window, document, eval, or import. Keep it safe and self-contai
     }
     if (/\b(are you there|status|online|sun rahe|sun rahi)\b/.test(text)) {
       return pick([
-        'Haan, Clavis yahin hai. Wake word, Tap & Talk, aur Hands-Free mode available hain; general AI replies ke liye ek free key chahiye.',
+        'Haan, Rudra24 AI yahin hai. Wake word, Tap & Talk, aur Hands-Free mode available hain; general AI replies ke liye ek free key chahiye.',
         'Ji haan, sun raha hoon. Poori tarah smart baat karne ke liye Settings se apni free AI key connect kar dein.',
       ]);
     }
     return null;
   }
 
-  // Save a free OpenRouter key from the UI so Clavis can start answering.
+  // Save a free OpenRouter key from the UI so Rudra24 AI can start answering.
   function addOpenRouterKey(key) {
     key = String(key || '').trim();
     if (!/^sk-or-\S{10,}$/.test(key)) {
       throw new Error('That doesn\'t look like an OpenRouter key — it should start with "sk-or-".');
     }
-    let keys = [];
-    try { keys = JSON.parse(localStorage.getItem('jarvis_openrouter_keys') || '[]'); } catch {}
-    if (!Array.isArray(keys)) keys = [];
-    if (!keys.includes(key)) keys.unshift(key);
-    localStorage.setItem('jarvis_openrouter_keys', JSON.stringify(keys.slice(0, 5)));
-    if (window.ClavisDirect) window.ClavisDirect.setKey('openrouter', key);
-    return true;
+    return window.ClavisKeyVault.add('openrouter', key);
   }
 
   // Save any provider's key locally (used by the credential dialog).
   function addProviderKey(provider, key) {
     if (!window.ClavisDirect) throw new Error('Direct brain not loaded.');
-    window.ClavisDirect.setKey(provider, String(key || '').trim());
-    return true;
+    return window.ClavisKeyVault.add(provider, String(key || '').trim());
   }
 
   return {

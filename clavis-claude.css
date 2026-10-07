@@ -1,0 +1,1179 @@
+/* ============================================================
+ * clavis-claude.css · the Claude-inspired look (loaded LAST)
+ * ------------------------------------------------------------
+ * Inspiration: claude.com (ivory ground, serif headlines, soft
+ * white cards, quiet hairlines, gentle shadows only on things
+ * that float) + Wispr Flow (calm minimalism, slow easing).
+ *
+ *   1. Fonts        local Geist (UI) + Source Serif 4 (headlines)
+ *   2. Tokens       one palette, light + dark, mapped onto every
+ *                   older token family (--au-*, --lxe-*, --cts-* …)
+ *   3. Shell        sidebar, top bar, the sheet
+ *   4. Type         headlines, greeting, numbers
+ *   5. Buttons      primary (one flat green), secondary, quiet
+ *   6. Inputs       fields, selects, search, the composer
+ *   7. Cards        dashboard stats, charts, tables, chips
+ *   8. Floating     dialogs, sheets, menus, toasts, tooltips,
+ *                   hover cards — rounded, soft shadow, blur-in
+ *   9. Motion       expo-out easing, leaves faster than it comes
+ *  10. Dark         Claude's warm charcoal
+ *
+ * Specificity: every rule starts with
+ *   html:not(#cc#cc#cc#cc#cc#cc#cc#cc)       (8 ids)
+ * which beats the 6-id layers (clavis-olive / clavis-final).
+ * Settings → Appearance still wins: it writes --cc-* variables
+ * with a 9-id selector (see clavis-appearance.js).
+ * To go back to the previous look, delete the two lines that
+ * load clavis-claude.css / clavis-claude.js in index.html.
+ * ============================================================ */
+
+/* ── 1. Fonts ──────────────────────────────────────────────── */
+@font-face {
+  font-family: 'CX Sans';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(fonts/geist-latin-wght-normal.woff2) format('woff2-variations'), url(fonts/geist-latin-wght-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'CX Sans';
+  font-style: italic;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(fonts/geist-latin-wght-italic.woff2) format('woff2-variations'), url(fonts/geist-latin-wght-italic.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'CX Serif';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url(fonts/source-serif-4-latin-opsz-normal.woff2) format('woff2-variations'), url(fonts/source-serif-4-latin-opsz-normal.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'CX Serif';
+  font-style: italic;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url(fonts/source-serif-4-latin-opsz-italic.woff2) format('woff2-variations'), url(fonts/source-serif-4-latin-opsz-italic.woff2) format('woff2');
+}
+
+/* ── 2. Tokens ─────────────────────────────────────────────── */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) {
+  /* ground */
+  --cc-shell: #F4F2EC;          /* sidebar + top bar */
+  --cc-sheet: #FAF9F5;          /* the page (Claude ivory) */
+  --cc-surface: #FFFFFF;        /* cards, dialogs, menus */
+  --cc-sunk: #F0EEE6;           /* wells, user bubble, tags */
+  --cc-hover: rgba(20, 20, 19, .045);
+  --cc-press: rgba(20, 20, 19, .075);
+  --cc-select: rgba(20, 20, 19, .065);
+  /* ink */
+  --cc-ink: #141413;
+  --cc-ink-2: #3D3D3A;
+  --cc-mute: #6B6A64;
+  --cc-faint: #9C9A92;
+  /* lines */
+  --cc-line: rgba(20, 20, 19, .08);
+  --cc-line-2: rgba(20, 20, 19, .13);
+  --cc-line-3: rgba(20, 20, 19, .22);
+  /* one flat green */
+  --cc-accent: #2F5233;
+  --cc-accent-hover: #264529;
+  --cc-on-accent: #FAF9F5;
+  --cc-accent-soft: rgba(47, 82, 51, .09);
+  --cc-accent-ink: #2F5233;
+  --cc-ring: 0 0 0 3px rgba(47, 82, 51, .16);
+  --cc-danger: #B5443A;
+  /* type */
+  --cc-sans: 'CX Sans', 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  --cc-serif: 'CX Serif', 'Source Serif 4', 'Newsreader', Georgia, 'Times New Roman', serif;
+  --cc-mono: ui-monospace, 'JetBrains Mono', 'SFMono-Regular', Menlo, Consolas, monospace;
+  /* shape */
+  --cc-r-xs: 6px;
+  --cc-r-sm: 8px;
+  --cc-r-md: 12px;
+  --cc-r-lg: 16px;
+  --cc-r-xl: 20px;
+  /* depth — only things that float get a shadow */
+  --cc-sh-1: 0 1px 2px rgba(20, 20, 19, .04);
+  --cc-sh-hover: 0 1px 2px rgba(20, 20, 19, .03), 0 8px 24px -10px rgba(20, 20, 19, .14);
+  --cc-sh-pop: 0 0 0 .5px rgba(20, 20, 19, .09), 0 2px 6px -1px rgba(20, 20, 19, .05), 0 16px 40px -10px rgba(20, 20, 19, .18);
+  --cc-sh-dlg: 0 0 0 .5px rgba(20, 20, 19, .09), 0 6px 18px -6px rgba(20, 20, 19, .07), 0 36px 80px -20px rgba(20, 20, 19, .28);
+  --cc-scrim: rgba(28, 27, 24, .22);
+  /* motion — expo-out in, quicker out */
+  --cc-ease: cubic-bezier(.16, 1, .3, 1);
+  --cc-ease-soft: cubic-bezier(.25, 1, .5, 1);
+  --cc-ease-in: cubic-bezier(.5, 0, .75, 0);
+  --cc-ease-io: cubic-bezier(.65, 0, .35, 1);
+  --cc-ease-apple: cubic-bezier(.32, .72, 0, 1);   /* iOS sheet curve */
+  --cc-t1: 160ms;
+  --cc-t2: 240ms;
+  --cc-t3: 420ms;
+  --cc-t4: 620ms;
+
+  /* every older token family now points at the palette above */
+  --au-ink: var(--cc-ink) !important;
+  --au-mute: var(--cc-mute) !important;
+  --au-faint: var(--cc-faint) !important;
+  --au-line: var(--cc-line) !important;
+  --au-line-2: var(--cc-line) !important;
+  --au-accent: var(--cc-accent) !important;
+  --au-panel: var(--cc-surface) !important;
+  --au-sunk: var(--cc-sunk) !important;
+  --au-sans: var(--cc-sans) !important;
+  --au-display: var(--cc-serif) !important;
+  --au-read: var(--cc-sans) !important;
+  --lxe-ink: var(--cc-ink) !important;
+  --lxe-ink-2: var(--cc-ink-2) !important;
+  --lxe-faint: var(--cc-faint) !important;
+  --lxe-line: var(--cc-line) !important;
+  --lxe-line-2: var(--cc-line) !important;
+  --lxe-accent: var(--cc-accent) !important;
+  --lxe-raised: var(--cc-surface) !important;
+  --lxe-hover: var(--cc-hover) !important;
+  --lxe-sans: var(--cc-sans) !important;
+  --lxe-serif: var(--cc-serif) !important;
+  --lxe-focus: 0 0 0 2px var(--cc-sheet), 0 0 0 4px rgba(47, 82, 51, .28) !important;
+  --lx-accent: var(--cc-accent) !important;
+  --lx-accent-hi: var(--cc-accent) !important;
+  --lx-accent-glow: rgba(47, 82, 51, .12) !important;
+  --ap-text-1: var(--cc-ink) !important;
+  --ap-text-2: var(--cc-mute) !important;
+  --ap-text-3: var(--cc-faint) !important;
+  --ap-accent: var(--cc-accent) !important;
+  --ap-sep: var(--cc-line) !important;
+  --cx-ink: var(--cc-ink) !important;
+  --cx-mute: var(--cc-mute) !important;
+  --cx-hair: var(--cc-line) !important;
+  --cx-hair-2: var(--cc-line) !important;
+  --cx-olive: var(--cc-accent) !important;
+  --foreground: var(--cc-ink) !important;
+  --border: var(--cc-line) !important;
+  --shell-hairline: var(--cc-line) !important;
+  --shell-panel: var(--cc-sheet) !important;
+  --do-border: var(--cc-line) !important;
+  --do-bg-card: var(--cc-surface) !important;
+  --text-primary: var(--cc-ink) !important;
+  --text-secondary: var(--cc-mute) !important;
+  --surface: var(--cc-surface) !important;
+  --card-bg: var(--cc-surface) !important;
+  --flow-sans: var(--cc-sans) !important;
+  --font-sans: var(--cc-sans) !important;
+  --cr-sans: var(--cc-sans) !important;
+  --mac-font: var(--cc-sans) !important;
+  --cts-sans: var(--cc-sans) !important;
+  --cts-serif: var(--cc-serif) !important;
+  --olive: var(--cc-accent) !important;
+  color-scheme: light;
+}
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) {
+  --cc-shell: #1F1E1D;
+  --cc-sheet: #262624;
+  --cc-surface: #30302E;
+  --cc-sunk: #1F1E1D;
+  --cc-hover: rgba(250, 249, 245, .055);
+  --cc-press: rgba(250, 249, 245, .085);
+  --cc-select: rgba(250, 249, 245, .075);
+  --cc-ink: #F5F4EE;
+  --cc-ink-2: #D9D7CF;
+  --cc-mute: #A6A39A;
+  --cc-faint: #7A7870;
+  --cc-line: rgba(250, 249, 245, .085);
+  --cc-line-2: rgba(250, 249, 245, .13);
+  --cc-line-3: rgba(250, 249, 245, .22);
+  --cc-accent: #4B7852;
+  --cc-accent-hover: #55865D;
+  --cc-on-accent: #FAF9F5;
+  --cc-accent-soft: rgba(126, 170, 132, .13);
+  --cc-accent-ink: #9CC4A1;
+  --cc-ring: 0 0 0 3px rgba(126, 170, 132, .22);
+  --cc-danger: #E0796F;
+  --cc-sh-1: 0 1px 2px rgba(0, 0, 0, .25);
+  --cc-sh-hover: 0 1px 2px rgba(0, 0, 0, .2), 0 10px 28px -12px rgba(0, 0, 0, .55);
+  --cc-sh-pop: 0 0 0 .5px rgba(250, 249, 245, .09), 0 2px 6px -1px rgba(0, 0, 0, .25), 0 18px 44px -10px rgba(0, 0, 0, .6);
+  --cc-sh-dlg: 0 0 0 .5px rgba(250, 249, 245, .09), 0 8px 20px -6px rgba(0, 0, 0, .3), 0 40px 90px -20px rgba(0, 0, 0, .7);
+  --cc-scrim: rgba(10, 10, 9, .5);
+  --lxe-focus: 0 0 0 2px var(--cc-sheet), 0 0 0 4px rgba(126, 170, 132, .35) !important;
+  --lx-accent-glow: rgba(126, 170, 132, .14) !important;
+  color-scheme: dark;
+}
+/* the Peek window and the key-setup dialog scope their own copies */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cts, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #cx-setup-root {
+  --cts-sans: var(--cc-sans) !important;
+  --cts-serif: var(--cc-serif) !important;
+  --au-sans: var(--cc-sans) !important;
+  --au-display: var(--cc-serif) !important;
+}
+
+/* ── 3. Base + shell ───────────────────────────────────────── */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body {
+  font-family: var(--cc-sans) !important;
+  color: var(--cc-ink);
+  background: var(--cc-shell) !important;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+  font-feature-settings: 'ss01' 0, 'cv11' 0;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body :is(button, input, select, textarea, optgroup) { font-family: var(--cc-sans) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body :is(code, pre, kbd, samp) { font-family: var(--cc-mono) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::selection { background: rgba(47, 82, 51, .16); color: inherit; }
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::selection { background: rgba(126, 170, 132, .28); }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :focus-visible { outline: 2px solid rgba(47, 82, 51, .45) !important; outline-offset: 2px !important; }
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) :focus-visible { outline-color: rgba(156, 196, 161, .55) !important; }
+/* The composer shell owns keyboard focus; a second square around its text is noise. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#jarvis-input, #chat-input, #candidate-ai-input, .cts-composer-input):focus-visible {
+  outline: none !important;
+}
+
+/* quiet scrollbars */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) * { scrollbar-width: thin; scrollbar-color: var(--cc-line-2) transparent; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar { width: 10px; height: 10px; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-track { background: transparent; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-thumb { background: var(--cc-line-2); border-radius: 99px; border: 3px solid transparent; background-clip: content-box; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) ::-webkit-scrollbar-thumb:hover { background: var(--cc-line-3); background-clip: content-box; border: 3px solid transparent; }
+
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #app-shell { background: var(--cc-shell) !important; background-image: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #main-content, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .main-content { background: var(--cc-shell) !important; background-image: none !important; }
+
+/* the sheet — ivory, one hairline, no shadow */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #main-scroll-area.views-container {
+  background: var(--cc-sheet) !important;
+  background-image: none !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+}
+
+/* Sidebar */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar {
+  background: var(--cc-shell) !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar .sidebar-brand-title {
+  font-family: var(--cc-serif) !important;
+  font-size: 19px !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.015em !important;
+  color: var(--cc-ink) !important;
+  font-style: normal !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar:is(:not(.collapsed), .au-peek) .nav-section-label {
+  font-family: var(--cc-sans) !important;
+  font-style: normal !important;
+  font-size: 11.5px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+  color: var(--cc-faint) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item) {
+  font-family: var(--cc-sans) !important;
+  font-size: 13.5px !important;
+  font-weight: 450 !important;
+  letter-spacing: -0.003em !important;
+  color: var(--cc-ink-2) !important;
+  border-radius: var(--cc-r-sm) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), color var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item) :is(svg, i, .nav-icon) {
+  color: var(--cc-mute) !important;
+  stroke-width: 1.6;
+  transition: color var(--cc-t2) var(--cc-ease), scale var(--cc-t3) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item) svg,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item) svg :is(path, circle, rect, line, polyline, polygon, ellipse):not([stroke="none"]) { stroke: currentColor !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item):hover { background: var(--cc-hover) !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item):hover :is(svg, i, .nav-icon) { color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item):active :is(svg, i, .nav-icon) { scale: .92; transition-duration: 90ms !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item).active {
+  background: var(--cc-select) !important;
+  color: var(--cc-ink) !important;
+  font-weight: 550 !important;
+  box-shadow: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-item, .nav-sub-item).active :is(svg, i, .nav-icon) { color: var(--cc-ink) !important; }
+/* the sliding coloured marker → gone; the soft fill says "you are here" */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.au-rail-marker, .nav-active-indicator) { opacity: 0 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar .nav-item.active::before, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar .nav-item.active::after { background: transparent !important; box-shadow: none !important; }
+
+/* window dots: neutral until hovered (still work as sidebar toggles) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .mac-window-controls .mac-dot, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-traffic-lights .smodal-dot {
+  background: var(--cc-line-2) !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  transition: background-color var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .mac-window-controls:hover .mac-close, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-traffic-lights:hover .smodal-dot-close { background: #EC6A5E !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .mac-window-controls:hover .mac-minimize, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-traffic-lights:hover .smodal-dot-minimize { background: #F4BF4F !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .mac-window-controls:hover .mac-maximize, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-traffic-lights:hover .smodal-dot-expand { background: #61C554 !important; }
+
+/* Top bar */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .topbar {
+  background: var(--cc-shell) !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .topbar .page-breadcrumb {
+  font-family: var(--cc-serif) !important;
+  font-size: 19px !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  letter-spacing: -0.012em !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .topbar :is(.topbar-chip, .topbar-right > button:not(#run-agent-btn):not(.luxe-switch), .topbar-right > a, .topbar-user-badge) {
+  color: var(--cc-ink-2) !important;
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  border-radius: var(--cc-r-sm) !important;
+  font-weight: 450 !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), color var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .topbar :is(.topbar-chip, .topbar-right > button:not(#run-agent-btn):not(.luxe-switch), .topbar-right > a, .topbar-user-badge):hover {
+  background: var(--cc-hover) !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .topbar :is(.topbar-chip, .topbar-right > button, .topbar-right > a) svg { color: var(--cc-mute) !important; }
+
+/* ── 4. Type ───────────────────────────────────────────────── */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #main-scroll-area :is(h1, h2, h3) { color: var(--cc-ink); }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-dash-greeting-title, .do-greeting-title, .jarvis-greeting, .claude-greeting, .ag-hero-title) {
+  font-family: var(--cc-serif) !important;
+  font-weight: 400 !important;
+  font-style: normal !important;
+  letter-spacing: -0.022em !important;
+  color: var(--cc-ink) !important;
+  font-optical-sizing: auto;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-dash-greeting-title, .do-greeting-title) { font-size: clamp(34px, 3.4vw, 46px) !important; line-height: 1.08 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-dash-greeting-sub, .do-greeting-sub) { color: var(--cc-mute) !important; font-size: 14px !important; letter-spacing: 0 !important; font-style: normal !important; }
+/* the gradient/italic "Sir" in the chat greeting becomes plain ink */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.claude-greeting, .jarvis-greeting, .do-dash-greeting-title) :is(span, em, i) {
+  background: none !important;
+  -webkit-text-fill-color: currentColor !important;
+  color: inherit !important;
+  font-style: normal !important;
+  font-family: inherit !important;
+  font-weight: inherit !important;
+}
+/* page + section headings */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #main-scroll-area :is(.page-title, .view-title, .leads-page-title, .section-title, .pg-title, .cand-title) {
+  font-family: var(--cc-serif) !important;
+  font-weight: 400 !important;
+  letter-spacing: -0.018em !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-chart-title, .chart-card-header h3, .smodal-section-title, .jarvis-modal-header h2, .jarvis-modal-header h3, .modal-header h2, .pg-modal-head h3, .pg-modal-head h2) {
+  font-family: var(--cc-serif) !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.012em !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-title { font-size: 17px !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-chart-sub, .do-chart-subtitle, .do-chart-header p, .smodal-section-desc) { color: var(--cc-mute) !important; font-style: normal !important; }
+
+/* ── 5. Buttons ────────────────────────────────────────────── */
+/* primary — one flat green, 8px corners like claude.com */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .cv-start,
+      .desktop-notif-btn--primary, .enr-btn-primary, .gmail-send-btn, .generate-leads-btn,
+      .do-quick-btn[onclick*="showView('agent')"], .mac-dialog-btn.primary, .mac-dialog-btn.mac-dialog-primary, .pg-btn-primary) {
+  background: var(--cc-accent) !important;
+  background-image: none !important;
+  color: var(--cc-on-accent) !important;
+  border: 1px solid transparent !important;
+  border-radius: var(--cc-r-sm) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-weight: 500 !important;
+  letter-spacing: -0.005em !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), scale var(--cc-t2) var(--cc-ease), box-shadow var(--cc-t2) var(--cc-ease), opacity var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .cv-start,
+      .desktop-notif-btn--primary, .enr-btn-primary, .gmail-send-btn, .generate-leads-btn,
+      .do-quick-btn[onclick*="showView('agent')"], .mac-dialog-btn.primary, .mac-dialog-btn.mac-dialog-primary, .pg-btn-primary) :is(svg, i) { color: currentColor !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .cv-start,
+      .desktop-notif-btn--primary, .enr-btn-primary, .gmail-send-btn, .generate-leads-btn,
+      .do-quick-btn[onclick*="showView('agent')"], .mac-dialog-btn.primary, .mac-dialog-btn.mac-dialog-primary, .pg-btn-primary):hover:not(:disabled) {
+  background: var(--cc-accent-hover) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#run-agent-btn, .generate-btn, .btn-primary, .smodal-btn-primary, .do-empty-cta, .cx-setup-btn--primary, .cv-start,
+      .desktop-notif-btn--primary, .enr-btn-primary, .gmail-send-btn, .generate-leads-btn,
+      .do-quick-btn, .mac-dialog-btn, .pg-btn-primary, .btn-secondary, .smodal-btn-secondary, .cx-setup-btn, .cv-cancel,
+      .desktop-notif-btn, .enr-btn-secondary, .cx-setup-pill, .pg-btn, .filter-clear-btn, .smodal-btn-danger, .chat-chip,
+      .jarvis-icon-pill, .jarvis-composer-btn, #jarvis-send-btn):active:not(:disabled) {
+  scale: .975;
+  transition-duration: 90ms !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #run-agent-btn { border-radius: var(--cc-r-sm) !important; }
+
+/* secondary — white with a hairline (claude.com "Windows (arm64)") */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.btn-secondary, .smodal-btn-secondary, .do-quick-btn:not([onclick*="showView('agent')"]), .cx-setup-btn--ghost, .cx-setup-btn--soft,
+      .cv-cancel, .desktop-notif-btn--secondary, .enr-btn-secondary, .cx-setup-pill, .pg-btn:not(.pg-btn-primary), .filter-clear-btn,
+      .mac-dialog-btn:not(.primary):not(.mac-dialog-primary), .gmail-tool-btn, .chat-chip, .cand-src-chip) {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  color: var(--cc-ink) !important;
+  border: 1px solid var(--cc-line-2) !important;
+  border-radius: var(--cc-r-sm) !important;
+  box-shadow: none !important;
+  text-shadow: none !important;
+  font-weight: 450 !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), border-color var(--cc-t2) var(--cc-ease), color var(--cc-t2) var(--cc-ease), scale var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.btn-secondary, .smodal-btn-secondary, .do-quick-btn:not([onclick*="showView('agent')"]), .cx-setup-btn--ghost, .cx-setup-btn--soft,
+      .cv-cancel, .desktop-notif-btn--secondary, .enr-btn-secondary, .cx-setup-pill, .pg-btn:not(.pg-btn-primary), .filter-clear-btn,
+      .mac-dialog-btn:not(.primary):not(.mac-dialog-primary), .gmail-tool-btn, .chat-chip, .cand-src-chip) :is(svg, i) { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.btn-secondary, .smodal-btn-secondary, .do-quick-btn:not([onclick*="showView('agent')"]), .cx-setup-btn--ghost, .cx-setup-btn--soft,
+      .cv-cancel, .desktop-notif-btn--secondary, .enr-btn-secondary, .cx-setup-pill, .pg-btn:not(.pg-btn-primary), .filter-clear-btn,
+      .mac-dialog-btn:not(.primary):not(.mac-dialog-primary), .gmail-tool-btn, .chat-chip, .cand-src-chip):hover:not(:disabled) {
+  background: var(--cc-sheet) !important;
+  border-color: var(--cc-line-3) !important;
+}
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.btn-secondary, .smodal-btn-secondary, .do-quick-btn:not([onclick*="showView('agent')"]), .cx-setup-btn--ghost, .cx-setup-btn--soft,
+      .cv-cancel, .desktop-notif-btn--secondary, .enr-btn-secondary, .cx-setup-pill, .pg-btn:not(.pg-btn-primary), .filter-clear-btn,
+      .mac-dialog-btn:not(.primary):not(.mac-dialog-primary), .gmail-tool-btn, .chat-chip, .cand-src-chip) {
+  background: transparent !important;
+}
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.btn-secondary, .smodal-btn-secondary, .do-quick-btn:not([onclick*="showView('agent')"]), .cx-setup-btn--ghost, .cx-setup-btn--soft,
+      .cv-cancel, .desktop-notif-btn--secondary, .enr-btn-secondary, .cx-setup-pill, .pg-btn:not(.pg-btn-primary), .filter-clear-btn,
+      .mac-dialog-btn:not(.primary):not(.mac-dialog-primary), .gmail-tool-btn, .chat-chip, .cand-src-chip):hover:not(:disabled) {
+  background: var(--cc-hover) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cand-src-chip.active, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cand-src-chip.is-active, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cand-src-chip[aria-pressed="true"] {
+  background: var(--cc-accent-soft) !important;
+  border-color: rgba(47, 82, 51, .35) !important;
+  color: var(--cc-accent-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-btn-danger {
+  background: transparent !important;
+  background-image: none !important;
+  color: var(--cc-danger) !important;
+  border: 1px solid color-mix(in srgb, var(--cc-danger) 35%, transparent) !important;
+  border-radius: var(--cc-r-sm) !important;
+  box-shadow: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-btn-danger:hover { background: color-mix(in srgb, var(--cc-danger) 8%, transparent) !important; }
+
+/* quiet icon buttons (Rudra24 AI header, composer tools) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.jarvis-icon-pill, .jarvis-composer-btn, .claude-icon-btn, .icon-btn, .smodal-icon-btn) {
+  background: transparent !important;
+  background-image: none !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--cc-mute) !important;
+  border-radius: var(--cc-r-sm) !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), color var(--cc-t2) var(--cc-ease), scale var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.jarvis-icon-pill, .jarvis-composer-btn, .claude-icon-btn, .icon-btn, .smodal-icon-btn):hover { background: var(--cc-hover) !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-icon-pill.active { background: var(--cc-accent-soft) !important; color: var(--cc-accent-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-icon-pill.active::after, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-icon-pill.active::before { background: var(--cc-accent-ink) !important; box-shadow: none !important; }
+
+/* round send button */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #jarvis-send-btn, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .claude-send-btn, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cts-composer-send {
+  background: var(--cc-accent) !important;
+  background-image: none !important;
+  color: var(--cc-on-accent) !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), scale var(--cc-t2) var(--cc-ease), opacity var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #jarvis-send-btn:hover:not(:disabled), html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .claude-send-btn:hover:not(:disabled) { background: var(--cc-accent-hover) !important; }
+
+/* ── 6. Inputs ─────────────────────────────────────────────── */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.smodal-input, .smodal-select, .auth-input, .ag-input:not(#auth-screen .ag-input), .cx-setup-inwrap, .mac-dialog-input, .mac-dialog-select, .outlook-input,
+      .search-input-wrap, .pg-input, .filter-select, .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="color"]), .form-group select, .form-group textarea) {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  border: 1px solid var(--cc-line-2) !important;
+  border-radius: var(--cc-r-sm) !important;
+  box-shadow: none !important;
+  color: var(--cc-ink) !important;
+  transition: border-color var(--cc-t2) var(--cc-ease), box-shadow var(--cc-t2) var(--cc-ease), background-color var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.smodal-input, .smodal-select, .auth-input, .ag-input:not(#auth-screen .ag-input), .cx-setup-inwrap, .mac-dialog-input, .mac-dialog-select, .outlook-input,
+      .search-input-wrap, .pg-input, .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .form-group select, .form-group textarea):hover { border-color: var(--cc-line-3) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.smodal-input, .smodal-select, .auth-input, .ag-input:not(#auth-screen .ag-input), .mac-dialog-input, .mac-dialog-select, .outlook-input, .pg-input,
+      .form-group input:not([type="checkbox"]):not([type="radio"]):not([type="range"]), .form-group select, .form-group textarea):focus,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.cx-setup-inwrap, .search-input-wrap):focus-within {
+  border-color: rgba(47, 82, 51, .55) !important;
+  box-shadow: var(--cc-ring) !important;
+  outline: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.cx-setup-inwrap, .search-input-wrap) :is(input, .cx-setup-input) { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+/* inputs only — composers (textareas) draw their own rotating hint (.lx-ph)
+   and hide the native placeholder; forcing its colour made both show at once */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) input:not(#auth-screen .ag-input)::placeholder { color: var(--cc-faint) !important; opacity: 1; font-style: normal; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .lx-ph { font-family: var(--cc-sans) !important; font-style: normal !important; color: var(--cc-faint) !important; }
+
+/* switches: flat track, green when on */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-switch .smodal-switch-track { background: var(--cc-line-2) !important; box-shadow: none !important; border: 0 !important; transition: background-color var(--cc-t3) var(--cc-ease) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-switch input:checked + .smodal-switch-track { background: var(--cc-accent) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-switch .smodal-switch-thumb { background: #fff !important; box-shadow: 0 1px 2px rgba(0, 0, 0, .18), 0 0 0 .5px rgba(0, 0, 0, .04) !important; transition: transform var(--cc-t3) var(--cc-ease), translate var(--cc-t3) var(--cc-ease) !important; }
+
+/* The composer — no card, no border, no fill. Just type. A whisper of a
+   shadow appears only once it's focused, so there's nothing to see until
+   he clicks in — no rectangle sitting on the page. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-input-container, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .claude-input-container, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cts-composer {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: var(--cc-r-xl) !important;
+  box-shadow: none !important;
+  transition: box-shadow var(--cc-t3) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-input-container:focus-within, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .claude-input-container:focus-within, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cts-composer:focus-within {
+  box-shadow: 0 1px 2px rgba(20, 20, 19, .04), 0 10px 28px -14px rgba(20, 20, 19, .16) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.claude-textarea, #jarvis-input, .cts-composer-input) {
+  font-family: var(--cc-sans) !important;
+  font-size: 15px !important;
+  color: var(--cc-ink) !important;
+  background: transparent !important;
+  caret-color: var(--cc-accent-ink);
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.claude-textarea, #jarvis-input)::placeholder { font-style: normal !important; }
+
+/* ── 7. Cards ──────────────────────────────────────────────── */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-stat-card, .do-chart-wrap, .stat-card, .chart-card, .analytics-card, .service-type-card, .jarvis-side-card, .email-sidebar-card,
+      .clavis-credential-card, .gmail-compose-card, .table-container, .enr-card, .cts-agent-card, .filter-bar) {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: 14px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: border-color var(--cc-t3) var(--cc-ease), box-shadow var(--cc-t3) var(--cc-ease), translate var(--cc-t3) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-stat-card, .stat-card, .service-type-card, .analytics-card):hover {
+  border-color: var(--cc-line-2) !important;
+  box-shadow: var(--cc-sh-hover) !important;
+  translate: 0 -1px;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-card::before, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-card::after, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-wrap::before, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-wrap::after { display: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-num {
+  font-family: var(--cc-serif) !important;
+  font-weight: 400 !important;
+  font-size: 34px !important;
+  letter-spacing: -0.02em !important;
+  color: var(--cc-ink) !important;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-label { color: var(--cc-ink-2) !important; font-weight: 450 !important; }
+/* rainbow icon tiles → one calm tone */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-icon-wrap {
+  background: var(--cc-sunk) !important;
+  background-image: none !important;
+  box-shadow: none !important;
+  border: 0 !important;
+  color: var(--cc-ink-2) !important;
+  border-radius: 10px !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-icon-wrap :is(svg, i) { color: var(--cc-ink-2) !important; stroke: currentColor; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-stat-trend, .do-status-badge) {
+  background: var(--cc-sunk) !important;
+  color: var(--cc-mute) !important;
+  border: 0 !important;
+  border-radius: 99px !important;
+  font-weight: 500 !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-stat-trend.do-trend-up { background: var(--cc-accent-soft) !important; color: var(--cc-accent-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-header { border-bottom-color: var(--cc-line) !important; }
+
+/* empty states: quiet, not pink */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-empty .do-empty-badge {
+  background: var(--cc-sunk) !important;
+  background-image: none !important;
+  color: var(--cc-mute) !important;
+  box-shadow: none !important;
+  border: 0 !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-empty .do-empty-badge svg { stroke: currentColor !important; color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-empty .do-empty-title { font-family: var(--cc-serif) !important; font-weight: 500 !important; font-size: 16px !important; font-style: normal !important; letter-spacing: -0.01em !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .do-chart-empty .do-empty-sub { font-family: var(--cc-sans) !important; font-style: normal !important; color: var(--cc-mute) !important; }
+
+/* tables */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.leads-table, .data-table, table.cand-table) { border-color: var(--cc-line) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.leads-table, .data-table, table.cand-table) thead th {
+  background: var(--cc-sheet) !important;
+  color: var(--cc-mute) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  letter-spacing: 0.01em !important;
+  text-transform: none !important;
+  border-bottom: 1px solid var(--cc-line) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.leads-table, .data-table, table.cand-table) tbody tr { transition: background-color var(--cc-t2) var(--cc-ease) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.leads-table, .data-table, table.cand-table) tbody tr:hover { background: var(--cc-hover) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.leads-table, .data-table, table.cand-table) td { border-color: var(--cc-line) !important; }
+
+/* chat — user turns sit in a soft beige bubble, Rudra24 AI just writes */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .chat-message.user .chat-bubble {
+  background: var(--cc-sunk) !important;
+  background-image: none !important;
+  color: var(--cc-ink) !important;
+  border: 0 !important;
+  border-radius: 16px !important;
+  box-shadow: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .chat-message:not(.user) .chat-bubble {
+  background: transparent !important;
+  background-image: none !important;
+  border: 0 !important;
+  box-shadow: none !important;
+  color: var(--cc-ink) !important;
+  font-size: 15px !important;
+  line-height: 1.65 !important;
+}
+
+/* status pill in the Rudra24 AI header */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-status-pill {
+  background: transparent !important;
+  border: 1px solid var(--cc-line-2) !important;
+  color: var(--cc-mute) !important;
+  box-shadow: none !important;
+}
+
+/* key-setup card on the Rudra24 AI screen: a calm white card, not yellow */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-jarvis #clavis-brain-card.cx-brain-card {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  border: 1px solid var(--cc-line-2) !important;
+  border-radius: 14px !important;
+  box-shadow: var(--cc-sh-1) !important;
+  color: var(--cc-ink) !important;
+  transition: box-shadow var(--cc-t3) var(--cc-ease), border-color var(--cc-t3) var(--cc-ease), translate var(--cc-t3) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-jarvis #clavis-brain-card.cx-brain-card:hover { box-shadow: var(--cc-sh-hover) !important; border-color: var(--cc-line-3) !important; translate: 0 -1px; transform: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-brain-card .cx-brain-text b { font-weight: 550 !important; letter-spacing: -0.005em; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-brain-card .cx-brain-text small { color: var(--cc-mute) !important; opacity: 1 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-brain-card .cx-brain-dot { background: #C9922E !important; box-shadow: 0 0 0 4px rgba(201, 146, 46, .14) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-brain-card .cx-brain-cta { background: var(--cc-accent) !important; color: var(--cc-on-accent) !important; border-radius: var(--cc-r-sm) !important; font-weight: 500 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-jarvis .clavis-live-mic-status {
+  background: transparent !important;
+  border: 1px solid var(--cc-line-2) !important;
+  color: var(--cc-mute) !important;
+  box-shadow: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-jarvis .clavis-ai-title-top { font-family: var(--cc-serif) !important; font-weight: 500 !important; font-size: 17px !important; letter-spacing: -0.012em !important; color: var(--cc-ink) !important; }
+
+/* Voice settings: a real popover under the header, not a 28px sliver
+   squeezed into the orb column (the orb wrapper forced it to position:relative) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-jarvis #jarvisVoicePanel {
+  position: fixed !important;
+  top: 128px !important;
+  right: 28px !important;
+  left: auto !important;
+  bottom: auto !important;
+  margin: 0 !important;
+  width: min(384px, calc(100vw - 32px)) !important;
+  height: auto !important;
+  max-height: min(70vh, 560px) !important;
+  flex: none !important;
+  overflow-y: auto !important;
+  z-index: 2147482800 !important;
+  padding: 14px !important;
+  background: var(--cc-surface) !important;
+  border: 0 !important;
+  border-radius: var(--cc-r-md) !important;
+  box-shadow: var(--cc-sh-pop) !important;
+  animation: cc-pop-in 380ms var(--cc-ease) backwards !important;
+  transform-origin: top right;
+}
+
+/* Rudra24 AI Live bar: always on top and clickable, Claude-white; clavis-claude.js
+   lifts it above whichever composer is on screen so the two never overlap */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-live-hud.clh {
+  z-index: 2147483647 !important;
+  background: var(--cc-surface) !important;
+  border: 0 !important;
+  box-shadow: var(--cc-sh-pop) !important;
+  color: var(--cc-ink) !important;
+  font-family: var(--cc-sans) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  transition: opacity 360ms var(--cc-ease), transform 520ms var(--cc-ease-apple), bottom 420ms var(--cc-ease-apple) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-live-hud .clh-state { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-live-hud .clh-caption { color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-live-hud .clh-btn { color: var(--cc-mute) !important; background: transparent !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-live-hud .clh-btn:hover { background: var(--cc-hover) !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-live-hud .clh-btn.is-on { background: var(--cc-accent) !important; color: var(--cc-on-accent) !important; }
+
+/* ── 8. Floating things ────────────────────────────────────── */
+/* scrims */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.settings-backdrop, .cx-setup-backdrop, .pg-modal-backdrop) {
+  background: rgba(20, 20, 19, .45) !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#settings-overlay.settings-overlay.open, .settings-overlay.open, .modal-overlay.open, .mac-settings-overlay.active, .jarvis-modal-overlay, .mac-upload-overlay, .clavis-confirm-overlay, #clavis-confirm-dialog.is-open, #clavis-voiceid-sheet) {
+  background: rgba(20, 20, 19, .45) !important;
+  background-image: none !important;
+  backdrop-filter: blur(6px) !important;
+  -webkit-backdrop-filter: blur(6px) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-overlay.open:has(> .settings-backdrop) {
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* dialogs — white, 16px corners, one long soft shadow */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.settings-modal, .cx-setup-dialog, .modal-card, .mac-dialog, .jarvis-modal, .pg-modal-card, #clavis-confirm-dialog .clavis-credential-card, #clavis-voiceid-sheet .cv-card) {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: 13px !important;
+  box-shadow: var(--cc-sh-dlg) !important;
+  color: var(--cc-ink) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.settings-modal, .cx-setup-dialog, .modal-card, .mac-dialog, .jarvis-modal, .pg-modal-card, #clavis-confirm-dialog .clavis-credential-card, #clavis-voiceid-sheet .cv-card) { background: var(--cc-surface) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-titlebar { background: transparent !important; border-bottom: 1px solid var(--cc-line) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-title { font-family: var(--cc-serif) !important; font-weight: 500 !important; font-size: 15px !important; letter-spacing: -0.01em !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-status-pill { background: var(--cc-sunk) !important; color: var(--cc-mute) !important; border: 0 !important; font-family: var(--cc-sans) !important; letter-spacing: 0.02em !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal :is(.smodal-nav, .smodal-sidebar, .smodal-nav-col) { background: var(--cc-sheet) !important; border-color: var(--cc-line) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-nav-group-label { font-family: var(--cc-sans) !important; font-size: 11px !important; font-weight: 500 !important; letter-spacing: .02em !important; color: var(--cc-faint) !important; text-transform: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-nav-item {
+  border-radius: var(--cc-r-sm) !important;
+  color: var(--cc-ink-2) !important;
+  font-weight: 450 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  transition: background-color var(--cc-t2) var(--cc-ease), color var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-nav-item:hover { background: var(--cc-hover) !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-nav-item.active { background: var(--cc-select) !important; color: var(--cc-ink) !important; font-weight: 550 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-nav-item :is(svg, .smodal-nav-icon) { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-section-title { font-size: 22px !important; font-weight: 400 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal :is(.smodal-label) { color: var(--cc-ink) !important; font-weight: 500 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal :is(.smodal-hint) { color: var(--cc-mute) !important; font-style: normal !important; font-family: var(--cc-sans) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-modal .smodal-field { border-color: var(--cc-line) !important; }
+
+/* the key-setup dialog */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-title { font-family: var(--cc-serif) !important; font-weight: 400 !important; letter-spacing: -0.02em !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-sub { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-card {
+  background: var(--cc-surface) !important;
+  border: 1px solid var(--cc-line) !important;
+  border-radius: var(--cc-r-md) !important;
+  box-shadow: none !important;
+  transition: border-color var(--cc-t3) var(--cc-ease), box-shadow var(--cc-t3) var(--cc-ease), background-color var(--cc-t3) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-card.is-open { border-color: var(--cc-line-2) !important; box-shadow: var(--cc-sh-1) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-card:hover:not(.is-open) { background: var(--cc-sheet) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-name { color: var(--cc-ink) !important; font-weight: 550 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog :is(.cx-setup-desc, .cx-setup-hint, .cx-setup-foot) { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-tag { background: var(--cc-accent-soft) !important; color: var(--cc-accent-ink) !important; border: 0 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-btn--link { background: transparent !important; border: 0 !important; color: var(--cc-accent-ink) !important; text-decoration: underline; text-underline-offset: 3px; text-decoration-color: rgba(47, 82, 51, .35); }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-x { border-radius: var(--cc-r-sm) !important; background: transparent !important; border: 0 !important; color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-dialog .cx-setup-x:hover { background: var(--cc-hover) !important; color: var(--cc-ink) !important; }
+
+/* one-time permission sheet */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-voiceid-sheet .cv-card h3 { font-family: var(--cc-serif) !important; font-weight: 400 !important; font-size: 22px !important; letter-spacing: -0.018em !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-voiceid-sheet .cv-card :is(.cv-sub, .cv-status) { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-voiceid-sheet .cv-card .cv-line { color: var(--cc-ink-2) !important; }
+
+/* menus + popovers — white, 12px, soft float */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.topbar-profile-menu, .jarvis-more-panel, .jarvis-composer-dropdown, .cand-source-menu, .lx-menu, .context-menu, .dropdown-menu) {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: var(--cc-r-md) !important;
+  box-shadow: var(--cc-sh-pop) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 5px !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.tpm-item, .jarvis-more-item, .jarvis-dropdown-item, .context-menu-item, .dropdown-item) {
+  border-radius: var(--cc-r-sm) !important;
+  color: var(--cc-ink-2) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  font-size: 13.5px !important;
+  font-weight: 450 !important;
+  transition: background-color var(--cc-t1) var(--cc-ease), color var(--cc-t1) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.tpm-item, .jarvis-more-item, .jarvis-dropdown-item, .context-menu-item, .dropdown-item):hover { background: var(--cc-hover) !important; color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.tpm-item, .jarvis-more-item, .jarvis-dropdown-item) :is(svg, i) { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .tpm-item.danger { color: var(--cc-danger) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .tpm-item.danger svg { color: var(--cc-danger) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.tpm-divider, .jarvis-more-sep) { background: var(--cc-line) !important; }
+
+/* toasts */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card {
+  background: var(--cc-surface) !important;
+  background-image: none !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  box-shadow: var(--cc-sh-pop) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card .desktop-notif-title { color: var(--cc-ink) !important; font-weight: 550 !important; letter-spacing: -0.005em !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card :is(.desktop-notif-body, .desktop-notif-detail) { color: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card .desktop-notif-time { color: var(--cc-faint) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card .desktop-notif-icon-col { background: var(--cc-sunk) !important; color: var(--cc-ink-2) !important; box-shadow: none !important; border: 0 !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card .desktop-notif-progress { background: var(--cc-line) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card .desktop-notif-progress-bar { background: var(--cc-line-3) !important; }
+
+/* tooltips — small ink pill */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .lx-tip {
+  background: #262624 !important;
+  color: #FAF9F5 !important;
+  border-radius: var(--cc-r-sm) !important;
+  font-family: var(--cc-sans) !important;
+  font-weight: 450 !important;
+  box-shadow: 0 6px 20px -8px rgba(20, 20, 19, .4) !important;
+  transition: opacity 180ms var(--cc-ease), transform 380ms var(--cc-ease) !important;
+}
+html[data-theme="dark"]:not(#cc#cc#cc#cc#cc#cc#cc#cc) .lx-tip { background: #3A3935 !important; color: #FAF9F5 !important; box-shadow: 0 0 0 .5px rgba(250, 249, 245, .1), 0 8px 24px -8px rgba(0, 0, 0, .6) !important; }
+
+/* Claude-style hover card (clavis-claude.js puts these on the rail) */
+.cc-card {
+  position: fixed;
+  left: -9999px;
+  top: 0;
+  z-index: 2147483000;
+  width: 248px;
+  padding: 14px 14px 12px;
+  border-radius: var(--cc-r-md, 12px);
+  background: var(--cc-surface, #fff);
+  color: var(--cc-ink, #141413);
+  box-shadow: var(--cc-sh-pop);
+  pointer-events: none;
+  opacity: 0;
+  translate: -6px 0;
+  scale: .97;
+  filter: blur(4px);
+  transform-origin: left center;
+  transition: opacity 160ms var(--cc-ease-in, ease-in), translate 200ms var(--cc-ease-in, ease-in), scale 200ms var(--cc-ease-in, ease-in), filter 160ms linear;
+  will-change: opacity, translate, scale, filter;
+}
+.cc-card.is-in {
+  opacity: 1;
+  translate: 0 0;
+  scale: 1;
+  filter: blur(0);
+  transition: opacity 280ms var(--cc-ease), translate 520ms var(--cc-ease), scale 520ms var(--cc-ease), filter 360ms var(--cc-ease);
+}
+.cc-card.is-move { transition: opacity 280ms var(--cc-ease), top 420ms var(--cc-ease), translate 520ms var(--cc-ease), scale 520ms var(--cc-ease), filter 360ms var(--cc-ease); }
+.cc-card-title {
+  font-family: var(--cc-serif);
+  font-size: 16px;
+  font-weight: 500;
+  letter-spacing: -0.012em;
+  line-height: 1.25;
+  margin: 0 0 4px;
+}
+.cc-card-text {
+  font-family: var(--cc-sans);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--cc-mute);
+  margin: 0;
+}
+.cc-card-foot {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 12px;
+  padding: 5px 10px;
+  border-radius: var(--cc-r-sm, 8px);
+  border: 1px solid var(--cc-line-2);
+  font-family: var(--cc-sans);
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--cc-ink);
+}
+.cc-card-foot kbd {
+  font-family: var(--cc-sans);
+  font-size: 11px;
+  color: var(--cc-faint);
+}
+
+
+/* ── Icons (Feather, via clavis-icons.js) ─────────────────── */
+svg.fi { width: 1em; height: 1em; flex: none; }
+svg.fi-inline { width: 1.05em; height: 1.05em; vertical-align: -0.17em; margin-right: .08em; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi] {
+  overflow: visible;
+  transition: color var(--cc-t2) var(--cc-ease), rotate 520ms var(--cc-ease), translate 420ms var(--cc-ease), scale 320ms var(--cc-ease) !important;
+}
+/* every icon keeps the same weight, whatever the old CSS said */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi], html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi] * { stroke-width: 1.75px; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi] :is(path, circle, rect, line, polyline, polygon, ellipse) { fill: none !important; stroke: currentColor !important; }
+/* a feather icon's own dots stay dots */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi="more-horizontal"] circle, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi="more-vertical"] circle { fill: currentColor !important; }
+
+/* micro-interactions — each icon moves the way its meaning suggests (fast, transform only) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .nav-item, .nav-sub-item, .tpm-item, .jarvis-dropdown-item, .jarvis-more-item, .smodal-nav-item, .topbar-chip, label):hover > svg[data-fi="refresh-cw"],
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):hover svg[data-fi="refresh-cw"] { rotate: 180deg; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):hover svg[data-fi="rotate-ccw"] { rotate: -180deg; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .nav-item, .smodal-nav-item):hover svg[data-fi="settings"] { rotate: 60deg; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):hover svg:is([data-fi="x"], [data-fi="plus"]) { rotate: 90deg; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .tpm-item, .jarvis-dropdown-item):hover svg:is([data-fi="arrow-right"], [data-fi="log-out"], [data-fi="log-in"], [data-fi="chevron-right"]) { translate: 2px 0; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):hover svg:is([data-fi="external-link"], [data-fi="arrow-up-right"], [data-fi="send"]) { translate: 1.5px -1.5px; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):hover svg:is([data-fi="arrow-up"], [data-fi="upload"], [data-fi="upload-cloud"]) { translate: 0 -1.5px; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):hover svg:is([data-fi="download"], [data-fi="arrow-down"], [data-fi="chevron-down"]) { translate: 0 1.5px; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .nav-item):hover svg:is([data-fi="zap"], [data-fi="star"], [data-fi="aperture"]) { scale: 1.1; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .nav-item):hover svg[data-fi="aperture"] { rotate: 45deg; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .nav-item, .smodal-nav-item):hover svg:is([data-fi="bell"], [data-fi="phone-call"], [data-fi="phone"]) { animation: cc-ring 620ms var(--cc-ease-soft) 1; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"], .nav-item):hover svg:is([data-fi="search"], [data-fi="eye"], [data-fi="compass"]) { scale: 1.08; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(button, a, [role="button"]):active svg[data-fi] { scale: .88; transition-duration: 90ms !important; }
+@keyframes cc-ring {
+  0%, 100% { rotate: 0deg; }
+  20% { rotate: -14deg; }
+  40% { rotate: 11deg; }
+  60% { rotate: -6deg; }
+  80% { rotate: 3deg; }
+}
+
+/* icon tiles everywhere (shortcuts, settings, empty states): one calm tone, no rainbow */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.sc-row-icon, .sc-section-icon, .svc-card-icon, .industry-card-icon, .pnode-icon, .stat-icon, .smodal-nav-icon) {
+  background: var(--cc-sunk) !important;
+  background-image: none !important;
+  color: var(--cc-ink-2) !important;
+  box-shadow: none !important;
+  border-color: transparent !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.sc-row-icon, .sc-section-icon, .svc-card-icon, .industry-card-icon, .pnode-icon, .stat-icon, .smodal-nav-icon) svg { color: currentColor !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .smodal-nav-icon { background: transparent !important; }
+
+/* ── 9. Motion ─────────────────────────────────────────────── */
+@keyframes cc-dialog-in {
+  from { opacity: 0; translate: 0 18px; scale: .97; }
+  to   { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes cc-pop-in {
+  from { opacity: 0; translate: 0 -6px; scale: .96; filter: blur(4px); }
+  to   { opacity: 1; translate: 0 0; scale: 1; filter: blur(0); }
+}
+@keyframes cc-pop-up {
+  from { opacity: 0; translate: 0 6px; scale: .96; filter: blur(4px); }
+  to   { opacity: 1; translate: 0 0; scale: 1; filter: blur(0); }
+}
+@keyframes cc-toast-in {
+  from { opacity: 0; translate: 18px 0; scale: .98; filter: blur(6px); }
+  to   { opacity: 1; translate: 0 0; scale: 1; filter: blur(0); }
+}
+@keyframes cc-fade-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes cc-rise {
+  from { opacity: 0; translate: 0 10px; }
+  to   { opacity: 1; translate: 0 0; }
+}
+
+/* dialogs that stay in the DOM and flip an .open class: transition both ways */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-overlay { transition: opacity 360ms var(--cc-ease) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-overlay:not(.open) { transition: opacity 200ms var(--cc-ease-io) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-overlay .settings-modal {
+  transform: none !important;   /* one motion owner: translate/scale below */
+  transition: opacity 200ms var(--cc-ease-io), translate 220ms var(--cc-ease-io), scale 220ms var(--cc-ease-io),
+              width 480ms var(--cc-ease-apple), height 480ms var(--cc-ease-apple), max-width 480ms var(--cc-ease-apple), max-height 480ms var(--cc-ease-apple) !important;
+  animation: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-overlay:not(.open) .settings-modal { translate: 0 14px; scale: .97; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .settings-overlay.open .settings-modal {
+  translate: 0 0; scale: 1;
+  transition: opacity 320ms var(--cc-ease), translate 560ms var(--cc-ease-apple), scale 560ms var(--cc-ease-apple),
+              width 480ms var(--cc-ease-apple), height 480ms var(--cc-ease-apple), max-width 480ms var(--cc-ease-apple), max-height 480ms var(--cc-ease-apple) !important;
+}
+
+/* dialogs that are display-toggled or created on demand: a keyframe on open */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-root.is-open .cx-setup-dialog,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .modal-overlay.open .modal-card,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .mac-settings-overlay.active > .mac-dialog,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-modal-overlay[aria-hidden="false"] .jarvis-modal,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .pg-modal .pg-modal-card,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #clavis-voiceid-sheet.is-in .cv-card {
+  animation: cc-dialog-in 560ms var(--cc-ease-apple) backwards !important;
+  transform-origin: 50% 40%;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cx-setup-root.is-open .cx-setup-backdrop,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .pg-modal .pg-modal-backdrop { animation: cc-fade-in 360ms var(--cc-ease) backwards !important; }
+
+/* menus: drop from their button (down), composer menus rise (up) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.topbar-profile-menu.open, #jarvis-more-panel.open, .cand-source-menu:not([hidden])) {
+  animation: cc-pop-in 380ms var(--cc-ease) backwards !important;
+  transform-origin: top right;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-composer-dropdown:not([hidden]) {
+  animation: cc-pop-up 380ms var(--cc-ease) backwards !important;
+  transform-origin: bottom left;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .jarvis-composer-dropdown--right:not([hidden]) { transform-origin: bottom right; }
+
+/* toasts slide in from the right, softly */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .desktop-notification-card:not(.desktop-notif-exit) { animation: cc-toast-in 520ms var(--cc-ease-apple) backwards !important; }
+
+/* page switches fade (opacity only — nothing fixed inside can jump) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #main-scroll-area > .view.active { animation: cc-fade-in 360ms var(--cc-ease) backwards; }
+/* the dashboard settles in, one card after another */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active :is(.do-stat-card, .do-chart-wrap, .do-quick-btn, .do-dash-greeting, .do-greeting) { animation: cc-rise 640ms var(--cc-ease) backwards; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-quick-btn:nth-child(2) { animation-delay: 30ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-quick-btn:nth-child(3) { animation-delay: 60ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-quick-btn:nth-child(4) { animation-delay: 90ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-quick-btn:nth-child(5) { animation-delay: 120ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-stat-card:nth-child(1) { animation-delay: 60ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-stat-card:nth-child(2) { animation-delay: 110ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-stat-card:nth-child(3) { animation-delay: 160ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-stat-card:nth-child(4) { animation-delay: 210ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-chart-wrap:nth-child(1) { animation-delay: 240ms; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-dashboard.active .do-chart-wrap:nth-child(2) { animation-delay: 300ms; }
+
+/* chat turns rise in */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#jarvis-messages > .chat-message, .chat-messages > .chat-message) { animation: cc-rise 560ms var(--cc-ease) backwards; }
+
+
+/* ── 10. 60 fps: only the compositor moves things ────────────
+ * apple-polish.css forces EVERY element to transition width,
+ * height, padding, gap, top/left… so any re-render (a label
+ * changing, the rail peeking, the orb box resizing) became a
+ * layout animation — layout + paint on every frame = the lag.
+ * Here every element may only transition paint-cheap properties;
+ * the few that genuinely need geometry opt back in below.
+ * ────────────────────────────────────────────────────────── */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) body *:where(:not(svg):not(path):not(circle):not(rect):not(line):not(polyline)) {
+  transition-property: color, background-color, border-color, border-radius, box-shadow, opacity,
+    transform, translate, scale, rotate, filter, fill, stroke, outline-color, text-decoration-color !important;
+}
+/* geometry that is meant to move (small, self-contained boxes) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.do-bar-fill, #token-bar-fill, [id$="progress-bar"], [id^="pnode-"][id$="-fill"], #ag-trans-fill, .cts-meter > i,
+      .outlook-progress-track div, .lx-ai-status-bar) { transition-property: width, opacity, background-color !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .wave-bar { transition-property: height, opacity, background-color !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#jarvis-input, #chat-input, #candidate-ai-input) { transition-property: height, color !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.luxe-switch-track, .luxe-switch-knob, .luxe-switch-haze, .cx-ap-sw, .lx-glide, .lx-nav-pill) {
+  transition-property: left, width, height, transform, translate, opacity, background-color, box-shadow !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar { transition-property: width, min-width, max-width, background-color, box-shadow !important; transition-duration: 380ms !important; transition-timing-function: var(--cc-ease-apple) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#settings-modal, #history-modal, #shortcuts-modal) { transition-property: opacity, translate, scale, width, height, max-width, max-height !important; }
+
+/* accordions inside small, fixed containers may still grow smoothly (their
+   layout is contained, the page does not re-flow) */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#sidebar, .cx-setup-dialog, .smodal-body, .cts) *:where(:not(svg):not(path):not(circle):not(rect):not(line):not(polyline)) {
+  transition-property: color, background-color, border-color, border-radius, box-shadow, opacity,
+    transform, translate, scale, rotate, filter, fill, stroke, height, max-height, grid-template-rows, margin, padding !important;
+}
+
+/* Rail labels: no width animation — the rail's own clip reveals them */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar :is(.nav-label-wrap, .logo-text, #logo-brand-text, .nav-item > span, .nav-sub-item > span) {
+  transition-property: opacity, color !important;
+  transition-duration: 240ms !important;
+}
+/* The sheet never animates its own layout; clavis-claude.js slides it
+   with a transform (FLIP) when the rail is pinned open or closed. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #main-content { transition: none !important; }
+/* Hover-peek floats over the page like a macOS sidebar, so the page
+   under it never re-lays itself out. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #sidebar.collapsed.au-peek { box-shadow: var(--cc-sh-pop) !important; z-index: 60; }
+
+/* Shared business surfaces: the older Excel/email templates still carry
+   inline Google blue/green values. Give them the same quiet hierarchy as
+   Dashboard, Client AI and the Rudra24 AI composer. */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-agent) :is(.view-title, h1.view-title) {
+  font-family: var(--cc-serif) !important;
+  color: var(--cc-ink) !important;
+  font-weight: 400 !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#view-excel, #view-analytics, #view-email, #view-whatsapp, #view-accounts, #view-agent) .view-subtitle {
+  color: var(--cc-mute) !important;
+  font-size: 14px !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel .email-sidebar-card :is(h3, .mem-val) {
+  color: var(--cc-ink) !important;
+  font-weight: 500 !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel .email-sidebar-card :is(p, .mem-lbl, label) {
+  color: var(--cc-mute) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-excel .email-sidebar-card :is(.mem-stat, #excel-import-preview > div, #excel-dropzone, div[style*="background:#fafafa"]) {
+  background: var(--cc-sheet) !important;
+  border-color: var(--cc-line) !important;
+  color: var(--cc-ink-2) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel #excel-dropzone {
+  border: 1px dashed var(--cc-line-2) !important;
+  border-radius: var(--cc-r-md) !important;
+  transition: border-color var(--cc-t2) var(--cc-ease), background-color var(--cc-t2) var(--cc-ease) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel #excel-dropzone:hover,
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel #excel-dropzone:focus-within {
+  border-color: var(--cc-accent) !important;
+  background: var(--cc-accent-soft) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-excel .email-sidebar-card svg[stroke] { stroke: var(--cc-mute) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel .email-sidebar-card div[style*="background:#e8"] { background: var(--cc-sunk) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-excel :is(#excel-import-rowcount, #excel-unsaved-leads, #excel-total-leads) { color: var(--cc-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel :is(#excel-import-btn, .btn-primary):not(:disabled) { background: var(--cc-accent) !important; color: var(--cc-on-accent) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-excel :is(#excel-import-btn, .btn-primary):disabled { background: var(--cc-sunk) !important; color: var(--cc-faint) !important; opacity: 1 !important; box-shadow: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-analytics :is(#analytics-kpi-total, #analytics-kpi-contacted, #analytics-kpi-conv) {
+  font: 400 32px/1.15 var(--cc-serif) !important;
+  letter-spacing: -.02em !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-analytics .analytics-card > h3 {
+  font: 500 17px/1.3 var(--cc-serif) !important;
+  color: var(--cc-ink) !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-analytics .analytics-card > div[style*="text-transform:uppercase"] {
+  color: var(--cc-mute) !important;
+  font-weight: 500 !important;
+  letter-spacing: .02em !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-email :is(.email-tab-btn.email-tab-active, .email-signature-save-btn) {
+  background: var(--cc-accent) !important;
+  color: var(--cc-on-accent) !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-email :is(#gmail-cc-bcc-toggle, .gmail-cc-bcc-toggle) { color: var(--cc-accent-ink) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc) #view-accounts .email-sidebar-card[style*="border-left"] {
+  border: 1px solid var(--cc-line) !important;
+  background: var(--cc-surface) !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not(#cc#cc#cc#cc#cc#cc#cc#cc) #view-excel #excel-dropzone { transition: none !important; }
+}
+
+/* full-screen blurs cost a whole-screen repaint per frame: dim only */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(#jarvis-side-backdrop, .ccv-backdrop) {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+/* cursor-following glows repainted a 500px blurred layer on every mouse move */
+#pfx-cursor-glow, .lx-sidebar-glow, .lx-content-glow { display: none !important; }
+
+/* The Peek window's old arrival (16px blur + animated corner radius) → light */
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cts.is-revealing { animation: cc-dialog-in 560ms var(--cc-ease-apple) backwards !important; filter: none !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cts.is-revealing::after { display: none !important; }
+
+@media (prefers-reduced-motion: reduce) {
+  html:not(#cc#cc#cc#cc#cc#cc#cc#cc) *, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) *::before, html:not(#cc#cc#cc#cc#cc#cc#cc#cc) *::after {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
+  }
+  .cc-card, .cc-card.is-in { transition: opacity 1ms !important; filter: none !important; }
+  html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi], html:not(#cc#cc#cc#cc#cc#cc#cc#cc) svg[data-fi] > * { rotate: none !important; translate: none !important; scale: none !important; stroke-dasharray: none !important; }
+}
+/* "Smooth" graphics tier: keep the motion, drop the blur */
+html[data-perf="lite"] .cc-card { filter: none !important; }
+@supports not (translate: 0 0) {
+  .cc-card { transform: translateX(-6px); }
+  .cc-card.is-in { transform: none; }
+}

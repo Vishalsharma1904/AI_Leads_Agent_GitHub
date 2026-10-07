@@ -26,6 +26,16 @@ const LeadsCtrl = {
   pageSize: 25,
   currentPage: 1,
 
+  statusOf(lead) {
+    const stage = window.CRMBridge?.getStage?.(lead.id);
+    if (stage) return window.CRMBridge.stageLabel(stage);
+    const status = String(lead.status || 'New');
+    if (/^(closed|won|converted|client|closed\/won)$/i.test(status)) return 'Review required';
+    if (/^contacted$/i.test(status)) return 'Attempted';
+    if (/^(lost|closed\/lost)$/i.test(status)) return 'Not interested';
+    return status;
+  },
+
   async init() {
     await this.loadLeads();
     this.populateFilterDropdowns();
@@ -145,13 +155,29 @@ const LeadsCtrl = {
     const sortedCities = Array.from(cities).sort();
     const currentVal = citySelect.value || 'all';
 
-    citySelect.innerHTML = `<option value="all">📍 All Cities (${sortedCities.length})</option>` +
+    citySelect.innerHTML = `<option value="">All Cities (${sortedCities.length})</option>` +
       sortedCities.map(c => `<option value="${c}" ${c === currentVal ? 'selected' : ''}>${c}</option>`).join('');
   },
 
   applyFilters() {
     let list = [...this.leads];
     const f = this.currentFilter;
+    // Support the actual page's legacy filter IDs as well as the newer UI.
+    const value = id => document.getElementById(id)?.value || '';
+    const checked = id => Boolean(document.getElementById(id)?.checked);
+    if (document.getElementById('filter-city')) f.city = value('filter-city');
+    if (document.getElementById('search-input')) f.search = value('search-input');
+    if (document.getElementById('filter-only-email')) f.hasEmail = checked('filter-only-email');
+    if (document.getElementById('filter-only-website')) f.hasWebsite = checked('filter-only-website');
+    const state = value('filter-state'), industry = value('filter-industry'), minScore = Number(value('filter-min-score')) || 0;
+    const type = value('filter-type'), sheets = value('filter-sheets');
+    const cutoff = { '24h': 86400000, '7d': 604800000, '30d': 2592000000 }[value('filter-date')];
+    list = list.filter(l => (!state || !l.state || l.state.toLowerCase() === state.toLowerCase()) &&
+      (!type || l.type === type) && (!cutoff || Date.now() - l.timestamp <= cutoff) &&
+      (!sheets || (sheets === 'synced' ? l.syncedToSheets : !l.syncedToSheets)) &&
+      (!industry || (l.industry || l.sector) === industry) && (l.leadScore || l.score || 0) >= minScore &&
+      (!checked('filter-only-security') || (l.securityScore || 0) >= 50) &&
+      (!checked('filter-only-housekeeping') || (l.housekeepingScore || 0) >= 50));
 
     // Search query
     if (f.search) {
@@ -195,8 +221,8 @@ const LeadsCtrl = {
     // Status filter
     if (f.status && f.status !== 'all') {
       list = list.filter(l => {
-        const st = (l.status || 'New').toLowerCase();
-        return st === f.status.toLowerCase();
+        const st = this.statusOf(l).toLowerCase();
+        return st === this.statusOf({ status: f.status }).toLowerCase();
       });
     }
 
@@ -238,6 +264,7 @@ const LeadsCtrl = {
     });
 
     this.filtered = list;
+    window.syncLeadState?.(this.leads, list);
     this.currentPage = 1;
   },
 
@@ -251,7 +278,8 @@ const LeadsCtrl = {
   renderKPIs() {
     const total = this.leads.length;
     const hotCount = this.leads.filter(l => parseInt(l.score || l.leadScore || 0, 10) >= 80).length;
-    const contactedCount = this.leads.filter(l => l.status && l.status.toLowerCase() !== 'new').length;
+    const contactedCount = this.leads.filter(l => l.lastContactAt || l.emailContactedAt || l.whatsappContactedAt ||
+      /^(attempted|connected|follow-up)$/i.test(this.statusOf(l))).length;
     const phoneCount = this.leads.filter(l => l.phone && l.phone.trim().length > 5).length;
 
     const setEl = (id, txt) => {
@@ -266,6 +294,8 @@ const LeadsCtrl = {
   },
 
   renderTable() {
+    const meta = document.getElementById('results-meta');
+    if (meta) meta.textContent = `Showing ${this.filtered.length} of ${this.leads.length} client leads`;
     const tbody = document.getElementById('leads-table-body') || document.querySelector('#view-leads table tbody');
     if (!tbody) return;
 
@@ -293,9 +323,17 @@ const LeadsCtrl = {
       const id = lead.id || `lead_${start + idx}`;
       const isSelected = this.selectedIds.has(id);
       const score = parseInt(lead.score || lead.leadScore || 0, 10);
-      const scoreColor = score >= 80 ? '#10b981' : score >= 60 ? '#f59e0b' : '#64748b';
+      const scoreColor = 'var(--foreground)';
       const scoreBg = score >= 80 ? 'rgba(16, 185, 129, 0.12)' : score >= 60 ? 'rgba(245, 158, 11, 0.12)' : 'rgba(100, 116, 139, 0.12)';
       const company = lead.company || lead.name || 'Unnamed Company';
+      // contactPerson/designation can come from a web-search snippet now, so
+      // they are untrusted text — escape before they touch innerHTML.
+      const esc = (v) => String(v == null ? '' : v)
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      const person = esc(lead.contactPerson || '');
+      const personTitle = esc(lead.designation || '');
+      const personSrc = esc(lead.contactPersonSource || '');
       const initial = company.charAt(0).toUpperCase() || 'C';
       const city = lead.city || lead.location || 'India';
       const phone = lead.phone || '';
@@ -307,7 +345,7 @@ const LeadsCtrl = {
         try { webLabel = new URL(website).hostname.replace(/^www\./, ''); }
         catch { webLabel = website.replace(/^https?:\/\/(www\.)?/, '').split('/')[0]; }
       }
-      const status = lead.status || 'New';
+      const status = this.statusOf(lead);
       const serviceType = lead.serviceType === 'housekeeping' ? '🧹 Housekeeping' : '🛡️ Security';
 
       return `
@@ -328,6 +366,10 @@ const LeadsCtrl = {
                 <div style="font-size: 11.5px; color: var(--gray-400); margin-top: 1px;">
                   ${lead.industry || 'Commercial Facility'} • ${serviceType}
                 </div>
+                ${person ? `<div style="font-size: 11.5px; margin-top: 2px; display: flex; align-items: center; gap: 5px;" title="${personSrc ? 'Found via ' + personSrc : ''}">
+                  <span style="font-weight: 520; color: var(--foreground);">${person}</span>
+                  ${personTitle ? `<span style="color: var(--gray-400);">${personTitle}</span>` : ''}
+                </div>` : ''}
               </div>
             </div>
           </td>
@@ -372,11 +414,13 @@ const LeadsCtrl = {
           <td>
             <select onchange="LeadsCtrl.updateStatus('${id}', this.value)" style="padding: 4px 8px; font-size: 12px; font-weight: 600; border-radius: 6px; border: 1px solid var(--border); background: var(--card); color: var(--foreground); cursor: pointer;">
               <option value="New" ${status === 'New' ? 'selected' : ''}>🔵 New</option>
-              <option value="Contacted" ${status === 'Contacted' ? 'selected' : ''}>🟡 Contacted</option>
+              <option value="Attempted" ${status === 'Attempted' ? 'selected' : ''}>Attempted</option>
+              <option value="Connected" ${status === 'Connected' ? 'selected' : ''}>Connected</option>
+              <option value="Follow-up" ${status === 'Follow-up' ? 'selected' : ''}>Follow-up</option>
               <option value="Qualified" ${status === 'Qualified' ? 'selected' : ''}>🟢 Qualified</option>
-              <option value="Proposal Sent" ${status === 'Proposal Sent' ? 'selected' : ''}>🟣 Proposal Sent</option>
-              <option value="Converted" ${status === 'Converted' ? 'selected' : ''}>💎 Converted</option>
-              <option value="Lost" ${status === 'Lost' ? 'selected' : ''}>⚪ Closed/Lost</option>
+              <option value="Not interested" ${status === 'Not interested' ? 'selected' : ''}>Not interested</option>
+              <option value="Review required" ${status === 'Review required' ? 'selected' : ''}>Review required</option>
+              ${status === 'Client' ? '<option value="Client" selected disabled>Client · Won deal</option>' : ''}
             </select>
           </td>
           <td style="text-align: right;">
@@ -488,11 +532,19 @@ const LeadsCtrl = {
     }
   },
 
-  updateStatus(id, newStatus) {
+  async updateStatus(id, newStatus) {
     const lead = this.leads.find(l => (l.id || `lead_${l.company}`) === id || l.id === id);
     if (!lead) return;
 
-    lead.status = newStatus;
+    try {
+      if (!window.CRMBridge?.updateStage) throw new Error('Connect CRM before changing a lead stage.');
+      await window.CRMBridge.updateStage(lead, newStatus);
+    } catch (error) {
+      window.showToast?.('warning', 'Stage not updated', error.message || 'Refresh CRM and try again.');
+      this.renderTable();
+      return;
+    }
+    lead.status = this.statusOf(lead);
     this.saveLeads();
     if (window.showToast) {
       window.showToast('success', 'Status Updated', `${lead.company || 'Lead'} marked as ${newStatus}`);
@@ -603,7 +655,7 @@ const LeadsCtrl = {
             </div>
             <div style="background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.2); border-radius:10px; padding:10px 12px;">
               <div style="font-size:11px; color:var(--gray-400); text-transform:uppercase; font-weight:700;">Lead Status</div>
-              <div style="font-size:14px; font-weight:700; color:#f59e0b; margin-top:3px;">${lead.status || 'New'}</div>
+              <div style="font-size:14px; font-weight:700; color:#f59e0b; margin-top:3px;">${this.statusOf(lead)}</div>
             </div>
           </div>
 
@@ -741,7 +793,7 @@ const LeadsCtrl = {
           'Industry': l.industry || '',
           'Rating': l.rating || '',
           'Reviews': l.reviewsCount || l.reviews || '',
-          'Status': l.status || 'New',
+          'Status': this.statusOf(l),
           'Website': l.website || '',
           'Address': l.address || '',
           'Notes': l.notes || ''
@@ -768,16 +820,18 @@ const LeadsCtrl = {
     const list = items || (this.selectedIds.size > 0 ? this.leads.filter(l => this.selectedIds.has(l.id || l._id || l.company)) : this.filtered);
     if (list.length === 0) return;
 
-    const headers = ['Company Name', 'City', 'Phone', 'Email', 'Service Required', 'Opportunity Score', 'Industry', 'Status', 'Website'];
+    const headers = ['Company Name', 'Contact Person', 'Designation', 'City', 'Phone', 'Email', 'Service Required', 'Opportunity Score', 'Industry', 'Status', 'Website'];
     const rows = list.map(l => [
       `"${(l.company || l.name || '').replace(/"/g, '""')}"`,
+      `"${(l.contactPerson || '').replace(/"/g, '""')}"`,
+      `"${(l.designation || '').replace(/"/g, '""')}"`,
       `"${(l.city || l.location || '').replace(/"/g, '""')}"`,
       `"${(l.phone || '').replace(/"/g, '""')}"`,
       `"${(l.email || '').replace(/"/g, '""')}"`,
       `"${l.serviceType === 'housekeeping' ? 'Housekeeping' : 'Security'}"`,
       l.score || l.leadScore || 75,
       `"${(l.industry || '').replace(/"/g, '""')}"`,
-      `"${l.status || 'New'}"`,
+      `"${this.statusOf(l)}"`,
       `"${(l.website || '').replace(/"/g, '""')}"`
     ]);
 
@@ -907,6 +961,8 @@ const LeadsCtrl = {
   },
 
   bindEvents() {
+    if (this.eventsBound) return;
+    this.eventsBound = true;
     // Search input debounce
     const searchInput = document.getElementById('search-input') || document.getElementById('leads-search-input') || document.getElementById('lead-search');
     if (searchInput) {
@@ -951,6 +1007,10 @@ const LeadsCtrl = {
 
 // Global Exposure
 window.LeadsCtrl = LeadsCtrl;
+document.addEventListener('crm:stagesupdated', () => {
+  LeadsCtrl.applyFilters();
+  LeadsCtrl.render();
+});
 
 // Auto-initialize when view shown or document ready
 document.addEventListener('DOMContentLoaded', () => {
@@ -963,7 +1023,7 @@ document.addEventListener('DOMContentLoaded', () => {
 const prevShowViewForLeads = window.showView;
 window.showView = function(viewName) {
   if (typeof prevShowViewForLeads === 'function') prevShowViewForLeads(viewName);
-  if (viewName === 'leads' || viewName === 'all-leads') {
+  if (viewName === 'all-leads') {
     setTimeout(() => {
       LeadsCtrl.init();
     }, 50);

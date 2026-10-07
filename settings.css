@@ -484,7 +484,7 @@ html[data-theme="light"] .settings-modal {
   transition: transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), width 240ms ease, height 240ms ease !important;
   will-change: transform !important;
 }
-.settings-overlay.open .settings-modal { transform: scale(1) translateY(0) !important; }
+.settings-overlay.open .settings-modal { transform: scale(1) translateY(0); }
 
 /* -- Titlebar -- */
 .smodal-titlebar {

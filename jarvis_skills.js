@@ -248,15 +248,33 @@ const JarvisSkills = (() => {
   });
 
   register('navigate_to_page', {
-    description: 'Switch the app to a different page/view.',
-    params: { view: 'one of: dashboard, leads, candidate-db, agent, excel, analytics, settings, voice-ai, accounts, jarvis' },
+    description: 'Switch the app to a different page/view (sidebar tab). "Client tab / client AI" = chat, "Rudra24 AI tab" = jarvis, "candidate tab" = candidate-ai. For Settings sections, top-bar buttons, mute or mic use app_action.',
+    params: { view: 'one of: jarvis, chat, voice-ai, candidate-ai, dashboard, leads, candidate-db, excel, analytics, agent, email, whatsapp, accounts, plugins, tokens, settings' },
     builtin: true,
     run: async ({ view }) => {
+      if (view === 'settings' && typeof window.openSettingsModal === 'function') { window.openSettingsModal(); return 'Opened Settings.'; }
       if (!document.getElementById(`view-${view}`)) throw new Error(`No such page: ${view}`);
       window.showView(view);
       return `Opened the ${view} page.`;
     },
   });
+
+  register('app_action', {
+    description: 'Open or switch anything inside this app by name: a tab, a Settings section, a top-bar button (History, Shortcuts, Peek Tasks, theme, sidebar), the floating task window, or mute / unmute / mic band / mic chalu. Prefer this over PC tools for anything that exists in the app.',
+    params: { target: 'what he asked for in a few words, e.g. "candidate tab", "settings voice", "history", "mute"' },
+    builtin: true,
+    run: async ({ target }) => {
+      const hit = window.ClavisAppMap?.resolve?.(String(target || ''), { loose: true });
+      if (!hit) throw new Error(`Not in the app: ${target}`);
+      return hit.run();
+    },
+  });
+  // The live map (tabs / sections / buttons actually on the page) is read at prompt time.
+  try {
+    const s = registry.get('app_action');
+    const base = s.description;
+    Object.defineProperty(s, 'description', { enumerable: true, get: () => base + (window.ClavisAppMap ? ' ' + window.ClavisAppMap.describe() : '') });
+  } catch (_) {}
 
   register('filter_leads', {
     description: 'Filter the Leads page table by industry/city/status and show it.',
@@ -381,13 +399,13 @@ const JarvisSkills = (() => {
     },
   });
 
-  // ── PC control (native bridge only) — Clavis's "hands" on the real
+  // ── PC control (native bridge only) — Rudra24 AI's "hands" on the real
   //    desktop, not just the browser tab. Every call goes through
   //    window.ClavisPC, which throws a clear error if the bridge isn't
   //    running or control isn't enabled — invoke()'s catch turns that into
   //    a spoken explanation rather than a silent failure. click/type/key are
   //    registered at a higher risk tier (see clavis-mind.js RISKY map) so the
-  //    owner gets one confirm() before Clavis touches the real mouse/keyboard.
+  //    owner gets one confirm() before Rudra24 AI touches the real mouse/keyboard.
   register('pc_move_mouse', {
     description: 'Move the real OS mouse cursor to a screen pixel coordinate (does not click). Use pc_get_screen first if unsure of screen size.',
     params: { x: 'pixel x from screen left', y: 'pixel y from screen top' },

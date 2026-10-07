@@ -22,6 +22,12 @@ window.ClavisSneakPeek = window.ClavisSneakPeek || {
 // Safe global application state
 let allLeads = [];
 let filteredLeads = [];
+window.syncLeadState = function (leads, filtered) {
+  allLeads = Array.isArray(leads) ? leads : [];
+  filteredLeads = Array.isArray(filtered) ? filtered : [...allLeads];
+  window.allLeads = allLeads;
+  window.filteredLeads = filteredLeads;
+};
 
 function getSafeLeads() {
   try {
@@ -152,7 +158,9 @@ const DataSanitizer = {
     const s = { ...lead };
     if (this.isFakeEmail(s.email)) s.email = '';
     if (this.isFakePhone(s.phone)) s.phone = '';
-    if (this.isFakeName(s.name)) s.name = s.company ? `${s.company} Contact` : 'Manager';
+    // A name we made up is worse than no name — it reaches the Excel, the
+    // email draft and the call script as if a real person said it. Blank it.
+    if (this.isFakeName(s.name)) s.name = '';
     return s;
   },
 
@@ -434,7 +442,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // on every page load, so the app shell stays hidden until the user actually
     // unlocks. Data restoration happens in AntigravityAuth.transitionToApp()
     // AFTER a successful unlock — never here, or it would run pre-auth.
-    const isLoggedIn = window.CLAVIS_LOCAL_MODE || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname) || Boolean(window.SupabaseAuth?.getSession?.());
+    const isLoggedIn = Boolean(window.SupabaseAuth?.getSession?.()) && !window.SupabaseAuth?.isRecoveryMode?.();
     const shell = document.getElementById('app-shell');
     const authScreen = document.getElementById('auth-screen');
 
@@ -653,7 +661,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.NEXUS = { showView, currentView: () => currentView, SnapshotManager, DataSanitizer };
     window.showView = showView;
 
-    showToast('info', '✓ Clavis AI Agent Ready', `${allLeads.length} leads loaded from memory`);
+    showToast('info', '✓ Rudra24 AI Agent Ready', `${allLeads.length} leads loaded from memory`);
   } catch (err) {
     console.error('Init error:', err);
     ensureAppShellVisible();
@@ -684,10 +692,20 @@ const ROUTE_MAP = {
   '': 'dashboard',
   '#': 'dashboard',
   '#dashboard': 'dashboard',
+  '#manual': 'manual',
+  '#crm': 'crm-overview',
+  '#sms': 'sms',
+  '#crm-overview': 'crm-overview',
+  '#crm-pipeline': 'crm-pipeline',
+  '#crm-activity': 'crm-activity',
+  '#crm-reports': 'crm-reports',
+  '#crm-clients': 'crm-clients',
   '#chat': 'chat',
   '#client-ai': 'chat',
   '#jarvis': 'jarvis',
   '#voice-ai': 'voice-ai',
+  '#calling': 'calling',
+  '#calling-agent': 'calling',
   '#candidate-ai': 'candidate-ai',
   '#leads': 'leads',
   '#all-leads': 'leads',
@@ -702,10 +720,12 @@ const ROUTE_MAP = {
   '#whatsapp': 'whatsapp',
   '#whatsapp-auto': 'whatsapp',
   '#accounts': 'accounts',
+  '#connectors': 'connectors',
   '#plugins': 'plugins',
   '#integrations': 'plugins',
   '#tokens': 'tokens',
   '#api-keys': 'tokens',
+  '#developer': 'developer',
   '#settings': 'settings'
 };
 
@@ -713,7 +733,7 @@ function triggerAutoRecovery() {
   try {
     // Only run recovery if user has genuinely authenticated this session
     // (skylark_logged_in is reset to 'false' on every page load)
-    const isLoggedIn = Boolean(window.SupabaseAuth?.getSession?.());
+    const isLoggedIn = Boolean(window.SupabaseAuth?.getSession?.()) && !window.SupabaseAuth?.isRecoveryMode?.();
     if (!isLoggedIn) return; // don't bypass auth — password must be entered
     const shell = document.getElementById('app-shell');
     if (shell && (shell.style.display === 'none' || getComputedStyle(shell).display === 'none')) {
@@ -796,7 +816,9 @@ function initHashRouting() {
 }
 
 function handleHashChange() {
-  const rawHash = (window.location.hash || '#dashboard').toLowerCase();
+  const preferred = safeLocalStorageGet('skylark-home-page');
+  const defaultView = ['dashboard', 'leads', 'chat'].includes(preferred) ? preferred : 'dashboard';
+  const rawHash = (window.location.hash || '#' + defaultView).toLowerCase();
   const viewName = ROUTE_MAP[rawHash] || rawHash.replace('#', '') || 'dashboard';
   showView(viewName);
 }
@@ -823,7 +845,9 @@ function bindNavigation() {
 }
 
 function showView(viewName) {
+  if (viewName === 'crm') viewName = 'crm-overview';
   currentView = viewName;
+  if (!viewName.startsWith('crm-')) window.CRMCtrl?.dispose?.();
 
   // 1. Highlight active sidebar link
   document.querySelectorAll('.nav-item, .nav-sub-item').forEach(el =>
@@ -833,20 +857,30 @@ function showView(viewName) {
   // 2. Update breadcrumb text
   const labels = {
     chat: 'Client AI (Chat)',
+    manual: 'Rudra24 AI · Manual',
     dashboard: 'Dashboard Overview',
+    'crm-overview': 'CRM · Overview',
+    'crm-pipeline': 'CRM · Pipeline',
+    'crm-activity': 'CRM · Follow-ups & Activity',
+    'crm-reports': 'CRM · Reports',
+    'crm-clients': 'CRM · Clients & Contracts',
+    sms: 'Text messages',
     leads: 'All Leads Database',
     agent: 'Run AI Agent',
     excel: 'Excel Manager',
     analytics: 'Analytics & Reports',
     settings: 'System Settings',
+    developer: 'Product insights',
     tokens: 'API Keys Dashboard',
     accounts: 'Connected Accounts',
+    connectors: 'Connectors',
     email: 'Email Automation',
     whatsapp: 'WhatsApp Automation',
     'candidate-ai': 'Candidate AI Recruiter',
     'candidate-db': 'Candidate Database',
-    jarvis: 'Clavis AI Studio',
-    'voice-ai': 'Voice Calling AI'
+    jarvis: 'Rudra24 AI Studio',
+    'voice-ai': 'Voice Calling AI',
+    calling: 'Calling Agent'
   };
   const breadcrumb = document.getElementById('breadcrumb-text');
   if (breadcrumb) {
@@ -890,10 +924,18 @@ function showView(viewName) {
 
   // Only guarantee #app-shell is visible when switching views if user is logged in
   const shell = document.getElementById('app-shell');
-  const isLoggedIn = localStorage.getItem('skylark_logged_in') === 'true';
+  const isLoggedIn = Boolean(window.SupabaseAuth?.getSession?.()) && !window.SupabaseAuth?.isRecoveryMode?.();
   if (isLoggedIn && shell && shell.style.display === 'none') {
     shell.style.display = 'flex';
   }
+  window.dispatchEvent(new Event('clavis:workspace-change'));
+
+  if (viewName.startsWith('crm-')) {
+    window.CRMBridge?.setDisclosure?.(true);
+    window.CRMCtrl?.init?.(viewName);
+  }
+  if (viewName === 'sms') window.TextBeeCtrl?.init?.();
+  if (viewName === 'manual') window.ClavisAppMap?.guide?.init?.();
 
   // 4. Render view content dynamically (safely wrapped in try...catch)
   try {
@@ -906,8 +948,10 @@ function showView(viewName) {
   try {
     if (viewName === 'leads') {
       if (window.LeadsCtrl && typeof window.LeadsCtrl.init === 'function') window.LeadsCtrl.init();
-      if (typeof populateFilterDropdowns === 'function') populateFilterDropdowns();
-      if (typeof renderLeadsTable === 'function') renderLeadsTable();
+      else {
+        if (typeof populateFilterDropdowns === 'function') populateFilterDropdowns();
+        if (typeof renderLeadsTable === 'function') renderLeadsTable();
+      }
     }
   } catch (err) { console.error('Error rendering leads view:', err); }
 
@@ -958,6 +1002,15 @@ function showView(viewName) {
     }
   } catch (err) { console.error('Error rendering accounts view:', err); }
 
+  if (viewName === 'connectors') window.ConnectorsPage?.init();
+
+  try {
+    if (viewName === 'calling' && window.SarvamCallingUI?.mount) {
+      window.SarvamCallingUI.mount();
+      window.SarvamCallingUI.render();
+    }
+  } catch (err) { console.error('Error rendering calling view:', err); }
+
   try {
     if (viewName === 'plugins') {
       if (window.PluginsCtrl && typeof window.PluginsCtrl.init === 'function') window.PluginsCtrl.init();
@@ -981,7 +1034,7 @@ function showView(viewName) {
   try {
     if (viewName === 'jarvis') {
       if (typeof window.initJarvisUI === 'function') window.initJarvisUI();
-      // Do NOT auto-open the task/pipeline surface just for opening the Clavis
+      // Do NOT auto-open the task/pipeline surface just for opening the Rudra24 AI
       // tab. It used to pop the idle "Autonomous Agent Pipeline" greeting with
       // no command given. The surface now opens only when the user actually
       // sends something (jarvis_ui.js calls ClavisTaskSurface.show() on submit).
@@ -1014,7 +1067,7 @@ function bindSidebarToggle() {
       return;
     }
     sidebar.classList.toggle('collapsed', collapsed);
-    toggleBtn.setAttribute('aria-pressed', String(collapsed));
+    toggleBtn.setAttribute('aria-pressed', String(!collapsed));
   };
 
   toggleBtn.addEventListener('click', () => {
@@ -1024,16 +1077,27 @@ function bindSidebarToggle() {
   });
 
   mobileToggleBtn?.addEventListener('click', () => {
-    if (window.innerWidth <= 768) sidebar.classList.toggle('mobile-open');
+    if (window.innerWidth <= 768) {
+      if (window.SidebarController) window.SidebarController.toggle();
+      else sidebar.classList.toggle('mobile-open');
+    }
   });
 
-  collapseBtn?.addEventListener('click', () => setCollapsed(true));
-  expandBtn?.addEventListener('click', () => setCollapsed(false));
+  collapseBtn?.addEventListener('click', () => {
+    if (window.SidebarController) window.SidebarController.collapse();
+    else setCollapsed(true);
+  });
+  expandBtn?.addEventListener('click', () => {
+    if (window.SidebarController) window.SidebarController.expand();
+    else setCollapsed(false);
+  });
 
   document.addEventListener('click', e => {
     if (window.innerWidth <= 768 && !sidebar.contains(e.target) &&
-        !toggleBtn.contains(e.target) && !mobileToggleBtn?.contains(e.target) && sidebar.classList.contains('mobile-open'))
-      sidebar.classList.remove('mobile-open');
+        !toggleBtn.contains(e.target) && !mobileToggleBtn?.contains(e.target) && sidebar.classList.contains('mobile-open')) {
+      if (window.SidebarController) window.SidebarController.collapse();
+      else sidebar.classList.remove('mobile-open');
+    }
   });
 }
 
@@ -1374,7 +1438,7 @@ function renderIndustryBars() {
   const sorted = Object.entries(industryMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
   const max = Math.max(...sorted.map(e => e[1]), 1);
 
-  const colors = ['#6366f1', '#f59e0b', '#ef4444', '#ec4899', '#10b981', '#3b82f6', '#8b5cf6', '#14b8a6'];
+  const colors = ['var(--cc-accent)', 'var(--cc-mute)', 'var(--cc-accent-ink)', 'var(--cc-line-3)'];
   container.innerHTML = '';
 
   sorted.forEach(([ind, cnt], i) => {
@@ -1520,6 +1584,15 @@ function renderLeadsTable() {
 }
 
 function applyFilters() {
+  // The modern controller and legacy export/filter handlers share one
+  // account-scoped dataset; lexical allLeads otherwise stays stale.
+  if (Array.isArray(window.allLeads)) allLeads = window.allLeads;
+  if (window.LeadsCtrl) {
+    window.LeadsCtrl.leads = allLeads;
+    window.LeadsCtrl.applyFilters();
+    window.LeadsCtrl.render();
+    return;
+  }
   const search        = (document.getElementById('search-input')?.value || '').toLowerCase();
   const type          = document.getElementById('filter-type')?.value || '';
   const stateVal      = document.getElementById('filter-state')?.value || '';
@@ -1575,6 +1648,7 @@ function applyFilters() {
 function sortTable(col) {
   if (sortConfig.col === col) sortConfig.dir = sortConfig.dir === 'asc' ? 'desc' : 'asc';
   else { sortConfig.col = col; sortConfig.dir = 'desc'; }
+  if (window.LeadsCtrl) window.LeadsCtrl.sort = { column: col === 'leadScore' ? 'score' : col, direction: sortConfig.dir };
   document.querySelectorAll('.th-sort').forEach(th => {
     th.classList.remove('sort-asc', 'sort-desc');
     if (th.dataset.col === col) th.classList.add(sortConfig.dir === 'asc' ? 'sort-asc' : 'sort-desc');
@@ -1680,8 +1754,9 @@ window.openLeadModalById = openLeadModalById;
 
 async function updateLeadStatus(id, newStatus, selectEl) {
   try {
-    await MemoryEngine.updateLead(id, { status: newStatus });
     const lead = allLeads.find(l => l.id === id);
+    if (window.CRMBridge && lead) await window.CRMBridge.updateStage(lead, newStatus);
+    await MemoryEngine.updateLead(id, { status: newStatus });
     if (lead) lead.status = newStatus;
     selectEl.className = `status-select ${newStatus.toLowerCase()}`;
     showToast('success', 'Status Updated', `Lead marked as ${newStatus}`);
@@ -1707,9 +1782,10 @@ function exportCSV() {
   const toExport = filteredLeads.length > 0 ? filteredLeads : allLeads;
   if (toExport.length === 0) { showToast('warning', 'No Leads', 'Nothing to export'); return; }
 
-  const headers = ['Company','Industry','City','Type','Phone','Email','Website','Address','Job Title','Positions','Status','Source','Date Added','Synced to Sheets'];
+  const headers = ['Company','Contact Person','Designation','Contact Source','Industry','City','Type','Phone','Email','Website','Address','Job Title','Positions','Status','Source','Date Added','Synced to Sheets'];
   const rows = toExport.map(l => [
-    l.company, l.industry||l.sector||'', l.city, l.type, l.phone, l.email, l.website, l.address,
+    l.company, l.contactPerson||'', l.designation||'', l.contactPerson ? (l.contactPersonSource||'Company website') : '',
+    l.industry||l.sector||'', l.city, l.type, l.phone, l.email, l.website, l.address,
     l.jobTitle, l.positions||1, l.status, l.source, formatDate(l.timestamp), l.syncedToSheets ? 'Yes' : 'No'
   ].map(v => `"${String(v||'').replace(/"/g, '""')}"`));
 
@@ -2010,6 +2086,11 @@ async function startAgentPipeline() {
       if (autoDownload && added > 0) {
         exportToExcel();
       }
+
+      // Calling agent khud se poochhta hai — de doon ya nahi, faisla owner ka.
+      if (added > 0) {
+        setTimeout(() => window.offerLeadsToCallingAgent?.(newLeads), 1400);
+      }
     },
     onError: (msg) => {
       setPipelineStatus('error');
@@ -2304,11 +2385,11 @@ function renderAnalytics() {
     }
     renderAnalyticsBars('analytics-source-chart', 'source',
       ['LinkedIn','Indeed','Google Jobs','Google Maps'],
-      ['#3b82f6','#ec4899','#10b981','#f59e0b']);
+      ['var(--cc-accent)']);
 
     renderAnalyticsBars('analytics-type-chart', 'type',
       ['Security','Housekeeping','Both'],
-      ['#6366f1','#10b981','#f59e0b']);
+      ['var(--cc-accent)']);
 
     renderTimeline('analytics-timeline');
     renderFunnel('analytics-funnel');
@@ -2346,7 +2427,7 @@ function renderAnalyticsIndustries(containerId) {
   allLeads.forEach(l => { const k = l.industry||l.sector||'Unknown'; map[k] = (map[k]||0)+1; });
   const sorted = Object.entries(map).sort((a,b)=>b[1]-a[1]).slice(0,8);
   const max = Math.max(...sorted.map(e=>e[1]),1);
-  const colors = ['#6366f1','#f59e0b','#ef4444','#ec4899','#10b981','#3b82f6','#8b5cf6','#14b8a6'];
+  const colors = ['var(--cc-accent)', 'var(--cc-mute)', 'var(--cc-accent-ink)', 'var(--cc-line-3)'];
   container.innerHTML = sorted.map(([k,v],i) => {
     const pct = Math.round((v/max)*100);
     const shortK = k.split('&')[0].trim().split(' ').slice(0,2).join(' ');
@@ -2378,7 +2459,7 @@ function renderTimeline(containerId) {
       const d = new Date(now - (days - 1 - i) * 86400000);
       const lbl = d.toLocaleDateString('en-IN', { month:'short', day:'numeric' });
       return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
-        <div style="width:100%;height:${h}px;background:#6366f1;border-radius:3px 3px 0 0;opacity:0.85;transition:height 0.3s" title="${lbl}: ${c} leads"></div>
+        <div style="width:100%;height:${h}px;background:var(--cc-accent);border-radius:3px 3px 0 0;opacity:0.85;transition:height 0.3s" title="${lbl}: ${c} leads"></div>
         ${i % 2 === 0 ? `<span style="font-size:9px;color:var(--gray-400);white-space:nowrap">${lbl}</span>` : '<span style="font-size:9px"></span>'}
       </div>`;
     }).join('')}
@@ -2390,10 +2471,10 @@ function renderFunnel(containerId) {
   const container = document.getElementById(containerId);
   if (!container) return;
   const stages = [
-    { key:'New',       color:'#6366f1', label:'New Leads' },
-    { key:'Contacted', color:'#f59e0b', label:'Contacted' },
-    { key:'Qualified', color:'#10b981', label:'Qualified' },
-    { key:'Closed',    color:'#9ca3af', label:'Closed/Won' },
+    { key:'New',       color:'var(--cc-accent)', label:'New Leads' },
+    { key:'Contacted', color:'var(--cc-accent-ink)', label:'Contacted' },
+    { key:'Qualified', color:'var(--cc-mute)', label:'Qualified' },
+    { key:'Closed',    color:'var(--cc-line-3)', label:'Closed/Won' },
   ];
   const counts = stages.map(s => allLeads.filter(l => l.status === s.key).length);
   const max = Math.max(...counts, 1);
@@ -2415,7 +2496,36 @@ function renderFunnel(containerId) {
 // ============================================================
 //  SETTINGS
 // ============================================================
+const SETTINGS_PREFERENCE_KEYS = {
+  'sm-home-page': 'skylark-home-page',
+  'sm-auto-rotate': 'skylark-auto-rotate',
+  'sm-verify-email': 'skylark-verify-email',
+  'sm-lead-scoring': 'skylark-lead-scoring',
+  'sm-ai-memory': 'skylark-ai-memory',
+  'sm-desktop-notifs': 'skylark-desktop-notifs',
+  'sm-toasts': 'skylark-toasts',
+  'sm-sound-notifs': 'skylark-sound-notifs',
+  'sm-reduce-motion': 'skylark-reduce-motion',
+  'sm-compact': 'skylark-compact',
+  'sm-charts': 'skylark-charts',
+  'sm-live-counters': 'skylark-live-counters'
+};
+
+function saveSettingsVoiceEngine() {
+  const select = document.getElementById('sm-tts-model');
+  if (!select || !Array.from(select.options).some(option => option.value === select.value)) return;
+  ['clavis_tts_provider', 'skylark-tts-model', 'skylark-tts-engine'].forEach(key => safeLocalStorageSet(key, select.value));
+}
+
 function loadSettingsToUI() {
+  for (const [id, key] of Object.entries(SETTINGS_PREFERENCE_KEYS)) {
+    const input = document.getElementById(id), saved = safeLocalStorageGet(key);
+    if (!input || saved === null) continue;
+    if (input.type === 'checkbox') {
+      // Old versions wrote "on" for both states; keep the default when unknown.
+      if (saved === 'true' || saved === 'false') input.checked = saved === 'true';
+    } else if (Array.from(input.options || []).some(option => option.value === saved)) input.value = saved;
+  }
   const settings = SettingsEngine.load();
   const apifyEl = document.getElementById('apify-key');
   if (apifyEl) {
@@ -2452,7 +2562,7 @@ function loadSettingsToUI() {
   if (accentEl) accentEl.value = safeLocalStorageGet('skylark-accent-color') || 'purple';
   const sidebarW = document.getElementById('sm-sidebar-width');
   if (sidebarW) {
-    const cur = safeLocalStorageGet('skylark-sidebar-width') || '230';
+    const cur = String(Math.max(210, Math.min(230, Number.parseInt(safeLocalStorageGet('do-sidebar-width'), 10) || 220)));
     sidebarW.value = cur;
     const wVal = document.getElementById('sm-sidebar-w-val');
     if (wVal) wVal.textContent = cur;
@@ -2470,7 +2580,10 @@ function loadSettingsToUI() {
 
   // Voice
   const voiceEl = document.getElementById('sm-tts-model');
-  if (voiceEl) voiceEl.value = 'gemini';
+  if (voiceEl) {
+    const saved = safeLocalStorageGet('clavis_tts_provider') || safeLocalStorageGet('skylark-tts-model') || 'fish_audio';
+    if (Array.from(voiceEl.options).some(option => option.value === saved)) voiceEl.value = saved;
+  }
   const speedEl = document.getElementById('sm-speech-speed');
   if (speedEl) {
     speedEl.value = safeLocalStorageGet('skylark-speech-speed') || '1.0';
@@ -2481,7 +2594,7 @@ function loadSettingsToUI() {
   if (handsEl) handsEl.checked = safeLocalStorageGet('skylark-hands-free') === 'true';
   const wakeEl = document.getElementById('clavis-wake-words');
   if (wakeEl) {
-    try { wakeEl.value = JSON.parse(localStorage.getItem('clavis_wake_words') || 'null')?.join(', ') || 'Clavis, Hey buddy, Hi pal'; } catch (_) {}
+    try { wakeEl.value = JSON.parse(localStorage.getItem('clavis_wake_words') || 'null')?.join(', ') || 'Rudra24 AI, Hey buddy, Hi pal'; } catch (_) {}
   }
 
   // Restore locations
@@ -2490,7 +2603,7 @@ function loadSettingsToUI() {
   }
   // Restore industries
   if (settings.lastIndustries?.length) {
-    settings.lastIndustries.forEach(k => toggleIndustry(k, null));
+    settings.lastIndustries.forEach(k => { if (!selectedIndustries.has(k)) toggleIndustry(k, null); });
   }
 
 }
@@ -2504,7 +2617,7 @@ async function refreshSettingsMemoryStats() {
   set('mem-pushed',   stats.pushed);
 }
 
-function saveSettings() {
+async function saveSettings() {
   const apifyKey     = (document.getElementById('apify-key')?.value || '').trim();
   const dedupStrategy = document.getElementById('dedup-field')?.value || 'company+type';
   const tokenBudget  = parseInt(document.getElementById('token-budget')?.value || '100');
@@ -2513,25 +2626,37 @@ function saveSettings() {
   const openaiKey    = (document.getElementById('openai-key-mgmt')?.value || '').trim();
   const deepseekKey  = (document.getElementById('deepseek-key-mgmt')?.value || '').trim();
 
-  SettingsEngine.save({ apifyKey, dedupStrategy, tokenBudget, workers });
+  SettingsEngine.save({ dedupStrategy, tokenBudget, workers });
   localStorage.setItem('skylark_dedup_strategy', dedupStrategy);
   // Provider secrets are accepted only by the authenticated backend vault.
   // Never persist or send them from this browser settings form.
+  for (const [provider, secret, inputId] of [
+    ['groq', groqKey, 'groq-key-mgmt'], ['openai', openaiKey, 'openai-key-mgmt'], ['deepseek', deepseekKey, 'deepseek-key-mgmt']
+  ]) {
+    if (!secret) continue;
+    try {
+      await window.ClavisKeyVault.add(provider, secret);
+      const input = document.getElementById(inputId);
+      if (input) input.value = '';
+    } catch (error) { showToast('error', 'API key not saved', error.message); return; }
+  }
 
   // Appearance
-  const accent = document.getElementById('sm-accent-color')?.value || 'purple';
-  localStorage.setItem('skylark-accent-color', accent);
-  applyAccentColor(accent);
+  const accent = document.getElementById('sm-accent-color')?.value;
+  if (accent) {
+    localStorage.setItem('skylark-accent-color', accent);
+    applyAccentColor(accent);
+  }
 
   const sidebarWidth = document.getElementById('sm-sidebar-width')?.value;
   if (sidebarWidth) {
     localStorage.setItem('skylark-sidebar-width', sidebarWidth);
-    localStorage.setItem('do-sidebar-width', sidebarWidth);
-    window.SidebarController?.setWidth(sidebarWidth);
+    if (window.lxSetAppearance) window.lxSetAppearance('sidebarWidth', sidebarWidth);
+    else {
+      localStorage.setItem('do-sidebar-width', sidebarWidth);
+      window.SidebarController?.setWidth(sidebarWidth);
+    }
   }
-
-  const homePage = document.getElementById('sm-home-page')?.value;
-  if (homePage) localStorage.setItem('skylark-home-page', homePage);
 
   // AI models
   const llm = document.getElementById('sm-llm')?.value;
@@ -2540,8 +2665,7 @@ function saveSettings() {
   if (temp) localStorage.setItem('skylark-temperature', temp);
 
   // Voice
-  const tts = document.getElementById('sm-tts-model')?.value;
-  if (tts) localStorage.setItem('skylark-tts-model', tts);
+  saveSettingsVoiceEngine();
   const speed = document.getElementById('sm-speech-speed')?.value;
   if (speed) localStorage.setItem('skylark-speech-speed', speed);
   const handsFree = document.getElementById('sm-hands-free')?.checked;
@@ -2550,35 +2674,48 @@ function saveSettings() {
     if (window.toggleHandsFreeSetting) window.toggleHandsFreeSetting(handsFree);
   }
 
-  // Auto-rotate keys
-  const autoRotate = document.getElementById('sm-auto-rotate')?.checked;
-  if (autoRotate !== undefined) localStorage.setItem('skylark-auto-rotate', autoRotate ? 'true' : 'false');
-
-  // Misc toggles
-  const toggles = {
-    'sm-verify-email': 'skylark-verify-email',
-    'sm-lead-scoring': 'skylark-lead-scoring',
-    'sm-ai-memory': 'skylark-ai-memory',
-    'sm-desktop-notifs': 'skylark-desktop-notifs',
-    'sm-toasts': 'skylark-toasts',
-    'sm-sound-notifs': 'skylark-sound-notifs',
-    'sm-encryption': 'skylark-encryption',
-    'sm-gpu-accel': 'skylark-gpu-accel',
-    'sm-dev-mode': 'skylark-dev-mode',
-    'sm-reduce-motion': 'skylark-reduce-motion',
-    'sm-compact': 'skylark-compact',
-    'sm-charts': 'skylark-charts',
-    'sm-live-counters': 'skylark-live-counters',
-    'sm-fps': 'skylark-fps'
-  };
-  for (const [id, key] of Object.entries(toggles)) {
+  for (const [id, key] of Object.entries(SETTINGS_PREFERENCE_KEYS)) {
     const el = document.getElementById(id);
-    if (el) localStorage.setItem(key, el.value !== undefined ? el.value : (el.checked ? 'true' : 'false'));
+    if (el && !el.disabled) localStorage.setItem(key, el.type === 'checkbox' ? String(el.checked) : el.value);
   }
 
-  if (typeof window.showToast === 'function') {
-    window.showToast('success', 'Settings Saved', 'All preferences stored locally');
+  if (apifyKey) {
+    if (!window.NexusAIChat?.saveCredential) {
+      showToast('error', 'Apify not connected', 'The secure credential service is unavailable.');
+      return;
+    }
+    try {
+      await window.NexusAIChat.saveCredential('apify', apifyKey);
+      document.getElementById('apify-key').value = '';
+      await refreshApifyCredentialStatus(true);
+    } catch (error) {
+      showToast('error', 'Apify not connected', error?.message || 'Could not verify this key.');
+      return;
+    }
   }
+  if (typeof window.showToast === 'function') {
+    window.showToast('success', apifyKey ? 'Apify connected' : 'Settings saved',
+      apifyKey ? 'Your key was verified and encrypted in your account.' : 'Preferences stored locally.');
+  }
+}
+
+async function checkSettingsKeySetup(button) {
+  const label = button.textContent;
+  button.disabled = true; button.textContent = 'Checking…';
+  let timer;
+  try {
+    const vault = window.ClavisKeyVault;
+    if (!vault) throw new Error('The provider setup service is unavailable.');
+    const ready = await Promise.race([
+      vault.refresh(),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error('The backend did not respond. Try again.')), 8000); })
+    ]);
+    if (!ready) throw new Error('Cannot check saved keys. Sign in and check the backend connection.');
+    const status = vault.status();
+    const names = status.connected.map(id => status.providers[id]?.label || id);
+    showToast(names.length ? 'success' : 'info', 'Saved provider keys', names.length ? names.join(', ') : 'No provider keys configured for this account.');
+  } catch (error) { showToast('error', 'Setup check unavailable', error.message); }
+  finally { clearTimeout(timer); button.disabled = false; button.textContent = label; }
 }
 
 function applyAccentColor(color) {
@@ -2630,17 +2767,14 @@ function initChatUI() {
   if(btn && input) {
     btn.addEventListener('click', handleChatSend);
     input.addEventListener('keydown', (e) => {
-      if(e.key === 'Enter' && !e.shiftKey) {
+      if(e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
         e.preventDefault();
         handleChatSend();
       }
     });
     
     // Auto-resize logic
-    input.addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = (this.scrollHeight) + 'px';
-    });
+    window.ClavisComposerSizing?.attach(input);
   }
   
   setupCustomDropdowns();
@@ -2711,7 +2845,7 @@ async function handleFileUpload(event) {
     typing.innerHTML = `
       <div class="chat-avatar" style="width:24px;height:24px;font-size:10px;margin-right:12px;">AI</div>
       <div style="display:flex;align-items:center;gap:8px;background:var(--gray-50);padding:10px 16px;border-radius:12px;">
-        <span style="font-size:13px;color:var(--gray-600);font-weight:500;">Clavis is enriching data</span>
+        <span style="font-size:13px;color:var(--gray-600);font-weight:500;">Rudra24 AI is enriching data</span>
         <div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>
       </div>`;
     container.appendChild(typing);
@@ -2807,11 +2941,11 @@ window.resetClientChat = resetClientChat;
 
 async function handleChatSend(textOverride, options = {}) {
   const input = document.getElementById('chat-input');
-  const text = (textOverride != null ? textOverride : (input ? input.value : '')).trim();
+  const text = (typeof textOverride === 'string' ? textOverride : (input ? input.value : '')).trim();
   const attachments = options.attachments || [];
   if(!text && !attachments.length) return;
   
-  if (input && textOverride == null) {
+  if (input && typeof textOverride !== 'string') {
     input.value = '';
     if (typeof window.resetComposer === 'function') {
       window.resetComposer(input);
@@ -2828,9 +2962,15 @@ async function handleChatSend(textOverride, options = {}) {
   }
 
   addChatMessage('user', text ? `<p>${escHtml(text)}</p>` : '', attachments);
-  
+
+  // Lead intent decides the whole surface: a general question stays in the
+  // chat thread, only a real lead/scrape request earns the floating task HUD.
+  const isExplicitLeadRequest = window.LeadCandidateDomain?.parseRequest
+    ? window.LeadCandidateDomain.parseRequest(text).isSearch
+    : /\b(lead|leads|prospect|prospects|company|companies|business|businesses|client|clients|scrape|extract|nikal|dhundh)\b/i.test(text);
+
   try {
-    if (window.ClavisTask?.begin) {
+    if (isExplicitLeadRequest && window.ClavisTask?.begin) {
       const activeTask = window.ClavisTask.current?.();
       if (!activeTask || ['completed', 'failed'].includes(activeTask.phase)) {
         window.ClavisTask.begin(text || (attachments.length ? 'Analyze attachment: ' + attachments[0].name : 'Task'), {
@@ -2842,13 +2982,13 @@ async function handleChatSend(textOverride, options = {}) {
   } catch (_) {}
 
   const status = window.LuxeStatus ? window.LuxeStatus.mount('chat-messages') : null;
-  const thinkingSteps = ['Thinking', 'Understanding your request', 'Composing a response'];
+  const thinkingSteps = (window.ChatFlow?.stepsFor?.(text)) || ['Thinking', 'Working through it', 'Writing the reply'];
   let stepIdx = 0;
   if (status) status.set(thinkingSteps[0]);
   const thinkingTimer = setInterval(() => {
     stepIdx = Math.min(stepIdx + 1, thinkingSteps.length - 1);
     status?.set(thinkingSteps[stepIdx]);
-  }, 1100);
+  }, 1600);
 
   const stopBtn = document.getElementById('chat-stop-btn');
   const sendBtn = document.getElementById('chat-send-btn');
@@ -2859,25 +2999,30 @@ async function handleChatSend(textOverride, options = {}) {
   
   try {
     const chatOptions = {
+      ...options,
       images: attachments.filter(a => a.isImage && a.dataUrl).map(a => a.dataUrl),
-      attachments: attachments
+      attachments: attachments,
+      leadOwner: 'client-chat'
     };
     const response = await window.ChatEngine.sendMessage(text, currentChatController.signal, chatOptions);
     clearInterval(thinkingTimer);
 
     if (response) {
-      const isExplicitLeadRequest = window.LeadCandidateDomain?.parseRequest
-        ? window.LeadCandidateDomain.parseRequest(text).isSearch
-        : /\b(lead|leads|prospect|prospects|company|companies|business|businesses|client|clients|data|scrape|extract|nikal|dhundh)\b/i.test(text);
-
       // A scrape command keeps the live status alive on THIS page ONLY if the user actually requested leads
       if (response.action && (response.action.type === 'generate') && isExplicitLeadRequest) {
         status?.remove();
         if (response.text) addChatMessage('assistant', `<p>${escHtml(response.text).replace(/\\n/g, '<br>')}</p>`);
-        runScrapeFromChat(response.action);
+        const activeTask = window.ClavisTask?.current?.();
+        const broadBuyerAsk = response.action.industries?.some?.(value => String(value || '').toUpperCase() === 'ALL');
+        if (broadBuyerAsk && activeTask && window.ClavisTask?.requestLeadScope) {
+          window.ClavisTask.requestLeadScope(activeTask.id, response.action, text, (_id, scopedAction) => runScrapeFromChat(scopedAction));
+        } else {
+          runScrapeFromChat(response.action);
+        }
       } else {
         status?.remove();
-        addAssistantMessage(response.text);
+        await addAssistantMessage(response.text, { stream: !response.guideTopicIds });
+        if (response.guideTopicIds) window.ClavisAppMap?.guide?.attachActions?.(document.querySelector('#chat-messages .chat-message.assistant:last-child'), response, text);
         if (response.action && (response.action.type !== 'generate' || isExplicitLeadRequest)) {
           executeChatAction(response.action);
         }
@@ -3096,6 +3241,12 @@ function addChatMessage(role, htmlContent, attachments) {
 // reflects the real scraper phase; on finish we surface a suggestion chip
 // (never an automatic redirect) so the user can inspect the Run Agent logs.
 function runScrapeFromChat(action, existingStatus) {
+  if (window.RealScraper?.isRunning?.()) {
+    const task = window.ClavisTask?.current?.();
+    if (task && task.phase !== 'completed') window.ClavisTask.fail(task.id, { message: 'Another lead search is already running.', code: 'SCRAPE_BUSY' });
+    addChatMessage('assistant', '<p>A lead search is already running. Its result will appear in the floating window when ready.</p>');
+    return;
+  }
   // The sourcing run continues after the assistant's short acknowledgement;
   // keep or create the active task so the floating window remains truthful.
   try {
@@ -3108,12 +3259,22 @@ function runScrapeFromChat(action, existingStatus) {
   } catch (_) {}
   const cities = (action.cities && action.cities.length)
     ? action.cities
-    : [window.SKYLARK_CONFIG?.DEFAULT_CITY || 'Gurugram'];
+    : (window.LeadCandidateDomain?.expandLocations(window.AgentCtrl?.getDefaults?.().locations || ['Delhi NCR']) || ['Delhi']);
   let industries = (action.industries && action.industries.length) ? action.industries : null;
+  if (!action._leadScopeConfirmed && (!industries || industries.some(value => /^all$/i.test(String(value).trim()))) && window.ClavisTask?.requestLeadScope) {
+    const task = window.ClavisTask.current();
+    if (task) {
+      task.display = 'window';
+      window.ClavisTask.requestLeadScope(task.id, {...action, cities}, action.query || '',
+        (_id, selected) => runScrapeFromChat({...selected, _leadScopeConfirmed:true}, existingStatus));
+      return;
+    }
+  }
   // "ALL" is the model's shorthand for "user named no industry" → every sector
-  if (industries && industries.length === 1 && /^all$/i.test(String(industries[0]).trim())) industries = null;
+  if (industries && industries.some(value => /^all$/i.test(String(value).trim()))) industries = ['ALL'];
   if (!industries) {
-    industries = (window.IndustryDB?.getNames?.() || [
+    const configuredBuyers = window.ClavisBusiness?.buyerQueries?.() || [];
+    industries = ((configuredBuyers.length ? configuredBuyers : window.IndustryDB?.getNames?.()) || [
       'Hotels & Hospitality', 'Hospitals & Healthcare',
       'Corporate IT Parks & Tech Hubs', 'Malls & Retail Chains',
       'Factories & Manufacturing'
@@ -3122,8 +3283,8 @@ function runScrapeFromChat(action, existingStatus) {
   const serviceTypes = (action.serviceType && action.serviceType.length)
     ? action.serviceType
     : ['Security', 'Housekeeping', 'Pantry Boy'];
-  // Count policy: default exactly 20; anything requested is clamped to 20–100.
-  const count = Math.max(20, Math.min(100,
+  // Default 20; honour an explicit smaller request too.
+  const count = Math.max(1, Math.min(100,
     parseInt(action.count, 10) || (window.AppSettings?.defaultCount?.()) || 20));
 
   const status = existingStatus || (window.LuxeStatus ? window.LuxeStatus.mount('chat-messages') : null);
@@ -3150,27 +3311,8 @@ function runScrapeFromChat(action, existingStatus) {
     cleanup();
     status?.remove();
     const d = e.detail || {};
-    try {
-      const cur = window.ClavisTask?.current?.();
-      if (cur && cur.phase !== 'completed') {
-        const rows = Array.isArray(d.leads) ? d.leads : [];
-        cur.intent = 'lead_gen';
-        cur.mode = 'leads';
-        cur.metrics.leads = Number(d.total || d.added || rows.length || 0);
-        if (d.completeContacts != null) cur.metrics.completeContacts = Number(d.completeContacts) || 0;
-        const result = {
-          type: 'leads',
-          text: d.ok
-            ? `${cur.metrics.leads} sourced leads are ready. Excel file has downloaded automatically.`
-            : (cur.metrics.leads ? `${cur.metrics.leads} leads found.` : 'No leads found matching criteria.'),
-          rows: rows,
-          metrics: cur.metrics
-        };
-        window.ClavisTask.complete(cur.id, result);
-      }
-    } catch (_) {}
     if (d.ok) {
-      addChatMessage('assistant', `<p><strong>Your data is ready.</strong> ${d.added || 0} sourced leads are available. ${d.completeContacts != null ? `${d.completeContacts} include website, phone and email.` : ''} The Excel file has downloaded automatically.</p>${chatSuggestionHtml('Open Run Agent to see the live logs and pipeline detail.')}`);
+      addChatMessage('assistant', `<p><strong>${d.stopped ? 'Search stopped.' : 'Your data is ready.'}</strong> ${(d.leads || []).length}${d.requested && (d.leads || []).length < d.requested ? ` of ${d.requested} requested` : ''} verified leads are available to preview and download from the task window.${d.exported ? ' Excel downloaded automatically.' : ''}</p>${chatSuggestionHtml('Open Run Agent to see the pipeline detail.')}`);
     } else if (d.incomplete) {
       addChatMessage('assistant', `<p>⚠️ I could only verify <strong>${d.completeContacts || d.added || 0}/${d.requested || count}</strong> leads with a complete website, phone and email, so nothing partial was exported. You can widen the city or industry and try again.</p>${chatSuggestionHtml('Open the Run Agent page to review what was found.')}`);
     } else {
@@ -3221,7 +3363,7 @@ function highlightRunAgentEntry() {
 
 function executeChatAction(action) {
   if (action.type === 'candidate_search') {
-    // Keep candidate sourcing in its own workstream/table. The shared Clavis
+    // Keep candidate sourcing in its own workstream/table. The shared Rudra24 AI
     // task surface can still report the work, but lead records must never be
     // mixed with candidate records.
     try {
@@ -3242,7 +3384,7 @@ function executeChatAction(action) {
     // only path that actually reaches the real scraper engine.
     const cities = (action.cities && action.cities.length)
       ? action.cities
-      : [window.SKYLARK_CONFIG?.DEFAULT_CITY || 'Gurugram'];
+      : (window.LeadCandidateDomain?.expandLocations(window.AgentCtrl?.getDefaults?.().locations || ['Delhi NCR']) || ['Delhi']);
 
     let industries = (action.industries && action.industries.length)
       ? action.industries
@@ -3452,23 +3594,33 @@ function showToast(a, b, c) {
 async function saveCustomKeys() {
   const apifyInput = document.getElementById('custom-apify-input');
   const groqInput  = document.getElementById('custom-groq-input');
-  if (!apifyInput || !groqInput) return;
+  if (!apifyInput && !groqInput) return;
 
-  const aKey = apifyInput.value.trim();
-  const gKey = groqInput.value.trim();
+  const aKey = apifyInput?.value.trim() || '';
+  const gKey = groqInput?.value.trim() || '';
+  if (!aKey && !gKey) {
+    showToast('warning', 'Add a key', 'Paste your Apify key to connect lead sourcing.');
+    return;
+  }
 
   if (!window.NexusAIChat?.saveCredential || !window.SupabaseAuth?.getAccessToken?.()) {
     showToast('warning', 'Sign in required', 'Provider keys are stored only in the secure backend vault.');
     return;
   }
   try {
-    if (aKey) await window.NexusAIChat.saveCredential('apify', aKey);
-    if (gKey) await window.NexusAIChat.saveCredential('groq', gKey);
-    apifyInput.value = '';
-    groqInput.value = '';
-    showToast('success', 'Keys Saved', 'Provider keys were encrypted in the secure backend vault.');
-  } catch (_) {
-    showToast('error', 'Key setup failed', 'The provider key could not be securely saved.');
+    if (aKey) {
+      await window.NexusAIChat.saveCredential('apify', aKey);
+      apifyInput.value = '';
+      await refreshApifyCredentialStatus(true);
+    }
+    if (gKey) {
+      await window.NexusAIChat.saveCredential('groq', gKey);
+      groqInput.value = '';
+    }
+    showToast('success', aKey ? 'Apify connected' : 'Key saved',
+      'The key was verified and encrypted in your account.');
+  } catch (error) {
+    showToast('error', 'Key setup failed', error?.message || 'The key could not be verified.');
   }
   renderTokenDashboard();
 }
@@ -4743,7 +4895,7 @@ window.loadAllSettings = function() {
   if (accountName) {
     const brandEl = document.getElementById('logo-brand-text');
     const settingsNameEl = document.getElementById('settings-account-name');
-    if (brandEl) brandEl.innerText = accountName;
+    if (brandEl) brandEl.innerText = 'Rudra24 AI';
     if (settingsNameEl) settingsNameEl.innerText = accountName;
     if (window.updateAvatarLetter) window.updateAvatarLetter();
   }
@@ -4979,8 +5131,8 @@ async function pushSelectedToSheets() {
     const spreadsheetId = prompt('Enter the Google Spreadsheet ID:');
     if (!spreadsheetId?.trim()) return;
     showToast('info', 'Syncing leads', `Pushing ${targetLeads.length} leads to Google Sheets…`);
-    const headers = ['Company', 'City', 'Industry', 'Website', 'Phone', 'Email', 'Status', 'Source'];
-    const rows = [headers, ...targetLeads.map(l => [l.company || l.title || '', l.city || '', l.industry || '', l.website || '', l.phone || '', l.email || '', l.status || 'New', l.source || 'Nexus'])];
+    const headers = ['Company', 'Contact Person', 'Designation', 'City', 'Industry', 'Website', 'Phone', 'Email', 'Status', 'Source'];
+    const rows = [headers, ...targetLeads.map(l => [l.company || l.title || '', l.contactPerson || '', l.designation || '', l.city || '', l.industry || '', l.website || '', l.phone || '', l.email || '', l.status || 'New', l.source || 'Nexus'])];
     await window.NexusGoogleSheets.sync(spreadsheetId.trim(), rows);
     targetLeads.forEach(l => { l.syncedToSheets = true; });
     showToast('success', 'Sheets synced', `${targetLeads.length} leads were written by the authenticated backend.`);
@@ -5004,9 +5156,7 @@ function saveVoiceSettings() {
   if (ttsKeyInput) ttsKeyInput.value = '';
 
   // System Settings panel fields
-  const tts = document.getElementById('sm-tts-model');
-  safeLocalStorageSet('skylark-tts-model', 'gemini');
-  safeLocalStorageSet('skylark-tts-engine', 'gemini');
+  saveSettingsVoiceEngine();
   const geminiVoice = document.getElementById('sm-gemini-voice')?.value || document.getElementById('clavis-gemini-voice')?.value || 'Kore';
   // setVoice also remembers a male pick as the fallback voice.
   if (!window.ClavisVoice?.setVoice?.(geminiVoice)) safeLocalStorageSet('clavis_gemini_voice', geminiVoice);
@@ -5047,7 +5197,7 @@ function saveJarvisSettings() {
   const memory = document.getElementById('sm-ai-memory');
   if (memory) safeLocalStorageSet('skylark-ai-memory', memory.checked ? 'true' : 'false');
 
-  showToast('success', '✓ Clavis Saved', 'Clavis assistant settings updated.');
+  showToast('success', '✓ Rudra24 AI Saved', 'Rudra24 AI assistant settings updated.');
 }
 
 function saveEmailKeys() {
@@ -5090,9 +5240,60 @@ window.saveWAKeys            = saveWAKeys;
 // ============================================================
 //  API KEYS DASHBOARD & LIVE CREDIT MONITOR
 // ============================================================
+let apifyCredentialState = { status: 'checking', checkedAt: 0 };
+let apifyCredentialRequest = null;
+let apifyCredentialToken = '';
+
+async function refreshApifyCredentialStatus(force = false) {
+  const token = window.SupabaseAuth?.getAccessToken?.() || '';
+  if (token !== apifyCredentialToken) {
+    apifyCredentialToken = token;
+    apifyCredentialState = { status: 'checking', checkedAt: 0 };
+  }
+  if (!token) {
+    apifyCredentialState = { status: 'sign_in', checkedAt: Date.now() };
+    return;
+  }
+  if (!window.NexusAIChat?.getCredentials) {
+    apifyCredentialState = { status: 'unavailable', checkedAt: Date.now() };
+    return;
+  }
+  if (apifyCredentialRequest) {
+    await apifyCredentialRequest;
+    if (!force) return;
+  }
+  if (!force && Date.now() - apifyCredentialState.checkedAt < 30000) return;
+  apifyCredentialRequest = window.NexusAIChat.getCredentials()
+    .then(data => {
+      if (window.SupabaseAuth?.getAccessToken?.() === token) {
+        apifyCredentialState = {
+          status: data.credentials?.some(item => item.provider === 'apify') ? 'connected' : 'missing',
+          checkedAt: Date.now()
+        };
+      }
+    })
+    .catch(() => {
+      if (window.SupabaseAuth?.getAccessToken?.() === token) {
+        apifyCredentialState = { status: 'unavailable', checkedAt: Date.now() };
+      }
+    })
+    .finally(() => { apifyCredentialRequest = null; renderTokenDashboard(); });
+  return apifyCredentialRequest;
+}
+
 function renderTokenDashboard() {
   if (!window.MemoryEngine) return;
   const cfg = window.SKYLARK_CONFIG || {};
+  const currentToken = window.SupabaseAuth?.getAccessToken?.() || '';
+  if (currentToken !== apifyCredentialToken) {
+    apifyCredentialToken = currentToken;
+    apifyCredentialState = { status: 'checking', checkedAt: 0 };
+  }
+  if (!currentToken) {
+    apifyCredentialState = { status: 'sign_in', checkedAt: Date.now() };
+  } else if (Date.now() - apifyCredentialState.checkedAt >= 30000) {
+    refreshApifyCredentialStatus();
+  }
 
   const providers = [
     { name: 'Apify Scraper Engine', id: 'apify', keys: cfg.APIFY_API_KEYS || [], limit: cfg.APIFY_KEY_LIMIT || 500, type: 'credits' },
@@ -5104,70 +5305,25 @@ function renderTokenDashboard() {
     { name: 'Moonshot AI', id: 'moonshot', keys: cfg.MOONSHOT_API_KEYS || [], limit: cfg.MOONSHOT_KEY_LIMIT || 500000, type: 'tokens' },
   ];
 
-  const activeApifyIdx = window.MemoryEngine.getActiveApifyIdx();
-
-  // Render Apify Key Table
+  // Account-scoped Apify keys live on the backend; browser config and local
+  // usage counters cannot report their health or remaining credits.
   const apifyTable = document.getElementById('apify-keys-table');
   if (apifyTable) {
-    const apifyKeys = (cfg.APIFY_API_KEYS || []).filter(k => k && k.trim());
-    if (apifyKeys.length === 0) {
-      apifyTable.innerHTML = `<div class="empty-chart-msg">No Apify keys configured in config.js</div>`;
-    } else {
-      apifyTable.innerHTML = `
-        <table class="leads-table" style="width:100%; font-size:12px;">
-          <thead>
-            <tr>
-              <th>Key Slot</th>
-              <th>API Key (Masked)</th>
-              <th>Credits Used</th>
-              <th>Remaining Quota</th>
-              <th>Latency (ms)</th>
-              <th>Usage Bar</th>
-              <th>Health Status</th>
-              <th>Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${apifyKeys.map((key, i) => {
-              const used = window.MemoryEngine.getKeyUsage('apify', i);
-              const remaining = Math.max(0, (cfg.APIFY_KEY_LIMIT || 500) - used);
-              const pct = Math.min(100, Math.round((used / (cfg.APIFY_KEY_LIMIT || 500)) * 100));
-              const isActive = i === activeApifyIdx;
-              const lat = window.MemoryEngine.getApiLatency('apify', i);
-
-              let statusBadge = `<span style="font-size:11px; padding:2px 8px; border-radius:99px; background:#dcfce7; color:#166534; font-weight:700;">🟢 Healthy</span>`;
-              if (pct >= 100) statusBadge = `<span style="font-size:11px; padding:2px 8px; border-radius:99px; background:#fee2e2; color:#991b1b; font-weight:700;">🔴 Exhausted</span>`;
-              else if (pct >= 85) statusBadge = `<span style="font-size:11px; padding:2px 8px; border-radius:99px; background:#fef3c7; color:#92400e; font-weight:700;">🟡 Degraded</span>`;
-
-              const masked = key.length > 12 ? key.slice(0, 10) + '...' + key.slice(-4) : '(empty)';
-
-              return `<tr style="${isActive ? 'background:rgba(99,102,241,0.08); font-weight:600;' : ''}">
-                <td>
-                  <strong>Slot #${i + 1}</strong>
-                  ${isActive ? '<span style="font-size:9px; background:#6366f1; color:#fff; padding:1px 5px; border-radius:4px; margin-left:4px;">CURRENT</span>' : ''}
-                </td>
-                <td><code>${masked}</code></td>
-                <td>${used} / ${cfg.APIFY_KEY_LIMIT || 500}</td>
-                <td><strong style="color:${remaining < 50 ? '#ef4444' : '#10b981'}">${remaining} credits</strong></td>
-                <td><span style="font-family:monospace; color:var(--gray-600);">${lat ? `${lat} ms` : 'Fast (<150ms)'}</span></td>
-                <td>
-                  <div style="width:100px; height:6px; background:var(--gray-200); border-radius:3px; overflow:hidden;">
-                    <div style="height:100%; width:${pct}%; background:${pct >= 90 ? '#ef4444' : pct >= 75 ? '#f59e0b' : '#6366f1'};"></div>
-                  </div>
-                </td>
-                <td>${statusBadge}</td>
-                <td>
-                  <button class="btn-secondary small" onclick="setActiveApifyKeyManual(${i})" ${isActive ? 'disabled' : ''}>
-                    ${isActive ? 'Active' : 'Set Active'}
-                  </button>
-                </td>
-              </tr>`;
-            }).join('')}
-          </tbody>
-        </table>
-      `;
-    }
+    const messages = {
+      checking: 'Checking Apify connection...',
+      connected: 'Apify connected. Your key was verified and stored in your account.',
+      missing: 'Apify not connected. Paste your API key above to activate lead sourcing.',
+      sign_in: 'Sign in to connect your Apify key.',
+      unavailable: 'Could not check Apify status. Check the backend connection and retry.'
+    };
+    apifyTable.innerHTML = `<div class="empty-chart-msg" role="status">${messages[apifyCredentialState.status]}</div>`;
   }
+  const apifyActive = document.getElementById('tk-apify-active');
+  const apifyStatus = document.getElementById('tk-apify-status');
+  if (apifyActive) apifyActive.textContent = ({ connected: 'Connected', missing: 'Not connected',
+    sign_in: 'Sign in', unavailable: 'Unavailable', checking: 'Checking' })[apifyCredentialState.status];
+  if (apifyStatus) apifyStatus.textContent = ({ connected: 'Verified on save', missing: 'Add an Apify key',
+    sign_in: 'Account required', unavailable: 'Check backend connection', checking: 'Checking account' })[apifyCredentialState.status];
 
   // Render Provider Overview & Rotation Logs in Groq Table Container
   const groqTable = document.getElementById('groq-keys-table');
@@ -5189,9 +5345,12 @@ function renderTokenDashboard() {
         <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:10px; margin-bottom:16px;">
           ${providers.map(p => {
             const valid = p.keys.filter(k => k && k.trim());
-            const count = valid.length;
-            const status = count > 0 ? '🟢 Active & Ready' : '⚪ Unconfigured';
-            const activeKey = count > 0 ? (valid[0].length > 10 ? valid[0].slice(0, 8) + '...' : valid[0]) : 'None';
+            const count = p.id === 'apify' ? Number(apifyCredentialState.status === 'connected') : valid.length;
+            const status = p.id === 'apify'
+              ? (count ? 'Connected to account' : 'Not connected')
+              : (count > 0 ? 'Active & Ready' : 'Unconfigured');
+            const activeKey = p.id === 'apify' ? (count ? 'Stored on server' : 'None')
+              : (count > 0 ? (valid[0].length > 10 ? valid[0].slice(0, 8) + '...' : valid[0]) : 'None');
             return `
               <div style="background:var(--card-bg, rgba(255,255,255,0.03)); border:1px solid var(--border); border-radius:10px; padding:10px;">
                 <div style="font-size:12px; font-weight:800; color:var(--gray-800);">${p.name}</div>

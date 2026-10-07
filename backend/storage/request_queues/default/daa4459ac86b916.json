@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://pioneeresolutions.com",
+  "url": "https://pioneeresolutions.com",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": "https://pioneeresolutions.com/",
+  "handled_at": "2026-10-05 06:49:06.834563+00:00"
+}

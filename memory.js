@@ -25,6 +25,10 @@ const MemoryEngine = (() => {
   const SNAPSHOTS_STORE       = 'snapshots';
   let db = null;
 
+  function queueAccountSync() {
+    window.CloudSyncManager?.schedulePush?.();
+  }
+
   // ─── Persistent token counter (localStorage) ──────────────
   const TOKEN_TOTAL_KEY    = 'skylark_total_tokens';
   const TOKEN_SESSION_KEY  = 'skylark_session_tokens';
@@ -525,6 +529,8 @@ const MemoryEngine = (() => {
       lead = window.DataSanitizer.sanitizeLead(lead);
     }
     if (!lead) return { success: false, reason: 'invalid_lead' };
+    const verifiedOwner = window.SupabaseAuth?.getUser?.()?.id;
+    if (verifiedOwner) lead = { ...lead, ownerUserId: verifiedOwner };
 
     const database = await openDB();
     const dupMatch = await findExistingDuplicate(lead);
@@ -532,6 +538,8 @@ const MemoryEngine = (() => {
     if (dupMatch && dupMatch.existingLead) {
       // Smart merge into existing lead
       const mergedLead = mergeLeadObjects(dupMatch.existingLead, lead);
+      // A new authenticated write does not establish ownership of old silo data.
+      mergedLead.ownerUserId = dupMatch.existingLead.ownerUserId || '';
       await updateLead(mergedLead.id, mergedLead);
       await incrementMeta('dupes_blocked');
       return { success: true, merged: true, id: mergedLead.id };
@@ -551,6 +559,7 @@ const MemoryEngine = (() => {
           window.CloudSyncManager.schedulePush();
         }
         resolve({ success: true, id: lead.id });
+        window.CRMBridge?.notifyLeads?.();
       };
       tx.onerror    = e => reject(e.target.error);
     });
@@ -581,6 +590,7 @@ const MemoryEngine = (() => {
             window.CloudSyncManager.schedulePush();
           }
           resolve(updated);
+          window.CRMBridge?.notifyLeads?.();
         };
         tx.onerror    = e => reject(e.target.error);
       };
@@ -738,7 +748,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(CLIENT_CHAT_STORE, 'readwrite');
       tx.objectStore(CLIENT_CHAT_STORE).put(msg);
-      tx.oncomplete = () => resolve(msg);
+      tx.oncomplete = () => { queueAccountSync(); resolve(msg); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -761,7 +771,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(CLIENT_CHAT_STORE, 'readwrite');
       tx.objectStore(CLIENT_CHAT_STORE).clear();
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -774,7 +784,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(CANDIDATE_CHAT_STORE, 'readwrite');
       tx.objectStore(CANDIDATE_CHAT_STORE).put(msg);
-      tx.oncomplete = () => resolve(msg);
+      tx.oncomplete = () => { queueAccountSync(); resolve(msg); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -797,7 +807,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(CANDIDATE_CHAT_STORE, 'readwrite');
       tx.objectStore(CANDIDATE_CHAT_STORE).clear();
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -810,7 +820,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_MSG_STORE, 'readwrite');
       tx.objectStore(JARVIS_MSG_STORE).put(msg);
-      tx.oncomplete = () => resolve(msg);
+      tx.oncomplete = () => { queueAccountSync(); resolve(msg); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -833,7 +843,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_MSG_STORE, 'readwrite');
       tx.objectStore(JARVIS_MSG_STORE).clear();
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -867,7 +877,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_MSG_STORE, 'readwrite');
       tx.objectStore(JARVIS_MSG_STORE).delete(id);
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -879,7 +889,7 @@ const MemoryEngine = (() => {
       const tx = database.transaction(JARVIS_MSG_STORE, 'readwrite');
       const store = tx.objectStore(JARVIS_MSG_STORE);
       ids.forEach(id => { try { store.delete(id); } catch (e) {} });
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -891,7 +901,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_FACT_STORE, 'readwrite');
       tx.objectStore(JARVIS_FACT_STORE).put({ key, value, updatedAt: Date.now() });
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -911,7 +921,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_FACT_STORE, 'readwrite');
       tx.objectStore(JARVIS_FACT_STORE).delete(key);
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -922,7 +932,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_SCRIPT_STORE, 'readwrite');
       tx.objectStore(JARVIS_SCRIPT_STORE).put(script);
-      tx.oncomplete = () => resolve(script);
+      tx.oncomplete = () => { queueAccountSync(); resolve(script); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -942,7 +952,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_SCRIPT_STORE, 'readwrite');
       tx.objectStore(JARVIS_SCRIPT_STORE).delete(id);
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -953,7 +963,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_SKILL_STORE, 'readwrite');
       tx.objectStore(JARVIS_SKILL_STORE).put(skill);
-      tx.oncomplete = () => resolve(skill);
+      tx.oncomplete = () => { queueAccountSync(); resolve(skill); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -973,7 +983,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_SKILL_STORE, 'readwrite');
       tx.objectStore(JARVIS_SKILL_STORE).delete(name);
-      tx.oncomplete = () => resolve();
+      tx.oncomplete = () => { queueAccountSync(); resolve(); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -984,7 +994,7 @@ const MemoryEngine = (() => {
     return new Promise((resolve, reject) => {
       const tx = database.transaction(JARVIS_TASK_STORE, 'readwrite');
       tx.objectStore(JARVIS_TASK_STORE).put(task);
-      tx.oncomplete = () => resolve(task);
+      tx.oncomplete = () => { queueAccountSync(); resolve(task); };
       tx.onerror    = e => reject(e.target.error);
     });
   }
@@ -996,6 +1006,31 @@ const MemoryEngine = (() => {
       const req = tx.objectStore(JARVIS_TASK_STORE).getAll();
       req.onsuccess = () => resolve((req.result || []).sort((a, b) => b.timestamp - a.timestamp).slice(0, limit));
       req.onerror   = e => reject(e.target.error);
+    });
+  }
+
+  async function replaceCloudCollections(snapshot) {
+    const mappings = [
+      ['client_chat', CLIENT_CHAT_STORE],
+      ['candidate_chat', CANDIDATE_CHAT_STORE],
+      ['jarvis_messages', JARVIS_MSG_STORE],
+      ['jarvis_facts', JARVIS_FACT_STORE],
+      ['jarvis_scripts', JARVIS_SCRIPT_STORE],
+      ['jarvis_skills', JARVIS_SKILL_STORE],
+      ['jarvis_tasks', JARVIS_TASK_STORE]
+    ].filter(([key]) => Array.isArray(snapshot[key]));
+    if (!mappings.length) return;
+    const database = await openDB();
+    return new Promise((resolve, reject) => {
+      const tx = database.transaction(mappings.map(([, store]) => store), 'readwrite');
+      for (const [key, storeName] of mappings) {
+        const store = tx.objectStore(storeName);
+        store.clear();
+        for (const record of snapshot[key]) store.put(record);
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = e => reject(e.target.error);
+      tx.onabort = e => reject(e.target.error || new Error('Cloud restore aborted'));
     });
   }
 
@@ -1078,6 +1113,7 @@ const MemoryEngine = (() => {
     saveJarvisScript, getAllJarvisScripts, deleteJarvisScript,
     saveCustomSkill, getAllCustomSkills, deleteCustomSkill,
     saveTaskRun, getAllTaskRuns,
+    replaceCloudCollections,
   };
 })();
 

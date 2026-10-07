@@ -1,0 +1,12 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const s=fs.readFileSync('apple-polish.js','utf8'),start=s.indexOf('  function orbVisible()'),end=s.indexOf('\n  function syncOrbLoop()',start);
+let active=true;const view={hidden:false,classList:{contains:()=>active},get offsetParent(){throw Error('visibility must not force layout');}};
+const context={reduced:false,orbInViewport:true,document:{hidden:false,getElementById:()=>view}};vm.createContext(context);vm.runInContext(s.slice(start,end),context);
+assert.equal(context.orbVisible(),true);context.orbInViewport=false;assert.equal(context.orbVisible(),false);
+context.orbInViewport=true;active=false;assert.equal(context.orbVisible(),false);active=true;context.document.hidden=true;assert.equal(context.orbVisible(),false);
+const petSource=fs.readFileSync('nexus-pet.js','utf8'),p=petSource.indexOf('  function place()'),q=petSource.indexOf('\n  /*',p);
+const pet={pet:{},host:{isConnected:true},anchor:{isConnected:true,closest:q=>q==='.view'?{classList:{contains:()=>true}}:null},isEnabled:()=>true,matchMedia:()=>({matches:false}),document:{querySelectorAll(){throw Error('unchanged pet placement must not scan every composer');}},unmount(){},mount(){}};
+vm.runInNewContext(petSource.slice(p,q)+'\nplace();',pet);
+const luxury=fs.readFileSync('luxury-ui.js','utf8');
+assert.equal((luxury.match(/DOMContentLoaded', \(\) => scan\(\)/g)||[]).length,2,'initial scans use the document instead of the DOMContentLoaded Event');
+console.log('Visible state: orb viewport/route/hidden guards, stable pet placement and scoped observer startup pass.');

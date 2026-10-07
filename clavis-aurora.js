@@ -123,6 +123,10 @@
       if (out.quals.indexOf(q[1]) === -1) out.quals.push(q[1]);
     });
 
+    if (global.LeadCandidateDomain) {
+      var plan = global.LeadCandidateDomain.parseRequest(raw);
+      if (plan.citiesExplicit) out.places = plan.cities;
+    }
     out.places = out.places.slice(0, 2);
     out.sectors = out.sectors.slice(0, 2);
     out.quals = out.quals.slice(0, 3);
@@ -166,7 +170,7 @@
      headline. If there is no sentence, the gerund is all we have. */
   function titleOf(task, fallback) {
     var t = (task && task.title) || fallback || 'Working';
-    if (task && task.confidence < 0.35) t = fallback || 'Clavis';
+    if (task && task.confidence < 0.35) t = fallback || 'Rudra24 AI';
     var cut = t.indexOf(' · ');
     if (cut > -1) {
       var subject = t.slice(cut + 3).trim();
@@ -289,6 +293,12 @@
    * ============================================================ */
   function openView(name) {
     try {
+      if (name === 'email' && global.EmailCtrl && global.EmailCtrl.setLeadAudience) {
+        var task = global.ClavisTask && global.ClavisTask.current();
+        global.EmailCtrl.setLeadAudience(task && task.result && task.result.rows || []);
+      }
+      if (global.ClavisTaskSurface) global.ClavisTaskSurface.hide();
+      if (global.location.hash !== '#' + name) { global.location.hash = '#' + name; return; }
       if (typeof global.showView === 'function') return global.showView(name);
       if (typeof global.switchView === 'function') return global.switchView(name);
     } catch (e) { console.warn('[ClavisAurora] view', name, e); }
@@ -312,6 +322,7 @@
      Reads the actual result text to decide which follow-up is
      most useful. Never generic — always rooted in what was said. */
   function smartNext(task) {
+    if (global.ClavisRequestIntent?.classify(task?._text).answerOnly) return [];
     var text = String(((task.result || {}).text) || ((task.result || {}).summary) || task.title || '').toLowerCase();
     var ask = readAsk(task);
     var out = [];
@@ -360,11 +371,11 @@
   var NEXT = {
     leads: function (t, m, a) {
       var out = [];
+      var rows = t.result && t.result.rows || [];
       if (m.leads || m.sources) out.push({ go: 'leads', label: 'Open Leads Hub' });
-      if (m.leads || m.rows) out.push({ ask: 'Ye leads Excel me export kar do', label: 'Export to Excel' });
+      var emails = rows.filter(function (l) { return l.email; }).length;
+      if (emails) out.push({ go: 'email', label: 'Load ' + emails + ' in Email Auto' });
       if (a.places.length) out.push({ ask: 'Aur leads nikalo ' + a.places[0] + ' se, wahi filters rakhna', label: 'More from ' + a.places[0] });
-      out.push({ ask: 'In leads ke decision maker ka phone aur email nikalo', label: 'Get contacts' });
-      out.push({ ask: 'In leads ke liye WhatsApp message draft karo', label: 'Draft outreach' });
       return out;
     },
     contacts: function (t, m) {
@@ -542,7 +553,7 @@
    * ============================================================ */
   var KICKERS = {
     search: 'Search', research: 'Research', code: 'Code', file: 'Document',
-    writing: 'Draft', create: 'Create', system: 'Action', thinking: 'Clavis',
+    writing: 'Draft', create: 'Create', system: 'Action', thinking: 'Rudra24 AI',
     leads: 'Lead intelligence', contacts: 'Contacts', outreach: 'Outreach',
     dataset: 'Data', calculate: 'Calculation'
   };
@@ -625,23 +636,13 @@
    * 5 · GRAB AND MOVE
    * ------------------------------------------------------------
    * Claimed at document-capture, which runs before the header's
-   * own listener, so the built-in drag never starts. Velocity is
-   * sampled over the last few moves and carried into a spring
-   * settle; near an edge the settle becomes a snap.
+   * own listener, so the built-in drag never starts. Pointer targets
+   * arrive once per frame and the reference spring eases between them.
    * ============================================================ */
   var POS_KEY = 'clavis-task-pos';
   var SIZE_KEY = 'clavis-task-size';
   var MARGIN = 10;
-  var SNAP = 34;          // release this close to an edge → flush
-  var THROW = 0.085;      // how much of the release velocity carries
-  var MAX_TILT = 2.2;     // degrees, at full speed
-
   var drag = null;
-
-  function reducedMotion() {
-    try { return global.matchMedia('(prefers-reduced-motion: reduce)').matches; }
-    catch (e) { return false; }
-  }
 
   function bounds(el) {
     var r = el.getBoundingClientRect();
@@ -669,13 +670,34 @@
   }
 
   function resetPos(el) {
-    el.classList.remove('is-moved', 'is-snapped-left', 'is-snapped-right');
+    if (dragSettleTimer) { clearTimeout(dragSettleTimer); dragSettleTimer = 0; }
+    el.classList.remove('is-moved', 'is-snapped-left', 'is-snapped-right', 'is-dragging');
     el.style.left = el.style.top = el.style.right = '';
-    el.style.transform = '';
+    el.style.removeProperty('transform');
+    el.style.removeProperty('transition');
     try { global.localStorage.removeItem(POS_KEY); } catch (e) {}
   }
 
   var dragRaf = 0;
+  var dragSettleTimer = 0;
+
+  function commitDrag(el, left, top, b) {
+    el.style.setProperty('transition', 'none', 'important');
+    place(el, left, top, b);
+    el.style.removeProperty('transform');
+    el.classList.remove('is-dragging');
+    el.getBoundingClientRect();
+    el.style.removeProperty('transition');
+    savePos(el);
+  }
+
+  function cancelSettle(el) {
+    if (!dragSettleTimer) return;
+    clearTimeout(dragSettleTimer);
+    dragSettleTimer = 0;
+    var current = el.getBoundingClientRect();
+    commitDrag(el, current.left, current.top);
+  }
 
   function onPointerDown(e) {
     var el = surfaceEl();
@@ -687,22 +709,26 @@
     if ((!onHead || !el.contains(onHead)) && !anywhere) return;
     if (e.target.closest('button, a, input, select, textarea')) return;
 
+    cancelSettle(el);
+
     var r = el.getBoundingClientRect();
     var b = bounds(el);
+    var duration = global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 480;
     drag = {
       el: el,
       bounds: b,
       startX: e.clientX, startY: e.clientY,
       nextClientX: e.clientX, nextClientY: e.clientY,
       baseL: r.left, baseT: r.top,
-      lastX: e.clientX, lastT: performance.now(),
-      vx: 0,
+      duration: duration,
       moved: false
     };
 
     el.classList.remove('is-settling', 'is-snapped-left', 'is-snapped-right');
     el.classList.add('is-dragging');
     place(el, r.left, r.top, b);
+    el.style.setProperty('transition', 'transform ' + duration + 'ms cubic-bezier(.34, 1.2, .64, 1), box-shadow 260ms cubic-bezier(.22, 1, .36, 1)', 'important');
+    el.style.setProperty('transform', 'translate3d(0px, 0px, 0)', 'important');
 
     doc.addEventListener('pointermove', onPointerMove, true);
     doc.addEventListener('pointerup', onPointerUp, true);
@@ -732,18 +758,10 @@
       var dy = cy - drag.startY;
       if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.moved = true;
 
-      // 1:1 direct tracking: solid physical weight, no loose rubber lag
-      place(drag.el, drag.baseL + dx, drag.baseT + dy, drag.bounds);
-
-      // Emil Apple Weight: subtle 0.8° inertia tilt conveys mass, not lightness
-      if (!reducedMotion()) {
-        var now = performance.now();
-        var dt = Math.max(1, now - drag.lastT);
-        var vx = (cx - drag.lastX) / dt * 16.7;
-        drag.lastX = cx; drag.lastT = now;
-        var tilt = clamp(vx * 0.035, -0.8, 0.8);
-        drag.el.style.transform = 'rotate(' + tilt.toFixed(2) + 'deg)';
-      }
+      // The reference panel eases each RAF target with a 480ms spring.
+      var left = clamp(drag.baseL + dx, MARGIN, drag.bounds.maxL);
+      var top = clamp(drag.baseT + dy, MARGIN, drag.bounds.maxT);
+      drag.el.style.setProperty('transform', 'translate3d(' + (left - drag.baseL) + 'px, ' + (top - drag.baseT) + 'px, 0)', 'important');
     });
     e.stopPropagation();
     e.preventDefault();
@@ -753,7 +771,6 @@
     if (!drag) return;
     if (dragRaf) { cancelAnimationFrame(dragRaf); dragRaf = 0; }
     var el = drag.el;
-    var moved = drag.moved;
     var cx = (e && typeof e.clientX === 'number') ? e.clientX : drag.nextClientX;
     var cy = (e && typeof e.clientY === 'number') ? e.clientY : drag.nextClientY;
     var b = drag.bounds;
@@ -761,22 +778,31 @@
     var baseT = drag.baseT;
     var startX = drag.startX;
     var startY = drag.startY;
+    var duration = drag.duration;
+    var moved = drag.moved || Math.abs(cx - startX) > 2 || Math.abs(cy - startY) > 2;
     drag = null;
 
     doc.removeEventListener('pointermove', onPointerMove, true);
     doc.removeEventListener('pointerup', onPointerUp, true);
     doc.removeEventListener('pointercancel', onPointerUp, true);
 
-    el.classList.remove('is-dragging');
-    el.style.transform = '';
-
-    if (!moved) return;
+    if (!moved) {
+      commitDrag(el, baseL, baseT, b);
+      return;
+    }
 
     // Exactly where released: "jha roku vhi ruk jaye jase phle hota tha" - zero drift or jumping
     var finalLeft = clamp(baseL + (cx - startX), MARGIN, b.maxL);
     var finalTop = clamp(baseT + (cy - startY), MARGIN, b.maxT);
-    place(el, finalLeft, finalTop, b);
-    savePos(el);
+    el.style.setProperty('transform', 'translate3d(' + (finalLeft - baseL) + 'px, ' + (finalTop - baseT) + 'px, 0)', 'important');
+    if (duration) {
+      dragSettleTimer = setTimeout(function () {
+        dragSettleTimer = 0;
+        commitDrag(el, finalLeft, finalTop, b);
+      }, duration + 20);
+    } else {
+      commitDrag(el, finalLeft, finalTop, b);
+    }
 
     if (e) { e.stopPropagation(); }
   }
@@ -786,6 +812,7 @@
     if (!el || !el.classList.contains('is-open')) return;
     var head = el.querySelector('.cts-head');
     if (!head || doc.activeElement !== head) return;
+    cancelSettle(el);
 
     if (e.key === 'Home') { resetPos(el); e.preventDefault(); return; }
     var step = e.altKey ? 1 : (e.shiftKey ? 48 : 14);
@@ -830,7 +857,7 @@
     if (head) {
       head.setAttribute('tabindex', '0');
       head.setAttribute('role', 'toolbar');
-      head.setAttribute('aria-label', 'Move the Clavis panel — arrow keys move it, Home resets it');
+      head.setAttribute('aria-label', 'Move the Rudra24 AI panel — arrow keys move it, Home resets it');
       head.addEventListener('dblclick', function (e) {
         if (e.target.closest('button')) return;
         resetPos(el);
@@ -1015,7 +1042,7 @@
   // 232 and pinning open then snapping to the *actual* saved width is
   // exactly the "opens, then jumps left/right" feeling. Peek must always
   // match whatever width pinning open would use.
-  var PEEK_IN = 35, PEEK_OUT = 140;
+  var PEEK_IN = 110, PEEK_OUT = 260;
   function peekWidth() {
     var v = doc.documentElement.style.getPropertyValue('--sidebar-expanded');
     return (parseFloat(v) || 220) + 'px';
@@ -1026,19 +1053,19 @@
     if (!rail || rail.__auroraPeek) return !!rail;
     rail.__auroraPeek = true;
 
-    var timer = 0;
+    var timer = 0, pointerInside = false;
     function collapsed() { return rail.classList.contains('collapsed'); }
 
     function set(on) {
-      on = !!on && collapsed();
+      on = (!!on || rail.contains(doc.activeElement)) && collapsed();
       if (rail.classList.contains('au-peek') === on) return;
       rail.classList.toggle('au-peek', on);
-      // Peek floats OVER the sheet (like a macOS sidebar) — moving the
-      // sheet re-laid out the whole page on every frame, which was the lag.
+      // Peek and pinned states share the CSS geometry clock with the sheet.
       /* Width comes from CSS only (clavis-manual.css §9) so the rail and
          the page share one number and one clock — an inline width here
          used to disagree with the page margin (220 vs 236) = the jump. */
-      ['width', 'min-width', 'max-width'].forEach(function (p) { rail.style.removeProperty(p); });
+      /* The spring in rudra-motion-ui.js now owns the inline width; wiping
+         it here left one unstyled frame on every peek. */
       /* apple-polish.js places its tooltip once, against whatever
          width the rail had at that instant. Any geometry change
          strands it, so every geometry change clears it. */
@@ -1048,11 +1075,20 @@
     }
     function later(on) { clearTimeout(timer); timer = setTimeout(function () { set(on); }, on ? PEEK_IN : PEEK_OUT); }
 
-    rail.addEventListener('pointerenter', function () { later(true); });
-    rail.addEventListener('pointerleave', function () { later(false); });
-    rail.addEventListener('focusin', function () { set(true); });
+    var hoverPointer = global.matchMedia ? global.matchMedia('(hover: hover) and (pointer: fine)') : null;
+    rail.addEventListener('pointerenter', function (event) {
+      if ((hoverPointer && !hoverPointer.matches) || event.pointerType === 'touch') return;
+      pointerInside = true;
+      later(true);
+    });
+    rail.addEventListener('pointerleave', function (event) {
+      if ((hoverPointer && !hoverPointer.matches) || event.pointerType === 'touch') return;
+      pointerInside = false;
+      later(false);
+    });
+    rail.addEventListener('focusin', function () { clearTimeout(timer); set(true); });
     rail.addEventListener('focusout', function (e) {
-      if (!rail.contains(e.relatedTarget)) set(false);
+      if (!rail.contains(e.relatedTarget) && !pointerInside) later(false);
     });
 
     /* Someone expanded the rail for real — drop the peek so the two
@@ -1070,7 +1106,7 @@
       if (String(e.key).toLowerCase() !== 'b') return;
       var c = global.SidebarController;
       if (!c || typeof c.toggle !== 'function') return;
-      set(false);
+      clearTimeout(timer);
       c.toggle();
       e.preventDefault();
     });
@@ -1093,7 +1129,8 @@
     nav.appendChild(marker);
     rail.classList.add('has-marker');
 
-    var queued = false;
+    var queued = false, markerVisible = getComputedStyle(marker).display !== 'none';
+    new MutationObserver(function () { markerVisible = getComputedStyle(marker).display !== 'none'; schedule(); }).observe(doc.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
     // Write only what changed. classList.add() on a class that is already
     // there still fires a mutation, and the observer below watches the nav
     // subtree — the marker kept re-scheduling itself every frame (a forced
@@ -1101,6 +1138,7 @@
     function on(v) { if (marker.classList.contains('is-on') !== v) marker.classList.toggle('is-on', v); }
     function place() {
       queued = false;
+      if (!markerVisible) return; // No per-scroll layout reads for the theme-hidden graphic.
       var active = nav.querySelector('.nav-item.active, .nav-sub-item.active');
       if (!active || active.offsetParent === null) { on(false); return; }
       var a = active.getBoundingClientRect(), n = nav.getBoundingClientRect();
@@ -1147,40 +1185,7 @@
     return true;
   }
 
-  /* ── 8d. The rail opens closed ───────────────────────────────
-     Three modules restore `.collapsed` from lx-sidebar-collapsed,
-     so once you had expanded the rail it came back expanded every
-     launch. With peek on hover the open rail is a state you enter,
-     not a state you live in — so every launch starts closed, and
-     the key is set to match so the other three agree with us.
-
-     Boot only. Expanding it by hand afterwards still sticks for
-     the rest of the session; this does not fight the user, it
-     just decides where the session starts. Reuses the app's own
-     controller rather than becoming a fourth setCollapsed(). */
-  function closeRailAtBoot() {
-    var rail = doc.getElementById('sidebar');
-    if (!rail || rail.__auroraClosed) return !!rail;
-    rail.__auroraClosed = true;
-    function shut() {
-      try { global.localStorage.setItem('lx-sidebar-collapsed', 'true'); } catch (e) {}
-      if (global.SidebarController && global.SidebarController.collapse) {
-        global.SidebarController.collapse();
-      } else if (!rail.classList.contains('collapsed')) {
-        rail.classList.add('collapsed');
-      }
-      doc.documentElement.dataset.sidebarState = 'collapsed';
-    }
-    shut();
-    /* luxury-ui restores its stored width on a later frame; the key
-       now says collapsed, so this second pass just settles it. */
-    requestAnimationFrame(shut);
-    setTimeout(shut, 400);
-    return true;
-  }
-
   function installRail() {
-    closeRailAtBoot();
     installPeek();
     installMarker();
     installSheet();
@@ -1193,10 +1198,11 @@
     function edge() {
       queued = false;
       var over = nav.scrollHeight - nav.clientHeight;
-      if (over < 6) { nav.dataset.edge = 'none'; return; }
+      if (over < 6) { if (nav.dataset.edge !== 'none') nav.dataset.edge = 'none'; return; }
       var top = nav.scrollTop > 4;
       var bottom = nav.scrollTop < over - 4;
-      nav.dataset.edge = top && bottom ? 'both' : (top ? 'top' : (bottom ? 'bottom' : 'none'));
+      var value = top && bottom ? 'both' : (top ? 'top' : (bottom ? 'bottom' : 'none'));
+      if (nav.dataset.edge !== value) nav.dataset.edge = value;
     }
     function schedule() { if (!queued) { queued = true; requestAnimationFrame(edge); } }
 
@@ -1357,91 +1363,19 @@
   function setH(ta, v) { ta.style.setProperty('height', v, 'important'); }
 
   function growBox(ta) {
-    var prevH = parseFloat(ta.style.height) || GROW_MIN;
-    if (!ta.value || !ta.value.trim()) {
-      setH(ta, GROW_MIN + 'px');
-      ta.classList.remove('au-measuring');
-      ta.classList.remove('au-shrinking');
-      ta.dataset.grow = 'fit';
-      ta.style.setProperty('--lx-ta-h', GROW_MIN + 'px');
-      var hst = ta.closest ? ta.closest('.chat-container, .jarvis-input-container, .claude-input-container, .candidate-composer') : null;
-      if (hst) hst.dataset.emptyInput = '1';
-      return;
-    }
-    ta.classList.add('au-measuring');
-    setH(ta, 'auto');
-    var next = Math.max(GROW_MIN, Math.min(ta.scrollHeight, GROW_MAX));
-    /* While the view is display:none scrollHeight reads 0, which
-       would pin the box at its floor. Leave it as it was instead. */
-    if (!ta.scrollHeight) next = prevH || GROW_MIN;
-
-    /* KEY FIX: Only animate when growing, never when shrinking.
-       On shrink (text deleted) we snap immediately — no spring
-       bounce, no fluctuation. This is exactly how Claude/ChatGPT
-       handle it: grow feels physical, shrink is instant.         */
-    var growing = next > prevH + 1;
-    if (growing) {
-      ta.classList.remove('au-shrinking');
-    } else {
-      ta.classList.add('au-shrinking');
-    }
-
-    /* Measurement technique: set old height back, flush, then
-       set new height so the transition starts from correct point. */
-    setH(ta, prevH + 'px');
-    void ta.offsetHeight; /* layout flush */
-    ta.classList.remove('au-measuring');
-    setH(ta, next + 'px');
-
-    var full = next >= GROW_MAX ? 'full' : 'fit';
-    if (ta.dataset.grow !== full) ta.dataset.grow = full;
-
-    var host = ta.closest ? ta.closest('.chat-container, .jarvis-input-container, .claude-input-container, .candidate-composer') : null;
-    if (host) {
-      var empty = !ta.value.trim() ? '1' : '0';
-      if (host.dataset.emptyInput !== empty) host.dataset.emptyInput = empty;
-    }
+    if (global.ClavisComposerSizing) global.ClavisComposerSizing.request(ta);
   }
-
-
   function installComposer() {
     var found = 0;
     COMPOSERS.forEach(function (id) {
       var ta = doc.getElementById(id);
       if (!ta) return;
       found++;
-      if (ta.__auroraGrow) return;
-      ta.__auroraGrow = true;
-
-      /* An empty textarea is as tall as its `rows`, and the two chat
-         pages never set one — so they opened two lines tall while the
-         studio opened at one. Same component, same resting height. */
-      if (ta.rows !== 1) ta.rows = 1;
-
-      var grow = function () { growBox(ta); };
-      ta.addEventListener('input', grow);
-      ta.addEventListener('focus', grow);
-      /* Quick-action chips and voice dictation write .value straight
-         in, which fires no input event. */
-      new MutationObserver(grow).observe(ta, { attributes: true, attributeFilter: ['value'] });
-      /* …and the first real measurement can only happen once the
-         view stops being display:none and the box gets a width.
-         WIDTH only: growBox writes the height, so a height-driven
-         re-measure would cut its own animation short every frame
-         and the box would ease toward its target forever. */
-      var lastW = -1;
-      try {
-        new ResizeObserver(function (entries) {
-          var w = Math.round(entries[0].contentRect.width);
-          if (w === lastW) return;
-          lastW = w;
-          grow();
-        }).observe(ta);
-      } catch (e) { setTimeout(grow, 500); }
-      grow();
+      if (global.ClavisComposerSizing) global.ClavisComposerSizing.attach(ta);
     });
     return found === COMPOSERS.length;
   }
+
 
   /* ============================================================
    * 10 · INSTALL
@@ -1464,6 +1398,7 @@
     global.addEventListener('resize', function () {
       var el = surfaceEl();
       if (!el || !el.classList.contains('is-moved')) return;
+      cancelSettle(el);
       place(el, parseFloat(el.style.left) || 0, parseFloat(el.style.top) || 0);
     });
 

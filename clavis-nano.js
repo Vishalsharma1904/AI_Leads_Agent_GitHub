@@ -1,7 +1,7 @@
-/* clavis-nano.js · the keyless, offline last resort for Clavis's brain.
+/* clavis-nano.js · the keyless, offline last resort for Rudra24 AI's brain.
    Chrome 148+ ships Gemini Nano on-device behind the Prompt API
    (LanguageModel). When no AI key is connected — or every key is out of
-   quota — Clavis can still hold a real conversation through it instead
+   quota — Rudra24 AI can still hold a real conversation through it instead
    of falling back to canned lines. Limits, stated honestly: no tools, no
    web, officially English output only (Hinglish in Latin script works
    reasonably), and it needs a capable PC (Chrome's own requirement:
@@ -28,7 +28,7 @@
   window.addEventListener('pointerdown', () => {
     if (state !== 'downloadable' || window.ClavisDirect?.hasKey?.()) return;
     try {
-      window.showToast?.({ type: 'info', title: "Setting up Clavis's offline brain", message: "Chrome is downloading its on-device AI once (a few GB). Clavis can think without any key after this." });
+      window.showToast?.({ type: 'info', title: "Setting up Rudra24 AI's offline brain", message: "Chrome is downloading its on-device AI once (a few GB). Rudra24 AI can think without any key after this." });
     } catch (_) {}
     state = 'downloading';
     LM().create({
@@ -38,9 +38,14 @@
   }, { once: true, passive: true });
 
   function persona() {
-    return 'You are Clavis, the calm, warm, quietly witty personal AI of the owner, whom you call "sir". '
-      + 'He runs a security and housekeeping staffing company in India. Speak like a trusted right hand: short, natural sentences, no lists. '
-      + 'Reply in English, or in Hinglish written in Latin script if he writes Hinglish. '
+    let fem = true;
+    try { fem = (window.ClavisVoice?.genderOf?.(window.ClavisVoice.primaryVoice()) || 'female') === 'female'; } catch (_) {}
+    return 'You are Rudra, the calm, warm, quietly witty personal AI of the owner, whom you call "sir". '
+      + 'He runs a security and housekeeping staffing company in India. Speak like a trusted right hand: answer his actual question first in one to three short, natural sentences, no lists, no filler like "anything else?". '
+      + 'Your name is Rudra — always; never say Clavis, Jarvis, Gemini or any model name. '
+      + 'Reply ONLY in Hinglish written in Latin script (plain English if he writes pure English). '
+      + 'Never Devanagari, never two scripts in one reply, never the same thing twice in two languages. '
+      + (fem ? 'In Hindi use feminine forms for yourself ("main dekh rahi hoon"). ' : 'In Hindi use masculine forms for yourself ("main dekh raha hoon"). ')
       + 'You are running offline on this PC with no tools and no internet right now: never invent facts, leads, numbers or contacts, '
       + 'and if he asks for leads, web lookups or app actions, tell him politely that needs an AI key reconnected.';
   }

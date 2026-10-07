@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Links the Clavis Stage v2 layer into index.html.
+"""Links the Rudra24 AI Stage v2 layer into index.html.
 
 Two anchors only -- the stylesheets and the one script. Everything else
 about the redesign lives in the new files themselves (the Task HUD builds
@@ -52,7 +52,7 @@ class Patcher:
 
 def main():
     print("=" * 60)
-    print(" Clavis Stage v2 — link into index.html")
+    print(" Rudra24 AI Stage v2 — link into index.html")
     print("=" * 60)
     p = Patcher("index.html")
 
@@ -60,7 +60,7 @@ def main():
         "link the stage + task HUD stylesheets last",
         '  <link rel="stylesheet" href="clavis-confirm-hud.css?v=1.0">',
         '  <link rel="stylesheet" href="clavis-confirm-hud.css?v=2.0">\n'
-        '  <!-- CLAVIS STAGE v2: voice-first Clavis page + floating Task HUD.\n'
+        '  <!-- RUDRA24 AI STAGE v2: voice-first Rudra24 AI page + floating Task HUD.\n'
         '       Both are scoped to #view-jarvis / #clavis-task-hud and hang off the\n'
         '       .clavis-stage-v2 class that clavis-task-hud.js adds to <html>, so\n'
         '       localStorage.clavis_stage_v2 = \'off\' reverts the whole redesign. -->\n'

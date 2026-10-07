@@ -1,0 +1,308 @@
+@font-face { font-family: 'Figtree'; src: url('fonts/figtree-latin-variable.woff2') format('woff2'); font-style: normal; font-weight: 400 600; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-variable.woff2') format('woff2'); font-style: normal; font-weight: 400 500; font-display: swap; }
+@font-face { font-family: 'EB Garamond'; src: url('fonts/eb-garamond-latin-italic-variable.woff2') format('woff2'); font-style: italic; font-weight: 400 500; font-display: swap; }
+
+/* Flow is a selectable skin. Other palettes retain their own colours. */
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] {
+  --flow-nav-ink: #fff;
+  --flow-nav-muted: color-mix(in srgb, var(--flow-nav-ink) 72%, transparent);
+  --flow-nav-hover: color-mix(in srgb, var(--flow-nav-ink) 8%, var(--cc-shell));
+  --flow-nav-active: color-mix(in srgb, var(--flow-nav-ink) 9%, var(--cc-shell));
+  --cc-surface: #FFFFF5 !important;
+  --cc-sunk: #F2F2DF !important;
+  --cc-line: rgba(35, 53, 41, .10) !important;
+  --cc-line-2: rgba(35, 53, 41, .17) !important;
+  --cc-hover: #F1F1DC !important;
+  --cc-select: #E8ECD9 !important;
+  --cc-mute: #5E665C !important;
+  --cc-faint: #6E7468 !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow][data-theme="dark"] {
+  --cc-surface: #1D2C25 !important;
+  --cc-sunk: #21342C !important;
+  --cc-line: rgba(240, 248, 232, .10) !important;
+  --cc-line-2: rgba(240, 248, 232, .18) !important;
+  --cc-hover: #233A30 !important;
+  --cc-select: #2B4437 !important;
+  --cc-mute: #C0CABB !important;
+  --cc-faint: #AFBBA9 !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] :is(#sidebar, .topbar, #settings-overlay .smodal-nav, #settings-overlay .smodal-titlebar) {
+  background: var(--cc-shell) !important;
+  background-image: none !important;
+  color: var(--flow-nav-ink) !important;
+  --csb-text: var(--flow-nav-ink); --csb-mute: var(--flow-nav-muted);
+  --csb-faint: var(--flow-nav-muted); --csb-line: rgba(255,255,255,.13);
+  --sb-text: var(--flow-nav-ink); --sb-muted: var(--flow-nav-muted);
+  --sb-hover: var(--flow-nav-hover); --sb-active: var(--flow-nav-active);
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.nav-item, .nav-sub-item, .nav-label-wrap, .sidebar-brand-title, .nav-item svg, .nav-sub-item svg),
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav :is(.smodal-nav-item, .smodal-nav-item span, .smodal-nav-icon) {
+  color: var(--flow-nav-ink) !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.nav-item, .nav-sub-item),
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item {
+  font-family: var(--cc-serif) !important;
+  font-size: 18px !important;
+  font-weight: 400 !important;
+  line-height: 1.25 !important;
+  letter-spacing: 0 !important;
+  border-radius: 7px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.nav-item:hover, .nav-sub-item:hover),
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item:hover { background: var(--flow-nav-hover) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.nav-item.active, .nav-sub-item.active),
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item.active { background: var(--flow-nav-active) !important; color: var(--flow-nav-ink) !important; box-shadow: none !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar .nav-section-label,
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-group-label {
+  font-family: var(--cc-sans) !important; font-size: 11px !important;
+  font-weight: 500 !important; letter-spacing: .04em !important;
+  color: var(--flow-nav-muted) !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.au-rail-marker, .nav-item::before, .nav-item::after, .nav-sub-item::before),
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #au-nav-ghost, html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #lx-rail-pill { display: none !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.dev-badge, .nav-badge) { background: rgba(255,255,255,.12) !important; color: var(--flow-nav-ink) !important; border: none !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap),
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item > span { font-family: var(--cc-serif) !important; font-size: inherit !important; font-weight: 400 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar .sidebar-brand-title { font-family: var(--cc-serif) !important; font-size: 20px !important; font-weight: 400 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #sidebar :is(.nav-item, .nav-sub-item, .sidebar-toggle) :is(svg, svg *) { stroke: currentColor !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] :is(#sidebar, .topbar, #settings-overlay .smodal-nav, #settings-overlay .smodal-titlebar) :focus-visible { outline: 2px solid var(--flow-nav-ink) !important; outline-offset: 2px !important; }
+
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(button, a, .page-breadcrumb, .topbar-profile-name, .topbar-profile-workspace, .topbar-profile-chevron, .tb-history-btn, .tb-shortcuts-btn, .tb-sneak-peek-btn, #connect-sheets-btn, #rudra-topbar-language, .rudra-language-trigger, .rudra-language-value) {
+  color: var(--flow-nav-ink) !important;
+  font-family: var(--cc-serif) !important;
+  font-size: 17px !important;
+  font-weight: 400 !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(.topbar-profile-name, .topbar-profile-workspace) { font-size: 14px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(.topbar-profile-workspace, .rudra-language-label) { color: var(--flow-nav-muted) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(.rudra-language-trigger, #run-agent-btn, .generate-btn) { background: var(--flow-nav-active) !important; border-color: rgba(255,255,255,.16) !important; box-shadow: none !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(.rudra-language-trigger, #run-agent-btn, .generate-btn):hover { background: var(--flow-nav-hover) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(button, a) > svg { color: var(--flow-nav-ink) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .rudra-language-menu { color: var(--cc-ink) !important; font-family: var(--cc-sans) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .rudra-language-menu :is(button, .rudra-language-option) { color: var(--cc-ink) !important; font-family: var(--cc-sans) !important; font-size: 14px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .topbar-profile-menu :is(button, a) { color: var(--cc-ink) !important; font-family: var(--cc-sans) !important; font-size: 14px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .page-breadcrumb { font-size: 21px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(.topbar-user-name, .topbar-user-company, .topbar-chip, .topbar-chevron, .tb-cmd-icon) { color: var(--flow-nav-ink) !important; font-family: var(--cc-serif) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .topbar-user-company { color: var(--flow-nav-muted) !important; font-family: var(--cc-sans) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .topbar-chip { font-size: 17px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .topbar-chip svg { color: var(--flow-nav-ink) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item .smodal-nav-icon { flex-shrink: 0; }
+@media (min-width: 769px) and (max-width: 1450px) {
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .topbar-user-info { display: none !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar .topbar-chip { font-size: 0 !important; gap: 0 !important; }
+}
+@media (min-width: 769px) and (max-width: 1180px) {
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .topbar :is(.tb-history-btn, .tb-shortcuts-btn, .tb-sneak-peek-btn) { font-size: 0 !important; gap: 0 !important; min-width: 32px !important; padding: 8px !important; }
+}
+
+/* A quiet two-column settings window, with readable control rows. */
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay .settings-modal { border: 0 !important; border-radius: 20px !important; overflow: hidden !important; box-shadow: 0 24px 80px rgba(10,20,16,.22),0 8px 24px rgba(10,20,16,.08) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .settings-modal { background: var(--cc-sheet) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay .smodal-content { border-radius: 18px 18px 18px 18px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay .smodal-hint { filter: none !important; text-shadow: none !important; opacity: 1 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-titlebar { border-bottom-color: rgba(255,255,255,.10) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-title { color: var(--flow-nav-ink) !important; font-family: var(--cc-serif) !important; font-size: 19px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-status-pill { color: var(--flow-nav-ink) !important; background: rgba(255,255,255,.10) !important; box-shadow: none !important; font-family: var(--cc-sans) !important; font-size: 10px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-status-dot { box-shadow: none !important; background: #A8C9A4 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav { width: 210px !important; border: 0 !important; padding: 18px 10px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item { min-height: 38px !important; height: auto !important; gap: 10px !important; padding: 8px 10px !important; margin: 2px 0 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-group-label { padding: 14px 10px 8px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-content { background: var(--cc-sheet) !important; padding: 28px 32px 36px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-section { background: transparent !important; border: 0 !important; box-shadow: none !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-section-header { margin-bottom: 22px !important; padding-bottom: 18px !important; border-bottom: 1px solid var(--cc-line-2) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-section-title { font-family: var(--cc-serif) !important; font-size: 30px !important; font-weight: 400 !important; letter-spacing: -.02em !important; color: var(--cc-ink) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-section-desc { font-size: 14px !important; line-height: 1.5 !important; color: var(--cc-mute) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-field { padding: 16px 0 !important; gap: 24px !important; border-color: var(--cc-line) !important; background: transparent !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-label { font-family: var(--cc-sans) !important; font-size: 14px !important; font-weight: 500 !important; color: var(--cc-ink) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-hint { font-family: var(--cc-sans) !important; font-size: 13px !important; line-height: 1.5 !important; color: var(--cc-mute) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-field-left { min-width: 0; flex: 1 1 40%; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .cx-ap-ctl { min-width: 0; max-width: 62%; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay :is(.smodal-input, .smodal-select, .cx-ap-clear) { min-height: 36px !important; font-size: 14px !important; border-radius: 7px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-select { max-width: 100%; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .cx-ap-themes { gap: 12px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .cx-ap-theme em { font-family: var(--cc-sans) !important; font-size: 11px !important; opacity: 1 !important; color: var(--cc-mute) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .cx-ap-theme:focus-visible { outline: 2px solid var(--cc-accent) !important; outline-offset: 4px !important; border-radius: 8px; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .cx-ap-theme.is-on .cx-ap-sw { box-shadow: 0 0 0 2px var(--cc-accent) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-section.active { animation: flow-section-enter 360ms ease both !important; }
+@keyframes flow-section-enter { from { opacity: 0; translate: 0 3px; } to { opacity: 1; translate: 0 0; } }
+
+/* Stable row geometry: icons never recenter or jump between width states.
+   This applies to every palette; the shared width clock is in manual.css. */
+@media (min-width: 769px) {
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar .sidebar-header { height: 72px !important; min-height: 72px !important; padding: 12px 10px 8px !important; margin: 0 !important; gap: 8px !important; justify-content: flex-start !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar .mac-window-controls { justify-content: flex-start !important; padding: 0 !important; gap: 6px !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar .sidebar-brand-row { display: flex !important; height: 28px !important; min-height: 28px !important; margin: 0 !important; padding: 0 5px !important; gap: 10px !important; justify-content: flex-start !important; overflow: hidden !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar .sidebar-brand-row img { width: 24px !important; height: 24px !important; flex-shrink: 0; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar .sidebar-nav { padding: 6px 8px 16px !important; scroll-behavior: auto !important; overflow-anchor: none; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar :is(.nav-item, .nav-sub-item) { justify-content: flex-start !important; min-height: 40px !important; height: 40px !important; padding: 8px 10px !important; gap: 10px !important; transform: none !important; translate: none !important; animation: none !important; overflow: hidden !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar :is(.nav-item, .nav-sub-item) > svg { flex: 0 0 17px !important; width: 17px !important; height: 17px !important; min-width: 17px !important; transform: none !important; translate: none !important; rotate: none !important; animation: none !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title) { display: inline-flex !important; white-space: nowrap !important; flex-shrink: 0 !important; width: auto !important; max-width: none !important; transform: none !important; opacity: 1 !important; transition: opacity 280ms ease 240ms !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar.collapsed:not(.au-peek) :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title) { opacity: 0 !important; pointer-events: none !important; transition: opacity 160ms ease !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar .nav-section-label { height: calc(26px * var(--rudra-section-open,1)) !important; min-height: calc(26px * var(--rudra-section-open,1)) !important; padding: calc(8px * var(--rudra-section-open,1)) 10px calc(4px * var(--rudra-section-open,1)) !important; margin: calc(12px * var(--rudra-section-open,1)) 0 calc(4px * var(--rudra-section-open,1)) !important; overflow: hidden !important; white-space: nowrap !important; background: transparent !important; opacity: 1 !important; transform: none !important; transition: opacity 240ms ease 240ms !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #sidebar.collapsed:not(.au-peek) .nav-section-label { opacity: 0 !important; font-size: 11px !important; transition: opacity 160ms ease !important; }
+}
+
+/* Only 10% larger than the existing rendered diameters (12px and 11px). */
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) .mac-window-controls .mac-dot { width: 13.2px !important; height: 13.2px !important; min-width: 13.2px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) .smodal-traffic-lights .smodal-dot { width: 12.1px !important; height: 12.1px !important; min-width: 12.1px !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] :is(.mac-window-controls .mac-dot, #settings-overlay .smodal-dot) { background: rgba(255,255,255,.42) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .mac-window-controls:hover .mac-close, html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-traffic-lights:hover .smodal-dot-close { background: #EC6A5E !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .mac-window-controls:hover .mac-minimize, html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-traffic-lights:hover .smodal-dot-minimize { background: #F4BF4F !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] .mac-window-controls:hover .mac-maximize, html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-traffic-lights:hover .smodal-dot-expand { background: #61C554 !important; }
+
+/* Keep rotating helper copy crisp throughout its fade, including quiet states. */
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #view-jarvis :is(.clavis-feature-tip-pill, .lx-ph) {
+  filter: none !important;
+  animation: none !important;
+  transition: opacity 240ms ease !important;
+}
+
+/* One gentle, interruptible entrance and exit; no stacked scale/transform. */
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay,
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay:is(.open, .closing, :not(.open)) { transition: opacity 520ms cubic-bezier(.4,0,.2,1) !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay .settings-modal {
+  transform: none !important; scale: 1 !important;
+  translate: 0 12px !important; opacity: 0 !important;
+  transition: translate 520ms cubic-bezier(.4,0,.2,1), opacity 520ms cubic-bezier(.4,0,.2,1) !important;
+}
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay.open .settings-modal { translate: 0 0 !important; opacity: 1 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay.closing .settings-modal { translate: 0 8px !important; opacity: 0 !important; }
+html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) #settings-overlay .settings-backdrop { backdrop-filter: blur(8px) !important; -webkit-backdrop-filter: blur(8px) !important; background: rgba(12, 30, 23, .34) !important; }
+
+/* Settings owns its panes and native customizable pickers. Keep this scoped:
+   the legacy global skin has important rules with eleven IDs of specificity. */
+html:not(#settings#settings#settings#settings#settings#settings#settings#settings#settings#settings#settings#settings) #settings-overlay {
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
+  .settings-modal {
+    width: min(1000px, calc(100vw - 48px)) !important;
+    max-width: min(1000px, calc(100vw - 48px)) !important;
+    height: min(704px, calc(100dvh - 80px)) !important;
+    max-height: min(704px, calc(100dvh - 80px)) !important;
+    min-height: 0 !important;
+    border: 0 !important;
+    box-shadow: 0 24px 80px rgba(10,20,16,.22), 0 8px 24px rgba(10,20,16,.08) !important;
+  }
+  .settings-modal.maximized { width: calc(100vw - 32px) !important; max-width: calc(100vw - 32px) !important; height: calc(100dvh - 32px) !important; max-height: calc(100dvh - 32px) !important; }
+  .smodal-titlebar { height: 50px !important; }
+  .smodal-body { padding: 0 !important; min-height: 0 !important; }
+  .smodal-nav { width: 236px !important; min-width: 236px !important; max-width: 236px !important; padding: 14px 12px 20px !important; overscroll-behavior: contain; }
+  .smodal-nav-item {
+    min-height: 44px !important; height: auto !important;
+    padding: 9px 12px !important; border-radius: 9px !important;
+    white-space: normal !important; overflow: visible !important;
+    line-height: 1.25 !important; transition: background-color 180ms ease !important;
+  }
+  .smodal-nav-item > span { min-width: 0; overflow-wrap: anywhere; }
+  .smodal-nav-icon { width: 16px !important; height: 16px !important; }
+  .smodal-nav-item::after { display: none !important; }
+  .smodal-nav-item svg { animation: none !important; rotate: none !important; }
+  .smodal-content { padding: 28px 32px 32px !important; overscroll-behavior: contain; }
+  :is(.smodal-content, .smodal-nav) { scrollbar-width: thin !important; scrollbar-color: color-mix(in srgb, var(--cc-mute) 30%, transparent) transparent !important; }
+  :is(.smodal-content, .smodal-nav)::-webkit-scrollbar { width: 5px !important; height: 5px !important; }
+  :is(.smodal-content, .smodal-nav)::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--cc-mute) 30%, transparent) !important; border-radius: 8px !important; }
+  :is(.smodal-content, .smodal-nav)::-webkit-scrollbar-button { display: none !important; }
+  .smodal-field { padding: 18px 0 !important; gap: 20px !important; }
+  .smodal-field-left { gap: 5px !important; }
+  .smodal-hint { line-height: 1.5 !important; }
+  .smodal-field:has(.cx-ap-themes) { flex-direction: column !important; align-items: stretch !important; }
+  .smodal-field:has(.cx-ap-themes) .cx-ap-ctl { max-width: 100% !important; width: 100%; }
+  .cx-ap-themes { display: grid !important; grid-template-columns: repeat(8, minmax(0, 1fr)); width: 100%; gap: 14px 10px !important; }
+  .cx-ap-themes > button { min-height: 62px !important; }
+  .smodal-actions { gap: 10px !important; margin-top: 24px !important; }
+  :is(.smodal-btn-primary, .smodal-btn-secondary, .smodal-btn-danger) { min-height: 40px !important; padding: 9px 16px !important; border-radius: 9px !important; }
+  :is(.smodal-input, .smodal-select) { min-height: 40px !important; }
+  :is(input:not([type="checkbox"]):not([type="range"]), textarea):focus {
+    outline: none !important; box-shadow: none !important; border-color: var(--cc-line-2) !important;
+  }
+  :is(button, select, a):focus-visible { outline: 2px solid var(--cc-accent) !important; outline-offset: 3px !important; }
+  .smodal-nav-item:focus-visible { outline-color: var(--flow-nav-ink, #fff) !important; outline-offset: -3px !important; }
+  .smodal-switch:has(input:focus-visible) { outline: 2px solid var(--cc-accent); outline-offset: 4px; border-radius: 99px; }
+
+  /* The browser handles option groups, keyboard, focus, positioning and touch;
+     values and change events continue through the original settings handlers. */
+  @supports (appearance: base-select) {
+    select, select::picker(select) { appearance: base-select !important; }
+    select {
+      width: min(280px, 100%) !important; min-width: 0 !important;
+      display: flex !important; align-items: center !important; gap: 16px;
+      padding: 10px 13px !important; border: 1px solid var(--cc-line-2) !important;
+      border-radius: 9px !important; background: var(--cc-surface) !important;
+      color: var(--cc-ink) !important; font: 400 14px/1.4 var(--cc-sans) !important;
+      box-shadow: 0 2px 3px -2px rgba(12, 30, 23, .10) !important;
+      transition: background-color 160ms ease !important;
+    }
+    select:hover { background: var(--cc-hover) !important; }
+    select::picker-icon { content: ''; width: 7px; height: 7px; margin-right: 2px; border-right: 1.5px solid var(--cc-mute); border-bottom: 1.5px solid var(--cc-mute); rotate: 45deg; transition: rotate 180ms ease; }
+    select:open::picker-icon { rotate: 225deg; }
+    select::picker(select) {
+      margin: 6px 0; padding: 6px !important; max-height: min(330px, 55dvh);
+      min-width: anchor-size(width); max-width: min(360px, calc(100vw - 40px));
+      border: 1px solid var(--cc-line-2) !important; border-radius: 12px !important;
+      background: var(--cc-surface) !important; color: var(--cc-ink) !important;
+      box-shadow: 0 16px 36px -12px rgba(12, 30, 23, .25), 0 4px 10px -4px rgba(12, 30, 23, .12) !important;
+      font: 400 14px/1.4 var(--cc-sans) !important; overflow-y: auto;
+      opacity: 0; translate: 0 -3px;
+      transition: opacity 160ms ease, translate 180ms ease, display 180ms allow-discrete, overlay 180ms allow-discrete;
+    }
+    select:open::picker(select) { opacity: 1; translate: 0 0; }
+    @starting-style { select:open::picker(select) { opacity: 0; translate: 0 -3px; } }
+    option { min-height: 42px; padding: 10px 12px; border-radius: 7px; gap: 12px; white-space: normal; cursor: pointer; }
+    option:is(:hover, :focus) { background: var(--cc-hover) !important; color: var(--cc-ink) !important; outline: none; }
+    option:checked { background: var(--cc-select) !important; color: var(--cc-ink) !important; font-weight: 500; }
+    option::checkmark { order: 1; margin-left: auto; color: var(--cc-accent); }
+    option:disabled { opacity: .5; cursor: default; }
+    optgroup > label { padding: 8px 12px; color: var(--cc-mute); font-size: 12px; }
+  }
+
+  @media (max-width: 800px) {
+    .smodal-nav { width: 204px !important; min-width: 204px !important; max-width: 204px !important; padding-inline: 8px !important; }
+    .smodal-content { padding: 24px !important; }
+    .smodal-field { flex-wrap: wrap !important; }
+    .cx-ap-ctl { max-width: 100% !important; }
+    .cx-ap-themes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+  @media (max-width: 640px) {
+    .settings-modal, .settings-modal.maximized { width: calc(100vw - 24px) !important; max-width: calc(100vw - 24px) !important; height: calc(100dvh - 24px) !important; max-height: calc(100dvh - 24px) !important; }
+    .smodal-title { font-size: 17px !important; }
+    .smodal-status-pill { display: none !important; }
+    .smodal-body { flex-direction: column !important; }
+    .smodal-nav {
+      display: flex !important; width: 100% !important; max-height: 72px;
+      min-width: 0 !important; max-width: none !important;
+      padding: 10px !important; gap: 5px; overflow-x: auto !important; overflow-y: hidden !important;
+      transition: max-height 320ms ease, padding 320ms ease, opacity 240ms ease !important;
+    }
+    .smodal-nav-group { display: contents !important; }
+    .smodal-nav-group-label { display: none !important; }
+    .smodal-nav-item { width: auto !important; flex-shrink: 0; white-space: nowrap !important; font-size: 16px !important; }
+    .settings-modal.nav-collapsed .smodal-nav { max-height: 0; padding-block: 0 !important; opacity: 0 !important; pointer-events: none; }
+    .smodal-content { padding: 22px 20px 28px !important; }
+    .smodal-section-title { font-size: 28px !important; }
+    .smodal-field-left { flex-basis: 100% !important; }
+    .smodal-field:has(.smodal-switch) { flex-wrap: nowrap !important; }
+    .smodal-field:has(.smodal-switch) .smodal-field-left { flex-basis: auto !important; }
+    .cx-ap-ctl { justify-content: flex-start !important; width: 100%; }
+    select { width: 100% !important; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    &, .settings-modal, .smodal-nav, .smodal-section.active, select::picker(select) { transition-duration: 1ms !important; animation: none !important; translate: none !important; }
+  }
+}
+
+@media (max-width: 768px) {
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-content { padding: 20px 18px 28px !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav { width: 170px !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-nav-item { font-size: 17px !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .smodal-field { flex-wrap: wrap; gap: 12px !important; }
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow)[data-rudra-flow] #settings-overlay .cx-ap-ctl { max-width: 100%; justify-content: flex-start !important; }
+}
+html:not(#settings#settings#settings#settings#settings#settings#settings#settings#settings#settings#settings#settings):is([data-motion="off"], [data-motion="reduced"]) #settings-overlay {
+  &, .settings-modal, .smodal-nav, .smodal-section.active, select::picker(select) { transition-duration: 1ms !important; animation: none !important; translate: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:not(#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow#flow) :is(#sidebar, #sidebar ~ #main-content, #settings-overlay, #settings-overlay .settings-modal, #sidebar *, #settings-overlay .smodal-section.active) { transition-duration: 1ms !important; transition-delay: 0ms !important; animation: none !important; }
+}

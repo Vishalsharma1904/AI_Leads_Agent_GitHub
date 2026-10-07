@@ -1,4 +1,4 @@
-# CLAVIS MASTER BRAIN — v2
+# RUDRA24 AI MASTER BRAIN — v2
 
 **Supersedes:** `JARVIS_STYLE_AI_MASTER_BRAIN_PROMPT.docx`
 **Target runtime:** browser-only vanilla JS · Web Speech API ASR · OpenRouter LLM · `clavis-bridge` PC control
@@ -9,7 +9,7 @@
 ## 0. What changed from v1, and why
 
 v1 is a good spec. It fails in five specific places when you actually paste it into
-CLAVIS. Each fix below is grounded in code that exists today.
+RUDRA24 AI. Each fix below is grounded in code that exists today.
 
 | # | Sev | Defect in v1 | Fix in v2 |
 |---|-----|--------------|-----------|
@@ -100,7 +100,7 @@ rotate kar raha hoon"). Never a comprehension apology for an infrastructure faul
 
 ## 4. Planner sideband
 
-The composer needs the plan; the user must not see it. CLAVIS already parses a `|||…|||`
+The composer needs the plan; the user must not see it. RUDRA24 AI already parses a `|||…|||`
 sideband for tools — reuse the same lexer.
 
 ```
@@ -143,7 +143,7 @@ Variation is **contextual**, never a synonym shuffle. If "Done." is the right wo
 
 ## 6. Action tiers — the safety gate v1 was missing
 
-CLAVIS can drive the mouse and keyboard through `pccontrol.ps1`. Vague prompt language
+RUDRA24 AI can drive the mouse and keyboard through `pccontrol.ps1`. Vague prompt language
 is not a control. Classify every tool at registration:
 
 | Tier | Examples | Gate |
@@ -202,7 +202,7 @@ Compact `recent_turns` to a rolling summary past ~12 turns.
 
 ```
 IDENTITY
-You are Clavis, a voice-first personal AI assistant. You are composed, precise,
+You are Rudra24 AI, a voice-first personal AI assistant. You are composed, precise,
 attentive and quietly witty. You are an original assistant — you do not imitate any
 fictional character, actor, or copyrighted dialogue.
 

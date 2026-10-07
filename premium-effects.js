@@ -257,7 +257,12 @@ function initCard3DTilt() {
   attachAll();
 
   // Re-attach after view changes using MutationObserver
-  const observer = new MutationObserver(() => attachAll());
+  const observer = new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => {
+    if (n.nodeType !== 1) return;
+    const selector = '.stat-card,.do-stat-card,.chart-card,.do-chart-wrap,.analytics-card';
+    if (n.matches(selector)) attachTilt(n);
+    n.querySelectorAll(selector).forEach(attachTilt);
+  })));
   observer.observe(document.getElementById('main-scroll-area') || document.body, {
     childList: true, subtree: true
   });
@@ -307,7 +312,9 @@ window.pfxSetHoverVariant = function(variant) {
 //  Like the login page spotlight — follows cursor inside main content
 // ══════════════════════════════════════════════════════════════
 function initCursorGlow() {
-  if (!PremiumFX.isCursorGlowEnabled()) return;
+  // Off for good: it moved a 500px blurred layer with left/top on every
+  // mouse move (layout + repaint per frame) and doesn't fit the minimal look.
+  return;
 
   const glow = document.createElement('div');
   glow.id = 'pfx-cursor-glow';
@@ -583,13 +590,13 @@ window.pfxToggleMic = function(enabled) {
       if (typeof toggleJarvisHandsFree === 'function') toggleJarvisHandsFree();
     }
     if (typeof showToast === 'function') {
-      showToast('info', 'Microphone Disabled', 'Clavis will not use the mic until re-enabled.');
+      showToast('info', 'Microphone Disabled', 'Rudra24 AI will not use the mic until re-enabled.');
     }
   } else {
     // Reset denial flag so permission can be requested again
     localStorage.removeItem('skylark-mic-permission-denied');
     if (typeof showToast === 'function') {
-      showToast('success', 'Microphone Enabled', 'Clavis can now use voice input.');
+      showToast('success', 'Microphone Enabled', 'Rudra24 AI can now use voice input.');
     }
   }
 };

@@ -63,6 +63,7 @@
     states.push(state);
 
     function stop() {
+      if (state.frame) cancelAnimationFrame(state.frame);
       state.frame = 0;
       state.lastTime = 0;
     }
@@ -139,7 +140,8 @@
 
   function init() {
     scan();
-    new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+    new MutationObserver(function(records){records.forEach(function(r){r.addedNodes.forEach(function(n){if(n.nodeType!==1)return;SELECTORS.forEach(function(s){if(n.matches(s))attach(n);n.querySelectorAll(s).forEach(attach);});});});}).observe(document.body, { childList: true, subtree: true });
+    document.addEventListener('visibilitychange',function(){if(document.hidden)states.forEach(function(s){cancelAnimationFrame(s.frame);s.frame=0;s.lastTime=0;});});
   }
 
   if (document.readyState === 'loading') {

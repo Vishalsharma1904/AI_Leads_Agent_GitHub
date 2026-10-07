@@ -1,4 +1,4 @@
-"""Google Gemini speech client -- the voice engine for the Clavis chat UI.
+"""Google Gemini speech client -- the voice engine for the Rudra24 AI chat UI.
 
 Both legs of a voice turn go through ONE Google API key
 (GEMINI_API_KEY in backend/.env):
@@ -39,6 +39,18 @@ API_BASE = "https://generativelanguage.googleapis.com/v1beta/models"
 # path instead.
 STT_MODEL = os.getenv("GEMINI_STT_MODEL", "gemini-3.8-flash")
 TTS_MODEL = os.getenv("GEMINI_TTS_MODEL", "gemini-3.1-flash-tts-preview")
+# One hardcoded preview model meant a 403 ("your key cannot use this model")
+# looked exactly like "TTS is broken". Google renames and gates these, and
+# which ones a key may call differs per project — so try the known names in
+# order and remember the first that answers. GEMINI_TTS_MODEL, when set, is
+# tried first and the rest stay as fallbacks.
+TTS_MODEL_CANDIDATES = [
+    TTS_MODEL,
+    "gemini-3.8-flash-lite-tts",
+    "gemini-3.8-flash-tts",
+    "gemini-2.5-flash-preview-tts",
+]
+_tts_model_ok = ""          # the one that last worked; tried first next time
 DEFAULT_VOICE = os.getenv("GEMINI_TTS_VOICE", "Charon")
 
 TRANSCRIBE_PROMPT = (
@@ -55,10 +67,16 @@ class GeminiSpeechError(RuntimeError):
     pass
 
 
-def _api_key() -> str:
-    key = (os.getenv("GEMINI_API_KEY") or "").strip()
+def _api_key(override: str = "") -> str:
+    """The caller's key wins; the .env key is the workspace fallback.
+
+    Passed as an argument rather than read from os.environ per request —
+    two users speaking at the same time would otherwise race over one
+    process-wide variable and could speak on each other's quota.
+    """
+    key = (override or "").strip() or (os.getenv("GEMINI_API_KEY") or "").strip()
     if not key:
-        raise GeminiSpeechError("GEMINI_API_KEY is not set in backend/.env")
+        raise GeminiSpeechError("No Gemini API key: connect one in Setup, or set GEMINI_API_KEY in backend/.env")
     return key
 
 
@@ -75,9 +93,9 @@ async def transcribe_wav(wav_bytes: bytes, language_hint: str = "") -> str:
     }
     url = f"{API_BASE}/{STT_MODEL}:generateContent"
     async with httpx.AsyncClient(timeout=20) as client:
-        resp = await client.post(url, params={"key": _api_key()}, json=body)
+        resp = await client.post(url, headers={"x-goog-api-key": _api_key()}, json=body)
     if resp.status_code != 200:
-        raise GeminiSpeechError(f"Gemini transcription failed ({resp.status_code}): {resp.text[:300]}")
+        raise GeminiSpeechError(f"Gemini transcription failed ({resp.status_code})")
     data = resp.json()
     try:
         parts = data["candidates"][0]["content"]["parts"]
@@ -87,7 +105,7 @@ async def transcribe_wav(wav_bytes: bytes, language_hint: str = "") -> str:
     return text
 
 
-async def synthesize(text: str, voice: str = "", style: str = "") -> bytes:
+async def synthesize(text: str, voice: str = "", style: str = "", api_key: str = "") -> bytes:
     """One-shot text -> raw PCM16 mono 24kHz audio bytes (no WAV header)."""
     spoken = f"{style.strip()}: {text}" if style and style.strip() else text
     body = {
@@ -99,11 +117,34 @@ async def synthesize(text: str, voice: str = "", style: str = "") -> bytes:
             },
         },
     }
-    url = f"{API_BASE}/{TTS_MODEL}:generateContent"
+    global _tts_model_ok
+    seen, order = set(), []
+    for name in [_tts_model_ok] + TTS_MODEL_CANDIDATES:
+        if name and name not in seen:
+            seen.add(name)
+            order.append(name)
+
+    resp = None
+    errors = []
     async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(url, params={"key": _api_key()}, json=body)
-    if resp.status_code != 200:
-        raise GeminiSpeechError(f"Gemini speech synthesis failed ({resp.status_code}): {resp.text[:300]}")
+        for name in order:
+            resp = await client.post(
+                f"{API_BASE}/{name}:generateContent",
+                headers={"x-goog-api-key": _api_key(api_key)},
+                json=body,
+            )
+            if resp.status_code == 200:
+                if _tts_model_ok != name:
+                    logger.info("Gemini TTS using model %s", name)
+                    _tts_model_ok = name
+                break
+            errors.append(f"{name}:{resp.status_code}")
+            # 403/404 = this key cannot use this model -> try the next name.
+            # Anything else (401 bad key, 429 quota, 5xx) is not model-specific.
+            if resp.status_code not in (403, 404):
+                break
+    if resp is None or resp.status_code != 200:
+        raise GeminiSpeechError("Gemini speech synthesis failed (" + ", ".join(errors) + ")")
     data = resp.json()
     try:
         inline = data["candidates"][0]["content"]["parts"][0]["inlineData"]

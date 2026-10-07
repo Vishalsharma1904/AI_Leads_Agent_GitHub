@@ -17,6 +17,7 @@ const ROOT = path.join(__dirname, '..');
 
 const SUITES = [
   'verify-app-integrity',
+  'verify-sidebar-theme',
   'verify-toast-policy',
   'verify-plugin-core',
   'verify-plugin-manifests',
@@ -26,7 +27,13 @@ const SUITES = [
   'verify-candidate-sourcing',
   'verify-auth-security',
   'verify-enterprise-contract',
-  'verify-clavis-voice'
+  'verify-clavis-voice',
+  'verify-sarvam-calling',
+  'verify-lead-pipeline',
+  'verify-metro-and-authority',
+  'verify-no-gemini',
+  'verify-quiet',
+  'verify-caption'
 ];
 
 let failed = 0;

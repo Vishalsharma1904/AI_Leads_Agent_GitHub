@@ -1,0 +1,11 @@
+{
+  "id": "9y68WIWzJ8pLtFS2P",
+  "name": null,
+  "accessed_at": "2026-10-05 06:49:06.847720+00:00",
+  "created_at": "2026-10-01 15:59:58.073358+00:00",
+  "modified_at": "2026-10-05 06:49:06.847720+00:00",
+  "had_multiple_clients": false,
+  "handled_request_count": 5,
+  "pending_request_count": 16,
+  "total_request_count": 21
+}

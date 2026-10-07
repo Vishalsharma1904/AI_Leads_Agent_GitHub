@@ -13,9 +13,9 @@
   if (window.ClavisHoverCards) return;
 
   var CARDS = {
-    'jarvis':       ['Clavis AI', 'Aapki personal assistant. Bolo ya likho — leads, calls, emails sab yahin se.'],
-    'chat':         ['Client AI', 'Shehar, industry ya role batao — Clavis live sources se verified clients dhoondhti hai.'],
-    'voice-ai':     ['Voice Calling AI', 'Clavis aapki taraf se client ko call karke baat karti hai.'],
+    'jarvis':       ['Rudra24 AI', 'Aapki personal assistant. Bolo ya likho — leads, calls, emails sab yahin se.'],
+    'chat':         ['Client AI', 'Shehar, industry ya role batao — Rudra24 AI live sources se verified clients dhoondhti hai.'],
+    'voice-ai':     ['Voice Calling AI', 'Rudra24 AI aapki taraf se client ko call karke baat karti hai.'],
     'candidate-ai': ['Candidate AI', 'Guards aur housekeeping staff ke liye sahi candidates dhoondho.'],
     'dashboard':    ['Dashboard', 'Aaj ki leads, pipeline aur progress — ek nazar me.'],
     'leads':        ['All Leads', 'Har buyer company ek jagah — search, filter, export.'],
@@ -153,21 +153,8 @@
      to transition margin-left + width — a full-page re-layout per frame.
      Now it lays out once and slides into place with a transform (FLIP). */
   function flipSheet() {
-    var main = document.getElementById('main-content');
-    var rail = document.getElementById('sidebar');
-    if (!main || !rail || !main.animate) return;
-    var last = main.getBoundingClientRect().left;
-    function check() {
-      var now = main.getBoundingClientRect().left;
-      var dx = last - now;
-      last = now;
-      if (Math.abs(dx) < 2 || reduced || document.documentElement.classList.contains('sidebar-resizing')) return;
-      main.animate([{ transform: 'translateX(' + dx + 'px)' }, { transform: 'none' }],
-        { duration: 420, easing: 'cubic-bezier(0.32, 0.72, 0, 1)' });
-    }
-    var mo = new MutationObserver(function () { requestAnimationFrame(check); });
-    mo.observe(rail, { attributes: true, attributeFilter: ['class', 'style'] });
-    mo.observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
+    // clavis-manual.css owns the coordinated 680ms rail/sheet geometry.
+    // A second 420ms transform animated the same change on a different clock.
   }
 
   /* Voice settings lived inside the orb stage, which animates `transform`
@@ -179,12 +166,18 @@
     if (p && v && p.parentElement !== v) v.appendChild(p);
   }
 
-  /* The Clavis Live bar sits at the bottom of the window, exactly where the
+  /* The Rudra24 AI Live bar sits at the bottom of the window, exactly where the
      composers are. Lift it to just above whichever composer is on screen. */
   function placeHud() {
     var hud = document.getElementById('clavis-live-hud');
     if (!hud) return;
-    /* The voice bar lives at the TOP of the page now (under the Clavis
+    if (hud.parentElement && hud.parentElement.classList.contains('jarvis-hero-actions')) {
+      hud.classList.remove('clh-top');
+      hud.style.top = hud.style.left = '';
+      hud.style.bottom = '';
+      return;
+    }
+    /* The voice bar lives at the TOP of the page now (under the Rudra24 AI
        header), centred on the sheet — the composer and the floating
        windows below never share its space. */
     var head = document.querySelector('.view.active .jarvis-hero-header, .view.active .view-header');

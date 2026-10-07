@@ -91,7 +91,11 @@
 
   // A manual toggle from the user opts out of auto for the rest of the session
   document.addEventListener('nexus:themechange', (e) => {
-    if (e.detail?.manual) localStorage.setItem(KEY, 'false');
+    if (e.detail?.manual) {
+      localStorage.setItem(KEY, 'false');
+      const checkbox = document.getElementById('sm-auto-theme');
+      if (checkbox) checkbox.checked = false;
+    }
   });
 })();
 
@@ -299,5 +303,9 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', scan);
   else scan();
-  new MutationObserver(scan).observe(document.body, { childList: true, subtree: true });
+  new MutationObserver(records => records.forEach(r => r.addedNodes.forEach(n => {
+    if (n.nodeType !== 1) return;
+    if (n.matches('.claude-input-container textarea')) attach(n);
+    n.querySelectorAll('.claude-input-container textarea').forEach(attach);
+  }))).observe(document.body, { childList: true, subtree: true });
 })();

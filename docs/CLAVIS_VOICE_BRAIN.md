@@ -1,4 +1,4 @@
-# Clavis Voice + Brain
+# Rudra24 AI Voice + Brain
 
 ## Recommended setup for the submission demo
 
@@ -19,7 +19,7 @@
 
 High-quality hosted speech requires a provider key. A fully keyless build can still speak using browser voices, or Piper after a one-time local binary/model installation; it will not have the same neural expressiveness as hosted TTS. An xAI key and a Groq key are separate products, so the xAI key alone cannot call Groq Whisper.
 
-Clavis uses an original executive voice profile. It should not clone the Iron Man actor or reproduce copyrighted movie dialogue.
+Rudra24 AI uses an original executive voice profile. It should not clone the Iron Man actor or reproduce copyrighted movie dialogue.
 
 ## Verification
 

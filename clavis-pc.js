@@ -1,6 +1,6 @@
 /**
  * ============================================================
- *  CLAVIS PC (clavis-pc.js)
+ *  RUDRA24 AI PC (clavis-pc.js)
  *  Browser client for the local bridge (clavis-bridge/bridge.js) plus
  *  safe browser-only fallbacks. Every action tries the native bridge
  *  first (real OS control) and degrades gracefully if it isn't running:
@@ -17,8 +17,8 @@
 'use strict';
 
 (() => {
-  const url = () => localStorage.getItem('clavis_bridge_url') || 'http://127.0.0.1:8777';
-  const token = () => localStorage.getItem('clavis_bridge_token') || 'clavis-local';
+  const url = () => window.CLAVIS_DESKTOP_BRIDGE_URL || localStorage.getItem('clavis_bridge_url') || 'http://127.0.0.1:8777';
+  const token = () => window.CLAVIS_DESKTOP_BRIDGE_TOKEN || localStorage.getItem('clavis_bridge_token') || 'clavis-local';
 
   let onlineCache = { at: 0, up: false, info: null };
   let displayStream = null; // cached getDisplayMedia stream (browser fallback)
@@ -34,7 +34,7 @@
       up = res.ok;
       // /ping also says what this bridge can do (version, features, whether
       // mouse/keyboard control is on). Keeping it here means a bridge that
-      // was restarted WITH control is noticed without reloading Clavis.
+      // was restarted WITH control is noticed without reloading Rudra24 AI.
       if (up) info = await res.json().catch(() => null);
     } catch (_) { up = false; }
     onlineCache = { at: Date.now(), up, info };
@@ -58,8 +58,16 @@
     return data;
   }
 
-  // Turn "youtube" / "gmail" into a real URL; leave app names/paths alone.
+  // Turn "youtube" / "gmail" / "rudra24 secure" into a real URL; leave app names/paths alone.
   const SITE_ALIASES = {
+    'rudra24 secure': 'https://rudra24secure.com',
+    'rudra 24 secure': 'https://rudra24secure.com',
+    'rudra24secure': 'https://rudra24secure.com',
+    'rudra24': 'https://rudra24secure.com',
+    'rudra 24': 'https://rudra24secure.com',
+    'rudra24 jobs': 'https://rudra24jobs.com',
+    'rudra 24 jobs': 'https://rudra24jobs.com',
+    'rudra24jobs': 'https://rudra24jobs.com',
     youtube: 'https://youtube.com', gmail: 'https://mail.google.com', google: 'https://google.com',
     wikipedia: 'https://en.wikipedia.org', whatsapp: 'https://web.whatsapp.com', maps: 'https://maps.google.com',
     chatgpt: 'https://chatgpt.com', claude: 'https://claude.ai', gemini: 'https://gemini.google.com',
@@ -76,10 +84,31 @@
     news: 'https://news.google.com'
   };
   function resolveWebTarget(target) {
-    const t = String(target || '').trim().toLowerCase();
+    if (!target) return null;
+    let t = String(target || '').trim().toLowerCase();
     if (SITE_ALIASES[t]) return SITE_ALIASES[t];
     if (/^https?:\/\//i.test(target)) return target;
+
+    // Clean verbal wrappers: "the rudra24 secure website" -> "rudra24 secure"
+    const cleaned = t
+      .replace(/^(?:the|open|launch|visit|go to|chalo|kholo|dikhao)\s+/gi, '')
+      .replace(/\s+(?:website|web site|site|portal|page|kholo|kar do|kardo|please)$/gi, '')
+      .replace(/[.!?,।]+/g, '')
+      .trim();
+
+    if (SITE_ALIASES[cleaned]) return SITE_ALIASES[cleaned];
+
+    // Rudra24 brand detection - exact domain routing
+    if (/\brudra\s*24\s*jobs\b/i.test(t) || /\brudra\s*24\s*jobs\b/i.test(cleaned)) {
+      return 'https://rudra24jobs.com';
+    }
+    if (/\brudra\s*24\s*secure\b/i.test(t) || /\brudra\s*24\b/i.test(t) || /\brudra\s*24\s*secure\b/i.test(cleaned)) {
+      return 'https://rudra24secure.com';
+    }
+
     if (/^[\w-]+\.[a-z]{2,}(\/\S*)?$/i.test(t)) return `https://${target}`;
+    if (/^[\w-]+\.[a-z]{2,}(\/\S*)?$/i.test(cleaned)) return `https://${cleaned}`;
+
     // YouTube search pattern: "youtube ...", "play ... on youtube"
     if (/\byoutube\b/.test(t)) {
       const q = t.replace(/\byoutube\b/g, '').replace(/\b(par|pe|me|search|karo|play|chalao|gaana|song|video)\b/g, ' ').trim();
@@ -107,7 +136,7 @@
   //   system  always present on Windows → safe to launch by exe directly
   //   browser can take a URL on launch     office  shows a Start screen first
   //   chat    typing lands in a prompt box messaging  Enter would SEND
-  //   inApp   this phrase means Clavis's own page, not the desktop app
+  //   inApp   this phrase means Rudra24 AI's own page, not the desktop app
   //   cue     only counts as the desktop app when this also appears
   //           (plain "whatsapp kholo" stays the in-app WhatsApp page)
   const APPS = {
@@ -171,7 +200,7 @@
   // Start-menu name (Store apps too); an older bridge gets the shell name
   // through /open. Returns { ok, native, web?, notInstalled?, name }.
   // opts.url: for a browser, open straight onto this page; opts.newWindow
-  // keeps it out of the window Clavis itself lives in.
+  // keeps it out of the window Rudra24 AI itself lives in.
   async function launchApp(keyOrName, opts = {}) {
     const app = appFor(keyOrName);
     const name = app ? app.label : String(keyOrName || '').trim();
@@ -248,7 +277,7 @@
     return fallback ? fallback.w : null;
   }
 
-  async function open(target) {
+  async function open(target, opts = {}) {
     await ping();
     if (available()) {
       // Native: can open apps ("notepad", "spotify"), files, or URLs.
@@ -269,16 +298,29 @@
           return { ok: false, native: true, notInstalled: true, error: `${r.name || target} is PC pe install nahi mila.` };
         }
       }
-      await bridge('/open', 'POST', { target: web || appFor(target)?.exe || target });
+      await bridge('/open', 'POST', { target: web || appFor(target)?.exe || target, browser: opts.browser });
       return { ok: true, native: true };
     }
     const app = appFor(target);
     const web = resolveWebTarget(target) || app?.web;
-    if (web) { window.open(web, '_blank', 'noopener'); return { ok: true, native: false }; }
+    if (web) {
+      if (typeof window !== 'undefined' && window.BrowserActionManager?.openWebsite) {
+        const res = await window.BrowserActionManager.openWebsite(web, { requestedEntity: target });
+        return { ok: res.success, native: false, verified: res.verified, error: res.error, tabReused: res.tabReused, url: web };
+      }
+      const w = window.open(web, '_blank', 'noopener');
+      if (!w) return { ok: false, native: false, verified: true, error: 'Popup blocked by browser. Please allow popups.' };
+      return { ok: true, native: false, verified: true };
+    }
     // Graceful web fallback for desktop apps when bridge is offline:
     const webFallback = `https://www.google.com/search?q=${encodeURIComponent(target)}`;
-    window.open(webFallback, '_blank', 'noopener');
-    return { ok: true, native: false, note: 'Opened in web' };
+    if (typeof window !== 'undefined' && window.BrowserActionManager?.openWebsite) {
+      const res = await window.BrowserActionManager.openWebsite(webFallback, { requestedEntity: target });
+      return { ok: res.success, native: false, verified: res.verified, error: res.error, note: 'Opened search in web' };
+    }
+    const w = window.open(webFallback, '_blank', 'noopener');
+    if (!w) return { ok: false, native: false, verified: true, error: 'Popup blocked by browser. Please allow popups.' };
+    return { ok: true, native: false, verified: true, note: 'Opened in web' };
   }
 
   async function saveNote(text, filename) {
@@ -386,10 +428,10 @@
     return controlEnabledCache;
   }
   function requireControl() {
-    if (!available()) throw new Error('Clavis bridge is not running — PC control needs it (Start-Bridge.bat).');
+    if (!available()) throw new Error('Rudra24 AI bridge is not running — PC control needs it (Start-Bridge.bat).');
     if (controlEnabledCache === false) throw new Error('Mouse/keyboard control is off on this bridge. Run Start-Bridge-With-Control.bat to enable it.');
   }
-  // Screenshot for Clavis's own eyes: bridge only, and it leaves the
+  // Screenshot for Rudra24 AI's own eyes: bridge only, and it leaves the
   // clipboard alone (screenshot() copies, which would clobber whatever
   // sir just copied). null when the bridge is off.
   async function peek() {

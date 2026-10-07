@@ -120,7 +120,7 @@ const CandidatesCtrl = {
     const chatInput = document.getElementById('candidate-ai-input') || document.getElementById('cand-chat-input');
     if (chatInput) {
       chatInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
+        if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.keyCode !== 229) {
           e.preventDefault();
           this.handleAiChatSubmit();
         }
@@ -417,8 +417,8 @@ const CandidatesCtrl = {
 
   // ── AI Conversational Chat → REAL multi-portal scrape ──
   async handleAiChatSubmit() {
-    if (this.isScraping) return;
     const input = document.getElementById('candidate-ai-input') || document.getElementById('cand-chat-input');
+    if (this.isScraping && !window.ClavisAppMap?.guide?.isQuestion(input?.value || '')) return;
     if (!input || !input.value.trim()) return;
 
     const query = input.value.trim();
@@ -444,6 +444,19 @@ const CandidatesCtrl = {
     if (box) box.dataset.chatState = 'active';
 
     this.appendUserMessage(query);
+    if (window.ClavisAppMap?.guide?.isQuestion(query)) {
+      const owner = window.SupabaseAuth?.getUser?.()?.id;
+      const response = await window.ClavisAppMap.guide.complete(query);
+      if (owner === window.SupabaseAuth?.getUser?.()?.id) {
+        await this.appendAiMessage(response.text, true, false);
+        window.ClavisAppMap.guide.attachActions(document.querySelector('#candidate-chat-messages .chat-message.assistant:last-child'), response, query, async (question, options) => {
+          const result = await window.ClavisAppMap.guide.complete(question, { ...options, topicIds: options.guideTopicIds });
+          if (owner !== window.SupabaseAuth?.getUser?.()?.id) return;
+          await this.appendAiMessage(result.text, true, false);
+        });
+      }
+      return;
+    }
 
     try {
       if (window.ClavisTask?.begin) {
@@ -494,7 +507,7 @@ const CandidatesCtrl = {
         this.showTypingIndicator();
         try {
           const honorific = window.UserProfileManager?.getHonorificName?.() || 'Sir';
-          const candidateSystemPrompt = `You are Clavis Candidate AI — Senior Talent Acquisition & Workforce Strategist with 15+ years of Indian staffing experience (blue-collar, grey-collar, and corporate roles).
+          const candidateSystemPrompt = `You are Rudra24 AI Candidate AI — Senior Talent Acquisition & Workforce Strategist with 15+ years of Indian staffing experience (blue-collar, grey-collar, and corporate roles).
 Always address the user respectfully as "${honorific}".
 
 ### COGNITIVE & RECRUITMENT EXPERTISE:
@@ -624,7 +637,7 @@ Always address the user respectfully as "${honorific}".
     if (/^(hi|hello|hey|namaste|good\s+(morning|afternoon|evening)|kaise\s+ho|kya\s+haal|who\s+are\s+you)\b/i.test(q)) {
       const hour = new Date().getHours();
       const timeGreeting = hour < 12 ? 'Good morning' : (hour < 17 ? 'Good afternoon' : 'Good evening');
-      return `${timeGreeting}, ${honorific}! I am Clavis Candidate AI — your Senior Talent Acquisition & Workforce Strategist.<br/><br/>` +
+      return `${timeGreeting}, ${honorific}! I am Rudra24 AI Candidate AI — your Senior Talent Acquisition & Workforce Strategist.<br/><br/>` +
         `Main aapki candidate sourcing, salary benchmarking, telephonic screening, aur interview planning me madad kar sakta hoon. ` +
         `Aap mujhse kisi bhi role ke standard market wages ya screening criteria pooch sakte hain, ya directly candidates source karne ke liye command de sakte hain (jaise: <i>"Gurugram me 20 security guard chahiye"</i>). Batayein, aaj kis role ki hiring plan karni hai?`;
     }
@@ -807,18 +820,18 @@ Always address the user respectfully as "${honorific}".
     return actionsDiv;
   },
 
-  appendAiMessage(html, save = true) {
+  async appendAiMessage(html, save = true, stream = true) {
     const messages = document.getElementById('candidate-chat-messages');
     if (!messages) return;
     this.hideWelcome();
 
     if (typeof window.streamAssistantMessage === 'function') {
-      window.streamAssistantMessage({
+      await window.streamAssistantMessage({
         container: messages,
         text: html,
         welcomeId: 'candidate-chat-welcome',
         inputId: 'candidate-ai-input',
-        createToolbar: (bubble, container, inputId) => this.createActionToolbar(bubble, container, inputId)
+        createToolbar: (bubble, container, inputId) => this.createActionToolbar(bubble, container, inputId), stream
       });
     } else {
       const msgDiv = document.createElement('div');

@@ -1,13 +1,13 @@
 /* ============================================================
- * CLAVIS TASK HUD (clavis-task-hud.css)
+ * RUDRA24 AI TASK HUD (clavis-task-hud.css)
  * ------------------------------------------------------------
- * The floating panel that appears ONLY while Clavis is actually
+ * The floating panel that appears ONLY while Rudra24 AI is actually
  * doing something, and carries the result when it finishes. It is
  * deliberately not a chat window: one card, one task, gone when
  * you are done with it.
  *
  * The card is positioned by clavis-task-hud.js (it measures the
- * Clavis stage and writes --ctk-x / --ctk-y / --ctk-w) because the
+ * Rudra24 AI stage and writes --ctk-x / --ctk-y / --ctk-w) because the
  * stage itself is overflow:hidden + contain:layout, so an absolutely
  * positioned child inside it would be clipped.
  *

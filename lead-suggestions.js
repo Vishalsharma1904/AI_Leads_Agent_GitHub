@@ -29,8 +29,11 @@
       timer = 0;
     };
 
+    const visible = () => !document.hidden && !textarea.closest('.view:not(.active),[hidden]');
     const type = (text, token, pos = 0) => {
       if (!active || token !== generation || textarea.value) return;
+      // hidden page: don't retype a placeholder nobody sees (it cost a style recalc ~30×/s)
+      if (!visible()) { stop(); return; }
       textarea.setAttribute('placeholder', text.slice(0, pos));
       if (pos < text.length) {
         timer = window.setTimeout(() => type(text, token, pos + 1), 32);
@@ -41,6 +44,7 @@
 
     const erase = (text, token, pos) => {
       if (!active || token !== generation || textarea.value) return;
+      if (!visible()) { stop(); return; }
       textarea.setAttribute('placeholder', text.slice(0, Math.max(0, pos)));
       if (pos > 0) {
         timer = window.setTimeout(() => erase(text, token, pos - 1), 10);
@@ -52,8 +56,14 @@
 
     const restart = () => {
       stop();
+      if (!visible()) return;
       if (textarea.value) {
         textarea.setAttribute('placeholder', '');
+        return;
+      }
+      if (window.RudraI18n?.currentLanguage?.() !== 'en') {
+        const prompt = SUGGESTIONS[suggestionIndex];
+        textarea.setAttribute('placeholder', window.RudraI18n?.translateText?.(prompt) || prompt);
         return;
       }
       const token = ++generation;
@@ -72,6 +82,11 @@
     });
     textarea.addEventListener('focus', () => { active = true; restart(); });
     textarea.addEventListener('blur', () => { active = true; restart(); });
+    window.addEventListener('hashchange', restart);
+    window.addEventListener('clavis:workspace-change', restart);
+    document.addEventListener('visibilitychange', restart);
+    window.addEventListener('rudra-language-change', restart);
+    window.addEventListener('rudra-translations-ready', restart);
     restart();
   }
 

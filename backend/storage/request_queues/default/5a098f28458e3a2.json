@@ -1,0 +1,16 @@
+{
+  "unique_key": "https://www.orangemantra.com",
+  "url": "https://www.orangemantra.com",
+  "method": "GET",
+  "payload": null,
+  "headers": {},
+  "user_data": {
+    "__crawlee": {
+      "state": 4
+    }
+  },
+  "retry_count": 0,
+  "no_retry": false,
+  "loaded_url": "https://www.orangemantra.com/",
+  "handled_at": "2026-10-05 06:49:01.979232+00:00"
+}
