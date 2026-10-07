@@ -31,6 +31,7 @@
   <link rel="stylesheet" href="styles.css?v=2.2"/>
   <link rel="stylesheet" href="settings.css?v=1.0"/>
   <link rel="stylesheet" href="voice-ai-studio.css?v=1"/>
+  <link rel="stylesheet" href="omnidimension-studio.css?v=1"/>
   <script>
     (function() {
       const savedTheme = localStorage.getItem('skylark-theme') || 'dark';
@@ -1260,6 +1261,7 @@
               <select id="vp-provider" onchange="VoiceProvider.select(this.value)">
                 <option value="toughtongue">Tough Tongue AI</option>
                 <option value="sarvam">Sarvam AI</option>
+                <option value="omnidimension">OmniDimension</option>
               </select>
             </label>
             <button class="btn-secondary" type="button" data-vp-tt onclick="VoiceAI.importAgent()">Import agent</button>
@@ -1303,6 +1305,7 @@
           </div>
         </section>
 
+        <section id="vp-omnidimension" hidden aria-label="OmniDimension voice workspace"></section>
         <p id="tt-status" class="tt-status" role="status" aria-live="polite">Checking connection…</p>
         <div class="tt-grid">
           <aside class="tt-panel">
@@ -5817,7 +5820,8 @@
   <!-- Sarvam voice calling agent: engine + page + look -->
   <link rel="stylesheet" href="sarvam-calling.css?v=4">
   <script src="sarvam-calling.js?v=2" defer></script>
-  <script src="sarvam-calling-ui.js?v=3" defer></script>
+  <script src="omnidimension-studio.js?v=1" defer></script>
+  <script src="sarvam-calling-ui.js?v=4" defer></script>
   <link rel="stylesheet" href="developer-insights.css?v=1.0">
   <link rel="stylesheet" href="clavis-voice-refine.css?v=1.2&r=0929voice">
   <script src="developer-insights.js?v=1.0" defer></script>

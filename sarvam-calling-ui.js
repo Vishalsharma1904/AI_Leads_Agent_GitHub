@@ -901,23 +901,29 @@ window.VoiceProvider = (() => {
   }
 
   function select(which) {
+    if (!['toughtongue', 'sarvam', 'omnidimension'].includes(which)) which = 'toughtongue';
     const sarvam = which === 'sarvam';
-    try { localStorage.setItem(LS, sarvam ? 'sarvam' : 'toughtongue'); } catch (_) {}
+    const omni = which === 'omnidimension';
+    if (!omni) window.OmniStudio?.stop?.();
+    try { localStorage.setItem(LS, which); } catch (_) {}
     const picker = $('vp-provider');
-    if (picker) picker.value = sarvam ? 'sarvam' : 'toughtongue';
+    if (picker) picker.value = which;
 
     const panel = $('vp-sarvam');
     if (panel) panel.hidden = !sarvam;
+    const omniPanel = $('vp-omnidimension');
+    if (omniPanel) omniPanel.hidden = !omni;
     // The Tough Tongue surface and its header buttons step aside together.
     const tt = document.querySelector('#view-voice-ai .tt-grid');
-    if (tt) tt.hidden = sarvam;
+    if (tt) tt.hidden = sarvam || omni;
     const ttStatus = document.querySelector('#view-voice-ai #tt-status');
-    if (ttStatus) ttStatus.hidden = sarvam;
-    document.querySelectorAll('#view-voice-ai [data-vp-tt]').forEach((b) => { b.hidden = sarvam; });
+    if (ttStatus) ttStatus.hidden = sarvam || omni;
+    document.querySelectorAll('#view-voice-ai [data-vp-tt]').forEach((b) => { b.hidden = sarvam || omni; });
     const label = document.querySelector('#view-voice-ai [data-voice-ai-status]');
-    if (label) label.textContent = sarvam ? 'Sarvam AI' : 'Tough Tongue AI';
+    if (label) label.textContent = omni ? 'OmniDimension' : sarvam ? 'Sarvam AI' : 'Tough Tongue AI';
 
     if (sarvam) { refresh(); loadPlan(); }
+    if (omni) window.OmniStudio?.refresh?.();
     return which;
   }
 
@@ -940,7 +946,7 @@ window.VoiceProvider = (() => {
     if (!key) { say('Paste your Sarvam subscription key first.', true); return; }
     say('Checking the key with Sarvam…');
     try {
-      await api('/api/credentials', { method: 'POST', body: { provider: 'sarvam', secret: key } });
+      await api('/api/credentials', { method: 'PUT', body: { provider: 'sarvam', secret: key } });
       if ($('vp-sarvam-key')) $('vp-sarvam-key').value = '';
       await saveIds();
       say('Key saved for your company. Now press "Find my agents & number".');

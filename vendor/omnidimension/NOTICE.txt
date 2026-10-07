@@ -1,0 +1,4 @@
+@omnidim-ai/client 0.1.0 — MIT license.
+Official OmniDimension browser SDK.
+Source: https://github.com/Omnidim/omnidim-web-sdk
+Distribution: https://www.npmjs.com/package/@omnidim-ai/client
