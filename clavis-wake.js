@@ -136,6 +136,7 @@
   }
 
   function wake(source = 'word', opts = {}) {
+    if (window.ClavisVoiceState && !window.ClavisVoiceState.isClavisWorkspace()) return false;
     // A source he has not opted into must not open a session at all — not
     // even a short one, because an open session is what lets the proactive
     // layers speak.
@@ -266,6 +267,7 @@
   }
 
   function allowBackground() {
+    if (!window.ClavisVoiceState?.isClavisWorkspace?.()) return false;
     const mode = ls('clavis_background_ai', 'auto');
     if (mode === 'on') return true;
     if (isAwake()) return true;

@@ -5,8 +5,8 @@
  */
 'use strict';
 
-const RUDRA_APP_NAME = 'Rudra24 AI & Leads';
-const RUDRA_APP_DESCRIPTION = 'Lead Generation · Business Support · Business Analysis';
+const RUDRA_APP_NAME = 'Rudra24 AI';
+const RUDRA_APP_DESCRIPTION = 'Your business workspace. Sign in to continue.';
 
 // ──────────────────────────────────────────────
 //  0. USER-SCOPED STORAGE ENGINE (Multi-Tenant / Multi-User Silo)
@@ -414,6 +414,8 @@ window.AntigravityAuth = {
   },
 
   async checkInitialSession() {
+    const feedback = document.getElementById('ag-auth-feedback');
+    if (feedback) feedback.hidden = true;
     // Keep sign-in hidden while the persisted Supabase session is restored. Showing
     // it first causes a login flash on every refresh for returning users.
     const authScreen = document.getElementById('auth-screen');
@@ -441,7 +443,11 @@ window.AntigravityAuth = {
         authScreen.classList.remove('ag-hidden');
         authScreen.classList.add('ag-auth-screen');
       }
-      this.showToast(ready?.error || 'Supabase Auth is unavailable.', 'error');
+      if (feedback) {
+        feedback.hidden = false;
+        const message = feedback.querySelector('[data-auth-message]');
+        if (message) message.textContent = ready?.error || 'Sign-in is temporarily unavailable.';
+      }
     }
     return;
   },

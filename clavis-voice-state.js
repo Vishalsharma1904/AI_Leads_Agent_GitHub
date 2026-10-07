@@ -85,7 +85,8 @@
     const shell = doc.getElementById('app-shell');
     const view = doc.getElementById('view-jarvis');
     if (!auth && !shell && !view) return true; // pure helper tests without an app DOM
-    if (root.SupabaseAuth && (!root.SupabaseAuth.getSession?.()?.user || root.SupabaseAuth.isRecoveryMode?.())) return false;
+    // Auth scripts load after this module. A hidden login is not a session.
+    if (!root.SupabaseAuth?.getSession?.()?.user || root.SupabaseAuth.isRecoveryMode?.()) return false;
     if (auth && !auth.classList?.contains('ag-hidden') && auth.style?.display !== 'none') return false;
     if (shell?.style?.display === 'none') return false;
     return Boolean(view?.classList?.contains('active'));

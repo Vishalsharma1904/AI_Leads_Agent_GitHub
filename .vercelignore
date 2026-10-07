@@ -40,3 +40,4 @@ secrets.local.js
 desktop-config.js
 alembic.ini
 package-lock.json
+work/

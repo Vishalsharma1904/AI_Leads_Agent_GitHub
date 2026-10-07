@@ -47,15 +47,15 @@
   max-height: calc(100dvh - 24px) !important;
   overflow-y: auto !important;
   margin: 0 auto !important;
-  padding: 22px 28px 16px !important;
+  padding: 32px !important;
   border-radius: 18px !important;
-  background: var(--ra-surface) !important;
+  background: #FFFFFF !important;
   border: 1px solid var(--ra-line) !important;
   box-shadow:
     0 1px 2px rgba(35, 54, 40, .04),
     0 20px 48px -30px rgba(44, 69, 47, .25) !important;
   backdrop-filter: none !important;
-  animation: raCardIn 900ms var(--ra-ease) 120ms both !important;
+  animation: none !important;
   scrollbar-color: rgba(83, 107, 67, .25) transparent !important;
 }
 #auth-screen .ag-auth-card::-webkit-scrollbar-thumb { background: rgba(83, 107, 67, .25) !important; }
@@ -70,7 +70,7 @@
   display: flex !important;
   align-items: center !important;
   gap: 12px !important;
-  margin-bottom: 10px !important;
+  margin-bottom: 24px !important;
   padding: 0 !important;
   border: 0 !important;
   background: none !important;
@@ -84,7 +84,7 @@
 }
 #auth-screen .ag-logo-emblem img {
   display: block !important;
-  width: 72px !important;
+  width: 48px !important;
   height: auto !important;
   mix-blend-mode: multiply;
 }
@@ -176,7 +176,7 @@
   margin-bottom: 4px !important;
 }
 #auth-screen .ag-form-label span { color: var(--ra-accent) !important; }
-#auth-screen .ag-form-grid { row-gap: 6px !important; }
+#auth-screen .ag-form-grid { row-gap: 18px !important; }
 
 #auth-screen .ag-input {
   height: 42px !important;
@@ -195,7 +195,8 @@
 #auth-screen .ag-input:focus {
   background: var(--ra-surface) !important;
   border-color: var(--ra-line-3, rgba(20, 20, 19, .3)) !important;
-  outline: none !important;
+  outline: 2px solid var(--ra-accent) !important;
+  outline-offset: 2px !important;
 }
 #auth-screen .ag-input-icon { color: var(--ra-faint) !important; left: 14px !important; width: 16px !important; height: 16px !important; }
 #auth-screen .ag-pw-toggle { color: var(--ra-faint) !important; }

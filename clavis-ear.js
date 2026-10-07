@@ -947,7 +947,7 @@
     card?.querySelector('.cv-status') && (card.querySelector('.cv-status').textContent = mic
       ? 'Ho gaya, sir. Jab kaam ho, bas "Rudra" boliye, snap ya clap kijiye.'
       : 'Mic browser ne block kiya hai — address bar ke mic icon se allow kar dijiye.');
-    setTimeout(() => { card?.classList.remove('is-in'); setTimeout(() => card?.remove(), 320); }, mic ? 1500 : 3200);
+    setTimeout(() => { card?.classList.remove('is-in'); setTimeout(() => card?.remove(), 180); }, mic ? 250 : 3200);
   }
   function consentCard() {
     if (!window.ClavisVoiceState?.isClavisWorkspace?.()) return;
@@ -978,6 +978,17 @@
   }
   setTimeout(() => { try { consentCard(); } catch (_) {} }, 2600);
   window.addEventListener('clavis:workspace-change', consentCard);
+  window.addEventListener('clavis:mic-granted', () => {
+    lsSet(CONSENT, JSON.stringify({ at: now(), mic: true, screen: false, proactive: false }));
+    const card = document.getElementById('clavis-voiceid-sheet');
+    // Leave voice enrolment dialogs alone; dismiss only the permission card.
+    if (card?.querySelector('.cv-start')) card.remove();
+  });
+  window.addEventListener('rudra:auth-state', () => {
+    if (!window.ClavisVoiceState?.isClavisWorkspace?.()) {
+      document.getElementById('clavis-voiceid-sheet')?.remove();
+    }
+  });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncUi, { once: true }); else setTimeout(syncUi, 0);
 
   window.ClavisEar = {

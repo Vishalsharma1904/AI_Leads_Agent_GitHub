@@ -754,6 +754,7 @@
   }
 
   function open(opts) {
+    if (!window.SupabaseAuth?.getSession?.()?.user || authShowing()) return false;
     opts = opts || {};
     build();
     watchMicPermission();
@@ -763,6 +764,7 @@
     if (S.motion) S.motion.cancel();
 
     var reason = opts.reason || 'manual';
+    S.reason = reason;
     var focusP = PROVIDERS[opts.provider] ? opts.provider : null;
     var banner = root.querySelector('[data-banner]');
     var text = '', tone = 'info';
@@ -841,6 +843,10 @@
   /* ── persistent entry point: "Setup ✦" pill ────────────────── */
   function updatePill() {
     var pill = doc.getElementById('cx-setup-pill');
+    if (!window.SupabaseAuth?.getSession?.()?.user || authShowing()) {
+      if (pill) pill.hidden = true;
+      return;
+    }
     if (!pill) {
       pill = doc.createElement('button');
       pill.type = 'button';
@@ -894,6 +900,7 @@
   }
 
   function maybeAutoOpen() {
+    if (!window.SupabaseAuth?.getSession?.()?.user || authShowing()) return Promise.resolve(false);
     if (S.isOpen) return Promise.resolve(false);
     if ((Number(lsGet(LS.snooze)) || 0) > Date.now()) return Promise.resolve(false);
     var v = vault();
@@ -923,7 +930,12 @@
     if (S.root) S.root.querySelectorAll('[data-input]').forEach(function (input) { input.value = ''; input.type = 'password'; });
     close();
   });
-  window.addEventListener('clavis:mic-granted', function () { S.mic = 'granted'; render(); });
+  window.addEventListener('clavis:mic-granted', function () {
+    S.mic = 'granted';
+    render();
+    // A microphone grant completes the microphone-only setup action.
+    if (S.isOpen && S.reason === 'voice') close();
+  });
   window.addEventListener('clavis:refuel-needed', function (e) {
     var d = (e && e.detail) || {};
     var last = Number(lsGet(LS.refuelAt)) || 0;

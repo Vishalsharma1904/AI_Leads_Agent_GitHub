@@ -42,8 +42,8 @@
   <!-- Graphics tier (Auto / Smooth / Max) — must run before the orb draws. -->
   <script src="clavis-perf.js?v=1.3&r=1002jank&finish=1006e"></script>
   <!-- Wake state (asleep until "Rudra" / Hey Buddy / Hey Clay / snap / clap) — everyone asks this before any LLM call. -->
-  <script src="clavis-wake.js?v=1.3&r=rudra"></script>
-  <script src="clavis-voice-state.js?v=1.6&r=1001latency&voice-fix=1005i"></script>
+  <script src="clavis-wake.js?v=1.4&r=1007auth"></script>
+  <script src="clavis-voice-state.js?v=1.7&r=1007auth"></script>
   <script>
     (function() {
       if (window.location.protocol === 'file:') {
@@ -584,6 +584,10 @@
       </div>
 
       <!-- Google 1-Click Cloud Sync Button -->
+      <div id="ag-auth-feedback" class="ag-auth-feedback" role="alert" hidden>
+        <p data-auth-message></p>
+        <button type="button" onclick="AntigravityAuth.checkInitialSession()">Retry connection</button>
+      </div>
       <div class="ag-google-auth-wrap">
         <button type="button" class="ag-btn-google" id="ag-google-sync-btn" onclick="AntigravityAuth.handleGoogleLogin()">
           <svg class="ag-google-icon" width="18" height="18" viewBox="0 0 24 24">
@@ -3337,8 +3341,8 @@
   <script src="device-account.js?v=1.0" defer></script>
   <script src="button-feedback.js?v=1.0" defer></script>
   <script src="cloud-sync.js?v=2.0&build=1004complete" defer></script>
-  <script src="supabase-auth.js?v=2.2&r=1001security" defer></script>
-  <script src="auth-antigravity.js?v=2.1&r=0930workspace&guide-defaults=1005final" defer></script>
+  <script src="supabase-auth.js?v=2.3&r=1007release" defer></script>
+  <script src="auth-antigravity.js?v=2.2&r=1007release" defer></script>
   <script src="auth.js?v=1.0" defer></script>
   <script src="crm-bridge.js?v=1.1&r=1006" defer></script>
   <script src="crm-business.js?v=1.0&r=1005business&island=1006" defer></script>
@@ -3421,9 +3425,9 @@
   <script src="clavis-suggestions.js?v=1.1" defer></script>
   <script src="clavis-proactive.js?island=1006&v=1.4&r=0930workspace" defer></script>
   <script src="clavis-vision.js?v=1.1" defer></script>
-  <script src="clavis-boot-greet.js?v=1.2&r=0930workspace" defer></script>
+  <script src="clavis-boot-greet.js?v=1.3&r=1007quiet" defer></script>
   <script src="clavis-voice.js?v=1.8&r=1002worklet&voice-fix=1005i" defer></script>
-  <script src="jarvis_ui.js?guide=1005&v=1.27&r=1004feedback&build=1004complete&guide-defaults=1005final&voice-fix=1005i&perf=1006&island=1006" defer></script>
+  <script src="jarvis_ui.js?v=1.28&r=1007auth" defer></script>
   <!-- Rudra24 AI orb v4: single-pass WebGL, round by construction (the old strands-orb.js drew a square whenever its glass pass failed). Same window.StrandsOrb API. -->
   <script src="clavis-orb.js?v=4.1" defer></script>
   <script src="app-shortcuts.js?v=1.0" defer></script>
@@ -5790,7 +5794,7 @@
   <link rel="stylesheet" href="clavis-ear.css?v=1.8&r=1004conveyor">
   <link rel="stylesheet" href="clavis-olive.css?v=1.1">
   <link rel="stylesheet" href="clavis-silk.css?v=1.2">
-  <script src="clavis-ear.js?v=2.1&r=1004conveyor&voice-fix=1005i" defer></script>
+  <script src="clavis-ear.js?v=2.2&r=1007permission" defer></script>
   <script src="clavis-intent.js?v=1.7&r=1002map" defer></script>
   <script src="clavis-automation.js?v=1.2&r=1002voice" defer></script>
   <script src="clavis-business.js?v=1.2&r=0929buyers" defer></script>
@@ -5798,7 +5802,7 @@
        links to free keys, auto-check), and the last-word visual polish layer. -->
   <link rel="stylesheet" href="clavis-setup.css?v=2.1&r=1002lead">
   <link rel="stylesheet" href="clavis-final.css?v=1.0">
-  <script src="clavis-setup.js?island=1006&v=2.3&r=1002lead" defer></script>
+  <script src="clavis-setup.js?island=1007&v=2.4&r=1007auth" defer></script>
   <!-- RUDRA24 AI × CLAUDE LOOK (2026-09-24): ivory ground, serif headlines, soft white
        cards, rounded dialogs with one long soft shadow, butter-smooth expo-out
        motion, and Claude-style hover cards on the sidebar. Loaded last so it
@@ -5843,7 +5847,7 @@
   <!-- The sign-in screen, in the same quiet Claude language as boot.html and
        the rest of the app. Loaded last so it settles the cascade over
        auth-antigravity.css without that file being rewritten. -->
-  <link rel="stylesheet" href="rudra-auth-claude.css?v=1.1">
+  <link rel="stylesheet" href="rudra-auth-claude.css?v=1.2">
   <!-- Floating-window motion + calm pass (2026-10-02). Loaded last on purpose:
        every .cts-* layer above it is one it is meant to settle. -->
   <link rel="stylesheet" href="clavis-task-polish.css?v=1.2&r=1002table&scopefix=1003f">

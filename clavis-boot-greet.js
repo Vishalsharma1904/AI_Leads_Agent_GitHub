@@ -371,6 +371,9 @@ window.ClavisBootGreet = (() => {
     // Visual heading har open par (local, free).
     updateVisualGreeting();
 
+    // Opening or signing in to the app is not a request for spoken audio.
+    if (localStorage.getItem('clavis_spoken_boot_greeting') !== 'true') return;
+
     // Bolna sirf din me ek baar.
     let spokeToday = false;
     try { spokeToday = localStorage.getItem(LS_GREET_DAY) === todayKey(); } catch (_) {}

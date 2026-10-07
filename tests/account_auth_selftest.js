@@ -32,6 +32,7 @@ async function main() {
   };
   const window = {
     location,
+    dispatchEvent() {},
     SKYLARK_CONFIG: { BACKEND_URL: 'http://localhost:8000' },
     supabase: { createClient: (_url, _key, options) => {
       assert.equal(options.auth.persistSession, true);
@@ -43,6 +44,7 @@ async function main() {
   };
   const authContext = {
     window, location, console,
+    CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     setTimeout: resolve => resolve(),
     fetch: async () => {
       configAttempts += 1;

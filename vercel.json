@@ -6,7 +6,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/:path*",
+      "source": "/api/:path((?!public-config$).*)",
       "destination": "https://REPLACE-WITH-BACKEND-HOST/api/:path*"
     }
   ],
@@ -14,21 +14,46 @@
     {
       "source": "/(.*)",
       "headers": [
-        { "key": "X-Content-Type-Options", "value": "nosniff" },
-        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
-        { "key": "X-Frame-Options", "value": "SAMEORIGIN" },
-        { "key": "Permissions-Policy", "value": "geolocation=(self), microphone=(self), camera=(), payment=()" }
+        {
+          "key": "X-Content-Type-Options",
+          "value": "nosniff"
+        },
+        {
+          "key": "Referrer-Policy",
+          "value": "strict-origin-when-cross-origin"
+        },
+        {
+          "key": "X-Frame-Options",
+          "value": "SAMEORIGIN"
+        },
+        {
+          "key": "Permissions-Policy",
+          "value": "geolocation=(self), microphone=(self), camera=(), payment=()"
+        }
       ]
     },
     {
       "source": "/(.*).(js|css|png|jpg|jpeg|svg|woff|woff2|ttf)",
       "headers": [
-        { "key": "Cache-Control", "value": "public, max-age=600, stale-while-revalidate=86400" }
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=600, stale-while-revalidate=86400"
+        }
       ]
     },
     {
       "source": "/index.html",
-      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-cache"
+        }
+      ]
     }
-  ]
+  ],
+  "functions": {
+    "api/public-config.js": {
+      "includeFiles": "public-auth-config.json"
+    }
+  }
 }

@@ -183,6 +183,7 @@ async function clavisMicPillClicked() {
 window.clavisMicPillClicked = clavisMicPillClicked;
 
 async function requestClavisMicrophoneOnce() {
+  if (!window.ClavisVoiceState?.isClavisWorkspace?.()) return false;
   if (!navigator.mediaDevices?.getUserMedia) return false;
   if (location.protocol === 'file:' || !window.isSecureContext) return false;
   try {
@@ -2899,6 +2900,7 @@ function syncClavisWorkspaceAudio() {
   document.getElementById('clavis-ai-speech-caption')?.classList.remove('is-visible');
 }
 window.addEventListener('clavis:workspace-change', syncClavisWorkspaceAudio);
+window.addEventListener('rudra:auth-state', syncClavisWorkspaceAudio);
 
 // The watchdog: never a dead mic, never stuck busy (clavis-voice-state.js).
 CLAVIS_VS.configure({
