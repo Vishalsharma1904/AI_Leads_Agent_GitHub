@@ -1,13 +1,9 @@
 .env
 .env.*
 !.env.example
-env.yaml
-env.*.yaml
+.venv
+.venv312
 __pycache__/
 *.pyc
-*.db
-.venv/
-.venv312/
-.venv-uv/
-.git/
-.pytest_cache/
+tests/
+storage/
