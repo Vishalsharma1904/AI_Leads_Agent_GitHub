@@ -83,7 +83,7 @@ html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .lx-rail {
 /* The display face, used where the reference uses it: the greeting, dialog
    titles, big numbers. Light weight and tight tracking — at this size a
    serif only needs 400 to feel substantial. */
-html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(h1, h2, .cc-display, .ccv-title, .rf-vhead, .smodal-title, .cts-title) {
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(h1, h2, .cc-display, .ccv-title, .rf-vhead, .smodal-title, .cts-title):not(:where(#auth-screen *)) {
   font-family: var(--cc-serif) !important;
   font-weight: 400 !important;
   letter-spacing: -.018em !important;
@@ -91,8 +91,8 @@ html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(h1, h2, .cc-display, .ccv-title, .rf-vhea
 }
 /* Instrument Serif runs small for its point size; nudge the big moments up
    so they match the sans around them optically rather than numerically. */
-html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h1 { font-size: clamp(28px, 3.4vw, 46px) !important; }
-html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h2 { font-size: clamp(22px, 2.4vw, 32px) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h1:not(:where(#auth-screen *)) { font-size: clamp(28px, 3.4vw, 46px) !important; }
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) h2:not(:where(#auth-screen *)) { font-size: clamp(22px, 2.4vw, 32px) !important; }
 /* The reference leans on italic for the phrase it wants you to hear. */
 html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(h1, h2) em,
 html:not(#cc#cc#cc#cc#cc#cc#cc#cc) .cc-display em { font-style: italic; }
@@ -114,7 +114,7 @@ html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(.modal, .dialog, [role="dialog"], .smodal
 }
 
 /* inputs: a well sunk into the page, not a box drawn on top of it */
-html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input[type="text"], input[type="password"], input[type="email"], input[type="search"], textarea, select) {
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input[type="text"], input[type="password"], input[type="email"], input[type="search"], textarea, select):not(:where(#auth-screen *)) {
   background: var(--cc-sunk) !important;
   border: 1px solid transparent !important;
   border-radius: 10px !important;
@@ -123,7 +123,7 @@ html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input[type="text"], input[type="password"
               border-color var(--rf-t2, .24s) var(--rf-ease, ease),
               box-shadow var(--rf-t2, .24s) var(--rf-ease, ease) !important;
 }
-html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input, textarea, select):focus {
+html:not(#cc#cc#cc#cc#cc#cc#cc#cc) :is(input, textarea, select):not(:where(#auth-screen *)):focus {
   background: var(--cc-surface) !important;
   border-color: var(--cc-line-2) !important;
   box-shadow: 0 0 0 3px var(--cc-accent-soft) !important;
