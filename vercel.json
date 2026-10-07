@@ -6,7 +6,7 @@
   "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/api/:path((?!(public-config|omnidimension)$).*)",
+      "source": "/api/:path((?!public-config$)(?!omnidimension$).*)",
       "destination": "https://REPLACE-WITH-BACKEND-HOST/api/:path*"
     }
   ],
