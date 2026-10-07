@@ -6,14 +6,9 @@
  * page did and hover-peek opened the rail to 236px while the page
  * margin went to 220px. That was the stutter.
  *
- * This file does NOT set the width. rudra-motion-ui.js (React +
- * Motion spring) writes it inline with !important on exactly two
- * elements, which is the only thing that outranks the sheets above
- * and the only way to keep style recalculation off the rest of the
- * document — measured: the custom-property version cost 41ms of
- * style recalc per frame, this one costs two element invalidations.
- * All this file does is take the old transitions away so nothing
- * runs a second clock, and make the no-JS peek width agree.
+ * rudra-motion-ui.js writes each destination once on the rail and
+ * sheet. This stylesheet owns the shared native transition; there
+ * are no per-frame JavaScript geometry writes or competing springs.
  * ============================================================ */
 
 @media (min-width: 769px) {
@@ -21,7 +16,7 @@
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body aside#sidebar.sidebar,
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed,
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek {
-    transition: background-color 240ms ease, border-color 240ms ease, box-shadow 260ms ease !important;
+    transition: width var(--csb-rail,1400ms) var(--csb-spring), min-width var(--csb-rail,1400ms) var(--csb-spring), max-width var(--csb-rail,1400ms) var(--csb-spring), background-color 240ms ease, border-color 240ms ease, box-shadow 260ms ease !important;
   }
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #main-content,
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body main#main-content,
@@ -30,7 +25,7 @@
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek ~ #main-content {
     max-width: none !important;
     transform: none !important;
-    transition: none !important;
+    transition: margin-left var(--csb-rail,1400ms) var(--csb-spring), width var(--csb-rail,1400ms) var(--csb-spring) !important;
   }
   /* Only used before the bundle boots: peek must match the page margin. */
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek,
@@ -43,6 +38,13 @@
      page behind it. */
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar { contain: paint; }
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar.collapsed.au-peek { contain: none; }
+}
+
+/* Match the owning selectors so old high-specificity sheets cannot undo
+   reduced motion or make the resizer lag behind the pointer. */
+html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):is(.sidebar-resizing,[data-motion="off"],[data-motion="reduced"]) body :is(#sidebar.sidebar,#sidebar.sidebar ~ #main-content,#sidebar.sidebar.collapsed.au-peek,#sidebar.sidebar.collapsed.au-peek ~ #main-content) { transition-duration: 1ms !important; transition-delay: 0ms !important; }
+@media (prefers-reduced-motion: reduce) {
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body :is(#sidebar.sidebar,#sidebar.sidebar ~ #main-content,#sidebar.sidebar.collapsed.au-peek,#sidebar.sidebar.collapsed.au-peek ~ #main-content) { transition-duration: 1ms !important; transition-delay: 0ms !important; }
 }
 
 /* The rail is one scroll surface from the brand down to the last item. */

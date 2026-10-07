@@ -1,0 +1,37 @@
+'use strict';
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const read = f => fs.readFileSync(f, 'utf8');
+const writes = [];
+function element() {
+  const values = new Map(), classes = new Set();
+  return { style: { setProperty(k,v) { values.set(k,v); writes.push(k); }, getPropertyValue(k) { return values.get(k) || ''; }, removeProperty(k) { values.delete(k); } }, dataset: {}, handlers: {}, addEventListener(k,f) { this.handlers[k] = f; }, classList: { contains(k) { return classes.has(k); }, add(k) { classes.add(k); }, remove(k) { classes.delete(k); } } };
+}
+const rail = element(), sheet = element(), root = element(), observers = [];
+root.style.setProperty('--sidebar-expanded', '220px'); rail.classList.add('collapsed');
+const mq = { matches: true, addEventListener(_k,fn) { this.change = fn; }, removeEventListener() {} };
+const context = { document: { documentElement: root, getElementById(id) { return id === 'sidebar' ? rail : sheet; } }, matchMedia: () => mq, getComputedStyle(el) { return el.style; }, MutationObserver: class { constructor(fn) { this.fn = fn; observers.push(this); } observe() {} disconnect() {} }, requestAnimationFrame() { throw new Error('Sidebar geometry must not be written from a JS frame loop'); } };
+const source = read('src/rudra-motion-ui.jsx');
+vm.runInNewContext(source.slice(source.indexOf('const RAIL_MIN'), source.indexOf('function enhanceDialog')) + '\nthis.cleanup = animateSidebarSections();', context);
+writes.length = 0;
+rail.classList.remove('collapsed'); observers[0].fn();
+assert.equal(rail.style.getPropertyValue('width'), '220.00px'); assert.equal(sheet.style.getPropertyValue('margin-left'), '220.00px');
+assert.equal(writes.length, 6, 'One state change writes only section state and the two destination geometries');
+observers[0].fn(); assert.equal(writes.length, 6, 'Unrelated class changes must not restart the transition');
+rail.classList.add('collapsed'); observers[0].fn(); assert.equal(rail.style.getPropertyValue('width'), '64.00px');
+rail.classList.add('au-peek'); observers[0].fn(); assert.equal(rail.style.getPropertyValue('width'), '220.00px');
+rail.classList.remove('au-peek'); observers[0].fn(); assert.equal(rail.style.getPropertyValue('width'), '64.00px');
+rail.classList.remove('collapsed'); observers[0].fn(); root.style.setProperty('--sidebar-expanded', '228px'); observers[1].fn();
+assert.equal(rail.style.getPropertyValue('width'), '228.00px', 'Resizing must still work after a completed transition');
+mq.matches = false; mq.change(); assert.equal(rail.style.getPropertyValue('width'), '');
+mq.matches = true; mq.change(); assert.equal(rail.style.getPropertyValue('width'), '228.00px'); context.cleanup();
+const watch = read('clavis-perf.js').match(/function watchSidebar\(\) \{[\s\S]*?\n  \}/)[0];
+vm.runInNewContext(watch + '\nwatchSidebar();', context);
+rail.handlers.transitionstart({ target: rail, propertyName: 'width' }); assert(rail.classList.contains('is-animating'));
+rail.handlers.transitionend({ target: rail, propertyName: 'background-color' }); assert(rail.classList.contains('is-animating'), 'Short colour transitions must not re-enable blur during width motion');
+rail.handlers.transitionend({ target: rail, propertyName: 'width' }); assert(!rail.classList.contains('is-animating'));
+assert.match(read('clavis-sidebar.css'), /--csb-rail:\s*1400ms/);
+assert.match(read('clavis-manual.css'), /transition: width var\(--csb-rail, 1400ms\)/);
+assert.match(read('rudra-rail.css'), /transition: width var\(--csb-rail,1400ms\)/);
+assert.match(read('rudra-rail.css'), /transition: margin-left var\(--csb-rail,1400ms\)/);
+assert.match(read('rudra-flow.css'), /\[data-motion="off"\][\s\S]*transition-duration: 1ms/);
+console.log('Sidebar checks passed: one native geometry transition, reversal targets, post-transition resize, mobile reset and blur lifetime.');

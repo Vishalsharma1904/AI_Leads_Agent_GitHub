@@ -383,13 +383,13 @@ html[data-theme="dark"] .sc-manual-sub { color: #6a6660; }
     min-width: 0 !important;
     max-width: none !important;
     transform: none !important;
-    transition: width 680ms cubic-bezier(.4,0,.2,1), background-color 180ms ease !important;
+    transition: width var(--csb-rail, 1400ms) var(--csb-spring, cubic-bezier(.77,0,.175,1)), background-color 180ms ease !important;
     overflow: hidden !important;
     will-change: auto;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed:not(.au-peek) {
     width: 64px !important;
-    transition-duration: 680ms, 180ms !important;
+    transition-duration: var(--csb-rail, 1400ms), 180ms !important;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed.au-peek {
     box-shadow: none !important; z-index: 60 !important;
@@ -399,17 +399,17 @@ html[data-theme="dark"] .sc-manual-sub { color: #6a6660; }
     width: calc(100% - var(--sidebar-expanded, 220px)) !important;
     max-width: none !important;
     transform: none !important;
-    transition: margin-left 680ms cubic-bezier(.4,0,.2,1), width 680ms cubic-bezier(.4,0,.2,1) !important;
+    transition: margin-left var(--csb-rail, 1400ms) var(--csb-spring, cubic-bezier(.77,0,.175,1)), width var(--csb-rail, 1400ms) var(--csb-spring, cubic-bezier(.77,0,.175,1)) !important;
     will-change: auto;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed:not(.au-peek) ~ #main-content {
     margin-left: 64px !important; width: calc(100% - 64px) !important;
-    transition-duration: 680ms, 680ms !important;
+    transition-duration: var(--csb-rail, 1400ms), var(--csb-rail, 1400ms) !important;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.collapsed.au-peek ~ #main-content {
     margin-left: var(--sidebar-expanded, 220px) !important;
     width: calc(100% - var(--sidebar-expanded, 220px)) !important;
-    transition: margin-left 680ms cubic-bezier(.4,0,.2,1), width 680ms cubic-bezier(.4,0,.2,1) !important;
+    transition: margin-left var(--csb-rail, 1400ms) var(--csb-spring, cubic-bezier(.77,0,.175,1)), width var(--csb-rail, 1400ms) var(--csb-spring, cubic-bezier(.77,0,.175,1)) !important;
   }
   html.sidebar-resizing:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar,
   html.sidebar-resizing:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar ~ #main-content {
@@ -462,7 +462,7 @@ html body .mobile-sidebar-trigger { display: none !important; }
     min-width: 0 !important;
     max-width: none !important;
     transform: translateX(-100%) !important;
-    transition: transform 460ms cubic-bezier(.16,1,.3,1) !important;
+    transition: transform var(--csb-rail, 1400ms) var(--csb-spring, cubic-bezier(.77,0,.175,1)) !important;
   }
   html:not(#m):not(#m):not(#m):not(#m):not(#m) body:not(#m):not(#m):not(#m):not(#m) #sidebar.sidebar.mobile-open {
     transform: translateX(0) !important;

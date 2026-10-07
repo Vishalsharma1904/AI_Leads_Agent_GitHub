@@ -37,11 +37,11 @@
   --csb-focus:     #B8916F;
 
   /* One motion vocabulary for the whole rail. */
-  --csb-spring:    cubic-bezier(0.16, 1, 0.3, 1);   /* settles, no overshoot */
+  --csb-spring:    cubic-bezier(0.77, 0, 0.175, 1); /* deliberate opening and closing */
   --csb-out:       cubic-bezier(0.2, 0, 0, 1);
-  --csb-rail:      240ms;   /* snappy: was 450ms, felt laggy */
-  --csb-label-out: 80ms;    /* labels leave first */
-  --csb-label-in:  160ms;
+  --csb-rail:      1400ms;  /* user requested a very slow rail */
+  --csb-label-out: 320ms;   /* labels leave before the rail narrows */
+  --csb-label-in:  450ms;
   --csb-tap:       120ms;
 }
 html[data-theme="dark"] {

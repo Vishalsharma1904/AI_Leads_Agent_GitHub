@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import { AnimatePresence, LazyMotion, animate as animateValue, domAnimation, m, useAnimate, useReducedMotion } from 'motion/react';
+import { AnimatePresence, LazyMotion, domAnimation, m, useAnimate, useReducedMotion } from 'motion/react';
 
 const springs = { type: 'spring', duration: .76, bounce: .12 };
 const listeners = new Set();
@@ -98,12 +98,9 @@ function animateSidebarSections() {
   const rail = document.getElementById('sidebar'); if (!rail) return () => {};
   const collapsed = () => rail.classList.contains('collapsed') && !rail.classList.contains('au-peek');
 
-  /* Measured, not guessed: driving the width through a custom property on
-     :root re-styled the WHOLE document every frame — 4.36s of style recalc
-     in 6.4s of animation, ~41ms a frame, so the browser only managed 4
-     frames per open. Two inline writes invalidate two elements instead.
-     Inline + !important is also the only thing that outranks the five
-     stylesheets that each still claim the rail's width. */
+  /* Write the destination once. Native transitions own interpolation and
+     reversal; the old JS spring wrote geometry every frame and notified
+     the app's style observers throughout the animation. */
   const paint = (w) => {
     const px = w.toFixed(2) + 'px';
     rail.style.setProperty('width', px, 'important');
@@ -121,30 +118,24 @@ function animateSidebarSections() {
     if (sheet) { sheet.style.removeProperty('margin-left'); sheet.style.removeProperty('width'); }
   };
 
-  let previous = collapsed(), current = railTarget(!previous), animation;
-  /* The labels and the section headings keep their own 110-240ms CSS fade.
-     Tying them to the spring meant a custom-property write per frame, and
-     the fade is far too short for anyone to see the difference. */
+  let previous = collapsed(), current = railTarget(!previous);
   const setSections = (v) => rail.style.setProperty('--rudra-section-open', String(v));
   setSections(previous ? 0 : 1);
   if (desktopRail()) paint(current);
 
   const observer = new MutationObserver(() => {
     const next = collapsed(); if (next === previous) return;
-    previous = next; animation?.stop();
+    previous = next;
     setSections(next ? 0 : 1);
     if (!desktopRail()) { clear(); return; }      // mobile drawer keeps its CSS
-    const to = railTarget(!next);
-    if (motionOff()) { current = to; paint(to); return; }
-    animation = animateValue(current, to, { type: 'spring', duration: .5, bounce: .06,
-      onUpdate: (v) => { current = v; paint(v); } });
+    current = railTarget(!next); paint(current);
   });
   observer.observe(rail, { attributes: true, attributeFilter: ['class'] });
 
   /* The resizer writes --sidebar-expanded live while dragging; the inline
      width has to follow it or the rail freezes at the old number. */
   const follow = new MutationObserver(() => {
-    if (animation || collapsed() || !desktopRail()) return;
+    if (collapsed() || !desktopRail()) return;
     const w = railTarget(true); if (w === current) return;
     current = w; paint(w);
   });
@@ -153,7 +144,7 @@ function animateSidebarSections() {
   const mq = matchMedia('(min-width: 769px)');
   const onMq = () => { if (!mq.matches) clear(); else { current = railTarget(!collapsed()); paint(current); } };
   mq.addEventListener?.('change', onMq);
-  return () => { observer.disconnect(); follow.disconnect(); animation?.stop(); mq.removeEventListener?.('change', onMq); };
+  return () => { observer.disconnect(); follow.disconnect(); mq.removeEventListener?.('change', onMq); };
 }
 function enhanceDialog(dialog){
   if(dialog.__rudraMotion)return;dialog.__rudraMotion=true;

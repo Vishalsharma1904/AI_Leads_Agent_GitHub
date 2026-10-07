@@ -41,7 +41,7 @@
   <!-- Appearance (colours, fonts, minimal) — applied before first paint. -->
   <script src="clavis-appearance.js?v=1.3&r=1004flow"></script>
   <!-- Graphics tier (Auto / Smooth / Max) — must run before the orb draws. -->
-  <script src="clavis-perf.js?v=1.3&r=1002jank&finish=1006e"></script>
+  <script src="clavis-perf.js?v=1.3&r=1002jank&finish=1006e&rail=1007slow"></script>
   <!-- Wake state (asleep until "Rudra" / Hey Buddy / Hey Clay / snap / clap) — everyone asks this before any LLM call. -->
   <script src="clavis-wake.js?v=1.4&r=1007auth"></script>
   <script src="clavis-voice-state.js?v=1.7&r=1007auth"></script>
@@ -152,7 +152,7 @@
        properties set on <html>, and custom properties inherit, so each
        flip of data-sidebar-state re-styled every element in the document.
        Nothing read --main-left at all, and the rail's width is written
-       inline by the spring in rudra-motion-ui.js. */
+       inline once per destination by rudra-motion-ui.js. */
 
     /* 3. SIDEBAR — Maximum specificity selector to beat clamp() rules and !important collisions */
     html body aside#sidebar.sidebar,
@@ -5769,8 +5769,8 @@
   <link rel="stylesheet" href="clavis-refine.css?v=2.0">
   <link rel="stylesheet" href="clavis-task-surface.css?v=2.2&r=1002drag">
   <link rel="stylesheet" href="clavis-viewport.css?v=3.0">
-  <link rel="stylesheet" href="clavis-sidebar.css?v=1.1">
-  <link rel="stylesheet" href="rudra-rail.css?v=1.0&rail=1007">
+  <link rel="stylesheet" href="clavis-sidebar.css?v=1.2&rail=1007slow">
+  <link rel="stylesheet" href="rudra-rail.css?v=1.1&rail=1007slow">
   <link rel="stylesheet" href="clavis-aurora.css?v=10.0">
   <link rel="stylesheet" href="clavis-chat.css?v=2.2">
   <script src="clavis-task-model.js?v=2.0&build=1004complete" defer></script>
@@ -5814,7 +5814,7 @@
        motion, and Claude-style hover cards on the sidebar. Loaded last so it
        wins; delete these two lines to return to the previous look. -->
   <link rel="stylesheet" href="clavis-claude.css?v=1.1&r=1004icons">
-  <link rel="stylesheet" href="clavis-manual.css?v=2.7&r=1004motion&lead-quality=1005j">
+  <link rel="stylesheet" href="clavis-manual.css?v=2.7&r=1004motion&lead-quality=1005j&rail=1007slow">
   <script src="clavis-claude.js?v=1.2&r=0929voice&perf=1006" defer></script>
   <!-- One icon family everywhere: Feather (bundled). Delete to restore the old icons. -->
   <script src="clavis-icons.js?v=1.0&island=1006" defer></script>
@@ -5870,12 +5870,12 @@
        restraint. Last sheet in, so it owns the --cc-* tokens. -->
   <link rel="stylesheet" href="clavis-cream.css?v=1.1">
   <link rel="stylesheet" href="rudra-readability.css?v=1.4">
-  <link rel="stylesheet" href="rudra-flow.css?v=1.3&r=1006finish2">
+  <link rel="stylesheet" href="rudra-flow.css?v=1.3&r=1006finish2&rail=1007slow">
   <link rel="stylesheet" href="crm.css?v=1.0&r=1004crm2">
   <link rel="stylesheet" href="crm-business.css?v=1.0&r=1005business">
   <link rel="stylesheet" href="crm-insights.css?v=1.0&r=1006">
   <link rel="stylesheet" href="rudra-motion-ui.css?v=1.0&r=1006f">
-  <script src="rudra-motion-ui.js?v=1.1&rail=1007" defer></script>
+  <script src="rudra-motion-ui.js?v=1.2&rail=1007slow" defer></script>
   <link rel="stylesheet" href="quiet-entry.css?v=1004composer">
   <link rel="stylesheet" href="composer-refine.css?v=1004refine">
   <link rel="stylesheet" href="chat-claude.css?v=1004chat">

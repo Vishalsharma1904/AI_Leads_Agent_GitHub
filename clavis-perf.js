@@ -125,8 +125,9 @@
     const bar = document.getElementById('sidebar');
     if (!bar || bar.dataset.cxPerfWatched === '1') return;
     bar.dataset.cxPerfWatched = '1';
-    const on = (e) => { if (e.target === bar) bar.classList.add('is-animating'); };
-    const off = (e) => { if (e.target === bar) bar.classList.remove('is-animating'); };
+    const geometry = e => e.target === bar && ['width', 'transform'].includes(e.propertyName);
+    const on = (e) => { if (geometry(e)) bar.classList.add('is-animating'); };
+    const off = (e) => { if (geometry(e)) bar.classList.remove('is-animating'); };
     bar.addEventListener('transitionstart', on);
     bar.addEventListener('transitionend', off);
     bar.addEventListener('transitioncancel', off);
