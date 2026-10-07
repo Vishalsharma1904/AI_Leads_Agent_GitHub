@@ -135,7 +135,7 @@ window.GrokStudio = (() => {
       await s.context.resume();
       const stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
       if (!current()) { stream.getTracks().forEach(t => t.stop()); return; } s.stream = stream;
-      await Promise.all([window.ClavisWorklet.add(s.context, 'clavis-mic-capture-worklet.js'), window.ClavisWorklet.add(s.context, 'clavis-pcm-player-worklet.js?v=3')]);
+      await Promise.all([window.ClavisWorklet.add(s.context, 'clavis-mic-capture-worklet.js'), window.ClavisWorklet.add(s.context, 'clavis-pcm-player-worklet.js?v=4')]);
       if (!current()) return;
       message.session.audio.output.format.rate = s.context.sampleRate;
       s.player = new AudioWorkletNode(s.context, 'clavis-pcm-player', { outputChannelCount: [1] }); s.player.connect(s.context.destination);
