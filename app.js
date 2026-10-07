@@ -661,7 +661,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     window.NEXUS = { showView, currentView: () => currentView, SnapshotManager, DataSanitizer };
     window.showView = showView;
 
-    showToast('info', '✓ Rudra24 AI Agent Ready', `${allLeads.length} leads loaded from memory`);
+    // Startup is silent; the dashboard already shows the loaded lead count.
   } catch (err) {
     console.error('Init error:', err);
     ensureAppShellVisible();

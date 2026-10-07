@@ -168,7 +168,6 @@
   // load na ho. "hi pal" hata diya — normal baat-cheet me bhi fire hota tha.
   const NAME_RE = /\b(clavis|klavis|clevis|klevis|clavish|claves|clavice|hey buddy|hey clay|hey klay)\b|क्ल[ेैा]विस|क्लेविज़/i;
   const ASK_NOW_RE = /\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|bhejo|nikalo|sunao|chahiye|chahie|show me|open|tell me|find|search)\b|करो|दिखाओ|बताओ|चाहिए/i;
-  const CONVO_RE = /[\u0900-\u097F]|\b(karo|kar\s*do|kardo|kariye|kijiye|dikhao|dikha\s*do|batao|bata\s*do|bataiye|kholo|khol\s*do|band|bhejo|nikalo|sunao|chahiye|kya|kaise|kyun|kitn[ae]|kaun|kahan|haan|nahi|theek|acha|accha|aur|wapas|mujhe|mera|meri|humein|leads?)\b/i;
   const STOP_RE = /\b(stop|wait|ruko|ruk ja|ruk jao|bas|bas karo|chup|chup karo|shut up|hold on|one sec|ek (?:min|minute|second)|suno|sunno|listen|nahi nahi|no no|cancel)\b|रुको|बस|चुप|सुनो/i;
   const ASK_RE = /\b(karo|kar do|kardo|kariye|kijiye|karna|dikhao|dikha do|dikhaiye|batao|bata do|bataiye|kholo|khol do|band|hatao|hata do|chalao|chala do|nikalo|nikal do|bhejo|bhej do|likho|likh do|search|find|show|open|close|tell|play|pause|stop|start|call|send|make|create|give|get|find|check|explain|summari[sz]e|translate|remind|set|go|zoom|scroll|type|read|what|what's|whats|which|who|whom|whose|why|how|when|where|kya|kyaa|kaise|kab|kahan|kaha|kitna|kitne|kitni|kaun|kyun|kyu|kis|konsa|kaunsa|can you|could you|would you|will you|please|plz|pls|zara|jara|chahiye|lao|le aao|de do|do na|suno|next|aur|agla|pichla|wapas|haan|han|nahi|nahin|yes|yeah|yep|no|nope|ok|okay|theek|thik|done|sure|bilkul|leads?|map|photo|photos|image|images|website|email|excel|whatsapp)\b|करो|दिखाओ|बताओ|खोलो|बंद|हटाओ|क्या|कैसे|कब|कहाँ|कितने|कौन|क्यों/i;
   function named(text) {
@@ -218,13 +217,10 @@
       if (e.fresh >= 2 && his) return { accept: true, barge: true, reason: 'his-voice', text: t };
       // Sir cutting in with a clear new instruction ("nahi, mujhe Noida ki
       // list chahiye") is heard and done — chatter without a request is not.
-      if (e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
-      // Answering right after Rudra24 AI finished ("haan, Noida ki bhi dikhao"):
+      if (e.fresh >= 4 && e.score < 0.25 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
+      // Answering right after Clavis finished ("haan, Noida ki bhi dikhao"):
       // clearly new words, not an echo, a Hindi/Hinglish request.
-      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && convoRequest(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
-      // Continuous session: he answers right after Rudra24 AI stops. Not an echo
-      // (the 0.8 check above) and at least one new word → it's his turn.
-      if (!speakingNow && ctx.session && !voiceId.enabled() && e.n >= 2 && e.fresh >= 1) return { accept: true, barge: false, reason: 'session', text: t };
+      if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
       return { accept: false, reason: 'unsure-while-speaking', text: t, echo: e };
     }
     // A recognizer can also deliver Rudra24 AI's words many seconds late.
@@ -239,14 +235,10 @@
       // Without Voice ID, the few seconds right after a reply still work like
       // a conversation — but only for a Hindi / Hinglish request, never
       // English chatter from a video ("go to the next video").
-      if (v.verdict !== 'owner' && !voiceId.enabled() && convoRequest(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
-      // Continuous session (he woke Rudra24 AI and is talking with it): any real
-      // sentence or a request / an answer to Rudra24 AI's question goes on — the
-      // LLM's [[silent]] still filters side talk, the echo guard ran above.
-      if (ctx.session && !voiceId.enabled()) {
-        const n = t.split(/\s+/).filter(Boolean).length;
-        if (n >= 2 || looksLikeRequest(t) || clavisJustAsked()) return { accept: true, barge: false, reason: 'session', text: t };
-      }
+      const words = t.split(/\s+/).filter(Boolean).length;
+      // Only a clear instruction (karo / dikhao / batao / chahiye …) — a room's
+      // Hindi chatter used to pass on words like "kya" or "aur" and start searches.
+      if (v.verdict !== 'owner' && !voiceId.enabled() && words >= 2 && words <= 30 && ASK_NOW_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
       if (v.verdict !== 'owner') return { accept: false, reason: voiceId.enabled() ? 'not-owner' : 'not-addressed', text: t, voice: v };
     }
     return { accept: true, barge: false, reason: 'ok', text: t };

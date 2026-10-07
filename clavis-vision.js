@@ -33,6 +33,16 @@
 
 (() => {
   const LS_ENABLED = 'clavis_vision_enabled';
+  // Sir asked for quiet: Clavis speaks only when spoken to. Proactive tips and
+  // screen watching start OFF (once, for everyone) — "tips on" brings them back.
+  try {
+    if (!localStorage.getItem('clavis_quiet_v1')) {
+      localStorage.setItem('clavis_proactive_enabled', 'false');
+      localStorage.setItem('clavis_vision_enabled', 'false');
+      localStorage.setItem('clavis_quiet_v1', '1');
+    }
+  } catch (_) {}
+
   const LS_INTERVAL = 'clavis_vision_interval_ms';
   const MIN_INTERVAL = 30000;   // don't hammer the vision API / the user's quota
   const DEFAULT_INTERVAL = 180000;   // a calm look every 3 min (was 45 s)

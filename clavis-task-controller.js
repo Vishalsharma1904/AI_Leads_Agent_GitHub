@@ -120,6 +120,34 @@
     var recent = Date.now() - (t.startedAt || 0) <= REUSE_WINDOW_MS;
     return (same || recent) ? t : null;
   }
+  /** Spelling-clean the heading shown at the top of the panel. Runs after
+   * the instant local title is already on screen (same instant-local +
+   * async-LLM-refine idiom as ClavisIQ's ghost suggestions) and only swaps
+   * it in if the corrected text still classifies at least as confidently —
+   * a bad correction never overwrites a good title with a worse one. */
+  function refineTitle(id, rawText) {
+    if (!global.ClavisIQ || typeof global.ClavisIQ.callModel !== 'function') return;
+    // Opt-in: an extra AI call per request only for a prettier heading used up
+    // the free daily quota that answers need (clavis_title_ai = 'true' to enable).
+    try { if (localStorage.getItem('clavis_title_ai') !== 'true') return; } catch (_) { return; }
+    var text = String(rawText || '').trim();
+    if (!text || text.length > 200) return;
+    global.ClavisIQ.callModel([
+      { role: 'system', content: 'Fix only spelling and obvious typos in the user text below. Keep the language (Hindi/Hinglish/English as given), meaning, and word order exactly the same. Reply with just the corrected text and nothing else.' },
+      { role: 'user', content: text }
+    ], { fast: true, temperature: 0, max_tokens: 60 }).then(function (corrected) {
+      var clean = String(corrected || '').trim().replace(/^["']|["']$/g, '');
+      if (!clean || clean.length > 220) return;
+      var t = tasks.get(id);
+      if (!t || t.phase === 'completed' || t.phase === 'failed') return;
+      var reclassified = Model.IntentClassifier.classify(clean);
+      if (reclassified && reclassified.confidence >= t.confidence - 0.05) {
+        t.classification = reclassified;
+        t.title = reclassified.title();
+        emit();
+      }
+    }).catch(function () {});
+  }
 
   function withTask(id, fn) {
     var t = tasks.get(id || activeId);

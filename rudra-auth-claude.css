@@ -241,6 +241,24 @@
 
 #auth-screen .ag-auth-card::before { display: none !important; }
 
+#auth-screen .ag-auth-feedback[hidden] { display: none !important; }
+#auth-screen .ag-auth-feedback {
+  margin-bottom: 18px;
+  padding: 14px;
+  border: 1px solid #e2c8bc;
+  border-radius: 10px;
+  background: #fff8f4;
+  color: #784333;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#auth-screen .ag-auth-feedback p { margin: 0 0 8px; }
+#auth-screen .ag-auth-feedback button {
+  border: 0; padding: 4px 0; background: transparent;
+  color: inherit; font: inherit; font-weight: 600; text-decoration: underline;
+  cursor: pointer;
+}
+
 /* ── language switcher, top right ─────────────────────────── */
 #auth-screen select,
 body > .rudra-lang-switch select {

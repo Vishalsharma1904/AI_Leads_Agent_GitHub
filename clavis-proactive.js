@@ -67,14 +67,17 @@
 
   // ── settings ────────────────────────────────────────────
   const num = (k, d) => { const v = Number(localStorage.getItem(k)); return Number.isFinite(v) && v > 0 ? v : d; };
-  // 2026-09: default OFF — background LLM nudges keys kha jaate the. Settings se ON.
-  // 2026-09-30: default ON again. It was switched off because background LLM
-  // nudges burned keys; that is handled properly now — a 20 min floor between
-  // lines, max 2 an hour, an ignore-backoff, and ClavisWake's presence check.
-  // Settings se OFF kiya ja sakta hai.
-  const isEnabled   = () => localStorage.getItem(LS.enabled) !== 'false';
-  // Soye hue Rudra24 AI ko background me LLM / Live nahi chalana (ClavisWake).
-  const bgAllowed   = () => { try { return window.ClavisVoiceState?.isClavisWorkspace?.() && (!window.ClavisWake || window.ClavisWake.allowBackground()); } catch (_) { return false; } };
+  // Sir asked for quiet: Clavis speaks only when spoken to. Proactive tips and
+  // screen watching start OFF (once, for everyone) — "tips on" brings them back.
+  try {
+    if (!localStorage.getItem('clavis_quiet_v1')) {
+      localStorage.setItem('clavis_proactive_enabled', 'false');
+      localStorage.setItem('clavis_vision_enabled', 'false');
+      localStorage.setItem('clavis_quiet_v1', '1');
+    }
+  } catch (_) {}
+  const isEnabled   = () => localStorage.getItem(LS.enabled) === 'true';   // default OFF — only when he turns it on
+  const bgAllowed = () => { try { return window.ClavisVoiceState?.isClavisWorkspace?.() && (!window.ClavisWake || window.ClavisWake.allowBackground()); } catch (_) { return false; } };
   const shareTitles = () => localStorage.getItem(LS.privacy) !== 'false';   // default ON
   const gapMs       = () => Math.max(MIN_GAP, num(LS.gapMs, DEFAULT_GAP));
   const perHour     = () => Math.min(4, num(LS.perHour, DEFAULT_HOUR));
