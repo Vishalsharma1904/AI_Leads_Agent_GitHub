@@ -63,3 +63,83 @@
 #vp-grok #gr-numbers{white-space:pre-wrap;overflow-wrap:anywhere}
 #vp-grok .om-row>span{font-size:13px;color:var(--om-muted)}
 #view-voice-ai>.view-header>div>div,#view-voice-ai>.view-header .view-header-actions{flex-wrap:wrap;max-width:100%}
+
+
+/* ── Controls you can actually see ──────────────────────────────────────────
+   Measured, not guessed: in this panel every text field computed to
+   border-color rgba(0,0,0,0) and background rgba(0,0,0,0), so "Languages",
+   "Speech speed", "Reply creativity" and "Recognition language" rendered as
+   bare text while the dropdowns looked like real controls. Two global sheets
+   do it — quiet-entry.css sets `border-color: transparent !important` on every
+   input in the app, and apple-polish.css sets `background: var(--ap-surface-
+   input, transparent) !important`. Both are meant for the chat composer.
+   The long :not(#om) chain is what it takes to out-rank them here, and only
+   here. The panel's own --om-line/--input-bg inherit theme values that are
+   near-invisible too, so the colours are pinned to the card instead.          */
+:is(#vp-omnidimension:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om),#vp-grok:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om)) :is(input:not([type=checkbox]):not([type=radio]):not([type=range]),textarea,select) {
+  border: 1px solid var(--om-field-line) !important;
+  background: var(--om-field-bg) !important;
+  color: var(--om-ink) !important;
+  border-radius: 9px !important;
+  box-shadow: none !important;
+  min-height: 44px !important;
+  padding: 11px 12px !important;
+  opacity: 1 !important;
+}
+:is(#vp-omnidimension:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om),#vp-grok:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om)) :is(input,textarea,select):hover { border-color: var(--om-field-line-strong) !important; }
+:is(#vp-omnidimension:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om),#vp-grok:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om)) :is(input,textarea,select):focus {
+  border-color: #5d8465 !important;
+  box-shadow: 0 0 0 3px rgba(93,132,101,.18) !important;
+}
+:is(#vp-omnidimension:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om),#vp-grok:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om)) ::placeholder { color: var(--om-muted) !important; opacity: .75 !important; }
+
+:is(#vp-omnidimension,#vp-grok) {
+  --om-field-bg: var(--surface, var(--card-bg, #fff));
+  --om-field-line: color-mix(in srgb, var(--om-ink) 22%, transparent);
+  --om-field-line-strong: color-mix(in srgb, var(--om-ink) 38%, transparent);
+}
+
+/* ── Sliders: a number you can feel, with the number still shown ───────────── */
+:is(#vp-omnidimension,#vp-grok) .om-slider { gap: 6px; }
+:is(#vp-omnidimension,#vp-grok) .om-slider .om-slider-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+:is(#vp-omnidimension,#vp-grok) .om-slider output {
+  font-variant-numeric: tabular-nums; font-weight: 700; font-size: 13px;
+  padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--om-ink) 8%, transparent);
+}
+:is(#vp-omnidimension:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om),#vp-grok:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om)) input[type=range] {
+  -webkit-appearance: none; appearance: none; width: 100%;
+  min-height: 0 !important; height: 22px !important; padding: 0 !important;
+  border: 0 !important; background: transparent !important; cursor: pointer;
+}
+:is(#vp-omnidimension,#vp-grok) input[type=range]::-webkit-slider-runnable-track {
+  height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--om-ink) 16%, transparent);
+}
+:is(#vp-omnidimension,#vp-grok) input[type=range]::-moz-range-track {
+  height: 5px; border-radius: 999px; background: color-mix(in srgb, var(--om-ink) 16%, transparent);
+}
+:is(#vp-omnidimension,#vp-grok) input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 18px; height: 18px; margin-top: -6.5px;
+  border-radius: 50%; background: #3b5a43; border: 2px solid var(--surface, #fff);
+  box-shadow: 0 1px 4px rgba(0,0,0,.28);
+}
+:is(#vp-omnidimension,#vp-grok) input[type=range]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 50%; background: #3b5a43;
+  border: 2px solid var(--surface, #fff); box-shadow: 0 1px 4px rgba(0,0,0,.28);
+}
+:is(#vp-omnidimension,#vp-grok) .om-hint { font-size: 12px; color: var(--om-muted); font-weight: 500; line-height: 1.5; margin: 0; }
+
+/* ── Languages: a fixed list, so it is picked, not typed ───────────────────── */
+:is(#vp-omnidimension,#vp-grok) .om-chips { display: flex; flex-wrap: wrap; gap: 7px; margin: 2px 0 0; }
+:is(#vp-omnidimension,#vp-grok) .om-chips label {
+  flex-direction: row; align-items: center; gap: 7px; margin: 0; font-weight: 500; font-size: 13px;
+  padding: 8px 12px; min-height: 40px; border: 1px solid var(--om-field-line);
+  border-radius: 999px; cursor: pointer; background: var(--om-field-bg);
+}
+:is(#vp-omnidimension,#vp-grok) .om-chips label:hover { border-color: var(--om-field-line-strong); }
+:is(#vp-omnidimension,#vp-grok) .om-chips label:has(input:checked) {
+  background: #3b5a43; border-color: #3b5a43; color: #fff; font-weight: 600;
+}
+:is(#vp-omnidimension:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om),#vp-grok:not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om):not(#om)) .om-chips input[type=checkbox] { width: 15px !important; height: 15px !important; min-height: 0 !important; accent-color: #fff; }
+/* A group of checkboxes is a fieldset, not a label pointing at nothing. */
+:is(#vp-omnidimension,#vp-grok) .om-chipset { border: 0; padding: 0; margin: 0 0 14px; min-width: 0; }
+:is(#vp-omnidimension,#vp-grok) .om-chipset legend { padding: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--om-ink); }

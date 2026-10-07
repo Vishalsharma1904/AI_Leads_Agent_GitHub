@@ -39,11 +39,25 @@ Write Hindi speech in Devanagari with familiar English terms where natural. Use 
       <div class="om-steps"><div><span>01</span><strong>Connect account</strong><small>Your key stays encrypted</small></div><div><span>02</span><strong>Design the conversation</strong><small>Instructions, voice & pace</small></div><div><span>03</span><strong>Listen, then call</strong><small>Browser test before phone calls</small></div></div><div class="om-tabs" aria-label="Voice workspace sections">${[['agents','Agents'],['test','Test & calls'],['numbers','Phone numbers'],['files','Knowledge files'],['campaigns','Campaigns'],['more','More controls']].map(([id,name]) => `<button type="button" data-om-tab="${id}" aria-pressed="${id==='agents'}">${name}</button>`).join('')}</div>
       <section data-om-panel="agents"><div class="om-grid"><aside class="om-card"><div class="om-row"><h3>Your agents</h3><button type="button" class="btn-secondary" data-om-action="new">New agent</button></div><label for="om-search">Find an agent</label><input id="om-search" placeholder="Search by name"><button type="button" class="btn-secondary" data-om-action="agents">Search / refresh</button><div id="om-agents" class="om-list">Connect your account to load agents.</div><div class="om-row"><button type="button" data-om-action="agents-prev">Previous</button><span id="om-agent-page">Page 1</span><button type="button" data-om-action="agents-next">Next</button></div></aside>
       <div class="om-card"><div class="om-row"><h3>Build your calling agent</h3><span id="om-agent-id">New agent</span></div><form id="om-agent-form"><div class="om-fields">${field('name','Agent name','required maxlength="120" placeholder="Rudra sales assistant"')}${field('welcome_message','First spoken message','required maxlength="3000" placeholder="Namaste, main Rudra24 ka AI assistant hoon…"')}<label class="om-wide">Custom instructions<textarea name="instructions" required rows="8" maxlength="30000" placeholder="Your business, calling goal, questions, handling objections, and when to hand over to a person."></textarea></label>
-      <label>Calling direction<select name="call_type"><option value="Outgoing">Outgoing calls</option><option value="Incoming">Incoming calls</option></select></label>${field('languages','Languages (comma separated)','value="Hindi, English (India)" placeholder="Hindi, English (India)"')}
+      <label>Calling direction<select name="call_type"><option value="Outgoing">Outgoing calls</option><option value="Incoming">Incoming calls</option></select></label><fieldset class="om-wide om-chipset"><legend>Languages the agent may speak</legend><div class="om-chips" id="om-langs">${
+        ['Hindi','English (India)','Marathi','Gujarati','Punjabi','Bengali','Tamil','Telugu','Kannada','Malayalam','Odia','Assamese']
+          .map(l=>`<label><input type="checkbox" value="${l}"${/^(Hindi|English \(India\))$/.test(l)?' checked':''}>${l}</label>`).join('')
+      }</div><input type="hidden" name="languages" value="Hindi, English (India)"><p class="om-hint">Pick every language the caller might use. The first two cover most Indian business calls.</p></fieldset>
       <fieldset class="om-wide om-sound"><legend>Voice & conversation</legend><p>Choose a voice, listen to its sample, then fine-tune the conversation.</p><div class="om-row"><button type="button" class="btn-primary" data-om-action="natural">Natural female · Hinglish</button><button type="button" data-om-action="fast">Faster replies</button><button type="button" data-om-action="steady">Fewer cut-offs</button></div><div class="om-fields"><label>AI model<select name="model"><option value="">Provider default / keep current</option></select></label><label>Voice provider<select name="voice_provider"><option value="">Provider default / keep current</option><option value="sarvam">Sarvam</option><option value="eleven_labs">ElevenLabs</option><option value="cartesia">Cartesia</option><option value="google">Google</option></select></label>
       <label>Voice preference<select name="voice_gender"><option value="female">Female</option><option value="">All voices</option></select></label><label>Voice<select name="voice_id"><option value="">Choose a voice after loading catalog</option></select></label><button type="button" class="btn-secondary" data-om-action="voices">Load available voices</button>
-      <div class="om-wide"><audio id="om-voice-sample" controls preload="none" hidden></audio><p id="om-voice-note">Load voices to listen to real provider samples. Nothing plays automatically.</p></div><label>Speech speed<input name="speed" type="number" min="0.5" max="2" step="0.05" value="1"></label><label>Reply creativity<input name="temperature" type="number" min="0" max="1" step="0.05" value="0.35"></label><label class="om-check"><input name="interrupt" type="checkbox" checked>Allow the caller to interrupt</label><label class="om-check om-wide"><input name="natural_style" type="checkbox" checked>Natural Hindi / Hinglish conversation style</label><label class="om-check"><input name="dynamic_greeting" type="checkbox">Adapt greeting to each caller</label><label class="om-check om-wide"><input name="tune_audio" type="checkbox" checked>Apply the listening settings below when saving</label><label>Speech recognition<select name="stt"><option value="sarvam">Sarvam · Indian languages</option><option value="soniox">Soniox · multilingual</option><option value="deepgram_stream">Deepgram</option><option value="cartesia">Cartesia</option><option value="azure_stream">Azure</option></select></label><label>Recognition language<input name="stt_language" value="hi-IN" placeholder="hi-IN, hi or multi"></label><label>Wait after the caller stops (ms)<input name="silence" type="number" min="200" max="2000" step="50" value="300"></label><label>Words needed to interrupt<input name="interrupt_words" type="number" min="1" max="10" step="1" value="3"></label><label class="om-check"><input name="noise" type="checkbox" checked>Reduce background noise</label><label class="om-check"><input name="greeting_interrupt" type="checkbox" checked>Allow interruption of the greeting</label></div><p>Speed 1× is normal. A longer wait avoids cutting off pauses; a shorter wait replies sooner. Start with 300 ms and 3 words. Phone networks and the selected voice also affect sound quality.</p><a href="https://docs.omnidim.io/docs/dashboard-guides/voices-and-languages" target="_blank" rel="noopener noreferrer">Provider tuning guide</a></fieldset></div>
-      <details><summary>Call behavior & integrations</summary><div class="om-fields">${field('timezone','Timezone','value="Asia/Kolkata"')}${field('max_duration','Maximum call seconds','type="number" min="30" max="3600" value="180"')}<label>End-call instruction<textarea name="end_condition" rows="2" placeholder="End when the next step is agreed."></textarea></label>${field('end_message','Closing message','placeholder="Dhanyavaad, aapka din achha rahe."')}<label class="om-wide">Dynamic variables (JSON)<textarea name="variables" rows="3" spellcheck="false" placeholder='{"customer_name":"Demo user"}'></textarea></label><label class="om-wide">Extra API settings (JSON)<textarea name="advanced" rows="5" spellcheck="false" placeholder='{"transcriber":{"provider":"deepgram_stream","model":"nova-3","language":"hi"},"web_search":{"enabled":true,"provider":"DuckDuckGo"}}'></textarea></label></div><p>Extra settings support transfers, voicemail, post-call email/webhooks, background sound, STT and context sections. Existing settings are preserved when omitted.</p></details><div class="om-row"><button class="btn-primary" type="submit">Save agent</button><button type="button" class="btn-secondary" data-om-action="test-tab">Test this agent</button><button type="button" data-om-action="delete-agent">Delete agent</button></div></form></div></div></section>
+      <div class="om-wide"><audio id="om-voice-sample" controls preload="none" hidden></audio><p id="om-voice-note">Load voices to listen to real provider samples. Nothing plays automatically.</p></div><label class="om-slider"><span class="om-slider-head">Speech speed<output data-for="speed">1.00&times;</output></span><input name="speed" type="range" min="0.5" max="2" step="0.05" value="1"><span class="om-hint">1&times; is normal. Slower is easier to follow on a phone line.</span></label><label class="om-slider"><span class="om-slider-head">Reply creativity<output data-for="temperature">0.35</output></span><input name="temperature" type="range" min="0" max="1" step="0.05" value="0.35"><span class="om-hint">Low sticks to your script. High improvises more, and wanders more.</span></label><label class="om-check"><input name="interrupt" type="checkbox" checked>Allow the caller to interrupt</label><label class="om-check om-wide"><input name="natural_style" type="checkbox" checked>Natural Hindi / Hinglish conversation style</label><label class="om-check"><input name="dynamic_greeting" type="checkbox">Adapt greeting to each caller</label><label class="om-check om-wide"><input name="tune_audio" type="checkbox" checked>Apply the listening settings below when saving</label><label>Speech recognition<select name="stt"><option value="sarvam">Sarvam · Indian languages</option><option value="soniox">Soniox · multilingual</option><option value="deepgram_stream">Deepgram</option><option value="cartesia">Cartesia</option><option value="azure_stream">Azure</option></select></label><label>Recognition language<select name="stt_language">${
+        [['hi-IN','Hindi (India)'],['en-IN','English (India)'],['multi','Auto-detect / multilingual'],['hi','Hindi'],['en','English'],
+         ['mr-IN','Marathi'],['gu-IN','Gujarati'],['pa-IN','Punjabi'],['bn-IN','Bengali'],['ta-IN','Tamil'],
+         ['te-IN','Telugu'],['kn-IN','Kannada'],['ml-IN','Malayalam']]
+          .map(([v,t])=>`<option value="${v}">${t} &middot; ${v}</option>`).join('')
+      }</select></label><label class="om-slider"><span class="om-slider-head">Wait after the caller stops<output data-for="silence">300 ms</output></span><input name="silence" type="range" min="150" max="2000" step="25" value="300"><span class="om-hint">Shorter replies sooner. Longer stops it cutting people off mid-sentence.</span></label><label class="om-slider"><span class="om-slider-head">Words needed to interrupt<output data-for="interrupt_words">3 words</output></span><input name="interrupt_words" type="range" min="1" max="10" step="1" value="3"><span class="om-hint">How much the caller must say before the agent stops talking. 1 reacts to a cough.</span></label><label class="om-check"><input name="noise" type="checkbox" checked>Reduce background noise</label><label class="om-check"><input name="greeting_interrupt" type="checkbox" checked>Allow interruption of the greeting</label></div><p>Speed 1× is normal. A longer wait avoids cutting off pauses; a shorter wait replies sooner. Start with 300 ms and 3 words. Phone networks and the selected voice also affect sound quality.</p><a href="https://docs.omnidim.io/docs/dashboard-guides/voices-and-languages" target="_blank" rel="noopener noreferrer">Provider tuning guide</a></fieldset></div>
+      <details><summary>Call behavior & integrations</summary><div class="om-fields"><label>Timezone<select name="timezone">${
+        ['Asia/Kolkata','Asia/Dubai','Asia/Singapore','Asia/Karachi','Asia/Dhaka','Asia/Kathmandu','Europe/London','Europe/Berlin','America/New_York','America/Chicago','America/Los_Angeles','Australia/Sydney','UTC']
+          .map(z=>`<option value="${z}">${z.replace('_',' ')}</option>`).join('')
+      }</select></label><label>Maximum call length<select name="max_duration">${
+        [[60,'1 minute'],[120,'2 minutes'],[180,'3 minutes'],[300,'5 minutes'],[600,'10 minutes'],[900,'15 minutes'],[1800,'30 minutes'],[3600,'1 hour']]
+          .map(([v,t])=>`<option value="${v}">${t}</option>`).join('')
+      }</select></label><label>End-call instruction<textarea name="end_condition" rows="2" placeholder="End when the next step is agreed."></textarea></label>${field('end_message','Closing message','placeholder="Dhanyavaad, aapka din achha rahe."')}<label class="om-wide">Dynamic variables (JSON)<textarea name="variables" rows="3" spellcheck="false" placeholder='{"customer_name":"Demo user"}'></textarea></label><label class="om-wide">Extra API settings (JSON)<textarea name="advanced" rows="5" spellcheck="false" placeholder='{"transcriber":{"provider":"deepgram_stream","model":"nova-3","language":"hi"},"web_search":{"enabled":true,"provider":"DuckDuckGo"}}'></textarea></label></div><p>Extra settings support transfers, voicemail, post-call email/webhooks, background sound, STT and context sections. Existing settings are preserved when omitted.</p></details><div class="om-row"><button class="btn-primary" type="submit">Save agent</button><button type="button" class="btn-secondary" data-om-action="test-tab">Test this agent</button><button type="button" data-om-action="delete-agent">Delete agent</button></div></form></div></div></section>
       <section data-om-panel="test" hidden><div class="om-grid"><div class="om-card"><h3>Test in your browser</h3><p id="om-selected">Save or select an agent first.</p><p>Uses your OmniDimension balance. No phone number needed. Microphone starts only when you press Start conversation.</p><div class="om-row"><button type="button" class="btn-primary" data-om-action="web-start">Start conversation</button><button type="button" class="btn-secondary" data-om-action="web-mute" id="om-mute">Mute</button><button type="button" class="btn-secondary" data-om-action="web-stop">End conversation</button></div><p id="om-web-state" role="status">Microphone is off.</p><div id="om-transcript" class="om-transcript" role="log" aria-label="Conversation transcript"></div></div>
       <div class="om-card"><h3>Place a phone test call</h3><p>Select your purchased number, enter your own test phone number and confirm. Dispatch means queued; logs show whether it connected.</p><form id="om-call-form"><label>Call from<select id="om-from"><option value="">Platform default (if available)</option></select></label><label>Call to<input id="om-to" required type="tel" pattern="\\+[1-9][0-9]{7,14}" placeholder="+919876543210"></label><label>Call context (JSON)<textarea id="om-context" rows="3" placeholder='{"customer_name":"Your name"}'></textarea></label><label class="om-check"><input id="om-call-consent" type="checkbox" required>I am authorized to call this number and accept provider call charges.</label><button type="submit" class="btn-primary">Confirm & place test call</button></form><p id="om-call-result" role="status"></p></div></div><div class="om-card"><div class="om-row"><h3>Call logs & analytics</h3><button type="button" class="btn-secondary" data-om-action="logs">Refresh logs</button><label>Status<select id="om-log-filter"><option value="">All statuses</option><option>completed</option><option>busy</option><option>failed</option><option>no-answer</option></select></label></div><div id="om-logs">No call logs loaded.</div><div class="om-row"><button type="button" data-om-action="logs-prev">Previous</button><span id="om-log-page">Page 1</span><button type="button" data-om-action="logs-next">Next</button></div><div id="om-call-detail"></div></div></section>
       <section data-om-panel="numbers" hidden><div class="om-card"><div class="om-row"><h3>Your calling numbers</h3><button type="button" class="btn-secondary" data-om-action="numbers">Refresh numbers</button></div><p>Attach your number to the selected agent for incoming calls. Outgoing tests can use a number selected in Test & calls.</p><div id="om-numbers">Connect to load purchased or imported numbers.</div></div><div class="om-card"><h3>Find a number to purchase</h3><form id="om-shop-form"><div class="om-fields"><label>Country<select name="region"><option value="IN">India</option><option value="US">United States</option></select></label>${field('carrier','Carrier','required value="carrier-1"')}${field('pattern','Number contains','placeholder="Optional digits"')}<button type="submit" class="btn-secondary">Search available numbers</button></div></form><p>Rental, telephony charges and KYC depend on the carrier. Purchase only after reviewing the returned price.</p><div id="om-shop"></div></div></section>
@@ -70,6 +84,82 @@ Write Hindi speech in Devanagari with familiar English terms where natural. Use 
     f.elements.voice_id.addEventListener('change',voiceSample);
     f.elements.voice_gender.addEventListener('change',()=>{voices=[];f.elements.voice_id.innerHTML='<option value="">Load voices for this preference</option>';voiceSample();});
     f.elements.stt.addEventListener('change',()=>{f.elements.stt_language.value=f.elements.stt.value==='deepgram_stream'?'hi':f.elements.stt.value==='soniox'?'multi':'hi-IN';});
+
+    /* A dropdown must never lose a value it was not built to know about: an
+       agent saved with a timezone or a call length outside these lists would
+       otherwise come back silently changed. Every one of these selects takes
+       whatever the API sends and grows an option for it. */
+    // Deferred, and composed with whatever is already on the instance:
+    // rudra-motion-ui.js wraps `value` on every select from a MutationObserver,
+    // so it lands after this function returns. Overwriting it outright lost
+    // both its label sync and this guard — measured: the value came back "".
+    setTimeout(()=>{
+      ['stt_language','timezone','max_duration'].forEach(name=>{
+        const select=f.elements[name]; if(!select||select.__omGuard) return;
+        select.__omGuard=true;
+        const own=Object.getOwnPropertyDescriptor(select,'value');
+        const base=(own&&own.set)?own:Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+        Object.defineProperty(select,'value',{configurable:true,
+          get(){return base.get.call(this);},
+          set(value){
+            const wanted=String(value??'');
+            if(wanted && ![...this.options].some(o=>o.value===wanted)) this.add(new Option(wanted,wanted));
+            base.set.call(this,wanted);
+          }});
+      });
+    },0);
+
+    /* Sliders show the number they are setting; without it a slider is a guess. */
+    const readouts={speed:v=>Number(v).toFixed(2)+'\u00d7',temperature:v=>Number(v).toFixed(2),
+                    silence:v=>v+' ms',interrupt_words:v=>v+(Number(v)===1?' word':' words')};
+    Object.entries(readouts).forEach(([name,format])=>{
+      const input=f.elements[name], out=f.querySelector(`output[data-for="${name}"]`);
+      if(!input||!out) return;
+      const sync=()=>{out.textContent=format(input.value);};
+      input.addEventListener('input',sync);
+      // The loader and the three presets assign .value directly, and that
+      // fires nothing, so the readout has to be told.
+      const descriptor=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+      Object.defineProperty(input,'value',{configurable:true,
+        get(){return descriptor.get.call(this);},
+        set(value){descriptor.set.call(this,value);sync();}});
+      sync();
+    });
+
+    /* Languages are a known list, so they are chips. The hidden input still
+       carries the comma string that save and load already speak. */
+    const langBox=$('om-langs'), langField=f.elements.languages;
+    if(langBox&&langField){
+      const boxes=()=>[...langBox.querySelectorAll('input[type=checkbox]')];
+      const fromChips=()=>{descriptorLang.set.call(langField,boxes().filter(b=>b.checked).map(b=>b.value).join(', '));};
+      const descriptorLang=Object.getOwnPropertyDescriptor(HTMLInputElement.prototype,'value');
+      const toChips=()=>{
+        const chosen=descriptorLang.get.call(langField).split(',').map(x=>x.trim().toLowerCase()).filter(Boolean);
+        boxes().forEach(b=>{b.checked=chosen.includes(b.value.toLowerCase());});
+        // A language the account already uses that is not on the list still
+        // gets a chip, rather than disappearing the moment the agent is saved.
+        chosen.forEach(name=>{
+          if(boxes().some(b=>b.value.toLowerCase()===name)) return;
+          const label=document.createElement('label');
+          label.innerHTML='<input type="checkbox" checked>';
+          label.append(name.replace(/\b\w/g,c=>c.toUpperCase()));
+          label.firstChild.value=name;
+          label.firstChild.addEventListener('change',fromChips);
+          langBox.appendChild(label);
+        });
+      };
+      boxes().forEach(b=>b.addEventListener('change',fromChips));
+      Object.defineProperty(langField,'value',{configurable:true,
+        get(){return descriptorLang.get.call(this);},
+        set(value){descriptorLang.set.call(this,value);toChips();}});
+      toChips();
+    }
+
+    /* The Voice dropdown was dead until someone found the "Load available
+       voices" button. Choosing a provider is the moment you want the list. */
+    f.elements.voice_provider.addEventListener('change',()=>{
+      if(f.elements.voice_provider.value&&connected) run(loadVoices);
+    });
   }
   function showTab(name) { $('vp-omnidimension').querySelectorAll('[data-om-panel]').forEach(p => p.hidden = p.dataset.omPanel !== name); $('vp-omnidimension').querySelectorAll('[data-om-tab]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.omTab === name))); }
   function object(text, label = 'JSON') { if (!text?.trim()) return {}; let out; try { out = JSON.parse(text); } catch (_) { throw new Error(`${label}: enter valid JSON.`); } if (!out || typeof out !== 'object' || Array.isArray(out)) throw new Error(`${label}: use a JSON object.`); return out; }
