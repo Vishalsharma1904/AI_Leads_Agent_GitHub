@@ -885,7 +885,17 @@ window.VoiceProvider = (() => {
       body: opts.body ? JSON.stringify(opts.body) : null,
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(typeof data.detail === 'string' ? data.detail : `Request failed (${res.status})`);
+    if (!res.ok) {
+      // The server answers with {code, message, console} for credential
+      // problems. Throwing "Request failed (422)" threw that away, which is
+      // why a rejected key never said where to get a new one.
+      const d = data.detail;
+      const err = new Error(
+        typeof d === 'string' ? d : (d && d.message) || data.message || `Request failed (${res.status})`);
+      if (d && typeof d === 'object') { err.code = d.code; err.console = d.console; }
+      err.status = res.status;
+      throw err;
+    }
     return data;
   }
 
@@ -950,11 +960,17 @@ window.VoiceProvider = (() => {
     if (!key) { say('Paste your Sarvam subscription key first.', true); return; }
     say('Checking the key with Sarvam…');
     try {
-      await api('/api/credentials', { method: 'PUT', body: { provider: 'sarvam', secret: key } });
+      const res = await api('/api/credentials', { method: 'PUT', body: { provider: 'sarvam', secret: key } });
       if ($('vp-sarvam-key')) $('vp-sarvam-key').value = '';
       await saveIds();
-      say('Key saved for your company. Now press "Find my agents & number".');
-    } catch (e) { say(e.message, true); }
+      // Saved and proved, or saved and not proved — both are progress, and the
+      // difference is worth telling the truth about.
+      say(res && res.verified
+        ? 'Sarvam accepted the key. Now press "Find my agents & number".'
+        : ((res && res.note ? res.note + ' ' : 'Key saved. ') + 'Press "Find my agents & number" to try it for real.'));
+    } catch (e) {
+      say(e.message + (e.console ? ' Get a fresh key: ' + e.console : ''), true);
+    }
   }
 
   async function saveIds() {

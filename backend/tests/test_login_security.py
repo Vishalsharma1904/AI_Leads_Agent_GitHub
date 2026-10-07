@@ -48,7 +48,7 @@ class LoginSecurityCheck(unittest.TestCase):
         b = auth_sync.UserAccount(id="b", email="b@example.com", name="B")
         key = "gsk_test_only_not_a_real_provider_key"
         with Session(engine) as db, patch.dict(os.environ, {"CREDENTIAL_MASTER_KEY": "test-master-key-32-bytes-long-not-real"}), \
-                patch.object(credentials, "_verify_ai_key"):
+                patch.object(credentials, "probe_key", return_value=("ok", "")):
             credentials.upsert_credential(credentials.CredentialRequest(provider="groq", secret=key), db, a)
             record = db.query(credentials.ProviderCredential).one()
             self.assertNotIn(key, record.ciphertext)
@@ -59,7 +59,7 @@ class LoginSecurityCheck(unittest.TestCase):
                 self.assertNotIn(key, str(status))
                 credentials.delete_credential("groq", db, b)
                 self.assertEqual(db.query(credentials.ProviderCredential).count(), 1)
-            with patch.object(credentials, "_verify_ai_key", side_effect=HTTPException(422, "Invalid")):
+            with patch.object(credentials, "probe_key", return_value=("rejected", "Invalid")):
                 with self.assertRaises(HTTPException):
                     credentials.upsert_credential(credentials.CredentialRequest(provider="groq", secret="bad-replacement"), db, a)
             self.assertEqual(credentials.decrypt_secret(record), key)

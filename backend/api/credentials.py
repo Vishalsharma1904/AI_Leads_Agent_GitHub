@@ -69,21 +69,111 @@ def normalize_provider(provider: str) -> str:
     return AI_PROVIDER_ALIASES.get(value, value)
 
 
-def _verify_apify_key(secret: str) -> None:
+# ── one table, one code path ─────────────────────────────────────────────────
+# Every provider says here how a key is PROVED. The rule that matters is the
+# one about rejection: only a definite authentication failure may refuse a key.
+#
+# This is what was wrong before. Sarvam was checked with
+# GET /text-to-speech/models, which is not in Sarvam's API, and Sarvam answers
+# 403 both for a bad key and for an authenticated request it will not serve —
+# their docs say the body's error.code is what tells the two apart. So a
+# perfectly good key came back "rejected". The AI providers had the same shape
+# of bug: an HTTP 400 was read as "key rejected" when it only means the probe
+# request was malformed, and Perplexity has no /models at all, so its keys
+# could never be saved either.
+#
+# Now a check can only ever reject on 401/403 (plus the provider's own error
+# code where it has one). Anything else — a moved endpoint, a rate limit, a
+# network blip — stores the key and reports it unverified, because refusing to
+# store a key you merely could not check is how a working key gets called bad.
+PROVIDER_CHECKS: dict = {
+    "apify": {
+        "label": "Apify", "method": "GET", "url": "https://api.apify.com/v2/users/me",
+        "headers": lambda s: {"Authorization": f"Bearer {s}"},
+        "code": "APIFY_KEY_INVALID", "console": "https://console.apify.com/account/integrations",
+    },
+    "toughtongue": {
+        "label": "Tough Tongue", "method": "GET",
+        "url": "https://app.toughtongueai.com/api/public/scenarios",
+        "headers": lambda s: {"Authorization": f"Bearer {s}"},
+        "console": "https://app.toughtongueai.com/",
+    },
+    "sarvam": {
+        # Sarvam publishes no cheap GET. An empty body on a real endpoint is the
+        # cheapest honest probe: a bad key is refused before the body is read,
+        # and a good key gets a validation error without translating anything.
+        "label": "Sarvam AI", "method": "POST", "url": "https://api.sarvam.ai/translate",
+        "json": {}, "headers": lambda s: {"api-subscription-key": s},
+        "marker": "invalid_api_key_error",     # the only thing that may reject
+        "ok_also": (400, 422),                 # got past auth = the key works
+        "console": "https://dashboard.sarvam.ai/admin",
+    },
+    "cartesia": {
+        "label": "Cartesia", "method": "GET", "url": "https://api.cartesia.ai/voices",
+        "headers": lambda s: {"X-API-Key": s, "Cartesia-Version": "2024-06-10"},
+        "console": "https://play.cartesia.ai/keys",
+    },
+    "gemini": {
+        "label": "Google AI Studio", "method": "GET",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models",
+        "headers": lambda s: {"x-goog-api-key": s},
+        "console": "https://aistudio.google.com/apikey",
+    },
+}
+# Everything OpenAI-compatible is proved the same way.
+for _name, _cfg in AI_PROVIDER_CONFIG.items():
+    PROVIDER_CHECKS.setdefault(_name, {
+        "label": _name.replace("_", " ").title(), "method": "GET",
+        "url": f"{_cfg['base_url']}/models",
+        "headers": lambda s: {"Authorization": f"Bearer {s}"}, "console": "",
+    })
+
+PROVIDER_CONSOLES = {k: v.get("console", "") for k, v in PROVIDER_CHECKS.items()}
+PROVIDER_CONSOLES.setdefault("google_sheets", "")
+PROVIDER_CONSOLES.setdefault("composio", "https://app.composio.dev/settings")
+
+
+def provider_label(provider: str) -> str:
+    check = PROVIDER_CHECKS.get(provider)
+    return check["label"] if check else provider.replace("_", " ").title()
+
+
+def probe_key(provider: str, secret: str):
+    """Return (state, message) where state is 'ok' | 'rejected' | 'unverified'."""
+    check = PROVIDER_CHECKS.get(provider)
+    label = provider_label(provider)
+    if not check:
+        return "unverified", f"Saved. {label} has no key check yet, so it is proved on first use."
     try:
-        response = httpx.get("https://api.apify.com/v2/users/me",
-                             headers={"Authorization": f"Bearer {secret}"}, timeout=10.0)
-        if response.status_code in (401, 403):
-            raise HTTPException(status_code=422, detail={"code": "APIFY_KEY_INVALID", "message": "Apify rejected this API key."})
-        if response.status_code == 429:
-            raise HTTPException(status_code=429, detail={"code": "APIFY_RATE_LIMITED", "message": "Apify is rate limiting key checks. Try again shortly."})
-        response.raise_for_status()
-    except HTTPException:
-        raise
+        response = httpx.request(check["method"], check["url"],
+                                 headers=check["headers"](secret),
+                                 json=check.get("json"), timeout=10.0)
     except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail={"code": "APIFY_TIMEOUT", "message": "Apify key check timed out. Try again."}) from None
+        return "unverified", f"Saved. {label} did not answer in time, so the key is unchecked."
     except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail={"code": "APIFY_UNAVAILABLE", "message": "Could not reach Apify to check the key."}) from None
+        return "unverified", f"Saved. {label} could not be reached, so the key is unchecked."
+
+    status = response.status_code
+    if status in (401, 403):
+        marker = check.get("marker")
+        if not marker:
+            return "rejected", f"{label} rejected this key."
+        body = (response.text or "")[:4000].lower()
+        if marker in body:
+            return "rejected", f"{label} rejected this key."
+        # 403 that does not name a bad key: authenticated, but not allowed here.
+        return "unverified", (f"Saved. {label} accepted the key but refused this check "
+                              f"— check the plan or permissions on that account.")
+    if status in check.get("ok_also", ()):
+        return "ok", f"{label} accepted this key."
+    if status == 429:
+        return "unverified", f"Saved. {label} is rate limiting key checks right now."
+    if status >= 500:
+        return "unverified", f"Saved. {label} is having trouble right now, so the key is unchecked."
+    if status < 300:
+        return "ok", f"{label} accepted this key."
+    # 400 / 404 / 405 prove the probe URL is wrong, never that the key is.
+    return "unverified", f"Saved. {label} answered {status} to the check; it will be proved on first use."
 
 
 def _master_key() -> bytes:
@@ -91,29 +181,6 @@ def _master_key() -> bytes:
     if len(raw) < 32:
         raise HTTPException(status_code=503, detail="Credential vault is not configured")
     return hashlib.sha256(raw.encode("utf-8")).digest()
-
-
-def _verify_ai_key(provider: str, secret: str) -> None:
-    try:
-        if provider == "gemini":
-            # AI Studio issues "AIza…" (legacy) and "AQ.…" (current) keys; both
-            # authenticate via x-goog-api-key on the native Gemini endpoint.
-            if not (secret.startswith("AIza") or secret.startswith("AQ.")):
-                raise HTTPException(status_code=422, detail="Use an AI Studio API key from aistudio.google.com/apikey")
-            response = httpx.get("https://generativelanguage.googleapis.com/v1beta/models",
-                                 headers={"x-goog-api-key": secret}, timeout=8.0)
-        else:
-            response = httpx.get(f"{AI_PROVIDER_CONFIG[provider]['base_url']}/models",
-                                 headers={"Authorization": f"Bearer {secret}"}, timeout=8.0)
-        if response.status_code in (400, 401, 403):
-            raise HTTPException(status_code=422, detail="The provider rejected this API key")
-        if response.status_code == 429:
-            raise HTTPException(status_code=429, detail="Provider verification is rate limited; retry shortly")
-        response.raise_for_status()
-    except HTTPException:
-        raise
-    except httpx.HTTPError:
-        raise HTTPException(status_code=502, detail="Could not verify the provider key; existing key was not changed") from None
 
 
 def encrypt_secret(secret: str) -> tuple[str, str]:
@@ -139,36 +206,21 @@ def upsert_credential(req: CredentialRequest, db: Session = Depends(get_db), use
     if provider not in ALLOWED_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unsupported provider")
     _master_key()
-    if provider in AI_PROVIDER_CONFIG:
-        _verify_ai_key(provider, req.secret.strip())
-    if provider == "apify":
-        _verify_apify_key(req.secret.strip())
-    if provider == "toughtongue":
-        try:
-            response = httpx.get("https://app.toughtongueai.com/api/public/scenarios",
-                                 headers={"Authorization": f"Bearer {req.secret}"}, timeout=10.0)
-            if response.status_code in (401, 403):
-                raise HTTPException(status_code=422, detail="Tough Tongue rejected this API key")
-            response.raise_for_status()
-        except HTTPException:
-            raise
-        except httpx.HTTPError:
-            raise HTTPException(status_code=502, detail="Could not verify the Tough Tongue API key") from None
-    if provider == "sarvam":
-        # Sarvam has no cheap "whoami", so the cheapest real call that proves
-        # the key is a text-to-speech model list. A bad key 401s here.
-        try:
-            response = httpx.get("https://api.sarvam.ai/text-to-speech/models",
-                                 headers={"api-subscription-key": req.secret}, timeout=10.0)
-            if response.status_code in (401, 403):
-                raise HTTPException(status_code=422, detail="Sarvam rejected this API key")
-        except HTTPException:
-            raise
-        except httpx.HTTPError:
-            # Reachability is not the tenant's problem — store it and let the
-            # first real call report the truth.
-            pass
-    ciphertext, nonce = encrypt_secret(req.secret.strip() if provider == "apify" else req.secret)
+    # Strip once, here, for every provider. Pasting a key from a web page
+    # carries a trailing newline often enough that it used to be stored broken
+    # for anything that was not Apify, and then every later call failed too.
+    secret = req.secret.strip()
+    if not secret:
+        raise HTTPException(status_code=422, detail={"code": "CREDENTIAL_EMPTY", "message": "Paste a key first."})
+    state, note = probe_key(provider, secret)
+    if state == "rejected":
+        check = PROVIDER_CHECKS.get(provider) or {}
+        raise HTTPException(status_code=422, detail={
+            "code": check.get("code", "CREDENTIAL_REJECTED"),
+            "message": note,
+            "console": check.get("console", ""),
+        })
+    ciphertext, nonce = encrypt_secret(secret)
     record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider=provider).first()
     if record:
         record.ciphertext, record.nonce, record.updated_at = ciphertext, nonce, time.time()
@@ -176,7 +228,9 @@ def upsert_credential(req: CredentialRequest, db: Session = Depends(get_db), use
         record = ProviderCredential(owner_user_id=user.id, provider=provider, ciphertext=ciphertext, nonce=nonce, updated_at=time.time())
         db.add(record)
     db.commit()
-    return {"success": True, "provider": provider, "updated_at": record.updated_at}
+    return {"success": True, "provider": provider, "updated_at": record.updated_at,
+            "verified": state == "ok", "note": note,
+            "console": PROVIDER_CONSOLES.get(provider, "")}
 
 
 @router.get("")
@@ -192,35 +246,25 @@ def list_credentials(db: Session = Depends(get_db), user: UserAccount = Depends(
 
 @router.post("/verify/{provider}")
 def verify_credential(provider: str, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    """Re-check a stored key. Every provider in the registry can be checked now
+    — Sarvam and Cartesia used to answer "cannot be verified yet"."""
     provider = normalize_provider(provider)
-    if provider != "apify" and provider not in AI_PROVIDER_CONFIG:
-        raise HTTPException(status_code=400, detail={"code": "CREDENTIAL_VERIFY_UNSUPPORTED", "message": "This provider cannot be verified yet."})
+    if provider not in ALLOWED_PROVIDERS:
+        raise HTTPException(status_code=400, detail={"code": "CREDENTIAL_VERIFY_UNSUPPORTED",
+                                                     "message": "Unsupported provider."})
     record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider=provider).first()
     if not record:
-        raise HTTPException(status_code=404, detail={"code": "AI_CREDENTIAL_MISSING", "message": f"{provider} credential is not configured."})
-    try:
-        secret = decrypt_secret(record)
-        if provider == "apify":
-            _verify_apify_key(secret)
-            return {"success": True, "provider": provider, "verified": True}
-        if provider == "gemini":
-            response = httpx.get("https://generativelanguage.googleapis.com/v1beta/models",
-                                 headers={"x-goog-api-key": secret}, timeout=8.0)
-        else:
-            response = httpx.get(f"{AI_PROVIDER_CONFIG[provider]['base_url']}/models",
-                                 headers={"Authorization": f"Bearer {secret}"}, timeout=8.0)
-        if response.status_code in (401, 403):
-            raise HTTPException(status_code=422, detail={"code": "AI_CREDENTIAL_INVALID", "message": "The provider rejected this key."})
-        if response.status_code == 429:
-            raise HTTPException(status_code=429, detail={"code": "AI_RATE_LIMITED", "message": f"{provider} rate limit was reached.", "retryable": True, "action": "RETRY"})
-        response.raise_for_status()
-    except HTTPException:
-        raise
-    except httpx.TimeoutException:
-        raise HTTPException(status_code=504, detail={"code": "AI_TIMEOUT", "message": "Provider verification timed out.", "retryable": True, "action": "RETRY"})
-    except (httpx.HTTPError, ValueError):
-        raise HTTPException(status_code=502, detail={"code": "AI_BACKEND_UNAVAILABLE", "message": "The provider could not be reached.", "retryable": True, "action": "RETRY"})
-    return {"success": True, "provider": provider, "verified": True}
+        raise HTTPException(status_code=404, detail={"code": "AI_CREDENTIAL_MISSING",
+                                                     "message": f"{provider_label(provider)} is not connected yet."})
+    state, note = probe_key(provider, decrypt_secret(record))
+    if state == "rejected":
+        check = PROVIDER_CHECKS.get(provider) or {}
+        raise HTTPException(status_code=422, detail={
+            "code": check.get("code", "AI_CREDENTIAL_INVALID"),
+            "message": note, "console": check.get("console", ""),
+        })
+    return {"success": True, "provider": provider, "verified": state == "ok", "note": note,
+            "console": PROVIDER_CONSOLES.get(provider, "")}
 
 
 @router.delete("/{provider}")

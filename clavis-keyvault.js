@@ -107,14 +107,32 @@
       emit(); return true;
     } catch (_) { if (current === generation) emit(); return false; }
   }
+  /* Three outcomes, not two. The server only refuses a key when the provider
+     actually said the key is bad; if the check could not be completed the key
+     is stored and reported unverified, so a provider being slow or moving an
+     endpoint never looks like a wrong key. */
   async function add(provider, key) {
     provider = String(provider || '').toLowerCase();
     key = String(key || '').trim();
     if (!key) throw new Error('Paste a complete provider key.');
+    var info = PROVIDER_INFO[provider] || {};
+    if (info.test && !info.test.test(key)) {
+      throw new Error((info.label || provider) + ' keys start with "' + (info.prefix || '') +
+        '". Check you pasted the key and not an ID.');
+    }
     var current = generation;
-    await request('', { method: 'PUT', body: JSON.stringify({ provider: provider, secret: key }) });
+    var data = await request('', { method: 'PUT', body: JSON.stringify({ provider: provider, secret: key }) });
     if (current === generation && token()) { providers[provider] = true; emit(); }
-    return { ok: true, synced: true, provider: provider, mask: 'Server vault' };
+    return {
+      ok: true, synced: true, provider: provider, mask: 'Server vault',
+      verified: !!(data && data.verified),
+      note: (data && data.note) || '',
+      console: (data && data.console) || info.console || ''
+    };
+  }
+  async function verify(provider) {
+    var data = await request('/verify/' + encodeURIComponent(String(provider || '').toLowerCase()), { method: 'POST' });
+    return { verified: !!(data && data.verified), note: (data && data.note) || '' };
   }
   async function remove(provider) {
     await request('/' + encodeURIComponent(provider), { method: 'DELETE' });
@@ -137,7 +155,7 @@
   }
   global.ClavisKeyVault = {
     boot: refresh, ready: refresh, refresh: refresh, use: function () { return ''; }, all: function () { return []; },
-    add: add, remove: remove, status: status, report: function () {}, info: PROVIDER_INFO, chain: CHAIN,
+    add: add, verify: verify, remove: remove, status: status, report: function () {}, info: PROVIDER_INFO, chain: CHAIN,
     purgeLegacy: purgeLegacy,
     onChange: function (fn) { listeners.push(fn); fn(status()); return function () { listeners = listeners.filter(function (f) { return f !== fn; }); }; },
     audit: status
