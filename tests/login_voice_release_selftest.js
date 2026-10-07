@@ -55,3 +55,20 @@ try {
   }
 }
 console.log('Login/voice release checks passed: auth race, sign-out, wake gate, public config and secret rejection.');
+
+(async () => {
+  const gate = await import('data:text/javascript,' + encodeURIComponent(fs.readFileSync('middleware.js','utf8')));
+  const saved = { environment: process.env.VERCEL_ENV, password: process.env.DEMO_PASSWORD };
+  try {
+    process.env.DEMO_PASSWORD = 'preview-test-only';
+    process.env.VERCEL_ENV = 'production';
+    assert.equal(gate.default(new Request('https://example.vercel.app/')), undefined, 'Production login page is public');
+    process.env.VERCEL_ENV = 'preview';
+    assert.equal(gate.default(new Request('https://example.vercel.app/')).status, 401, 'Preview demo gate remains');
+  } finally {
+    for (const [name,value] of [['VERCEL_ENV',saved.environment],['DEMO_PASSWORD',saved.password]]) {
+      if (value === undefined) delete process.env[name]; else process.env[name] = value;
+    }
+  }
+  console.log('Production public-access and preview protection checks passed.');
+})().catch(error => { console.error(error); process.exitCode=1; });

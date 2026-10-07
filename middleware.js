@@ -13,6 +13,9 @@ const same = (a, b) => {
 };
 
 export default function middleware(request) {
+  // The production landing/sign-in page is public. Supabase and the backend
+  // enforce account access; this old demo gate applies only to previews.
+  if (process.env.VERCEL_ENV === 'production') return;
   const password = process.env.DEMO_PASSWORD;
   if (!password) return;                       // no password set → open site
   const user = process.env.DEMO_USER || 'demo';
