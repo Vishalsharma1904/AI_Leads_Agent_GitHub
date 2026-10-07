@@ -561,7 +561,7 @@
 </div>
 
 <!-- ═══════════ ANTIGRAVITY LUXURY AUTH SCREEN (CLEAN RECTANGULAR EDITION) ═══════════ -->
-<div id="auth-screen" class="ag-auth-screen ag-hidden" style="display: none; background:#FAF9F5;">
+<div id="auth-screen" class="ag-auth-screen" style="background:#FAF9F5;">
   <!-- Dynamic Ambient Lighting -->
   <div class="ag-ambient-canvas">
     <div class="ag-cursor-spotlight" id="ag-cursor-spotlight"></div>
@@ -579,7 +579,7 @@
         <div class="ag-logo-emblem"><img src="assets/rudra24-icon.png" alt="Rudra24 Digital" width="72" height="72"></div>
         <div class="ag-brand-title-wrap">
           <h1 class="ag-brand-name" id="ag-card-title" data-rudra-i18n-ignore>Rudra24 AI &amp; Leads</h1>
-          <p class="ag-brand-sub" id="ag-card-sub">Lead Generation · Business Support · Business Analysis</p>
+          <p class="ag-brand-sub" id="ag-card-sub">Your business workspace. Sign in to continue.</p>
         </div>
       </div>
 
@@ -589,7 +589,7 @@
         <button type="button" onclick="AntigravityAuth.checkInitialSession()">Retry connection</button>
       </div>
       <div class="ag-google-auth-wrap">
-        <button type="button" class="ag-btn-google" id="ag-google-sync-btn" onclick="AntigravityAuth.handleGoogleLogin()">
+        <button type="button" class="ag-btn-google" id="ag-google-sync-btn" onclick="AntigravityAuth.handleGoogleLogin()" disabled>
           <svg class="ag-google-icon" width="18" height="18" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17z"/>
             <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.35 24 12 24z"/>
@@ -606,13 +606,14 @@
       </div>
 
       <!-- Segmented Tab Switcher -->
-      <div class="ag-segmented-tabs" id="ag-segmented-tabs" data-tab="signup">
+      <p id="ag-auth-progress" class="ag-auth-progress" role="status">Preparing secure sign-in…</p>
+      <div class="ag-segmented-tabs" id="ag-segmented-tabs" data-tab="login">
         <div class="ag-tab-pill-bg"></div>
-        <button type="button" class="ag-tab-btn active" id="ag-tab-signup" onclick="AntigravityAuth.switchTab('signup')">
+        <button type="button" class="ag-tab-btn" id="ag-tab-signup" onclick="AntigravityAuth.switchTab('signup')" disabled>
           <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path d="M8 9a3 3 0 100-6 3 3 0 000 6zM8 11a6 6 0 016 6H2a6 6 0 016-6zM16 7a1 1 0 10-2 0v1h-1a1 1 0 100 2h1v1a1 1 0 102 0v-1h1a1 1 0 100-2h-1V7z"/></svg>
           Create Account
         </button>
-        <button type="button" class="ag-tab-btn" id="ag-tab-login" onclick="AntigravityAuth.switchTab('login')">
+        <button type="button" class="ag-tab-btn active" id="ag-tab-login" onclick="AntigravityAuth.switchTab('login')" disabled>
           <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 3a1 1 0 011 1v12a1 1 0 11-2 0V4a1 1 0 011-1zm7.707 3.293a1 1 0 010 1.414L9.414 9H17a1 1 0 110 2H9.414l1.293 1.293a1 1 0 01-1.414 1.414l-3-3a1 1 0 010-1.414l3-3a1 1 0 011.414 0z" clip-rule="evenodd"/></svg>
           Sign In
         </button>
@@ -620,7 +621,7 @@
 
       <!-- Form Elements -->
       <form id="ag-auth-form" autocomplete="on">
-        <div class="ag-form-grid" id="ag-form-grid">
+        <div class="ag-form-grid" id="ag-form-grid" data-tab="login">
           <!-- Full Name (Signup only) -->
           <div class="ag-form-group ag-signup-only">
             <label class="ag-form-label" for="ag-input-name">Full Name <span style="color:#B85D26;">*</span></label>
@@ -687,8 +688,8 @@
         </div>
 
         <!-- Submit Button -->
-        <button type="submit" class="ag-btn-submit" id="ag-submit-btn">
-          <span>Create Account &amp; Sync</span>
+        <button type="submit" class="ag-btn-submit" id="ag-submit-btn" disabled>
+          <span>Sign In</span>
           <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
         </button>
 
@@ -3342,7 +3343,7 @@
   <script src="button-feedback.js?v=1.0" defer></script>
   <script src="cloud-sync.js?v=2.0&build=1004complete" defer></script>
   <script src="supabase-auth.js?v=2.3&r=1007release" defer></script>
-  <script src="auth-antigravity.js?v=2.2&r=1007release" defer></script>
+  <script src="auth-antigravity.js?v=2.3&r=1007visible" defer></script>
   <script src="auth.js?v=1.0" defer></script>
   <script src="crm-bridge.js?v=1.1&r=1006" defer></script>
   <script src="crm-business.js?v=1.0&r=1005business&island=1006" defer></script>
@@ -5847,7 +5848,7 @@
   <!-- The sign-in screen, in the same quiet Claude language as boot.html and
        the rest of the app. Loaded last so it settles the cascade over
        auth-antigravity.css without that file being rewritten. -->
-  <link rel="stylesheet" href="rudra-auth-claude.css?v=1.2">
+  <link rel="stylesheet" href="rudra-auth-claude.css?v=1.3">
   <!-- Floating-window motion + calm pass (2026-10-02). Loaded last on purpose:
        every .cts-* layer above it is one it is meant to settle. -->
   <link rel="stylesheet" href="clavis-task-polish.css?v=1.2&r=1002table&scopefix=1003f">

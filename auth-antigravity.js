@@ -416,13 +416,13 @@ window.AntigravityAuth = {
   async checkInitialSession() {
     const feedback = document.getElementById('ag-auth-feedback');
     if (feedback) feedback.hidden = true;
-    // Keep sign-in hidden while the persisted Supabase session is restored. Showing
-    // it first causes a login flash on every refresh for returning users.
+    // Keep a useful sign-in screen visible while scripts or auth config load.
+    // Voice stays gated by the verified session, not by screen visibility.
     const authScreen = document.getElementById('auth-screen');
     const appShell = document.getElementById('app-shell');
     if (authScreen) {
-      authScreen.style.display = 'none';
-      authScreen.classList.add('ag-hidden');
+      authScreen.style.display = '';
+      authScreen.classList.remove('ag-hidden');
     }
     if (appShell) appShell.style.display = 'none';
     const form = document.getElementById('ag-auth-form');
@@ -437,6 +437,16 @@ window.AntigravityAuth = {
     if (googleText) googleText.textContent = 'Continue with Google';
     this.switchTab('login');
     const ready = await window.SupabaseAuth?.init?.();
+    const progress = document.getElementById('ag-auth-progress');
+    if (progress) progress.hidden = true;
+    for (const id of ['ag-tab-login', 'ag-tab-signup']) {
+      const button = document.getElementById(id);
+      if (button) button.disabled = false;
+    }
+    for (const id of ['ag-google-sync-btn', 'ag-submit-btn']) {
+      const button = document.getElementById(id);
+      if (button) button.disabled = !ready?.success;
+    }
     if (!ready?.success) {
       if (authScreen) {
         authScreen.style.display = '';

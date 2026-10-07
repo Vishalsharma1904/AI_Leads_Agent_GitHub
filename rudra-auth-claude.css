@@ -110,6 +110,14 @@
   color: var(--ra-mute) !important;
   margin: 0 !important;
 }
+#auth-screen .ag-brand-name { font-size: 34px !important; line-height: 1.15 !important; }
+#auth-screen #ag-form-grid[data-tab="login"] .ag-signup-only { display: none; }
+#auth-screen .ag-auth-progress { margin: 12px 0; color: var(--ra-mute); font-size: 12px; }
+#auth-screen .ag-auth-progress[hidden] { display: none !important; }
+#auth-screen button:disabled { cursor: wait; opacity: .6; }
+@media (max-width: 560px) {
+  #auth-screen .ag-brand-name { font-size: 27px !important; }
+}
 
 /* ── Google button ────────────────────────────────────────── */
 #auth-screen .ag-btn-google {
