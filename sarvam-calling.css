@@ -7,8 +7,34 @@
 
 #view-calling {
   --sc-rail: 292px;
-  --sc-side: 340px;
+  --sc-side: 372px;
 }
+
+#view-calling .sc-demo { display:grid; grid-template-columns: minmax(0,1fr) minmax(260px,380px); gap:12px 30px; padding:22px 24px; margin:24px 0; border:1px solid var(--cc-line); border-radius:14px; background:var(--cc-surface); }
+#view-calling .sc-demo h2 { font:400 25px/1.25 var(--cc-serif,Georgia,serif); margin:8px 0; color:var(--cc-ink); }
+#view-calling .sc-demo p { margin:0; max-width:600px; line-height:1.6; }
+#view-calling .sc-demo form { display:flex; align-items:end; gap:10px; }
+#view-calling .sc-demo .sc-field { flex:1; min-width:0; }
+#view-calling .sc-eyebrow { font:600 10px/1.4 var(--cc-sans,system-ui); letter-spacing:.1em; color:var(--cc-mute); }
+#view-calling #sc-demo-note { grid-column:1/-1; }
+#view-calling .sc-recording, #view-calling .sc-review { padding:16px; margin-top:16px; border:1px solid var(--cc-line); border-radius:12px; }
+#view-calling .sc-review { background:var(--cc-accent-soft,var(--cc-sunk)); }
+#view-calling .sc-review .sc-card-head { flex-wrap:wrap; }
+#view-calling .sc-languages { display:flex; gap:4px; margin-left:auto; }
+#view-calling .sc-languages [aria-pressed="true"] { background:var(--cc-accent); color:var(--cc-on-accent,#fff); }
+#view-calling .sc-review h4 { font:400 22px/1.3 var(--cc-serif,Georgia,serif); margin:18px 0 8px; }
+#view-calling .sc-review h5 { font:600 12px/1.5 var(--cc-sans,system-ui); margin:18px 0 5px; }
+#view-calling .sc-review p, #view-calling .sc-review li { font-size:13px; line-height:1.65; overflow-wrap:anywhere; }
+#view-calling .sc-review ul { padding-left:18px; margin:4px 0; }
+#view-calling .sc-review-actions { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin-top:14px; }
+#view-calling .sc-player { padding:0; background:transparent; flex-wrap:wrap; }
+#view-calling .sc-player audio { width:100%; min-width:160px; }
+#view-calling .sc-transcript-head { display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap; align-items:center; margin-top:24px; }
+#view-calling .sc-transcript-head h3 { margin:0; font-size:14px; }
+#view-calling .sc-supervision .sc-field { margin:12px 0; }
+#view-calling .sc-escalated { border-top:1px solid var(--cc-line); padding-top:12px; }
+#view-calling .sc-btn:focus-visible { outline:2px solid var(--cc-accent); outline-offset:3px; }
+@media(max-width:700px) { #view-calling .sc-demo { grid-template-columns:1fr; padding:18px; } #view-calling .sc-demo form { flex-wrap:wrap; } #view-calling .sc-demo .sc-field { flex-basis:100%; } }
 
 /* ── layout ─────────────────────────────────────────────── */
 
@@ -37,7 +63,7 @@
 @media (max-width: 1280px) {
   #view-calling .sc-grid { grid-template-columns: 250px minmax(0, 1fr); }
   #view-calling .sc-side { grid-column: 1 / -1; flex-direction: row; flex-wrap: wrap; }
-  #view-calling .sc-side > .sc-card { flex: 1 1 280px; }
+  #view-calling .sc-side > .sc-card { flex: 1 1 320px; }
 }
 @media (max-width: 900px) {
   #view-calling .sc-grid { grid-template-columns: minmax(0, 1fr); }
@@ -237,15 +263,34 @@
 #view-calling .sc-field-check input { width: auto; }
 #view-calling .sc-field.is-missing input, #view-calling .sc-field.is-missing textarea { border-color: rgba(180,67,47,.45); }
 
-#view-calling .sc-preview { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+/* The table is laid out by the card, not by its own content. Without
+   table-layout:fixed the three columns each grew to their max-width and the
+   table ran 380px wide inside a 340px card — 69px of it hanging out past the
+   right edge, which is the sliced-off last column and the broken corner. */
+#view-calling .sc-card-preview { overflow: hidden; }
+#view-calling .sc-preview-wrap {
+  max-height: 340px; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+}
+#view-calling .sc-preview {
+  width: 100%; max-width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 11.5px;
+}
+/* The number never ellipses: +91 and ten digits always fit in 108px here.
+   The city gets a fixed share, and the company — the only field with no
+   length limit — takes what is left and truncates. */
+#view-calling .sc-preview col.sc-col-num  { width: 104px; }
+#view-calling .sc-preview col.sc-col-city { width: 92px; }
 #view-calling .sc-preview th {
   text-align: left; font: 600 10.5px/1 var(--cc-sans, system-ui); text-transform: uppercase;
-  letter-spacing: .04em; color: var(--cc-faint, #8a8a85); padding: 0 6px 7px 0;
+  letter-spacing: .04em; color: var(--cc-faint, #8a8a85); padding: 7px 6px 7px 0;
+  position: sticky; top: 0; z-index: 1; background: var(--cc-surface, #fff);
 }
 #view-calling .sc-preview td {
   padding: 6px 6px 6px 0; border-top: 1px solid var(--cc-line-3, rgba(20,20,19,.05));
-  color: var(--cc-ink-2, #33332f); max-width: 130px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  color: var(--cc-ink-2, #33332f); overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
+#view-calling .sc-preview td.sc-mono { letter-spacing: -.1px; }
+#view-calling .sc-preview tbody tr:hover td { background: var(--cc-sunk, rgba(20,20,19,.04)); }
+#view-calling .sc-preview-more { padding-top: 8px; }
 #view-calling .sc-outcome {
   font: 600 13px/1 var(--cc-sans, system-ui); padding: 8px 10px; border-radius: 8px;
   background: var(--cc-sunk, rgba(20,20,19,.05)); color: var(--cc-ink, #141413);
@@ -484,3 +529,17 @@ html[data-theme="dark"] .vp-dep { background: #111310; border-color: rgba(201, 2
 }
 .vp-meter[data-low="true"] > span { background: #C96442; }
 html[data-theme="dark"] .vp-meter { background: rgba(201, 219, 160, 0.14); }
+
+
+/* Measured: the app's table styling forced these cells to 14px padding on
+   both sides and 13px type, so a 108px column had only 80px of usable room
+   while "+91" plus ten digits needs 104px at that size — the number was
+   ellipsed no matter how wide the column got. Pinned here, and only here. */
+#view-calling:not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc) .sc-preview { font-size: 11.5px !important; }
+#view-calling:not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc) .sc-preview :is(th, td) {
+  padding: 6px 8px 6px 0 !important;
+  font-size: 11.5px !important;
+  vertical-align: middle !important;
+}
+#view-calling:not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc) .sc-preview th { padding-top: 7px !important; padding-bottom: 7px !important; }
+#view-calling:not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc):not(#sc) .sc-preview td.sc-mono { font-size: 11.5px !important; letter-spacing: -.1px !important; }

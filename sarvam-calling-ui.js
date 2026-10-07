@@ -18,7 +18,8 @@
   if (window.SarvamCallingUI) return;
   const S = () => window.SarvamCalling;
 
-  const ui = { tab: 'queue', openThreadId: null, threads: [], queue: [], running: false, mounted: false };
+  const ui = { tab: 'queue', openThreadId: null, threads: [], queue: [], running: false, mounted: false,
+    demoPhone: '', reviewLang: 'en', busy: new Set(), error: '' };
 
   const esc = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -35,6 +36,7 @@
   const TONE = {
     pending: 'wait', dialing: 'live', ringing: 'live', connected: 'live',
     done: 'good', no_answer: 'dim', busy: 'dim', failed: 'bad', skipped: 'dim',
+    unknown: 'wait',
   };
   const OUTCOME_LABEL = {
     interested: 'Interested', meeting_booked: 'Meeting fix', callback: 'Callback maanga',
@@ -60,14 +62,24 @@
     <div class="view-header">
       <div>
         <h1 class="view-title">Voice Calling Setup</h1>
-        <div class="view-subtitle">Sarvam AI aapke leads ko ek-ek karke call karta hai. Awaaz phone par jaati hai — app me nahi.</div>
+        <div class="view-subtitle">Apne number par test kijiye. Har call ki recording, poori conversation aur AI review ek jagah.</div>
       </div>
       <div class="view-header-actions">
+        <button class="sc-btn" type="button" onclick="SarvamCallingUI.syncCalls()">${icon('refresh-cw')} Sync calls</button>
         <button class="sc-btn" type="button" onclick="SarvamCallingUI.openSetup()">${icon('sliders')} Agent setup</button>
         <button class="sc-btn sc-btn-primary" type="button" onclick="SarvamCallingUI.pullLeads()">${icon('download')} Leads laao</button>
       </div>
     </div>
     <div class="sc-banner" id="sc-banner" hidden></div>
+    <section class="sc-demo" aria-label="Demo call">
+      <div><span class="sc-eyebrow">TEST YOUR AGENT</span><h2>Sabse pehle, khud baat kijiye.</h2>
+        <p class="sc-dim">Sirf aapke number par ek real phone call. Lead queue se koi number dial nahi hoga. Provider ke calling charges lagenge.</p></div>
+      <form onsubmit="event.preventDefault(); SarvamCallingUI.demo()">
+        <label class="sc-field"><span>Aapka mobile number</span><input id="sc-demo-phone" type="tel" inputmode="tel" autocomplete="tel" placeholder="+91 98765 43210" required oninput="SarvamCallingUI.demoNumber(this.value)"></label>
+        <button id="sc-demo-start" class="sc-btn sc-btn-primary" type="submit">${icon('phone-outgoing')} Demo call</button>
+      </form>
+      <p id="sc-demo-note" class="sc-dim sc-small" role="status"></p>
+    </section>
     <div class="sc-grid">
       <aside class="sc-rail" aria-label="Queue and calls">
         <div class="sc-tabs" role="tablist">
@@ -159,7 +171,14 @@
     const main = $('#sc-main');
     if (!main) return;
     const t = ui.threads.find((x) => x.id === ui.openThreadId);
+    const audio = main.querySelector('audio'), playing = audio && !audio.paused, position = audio?.currentTime || 0;
     main.innerHTML = t ? threadView(t) : mainEmpty();
+    const nextAudio = main.querySelector('audio');
+    if (audio && nextAudio && audio.getAttribute('src') === nextAudio.getAttribute('src')) {
+      nextAudio.replaceWith(audio); audio.currentTime = position;
+      if (playing) audio.play().catch(() => recordingError());
+    }
+    else if (audio) audio.pause();
     refreshIcons();
     const log = $('#sc-log');
     if (log) log.scrollTop = log.scrollHeight;
@@ -183,7 +202,7 @@
   }
 
   function threadView(t) {
-    const live = ['dialing', 'ringing', 'connected'].includes(t.status);
+    const live = liveStatus(t);
     return `
       <header class="sc-thread-head">
         <div>
@@ -194,13 +213,22 @@
         <span class="sc-chip sc-chip-${TONE[t.status] || 'dim'}">${esc(S().STATUS[t.status] || t.status)}</span>
       </header>
 
-      ${t.recordingUrl ? `<div class="sc-player">
-        ${icon('headphones')}
-        <audio controls preload="none" src="${esc(t.recordingUrl)}"></audio>
-        <a class="sc-link" href="${esc(t.recordingUrl)}" download target="_blank" rel="noopener">Download</a>
-      </div>` : ''}
-
-      ${t.summary ? `<div class="sc-summary">${icon('file-text')}<p>${esc(t.summary)}</p></div>` : ''}
+      <div class="sc-review-actions">
+        <button class="sc-btn" ${ui.busy.has(t.id) ? 'disabled' : ''} onclick="SarvamCallingUI.refreshCall('${esc(t.id)}')">${icon('refresh-cw')} Refresh call</button>
+        <button class="sc-btn" onclick="SarvamCallingUI.downloadTranscript('${esc(t.id)}')" ${t.transcript?.length ? '' : 'disabled'}>${icon('download')} Transcript</button>
+        ${t.demo ? '<span class="sc-tag">Demo call</span>' : ''}
+      </div>
+      ${t.syncNote ? `<p class="sc-dim sc-small">${esc(t.syncNote)}</p>` : ''}
+      <section class="sc-recording" aria-label="Call recording">
+        <div class="sc-card-head">${icon('headphones')}<h3>Call recording</h3><span class="sc-tag">${live ? 'Call in progress' : S().mediaUrl(t.recordingUrl) ? 'Ready to listen' : 'Awaiting provider'}</span></div>
+        ${S().mediaUrl(t.recordingUrl) ? `<div class="sc-player">
+          <audio controls preload="none" aria-label="Call recording" src="${esc(S().mediaUrl(t.recordingUrl))}" onerror="SarvamCallingUI.recordingError()"></audio>
+          <a class="sc-link" href="${esc(S().mediaUrl(t.recordingUrl))}" download target="_blank" rel="noopener">Download</a>
+        </div>` : `<p class="sc-dim sc-small">${live ? 'Call ke baad provider recording process karega.' : 'Recording abhi available nahi. Refresh call try kijiye; agent deployment mein recording enabled honi chahiye.'}</p>`}
+        <p id="sc-recording-note" class="sc-dim sc-small" role="status">Play dabane par hi recording sunai degi.</p>
+      </section>
+      ${reviewCard(t)}
+      <div class="sc-transcript-head"><h3>Full conversation</h3><span class="sc-dim sc-small">Original words · ${t.transcript?.length || 0} messages</span></div>
 
       <div class="sc-log" id="sc-log">
         ${t.transcript?.length ? t.transcript.map(bubble).join('')
@@ -211,6 +239,29 @@
             </div>`}
       </div>`;
   }
+
+  function reviewCard(t) {
+    const lang = ui.reviewLang, hi = lang === 'hi', v = t.review?.[lang];
+    const list = (items) => `<ul>${items.map(s => `<li>${esc(s)}</li>`).join('')}</ul>`;
+    return `<section class="sc-review" lang="${lang}" aria-label="AI call summary">
+      <div class="sc-card-head">${icon('sparkles')}<h3>${hi ? 'कॉल का सारांश' : 'Call summary'}</h3>
+        <div class="sc-languages" role="group" aria-label="Summary language">
+          <button class="sc-btn sc-btn-small" aria-pressed="${!hi}" onclick="SarvamCallingUI.reviewLanguage('en')">English</button>
+          <button class="sc-btn sc-btn-small" aria-pressed="${hi}" onclick="SarvamCallingUI.reviewLanguage('hi')">हिन्दी</button>
+        </div></div>
+      ${v ? `<h4>${esc(v.title)}</h4><p class="sc-overview">${esc(v.overview)}</p>
+        ${v.keyPoints.length ? `<h5>${hi ? 'मुख्य बातें' : 'Key points'}</h5>${list(v.keyPoints)}` : ''}
+        ${v.nextSteps.length ? `<h5>${hi ? 'अगला कदम' : 'Next steps'}</h5>${list(v.nextSteps)}` : ''}`
+        : `<p class="sc-dim">${t.summary ? esc(t.summary) : hi ? 'पूरी बातचीत पढ़कर AI दोनों भाषाओं में सारांश बनाएगा।' : 'Turn the conversation into a clear review: requirements, decisions and next steps.'}</p>`}
+      ${t.summaryPartial ? `<p class="sc-dim sc-small">${hi ? 'लंबी कॉल: सारांश शुरुआती बातचीत पर आधारित है। पूरी बातचीत नीचे उपलब्ध है।' : 'Long call: this summary covers the first part. The complete transcript is below.'}</p>` : ''}
+      ${t.escalation ? `<p class="sc-escalated">${hi ? 'समीक्षा के लिए चिह्नित' : 'Flagged for review'} · ${esc(t.escalation.note)}</p>` : ''}
+      <div class="sc-review-actions"><button class="sc-btn sc-btn-primary" ${ui.busy.has(t.id) || !t.transcript?.length || liveStatus(t) ? 'disabled' : ''} onclick="SarvamCallingUI.makeSummary('${esc(t.id)}')">${icon('file-text')} ${ui.busy.has(t.id) ? 'Working…' : hi ? 'सारांश बनाएं' : 'Make summary'}</button>
+        <span class="sc-dim sc-small">${hi ? 'English और हिन्दी में एक साथ' : 'English + Hindi in one request'}</span></div>
+      ${ui.error ? `<p class="sc-row-err" role="alert">${esc(ui.error)}</p>` : ''}
+    </section>`;
+  }
+
+  const liveStatus = t => ['dialing','ringing','connected','unknown'].includes(t.status);
 
   /* Customer right, AI left — jaisa owner ne maanga tha. */
   function bubble(m) {
@@ -227,8 +278,21 @@
     const side = $('#sc-side');
     if (!side) return;
     const t = ui.threads.find((x) => x.id === ui.openThreadId);
-    side.innerHTML = batchCard() + (t ? outcomeCard(t) + meetingCard(t) + emailCard(t) : previewCard());
+    side.innerHTML = (t && liveStatus(t) ? supervisionCard(t) : '') + batchCard() + (t ? outcomeCard(t) + meetingCard(t) + emailCard(t) : previewCard());
     refreshIcons();
+  }
+
+  function supervisionCard(t) {
+    return `<section class="sc-card sc-supervision" aria-label="Live call supervision">
+      <div class="sc-card-head">${icon('radio')}<h3>Live supervision</h3></div>
+      <p class="sc-dim sc-small">Sarvam hosted calling se browser ko live audio stream ya remote hangup control abhi nahi mil raha. Telephony monitoring connection chahiye.</p>
+      <button class="sc-btn" role="switch" aria-checked="false" disabled aria-describedby="sc-live-reason">${icon('headphones')} Live listen off</button>
+      <p id="sc-live-reason" class="sc-dim sc-small">Yeh recording player se alag control hai. Dono sides ki live stream connect hone par enable hoga.</p>
+      <div class="sc-card-actions"><button class="sc-btn sc-btn-danger" disabled title="This provider connection has no remote hangup API">${icon('phone-off')} End call unavailable</button></div>
+      <label class="sc-field"><span>Issue / escalation note</span><textarea id="sc-escalation-note" rows="2" placeholder="Kya problem hui?">${esc(t.escalation?.note || '')}</textarea></label>
+      <button class="sc-btn" onclick="SarvamCallingUI.flagCall('${esc(t.id)}')">${icon('flag')} Flag for review</button>
+      <p class="sc-dim sc-small">Note is call par save hoga. Isse call transfer ya kisi ko message nahi jaata.</p>
+    </section>`;
   }
 
   function batchCard() {
@@ -254,17 +318,32 @@
   function previewCard() {
     const rows = ui.queue.slice(0, 40);
     if (!rows.length) return '';
-    return `<div class="sc-card">
+    /* The number is the one thing that must never be cut: it is what the
+       call goes to. So its column is a fixed width wide enough for +91 and
+       ten digits, the city gets a fixed width too, and the company name —
+       the only one that can be any length — takes what is left and ellipses.
+       table-layout:fixed is what keeps the whole thing inside the card:
+       measured before this, the table ran 380px wide inside a 340px card and
+       hung 69px out past its right edge, which is why the last column looked
+       sliced off and the card stopped looking like a rectangle. */
+    const cell = (text, cls) => {
+      const value = esc(text);
+      return `<td class="${cls}" title="${value}">${value}</td>`;
+    };
+    return `<div class="sc-card sc-card-preview">
       <div class="sc-card-head">${icon('users')}<h3>Preview</h3><span class="sc-count">${ui.queue.length}</span></div>
-      <table class="sc-preview">
-        <thead><tr><th>Number</th><th>Company</th><th>City</th></tr></thead>
-        <tbody>${rows.map((i) => `<tr>
-          <td class="sc-mono">${esc(i.lead.phone)}</td>
-          <td>${esc(i.lead.company || i.lead.name || '—')}</td>
-          <td class="sc-dim">${esc(i.lead.city || '—')}</td>
-        </tr>`).join('')}</tbody>
-      </table>
-      ${ui.queue.length > rows.length ? `<div class="sc-dim sc-small">+${ui.queue.length - rows.length} aur</div>` : ''}
+      <div class="sc-preview-wrap">
+        <table class="sc-preview">
+          <colgroup><col class="sc-col-num"><col class="sc-col-co"><col class="sc-col-city"></colgroup>
+          <thead><tr><th>Number</th><th>Company</th><th>City</th></tr></thead>
+          <tbody>${rows.map((i) => `<tr>
+            ${cell(i.lead.phone, 'sc-mono')}
+            ${cell(i.lead.company || i.lead.name || '—', '')}
+            ${cell(i.lead.city || '—', 'sc-dim')}
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+      ${ui.queue.length > rows.length ? `<div class="sc-dim sc-small sc-preview-more">+${ui.queue.length - rows.length} aur</div>` : ''}
     </div>`;
   }
 
@@ -444,9 +523,12 @@
   function setTab(tab) { ui.tab = tab; renderRail(); }
 
   function open(id) {
+    ui.error = '';
     ui.openThreadId = id;
     ui.tab = 'calls';
     renderAll();
+    const t = threadById(id);
+    if (t?.interactionId && !t.transcript?.length) refreshCall(id);
   }
 
   function drop(id) { S().removeFromQueue(id); }
@@ -472,6 +554,39 @@
   }
 
   function stop() { S().stop(); toast('info', 'Rok rahe hain', 'Jo call chal rahi hai wo poori hogi.'); }
+
+  function demoNumber(value) { ui.demoPhone = value; }
+  async function demo() {
+    const phone = $('#sc-demo-phone')?.value || ui.demoPhone;
+    ui.demoPhone = phone;
+    const note = $('#sc-demo-note');
+    try { if (note) note.textContent = 'Demo number par call shuru kar rahe hain…'; await S().demoCall(phone);
+      if (note) note.textContent = 'Demo call ka result Calls mein khul gaya hai.';
+    } catch(e) { if (note) note.textContent = e.message; toast('error', 'Demo call', e.message); }
+  }
+  function reviewLanguage(lang) { if (['en','hi'].includes(lang)) { ui.reviewLang = lang; renderMain(); } }
+  async function reviewAction(id, action) {
+    if (ui.busy.has(id)) return;
+    ui.busy.add(id); ui.error = ''; renderMain();
+    try { await action(); await reloadThreads(); }
+    catch(e) { ui.error = e.message; toast('error', 'Call review', e.message); }
+    finally { ui.busy.delete(id); renderAll(); }
+  }
+  function makeSummary(id) { return reviewAction(id, () => S().summarizeThread(threadById(id))); }
+  function refreshCall(id) { return reviewAction(id, () => S().refreshThread(id)); }
+  function recordingError() { const note = $('#sc-recording-note'); if (note) note.textContent = 'Recording link expire hua ya audio load nahi hua. Refresh call dabakar naya link lijiye.'; }
+  async function flagCall(id) {
+    const note = $('#sc-escalation-note')?.value.trim();
+    if (!note) { toast('warning', 'Issue likhiye', 'Escalation note khaali hai.'); return; }
+    await reviewAction(id, () => S().flagThread(id, note));
+  }
+  function downloadTranscript(id) {
+    const t = threadById(id); if (!t?.transcript?.length) return;
+    const text = [t.company, t.phone, '', ...t.transcript.map(m => `${m.role === 'user' ? 'Customer' : 'AI'}: ${m.text}`)].join('\n');
+    const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+    const a = document.createElement('a'); a.href = url; a.download = 'call-transcript.txt'; a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
 
   function banner(text, actionLabel, onClick) {
     const el = $('#sc-banner');
@@ -705,10 +820,7 @@
   async function redraft(id) {
     const t = threadById(id);
     if (!t) return;
-    toast('info', 'Draft bana rahe hain', '');
-    await S().summarizeThread(t);
-    await reloadThreads();
-    renderAll();
+    return reviewAction(id, () => S().summarizeThread(t));
   }
 
   function downloadIcs(id) {
@@ -735,6 +847,16 @@
     renderRail();
     renderMain();
     renderSide();
+    const demoButton = $('#sc-demo-start'); if (demoButton) demoButton.disabled = ui.running;
+  }
+
+  async function syncCalls() {
+    if (ui.busy.has('history')) return;
+    ui.busy.add('history');
+    try { const res = await S().syncHistory(); await reloadThreads(); ui.tab = 'calls'; renderAll();
+      toast('success', 'Calls synced', `${res.count} recent calls (last 7 days)${res.limited ? ' · maximum 500 per sync' : ''}`);
+    } catch(e) { toast('error', 'Sync calls', e.message); }
+    finally { ui.busy.delete('history'); }
   }
 
   /* Sirf tab render jab kuch badla ho — clavis-claude.css ke 60fps
@@ -753,10 +875,12 @@
     if (!t) return;
     const i = ui.threads.findIndex((x) => x.id === t.id);
     if (i >= 0) ui.threads[i] = t; else ui.threads.unshift(t);
+    if (t.demo && t.status === 'dialing') { ui.openThreadId = t.id; ui.tab = 'calls'; }
     if (!ui.openThreadId || ui.openThreadId === t.id) ui.openThreadId = t.id;
     schedule();
   });
   window.addEventListener('sarvam:config', schedule);
+  window.addEventListener('rudra:auth-state', () => { ui.threads = []; ui.openThreadId = null; reloadThreads().then(schedule); });
 
   /* Rudra24 AI jab leads nikaalta hai (clavis-task-controller.js -> RealScraper)
      to woh yeh event chhodta hai. Yahi wo jagah hai jahan Rudra24 AI khud se
@@ -844,6 +968,7 @@
     openSetup, closeSetup, saveSetup, copyPrompt, fetchDeployments, openVault,
     saveMail, openMail, copyMail, redraft, downloadIcs,
     reloadThreads, render: renderAll,
+    demo, demoNumber, reviewLanguage, makeSummary, refreshCall, recordingError, flagCall, downloadTranscript, syncCalls,
   };
 
   /** Leads page ka button aur baaki app isi ko bulate hain. */
