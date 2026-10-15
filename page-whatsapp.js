@@ -312,16 +312,12 @@ Object.assign(WhatsAppCtrl, {
     this.chatOpened = true;
     document.getElementById('wa-confirm-btn').disabled = false;
   },
-  async confirmCurrent() {
-    if (!this.isBatchRunning || !this.chatOpened || this.confirming) return;
-    const lead = this.queue[this.currentIndex];
-    if (lead.phoneOptOut) return window.showToast?.('warning', 'Phone opt-out', 'This lead opted out of phone outreach.');
-    this.confirming = true;
-    document.getElementById('wa-confirm-btn').disabled = true;
+  // Shared by the manual review queue and OpenWA auto-send.
+  async markSent(lead, source) {
     try {
       await window.CRMBridge?.logWhatsApp?.(lead);
     } catch (error) {
-      window.showToast?.('warning', 'CRM not updated', `${error.message || 'Could not save this confirmation.'} The message was confirmed by you; do not resend.`);
+      window.showToast?.('warning', 'CRM not updated', `${error.message || 'Could not save this send.'} The message went out; do not resend.`);
     }
     const storage = this.getStorage();
     const leads = storage.getJSON('allLeads', window.allLeads || []);
@@ -341,8 +337,16 @@ Object.assign(WhatsAppCtrl, {
       }
       storage.setJSON('allLeads', leads);
       window.allLeads = leads;
-      document.dispatchEvent(new CustomEvent('nexus:leadsupdated', { detail: { source: 'whatsapp-confirmed' } }));
+      document.dispatchEvent(new CustomEvent('nexus:leadsupdated', { detail: { source } }));
     }
+  },
+  async confirmCurrent() {
+    if (!this.isBatchRunning || !this.chatOpened || this.confirming) return;
+    const lead = this.queue[this.currentIndex];
+    if (lead.phoneOptOut) return window.showToast?.('warning', 'Phone opt-out', 'This lead opted out of phone outreach.');
+    this.confirming = true;
+    document.getElementById('wa-confirm-btn').disabled = true;
+    await this.markSent(lead, 'whatsapp-confirmed');
     this.reviewed.push('confirmed');
     this.confirming = false;
     window.CRMBridge?.notifyLeads?.();

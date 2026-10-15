@@ -27,6 +27,7 @@ node_modules/
 
 # Rebrand (Clavis -> Rudra24 AI) ke originals
 _rebrand_backup/
+_backup_before_eleven_voice/
 
 # Local packaging verification output
 tests/artifacts/package-verification/
@@ -42,3 +43,28 @@ backend/.venv312
 # 238MB and 378MB of run output — never belongs in the repo
 exports/
 tests/artifacts/
+
+# OpenWA WhatsApp gateway (local engine; its own deps, sessions and API key)
+openwa/
+_to_delete/
+backend/.family-providers.json
+
+# Local build tools / scratch (kept off GitHub so the cloud copy stays small)
+Rudra24Mobile/.toolchain/
+Rudra24Mobile/**/build/
+Rudra24Mobile/**/.gradle/
+work/
+Claude outputs/
+runtime/
+backend-runtime/
+backend/.deps-ready
+backend/.scrapling-browser-ready
+*.zip
+*.apk
+*.keystore
+*.jks
+Rudra24Mobile/artifacts/
+Rudra24Mobile/deployment/
+
+# Crawler run state
+backend/storage/

@@ -15,9 +15,14 @@
 
     html.setAttribute('data-theme', next);
     localStorage.setItem('skylark-theme', next);
-    requestAnimationFrame(() => requestAnimationFrame(() => {
-      themeTimer = setTimeout(() => html.classList.remove('theme-switching'), 60);
-    }));
+    // During the reveal (clavis-luxe.js) the class must stay until it has
+    // finished — dropping it mid-animation is another full recalc = a hitch.
+    // settle() there removes it together with its own classes.
+    if (!window.__themeTransitioning) {
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        themeTimer = setTimeout(() => html.classList.remove('theme-switching'), 60);
+      }));
+    }
 
     const btn = document.getElementById('mark-bennett-theme-btn');
     if (btn) {

@@ -8,6 +8,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 
 from api.auth_sync import Base, UserAccount
+from api import billing, limits
 from api.toughtongue import CallRequest, ScenarioRequest, VoiceScenario, _config, call, create_scenario, update_scenario
 
 
@@ -33,6 +34,8 @@ class ToughTongueCheck(unittest.TestCase):
             with self.assertRaises(HTTPException) as denied:
                 asyncio.run(call(CallRequest(scenario_id=scenario_id, sip_trunk_id="trunk", phone_number="+919876543210"), db, other))
             self.assertEqual(denied.exception.status_code, 404)
+            budget = db.get(limits.TenantLimits, other.id)
+            self.assertTrue(budget is None or budget.calls_used == 0, 'An unowned agent must not consume call allowance')
             with self.assertRaises(HTTPException):
                 _config({**payload, "id": scenario_id})
 

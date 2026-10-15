@@ -1,5 +1,7 @@
 # Nexus AI Leads Agent — Project Context
 
+Current Rudra24 voice/auth/deployment handoff: read `MUSE_HANDOFF.md` first. The historical overview below predates the Supabase-managed backend and ElevenLabs-first voice implementation; verify current source before changing these flows.
+
 ## Overview
 This repo now contains **two products**:
 

@@ -8,42 +8,52 @@ from unittest.mock import AsyncMock, patch
 import httpx
 from fastapi import HTTPException, UploadFile
 from api import speech, tts
-from api import ai_chat, limits, auth_sync
+from api import ai_chat, limits, auth_sync, billing
 from sqlalchemy import create_engine
 from sqlalchemy.orm import Session
 from fastapi.responses import StreamingResponse
 
 
 class VoiceProviderTests(unittest.IsolatedAsyncioTestCase):
+    def setUp(self):
+        self.engine = create_engine('sqlite:///:memory:')
+        auth_sync.Base.metadata.create_all(self.engine)
+        self.db = Session(self.engine)
+        self.addCleanup(self.engine.dispose)
+        self.addCleanup(self.db.close)
+        connected = patch.object(ai_chat, 'get_provider_secret', return_value='owned-secret')
+        connected.start(); self.addCleanup(connected.stop)
+
     async def test_transcription_uses_owned_vault_and_preserves_language(self):
         user = SimpleNamespace(id="owner-a")
         response = httpx.Response(200, json={"text": "CRM kaise use karun?", "segments": [{"no_speech_prob": .01}]}, request=httpx.Request("POST", "https://provider.test"))
         client = AsyncMock()
         client.__aenter__.return_value = client
         client.post.return_value = response
-        with patch.object(speech, "get_provider_secret", return_value="test-secret") as vault, patch.object(speech.httpx, "AsyncClient", return_value=client), patch.object(speech,"prepare_transcription_wav",return_value=b"audio"):
-            data = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio"), filename="voice.webm"), "hi-IN", "groq", user, "owned-db")
-            vault.assert_called_once_with("groq", user, "owned-db")
+        from services.speech.audio import pcm16_to_wav
+        with patch.object(speech, "get_provider_secret", return_value="test-secret") as vault, patch.object(speech.httpx, "AsyncClient", return_value=client), patch.object(speech,"prepare_transcription_wav",return_value=pcm16_to_wav(b'\0'*32000,16000)):
+            data = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio"), filename="voice.webm"), "hi-IN", "groq", user, self.db)
+            vault.assert_called_once_with("groq", user, self.db)
             self.assertEqual(data["text"], "CRM kaise use karun?")
             self.assertEqual(client.post.call_args.kwargs["data"]["language"], "hi")
             self.assertEqual(client.post.call_args.kwargs["data"]["model"], "whisper-large-v3")
             response._content = b'{"text":"Thanks for watching","segments":[{"no_speech_prob":0.99}]}'
-            silent = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, "owned-db")
+            silent = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, self.db)
             self.assertEqual(silent["text"], "")
             self.assertEqual(silent["reason"], "no_speech")
             for segment in ({"avg_logprob": -1.8}, {"compression_ratio": 3.1},
                             {"no_speech_prob": .7, "avg_logprob": -1.1}):
                 response._content = json.dumps({"text": "I am going to " * 5, "segments": [segment]}).encode()
-                rejected = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, "owned-db")
+                rejected = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, self.db)
                 self.assertEqual(rejected["text"], "")
                 self.assertEqual(rejected["reason"], "unclear_audio")
             # A genuinely spoken phrase is allowed; no keyword blacklist.
             response._content = b'{"text":"I am going to Delhi","segments":[{"avg_logprob":-0.1,"no_speech_prob":0.01,"compression_ratio":1.2}]}'
-            accepted = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, "owned-db")
+            accepted = await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, self.db)
             self.assertEqual(accepted["text"], "I am going to Delhi")
             client.post.return_value = httpx.Response(429, request=httpx.Request("POST", "https://provider.test"))
             with self.assertRaises(HTTPException) as error:
-                await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, "owned-db")
+                await speech.transcribe_audio(UploadFile(io.BytesIO(b"audio")), "", "groq", user, self.db)
             self.assertEqual(error.exception.status_code, 429)
 
     async def test_silence_is_rejected_before_provider_request(self):
@@ -53,19 +63,19 @@ class VoiceProviderTests(unittest.IsolatedAsyncioTestCase):
         noise=pcm16_to_wav(float_audio_to_pcm16(np.random.default_rng(0).normal(0,.04,16000)),16000)
         with patch.object(speech,"get_provider_secret",return_value="test-secret"), patch.object(speech.httpx,"AsyncClient") as client:
             for clip in (audio,noise):
-                result=await speech.transcribe_audio(UploadFile(io.BytesIO(clip),filename="silent.wav"),"","groq",SimpleNamespace(id="a"),None)
+                result=await speech.transcribe_audio(UploadFile(io.BytesIO(clip),filename="silent.wav"),"","groq",SimpleNamespace(id="a"),self.db)
                 self.assertEqual(result["reason"],"no_speech")
                 self.assertEqual(result["text"],"")
             client.assert_not_called()
 
-    async def test_pcm_never_silently_becomes_gemini_wav(self):
-        with patch.object(tts, "get_provider_secret", return_value="test-secret"), patch.object(tts, "synthesize_cartesia", side_effect=RuntimeError("provider down")), patch.object(tts, "synthesize_gemini_wav", new_callable=AsyncMock) as gemini:
+    async def test_explicit_cartesia_pcm_never_silently_switches_provider(self):
+        with patch.object(tts, "get_provider_secret", return_value="test-secret"), patch.object(tts, "synthesize_cartesia", side_effect=RuntimeError("provider down")), patch.object(tts.elevenlabs_client, "synthesize_response", new_callable=AsyncMock) as elevenlabs:
             with self.assertRaises(HTTPException) as error:
-                await tts.synthesize(tts.TTSRequest(text="Hello", engine="cartesia", fmt="pcm"), "db", SimpleNamespace(id="owner-a"))
+                await tts.synthesize(tts.TTSRequest(text="Hello", engine="cartesia", fmt="pcm"), self.db, SimpleNamespace(id="owner-a"))
             self.assertEqual(error.exception.status_code, 503)
-            gemini.assert_not_called()
+            elevenlabs.assert_not_called()
         with patch.object(tts, "get_provider_secret", return_value="test-secret"), patch.object(tts, "synthesize_cartesia", new_callable=AsyncMock, return_value=b"\x00\x01"):
-            audio = await tts.synthesize(tts.TTSRequest(text="Hello", engine="cartesia", fmt="pcm"), "db", SimpleNamespace(id="owner-a"))
+            audio = await tts.synthesize(tts.TTSRequest(text="Hello", engine="cartesia", fmt="pcm"), self.db, SimpleNamespace(id="owner-a"))
             self.assertEqual(audio.media_type, "audio/pcm")
             self.assertEqual(audio.headers["x-tts-engine"], "cartesia")
 

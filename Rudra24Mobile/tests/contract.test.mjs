@@ -1,0 +1,16 @@
+import assert from 'node:assert/strict';
+import {batchPayload,recipients,validBase,escapeHTML} from '../pwa/contract.js';
+const leads=[{id:'1',profile:{company:'A',phone:'+919999999999',email:'a@example.com'}},{id:'2',profile:{company:'B',phone:'+918888888888',email:'b@example.com'}}];
+const targets=recipients(leads,new Set(['1','2']),'email',1);
+assert.equal(targets.length,1);
+assert.deepEqual(batchPayload('email',targets,{subject:'Hi',message:'Hello'},'request-123456789').record_ids,['1']);
+assert.throws(()=>batchPayload('email',[{id:'1',destination:'bad'}],{},'id'));
+assert.throws(()=>batchPayload('calls',[{id:'1',destination:'99999'}],{},'id'));
+assert.throws(()=>batchPayload('email',[...targets,...targets],{},'id'));
+assert.throws(()=>validBase('http://example.com'));
+assert.throws(()=>validBase('https://user:secret@example.com'));
+assert.equal(validBase('https://example.com/'),'https://example.com');
+assert.equal(escapeHTML('<script>'),'&lt;script&gt;');
+assert.equal(recipients([{id:'1',profile:{phone:'+91 99999-99999'}}],new Set(['1']),'calls',1)[0].destination,'+919999999999');
+assert.equal(batchPayload('calls',[{id:'crm-1',destination:'+919999999999'}],{agent:'a',phone:'p'},'request-123456789').recipients[0].crm_record_id,'crm-1');
+console.log('PASS: review payload, batch cap, validation, duplicate destinations, HTTPS, escaping');

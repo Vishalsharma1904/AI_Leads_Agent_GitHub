@@ -17,18 +17,28 @@ const check = (l, ok) => { console.log(`  ${ok ? 'PASS' : 'FAIL'}  ${l}`); if (!
 const wake = read('clavis-wake.js');
 const voice = read('clavis-voice.js');
 const canvas = read('clavis-canvas.js');
+const vm = require('node:vm');
+const timers = new Map(), storage = new Map(); let nextTimer = 0, speech = 0;
+const quietWindow = { ClavisVoiceState: { isClavisWorkspace: () => true }, ClavisVoice: { speak: () => speech++ }, addEventListener() {}, dispatchEvent() {} };
+vm.runInNewContext(wake, {window: quietWindow, document: {documentElement:{setAttribute(){}},addEventListener(){}},
+  localStorage:{getItem:key=>storage.get(key)??null}, setTimeout:(fn,ms)=>{timers.set(++nextTimer,{fn,ms});return nextTimer;},clearTimeout:id=>timers.delete(id)});
 
 check('a wake source must be opted into before it opens a session',
   /function sourceAllowed/.test(wake) && /if \(!opts\.force && !sourceAllowed\(source\)\) return false;/.test(wake));
-check('the wake WORD is not in the default sources',
-  /const DEFAULT_SOURCES = '([^']+)'/.test(wake) &&
-  !/const DEFAULT_SOURCES = '[^']*\bword\b/.test(wake));
+storage.set('clavis_wake_sources', 'snap,tap,typed,touch');
+check('a saved wake-word opt-out refuses voice wake', !quietWindow.ClavisWake.wake('word') && !quietWindow.ClavisWake.isAwake());
+storage.delete('clavis_wake_sources');
+const input = read('jarvis_ui.js');
+const gate = input.slice(input.indexOf('// Authenticate the speaker before wake'), input.indexOf('// ── Wake gate:'));
+check('speaker rejection returns before wake or dispatch', /clavisVoiceVerdict\(heard, meta\)/.test(gate) && /if \(!verdict.accept\)/.test(gate) && /return;/.test(gate));
 check('a snap is',
   /const DEFAULT_SOURCES = 'snap/.test(wake));
 check('speaking is refused while he is asleep',
   /if \(!opts\.unprompted\)/.test(voice) && /W\.isAwake\(\)/.test(voice));
-check('the sleepy check-in is the single exception, and fires once per wake',
-  /CHECK_IN_LINES/.test(wake) && /S\.checkedIn = true;/.test(wake) && /unprompted: true/.test(wake));
+quietWindow.ClavisWake.wake('typed');
+const idle = [...timers.values()].find(timer=>timer.ms===45000);
+idle?.fn();
+check('idle check-in sleeps silently without paid speech', Boolean(idle) && !quietWindow.ClavisWake.isAwake() && speech===0);
 check('going to sleep cancels a pending check-in',
   /clearTimeout\(S\.checkTimer\);[\s\S]{0,60}S\.checkedIn = false;/.test(wake));
 check('still being there postpones the sleepy line rather than stacking one',

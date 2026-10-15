@@ -58,7 +58,7 @@
       label: 'Groq',
       title: 'Groq key',
       tag: 'Recommended',
-      desc: 'Rudra thinks and hears with this one.',
+      desc: 'Rudra’s fast LLM. Also provides backup speech recognition.',
       link: 'https://console.groq.com/keys',
       linkText: 'Create a Groq key',
       prefix: 'gsk_',
@@ -81,9 +81,17 @@
       icon: 'route'
     }
   };
+  PROVIDERS.elevenlabs = {
+    label: 'ElevenLabs', title: 'ElevenLabs API key', tag: 'Primary voice',
+    desc: 'Realtime listening, natural Hindi / English voice and calling.',
+    link: 'https://elevenlabs.io/app/settings/api-keys', linkText: 'Create an ElevenLabs key',
+    prefix: '', rx: /[^\s]{16,}/,
+    steps: ['Create an API key', 'Enable STT, TTS, Agents, Voices and User read access', 'Check & Save'],
+    placeholder: 'Paste your ElevenLabs API key', icon: 'spark'
+  };
   PROVIDERS.cartesia = {
     label: 'Cartesia', title: 'Voice key', tag: 'Voice',
-    desc: "Rudra's speaking voice — Hindi and English, with feeling.",
+    desc: 'Optional speaking voice when ElevenLabs is unavailable.',
     link: 'https://play.cartesia.ai/keys', linkText: 'Create a Cartesia key',
     prefix: 'sk_car_', rx: /[^\s]{20,}/,
     steps: ['Create an API key', 'Copy the key', 'Check & Save'],
@@ -102,11 +110,11 @@
      list entirely — billing made it mandatory-paid and it is switched off
      app-wide, so a card asking for it was asking for an error. Everything
      else, including the spare LLM providers, folds into the drawer. */
-  var ORDER = ['groq', 'cartesia', 'apify', 'openrouter', 'sarvam'];
+  var ORDER = ['elevenlabs', 'groq', 'apify', 'cartesia', 'openrouter', 'sarvam'];
   // What he actually needs, open on the page. Everything added below this
   // line is a spare LLM provider and lives in a folded drawer — fourteen
   // identical full-size cards was the "sab bada bada hai" problem.
-  var PRIMARY = ['groq', 'cartesia', 'apify'];
+  var PRIMARY = ['elevenlabs', 'groq', 'apify'];
   [
     ['openai', 'OpenAI', 'https://platform.openai.com/api-keys'],
     ['deepseek', 'DeepSeek', 'https://platform.deepseek.com/api_keys'],
@@ -194,12 +202,6 @@
   function vaultStatus() { try { return vault() && vault().status ? vault().status() : null; } catch (_) { return null; } }
 
   function providerState(provider) {
-    // Apify lives in this browser, not the server vault — so it reports
-    // connected whether or not a backend is up or he is signed in.
-    if (provider === 'apify' && window.ApifyLeads) {
-      var on = window.ApifyLeads.hasToken();
-      return { connected: on, state: on ? 'live' : 'empty', mask: on ? window.ApifyLeads.mask() : '', count: on ? 1 : 0 };
-    }
     if (!window.SupabaseAuth?.getAccessToken?.()) return { connected: false, state: 'empty', mask: '', count: 0 };
     var vs = vaultStatus();
     var p = vs && vs.providers && vs.providers[provider];
@@ -261,31 +263,11 @@
         message: 'That does not look like a complete ' + info.label + ' API key — ' + why + '. Clear the field (eye icon to see it) and paste the key again.' });
     }
 
-    /* Apify is the one key the BROWSER itself has to use: api.apify.com is
-       called straight from this page, so the server vault — which never
-       hands a secret back — cannot supply it. It is checked against Apify
-       and kept in this browser, and still mirrored to the vault when a
-       backend happens to be up. */
-    if (provider === 'apify' && window.ApifyLeads) {
-      return window.ApifyLeads.verify(key).then(function (v) {
-        if (!v.ok) {
-          return { saved: false, status: 'invalid',
-            message: v.reason === 'unauthorized'
-              ? 'Apify rejected this token. Copy a new one from the console.'
-              : 'Could not reach Apify. Check your connection and retry.' };
-        }
-        window.ApifyLeads.setToken(key);
-        try { window.ClavisKeyVault && window.ClavisKeyVault.add('apify', key).catch(function () {}); } catch (_) {}
-        fire('clavis:keys-ready', { provider: 'apify', status: 'ok' });
-        return { saved: true, status: 'ok', mask: window.ApifyLeads.mask(),
-          message: 'Apify connected' + (v.username ? ' (' + v.username + ')' : '') + '. Leads can now use Apify.' };
-      });
-    }
-
     if (!window.ClavisKeyVault) return Promise.resolve({ saved: false, status: 'unknown', message: 'Key vault is not ready yet.' });
-    return window.ClavisKeyVault.add(provider, key).then(function () {
-      fire('clavis:keys-ready', { provider: provider, status: 'ok' });
-      return { saved: true, status: 'ok', message: info.label + ' saved in your encrypted server vault.', mask: 'Server vault' };
+    return window.ClavisKeyVault.add(provider, key).then(function (result) {
+      var state = result.verified ? 'ok' : 'unknown';
+      fire('clavis:keys-ready', { provider: provider, status: state });
+      return { saved: true, status: state, message: result.note || info.label + ' saved in your encrypted server vault.', mask: 'Server vault' };
     }).catch(function (error) {
       return { saved: false, status: 'unknown', message: error.message || 'Could not save the key.' };
     });
@@ -433,8 +415,7 @@
       '<section class="cx-setup-card" data-card="' + p + '" style="--cx-i:' + idx + '">' +
         '<button type="button" class="cx-setup-head" data-act="toggle" data-p="' + p + '" aria-expanded="false" aria-controls="' + bodyId + '">' +
           '<span class="cx-setup-titles">' +
-            '<span class="cx-setup-name">' + esc(info.title) +
-              '<span class="cx-setup-tag' + (p === 'groq' ? ' is-rec' : '') + '">' + esc(info.tag) + '</span></span>' +
+            '<span class="cx-setup-name">' + esc(info.title) + '</span>' +
             '<span class="cx-setup-desc" data-desc="' + p + '">' + esc(info.desc) + '</span>' +
           '</span>' +
           '<span class="cx-setup-chip" data-chip="' + p + '" data-tone="idle">Not set</span>' +
@@ -692,14 +673,12 @@
         else { chip.textContent = 'Connected'; chip.setAttribute('data-tone', 'ok'); }
       }
       if (desc) {
-        desc.textContent = s.connected && s.mask
-          ? (s.count > 1 ? s.mask + '  ·  ' + s.count + ' keys' : s.mask)
-          : PROVIDERS[p].desc;
-        desc.classList.toggle('is-mask', !!(s.connected && s.mask));
+        desc.textContent = PROVIDERS[p].desc;
+        desc.classList.remove('is-mask');
       }
       if (card) card.setAttribute('data-state', s.connected ? s.state : 'empty');
       var input = S.root.querySelector('[data-input="' + p + '"]');
-      var ph = s.connected && s.mask ? 'Saved: ' + s.mask + ' — paste a new key to replace it' : PROVIDERS[p].placeholder;
+      var ph = s.connected ? 'Replace saved key' : PROVIDERS[p].placeholder;
       if (input && input.placeholder !== ph) input.placeholder = ph;
     });
     var mic = st.mic;
@@ -910,7 +889,7 @@
       if (S.isOpen) return false;
       if ((Number(lsGet(LS.snooze)) || 0) > Date.now()) return false;
       var st = status();
-      if (st.groq.connected || st.cartesia.connected || st.openrouter.connected) return false;
+      if (st.groq.connected || st.elevenlabs.connected || st.cartesia.connected || st.openrouter.connected) return false;
       if (authShowing() || otherModalShowing()) {
         // Wait politely for the login / permission sheet to finish.
         if (S.autoTries++ < 40) setTimeout(maybeAutoOpen, 3000);

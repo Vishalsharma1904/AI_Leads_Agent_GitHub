@@ -61,14 +61,8 @@ if AUTO_CREATE_SCHEMA:
 def _developer_allowed(user: UserAccount, credentials: HTTPAuthorizationCredentials) -> bool:
     # A signed Supabase token is verified by get_current_user. The allowlist is
     # server owned; localStorage/profile email and UI state never grant access.
-    configured = os.getenv("DEVELOPER_EMAILS", "vishalsharma190405@gmail.com")
-    allowed = {email.strip().lower() for email in configured.split(",") if email.strip()}
-    if not credentials or user.email.lower() not in allowed:
-        return False
-    claims = _verify_supabase_token(credentials.credentials)
-    # Developer login uses the existing Google OAuth flow. A self-registered,
-    # unconfirmed password account with the same address must not gain access.
-    return claims.get("sub") == user.id and (claims.get("app_metadata") or {}).get("provider") == "google"
+    from services.developer_control import owner_claims
+    return bool(credentials and owner_claims(user, _verify_supabase_token(credentials.credentials)))
 
 
 def require_developer(user: UserAccount = Depends(get_current_user),

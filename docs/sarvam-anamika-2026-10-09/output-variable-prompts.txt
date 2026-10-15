@@ -1,0 +1,29 @@
+Edit each existing Output variable's Extraction prompt separately. Do not paste this entire file as one variable. Preserve existing variable names and enum values used by integrations unless you also update their consumers. Unknown String values should be empty; if the connected integration requires a literal unknown marker, use that marker consistently instead. For Enum variables, configure the proposed values before using them.
+
+GLOBAL EXTRACTION RULE
+Use only caller statements, trustworthy call metadata and verified tool results. Agent suggestions and unsupported agent assertions are not caller-confirmed facts. No fabricated defaults. Interest, a requested action, a logged request and a confirmed booking are separate states.
+
+CALL SUMMARY
+Summarise the current arrangement, the caller's stated concerns, expressed interest, the exact requested next step and missing details. Do not repeat the agent's unsupported company claims as facts. Clearly mark unconfirmed actions. Do not infer a decision maker or an intention to replace the vendor. Use the correct company name Rudra Twenty Four Secure Services Private Limited only when needed.
+
+CALL STATUS
+If using an Enum, review compatibility before changing values. Suggested outcomes: audit_interested, callback_requested, meeting_requested, site_visit_requested, next_step_requested, booking_confirmed, details_requested, not_interested, do_not_call, wrong_number, no_response, unclear.
+Use meeting_requested or site_visit_requested only when the caller clearly selected that action. If they agreed to an unresolved meeting-or-visit choice, use next_step_requested. Use booking_confirmed only when a real booking action confirmed the relevant appointment. Never infer confirmation from the agent saying “fixed”. Opt-out and wrong-number outcomes override sales interest. With a String variable, a concise equivalent disposition is acceptable.
+
+LEAD SCORE
+Suggested Enum values: hot, warm, cold, unknown. Hot requires an explicit near-term buying/replacement requirement plus confirmed relevant decision-making authority. Warm means audit/discussion interest or a possible requirement but missing buying intent, authority or timeline. Cold means no current interest. Unknown means insufficient information. Complaints plus an unconfirmed discussion request do not automatically qualify as hot. Map this rubric to existing score enums/numeric scales if those are used by the application.
+
+REQUIREMENT SUMMARY
+Record only what the caller explicitly stated: current vendor if clear, specific concern, site/staff/shift needs if supplied, and desired next step. Do not state that they want to replace the vendor unless they said so. Do not assume facility type, headcount, budget or start date. Identify important uncollected details rather than filling them in.
+
+FOLLOW UP DATE
+Return YYYY-MM-DD only for a caller-agreed follow-up day or appointment request. Use the actual call's local start date from reliable Sarvam call/system context. Resolve “tomorrow” and future “parson” relative to that call date; never use an old example date, transcript-review date or today's date at extraction if it differs from the call date. Prefer an explicitly confirmed date. If the necessary base date or intent is ambiguous, return empty. The requested date does not imply a confirmed booking. Do not return a date after the caller opted out.
+
+FOLLOW UP TIME
+Return HH:MM in 24-hour form for a caller-agreed requested time, using the confirmed context. “दोपहर बारह बजे” is 12:00; midnight is 00:00. If “बारह बजे” is not disambiguated, return empty. Use the latest explicit correction after an interruption. Do not treat an unfinished agent suggestion as caller agreement. This is a requested time unless booking is verified. Do not return a time after opt-out.
+
+DECISION MAKER
+Return the name or role of the explicitly confirmed person responsible for security decisions. Agreement to an audit, fluent answers, or being the person who picked up does not establish authority. Return empty if not established, or the downstream integration's configured unknown marker. Do not invent a name or copy an unverified input lead name as a confirmed decision maker.
+
+OPTIONAL CONTACT NAME
+Extract the caller's explicitly supplied or confirmed name only. Empty if unknown or declined. Do not interpret Sir, Madam, Ji or a blank greeting as a name.

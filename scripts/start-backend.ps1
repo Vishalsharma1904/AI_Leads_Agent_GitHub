@@ -24,6 +24,27 @@ function Test-PythonRuntime([string]$Candidate) {
   } catch { return $false }
 }
 
+# Check installed packages without importing the whole app twice. Uvicorn and
+# the launcher's /health check validate the actual application once it starts.
+$dependencyProbe = @'
+import sys
+from pathlib import Path
+from importlib.metadata import version
+from packaging.requirements import Requirement
+optional = {'torch', 'kokoro', 'silero-vad'}
+for line in Path(sys.argv[1]).read_text().splitlines():
+    line = line.strip()
+    if not line or line.startswith('#'):
+        continue
+    requirement = Requirement(line)
+    if requirement.name.lower() in optional or (requirement.marker and not requirement.marker.evaluate()):
+        continue
+    installed = version(requirement.name)
+    if not requirement.specifier.contains(installed):
+        raise RuntimeError(f'{requirement.name} {installed} does not satisfy {requirement.specifier}')
+'@
+$requirements = Join-Path $backend 'requirements.txt'
+
 # A venv launcher can remain after its base Python was removed. Test execution
 # instead of trusting the launcher file's existence.
 $candidates = @(
@@ -31,7 +52,18 @@ $candidates = @(
   (Join-Path $backend '.venv312\Scripts\python.exe'),
   (Join-Path $backend '.venv\Scripts\python.exe')
 )
-$python = $candidates | Where-Object { Test-PythonRuntime $_ } | Select-Object -First 1
+# The shared ZIP ships its backend packages inside runtime\python, so that
+# copy wins: a half-installed venv from an older failed run must not shadow it.
+$python = $null
+$portableReady = $false
+$portablePython = Join-Path $root 'runtime\python\python.exe'
+if (Test-PythonRuntime $portablePython) {
+  if ((Invoke-Logged $portablePython @('-c', $dependencyProbe, $requirements)) -eq 0) {
+    $python = $portablePython
+    $portableReady = $true
+  }
+}
+if (-not $python) { $python = $candidates | Where-Object { Test-PythonRuntime $_ } | Select-Object -First 1 }
 $uv = (Get-Command uv -ErrorAction SilentlyContinue).Source
 
 if (-not $python -and $uv) {
@@ -47,6 +79,7 @@ if (-not $python -and $uv) {
 
 if (-not $python) {
   $systemPython = (Get-Command python -ErrorAction SilentlyContinue).Source
+  if (Test-PythonRuntime $portablePython) { $systemPython = $portablePython }
   if (Test-PythonRuntime $systemPython) {
     $managedEnv = Join-Path $backend '.venv312'
     $managedPython = Join-Path $managedEnv 'Scripts\python.exe'
@@ -59,93 +92,33 @@ if (-not $python) { throw 'No working Python runtime found. Install Python 3.12+
 
 Push-Location $backend
 try {
-  # Fast path: dependencies pehle verify ho chuki hain aur requirements.txt
-  # nahi badla -> har boot par fastapi/scrapling import-check (kai second) skip.
   $depsMarker = Join-Path $backend '.deps-ready'
-  $browserMarker = Join-Path $backend '.scrapling-browser-ready'
-  $reqStamp = "$python|$((Get-Item -LiteralPath (Join-Path $backend 'requirements.txt')).LastWriteTimeUtc.Ticks)"
-
-  # A marker file is a promise, not a fact. Playwright bumps its Chromium
-  # build number on every upgrade, and the browser for the NEW build was
-  # never downloaded -- so leads quietly fell back to a static parser with no
-  # phone numbers and no website enrichment, which reads as "leads fail".
-  # Ask the runtime whether the browser is really on disk.
-  function Test-LeadBrowser([string]$Py) {
-    $probe = @'
-import sys
-try:
-    from playwright.sync_api import sync_playwright
-except Exception:
-    sys.exit(3)
-try:
-    with sync_playwright() as p:
-        path = p.chromium.executable_path
-except Exception:
-    sys.exit(4)
-import os
-sys.exit(0 if path and os.path.exists(path) else 5)
-'@
-    try { & $Py -c $probe 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) } catch { return $false }
+  $reqStamp = "$python|$((Get-Item -LiteralPath (Join-Path $backend 'requirements.txt')).LastWriteTimeUtc.Ticks)|$((Get-Item -LiteralPath $PSCommandPath).LastWriteTimeUtc.Ticks)"
+  $ready = $portableReady -or ((Test-Path -LiteralPath $depsMarker) -and
+           ("$(Get-Content -LiteralPath $depsMarker -Raw -ErrorAction SilentlyContinue)".Trim() -eq $reqStamp))
+  if (-not $ready) {
+    $ready = (Invoke-Logged $python @('-c', $dependencyProbe, $requirements)) -eq 0
+    if (-not $ready) {
+      # Cloud Groq/ElevenLabs/Apify need no local speech model downloads.
+      # Existing setup-clavis-runtime.ps1 installs the full local voice stack on demand.
+      $coreRequirements = Join-Path $logsDir 'backend-core-requirements.txt'
+      Get-Content -LiteralPath (Join-Path $backend 'requirements.txt') |
+        Where-Object { $_ -notmatch '^(torch|kokoro|silero-vad)' } |
+        Set-Content -LiteralPath $coreRequirements
+      if ($uv) { $setupCode = Invoke-Logged $uv @('pip', 'install', '--python', $python, '-r', $coreRequirements) }
+      else { $setupCode = Invoke-Logged $python @('-m', 'pip', 'install', '-r', $coreRequirements) }
+      if ($setupCode -ne 0) { throw "Backend dependency installation failed. See $installLog" }
+      if ((Invoke-Logged $python @('-c', $dependencyProbe, $requirements)) -ne 0) { throw "Backend dependencies are incomplete. See $installLog" }
+    }
+    Set-Content -LiteralPath $depsMarker -Value $reqStamp
   }
-
-  $browserOk = Test-LeadBrowser $python
-  $depsFast = $browserOk -and (Test-Path -LiteralPath $depsMarker) -and
-              ("$(Get-Content -LiteralPath $depsMarker -Raw -ErrorAction SilentlyContinue)".Trim() -eq $reqStamp)
-  if ($depsFast) {
+  # The lead pipeline's existing ensure_browser() installs Chromium when needed.
+  # An optional scraper download must not hold API key setup hostage.
+  # Watchdog: agar engine kabhi band ho jaye (crash, sleep) to 3 sec me khud
+  # dobara start. Stop-Clavis.bat is PowerShell ko bhi band kar deta hai.
+  while ($true) {
     & $python -m uvicorn main:app --host 127.0.0.1 --port $Port --workers 1
-    return
+    Add-Content -LiteralPath (Join-Path $logsDir 'backend-restarts.log') -Value "$(Get-Date -Format o) engine exited ($LASTEXITCODE), restarting"
+    Start-Sleep -Seconds 3
   }
-  if (-not $browserOk -and (Test-Path -LiteralPath $browserMarker)) {
-    Add-Content -LiteralPath $installLog -Value "$(Get-Date -Format o) Lead browser missing despite marker - reinstalling"
-    Remove-Item -LiteralPath $browserMarker -ErrorAction SilentlyContinue
-  }
-
-  # Install dependencies before uvicorn starts. The old background install
-  # raced the first lead request and hid the actual failure.
-  # crawlee was in requirements.txt but never reached the environment: this
-  # probe only asked for fastapi, so a box with fastapi already installed
-  # skipped the whole install and lost website enrichment.
-  $fastapiReady = $false
-  try { & $python -c "import fastapi, uvicorn, crawlee, playwright" 2>$null; $fastapiReady = ($LASTEXITCODE -eq 0) } catch {}
-  if (-not $fastapiReady) {
-    Add-Content -LiteralPath $installLog -Value "$(Get-Date -Format o) Installing backend requirements"
-    if ($uv) { $setupCode = Invoke-Logged $uv @('pip', 'install', '--python', $python, '-r', (Join-Path $backend 'requirements.txt')) }
-    else { $setupCode = Invoke-Logged $python @('-m', 'pip', 'install', '-r', (Join-Path $backend 'requirements.txt')) }
-    if ($setupCode -ne 0) { throw "Backend dependency installation failed. See $installLog" }
-  }
-
-  $scraplingReady = $false
-  try { & $python -c "import scrapling" 2>$null; $scraplingReady = ($LASTEXITCODE -eq 0) } catch {}
-  if (-not $scraplingReady) {
-    Add-Content -LiteralPath $installLog -Value "$(Get-Date -Format o) Installing Scrapling fetchers"
-    if ($uv) { $setupCode = Invoke-Logged $uv @('pip', 'install', '--python', $python, 'scrapling[fetchers]>=0.4.15,<1') }
-    else { $setupCode = Invoke-Logged $python @('-m', 'pip', 'install', 'scrapling[fetchers]>=0.4.15,<1') }
-    if ($setupCode -ne 0) { throw "Scrapling installation failed. See $installLog" }
-  }
-
-  if (-not (Test-LeadBrowser $python)) {
-    Add-Content -LiteralPath $installLog -Value "$(Get-Date -Format o) Installing the lead-scraper browser runtime"
-    # Playwright first: it is the one both Scrapling and Crawlee actually
-    # launch, and 'playwright install chromium' is the command that puts the
-    # binary at the exact build path the installed version looks for.
-    $setupCode = Invoke-Logged $python @('-m', 'playwright', 'install', 'chromium')
-    if ($setupCode -ne 0) {
-      $scraplingCli = Join-Path (Split-Path $python) 'scrapling.exe'
-      if (Test-Path -LiteralPath $scraplingCli) {
-        $setupCode = Invoke-Logged $scraplingCli @('install', '--force')
-      } else {
-        Add-Content -LiteralPath $installLog -Value "$(Get-Date -Format o) Scrapling CLI was not found in the selected environment"
-      }
-    }
-    if (Test-LeadBrowser $python) {
-      Set-Content -LiteralPath $browserMarker -Value (Get-Date -Format o)
-    } else {
-      Add-Content -LiteralPath $installLog -Value "$(Get-Date -Format o) Lead browser still missing - leads will run without phone/e-mail enrichment"
-    }
-  } elseif (-not (Test-Path -LiteralPath $browserMarker)) {
-    Set-Content -LiteralPath $browserMarker -Value (Get-Date -Format o)
-  }
-
-  if (Test-Path -LiteralPath $browserMarker) { Set-Content -LiteralPath $depsMarker -Value $reqStamp }
-  & $python -m uvicorn main:app --host 127.0.0.1 --port $Port --workers 1
 } finally { Pop-Location }

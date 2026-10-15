@@ -76,12 +76,13 @@ const doc = {
       tagName: tag.toUpperCase(),
       dataset: {},
       style: {},
-      classList: {
-        add() {},
-        remove() {},
-        toggle() {},
-        contains() { return false; }
-      },
+      classList: (() => {
+        const classes = new Set();
+        return { add:(...names)=>names.forEach(name=>classes.add(name)),
+          remove:(...names)=>names.forEach(name=>classes.delete(name)),
+          contains:name=>classes.has(name),
+          toggle(name,on) {const enabled=on ?? !classes.has(name);enabled?classes.add(name):classes.delete(name);return enabled;} };
+      })(),
       children: [],
       appendChild(c) { this.children.push(c); },
       setAttribute() {},
@@ -112,7 +113,8 @@ const doc = {
 };
 
 doc.body = {
-  appendChild() {},
+  children: [],
+  appendChild(element) {this.children.push(element);},
   contains() { return true; },
   removeChild() {},
   style: {}
@@ -202,8 +204,8 @@ const win = {
     },
     clipboard: { readText: async () => '' }
   },
-  fetch: (url) => Promise.resolve(String(url).includes('/gemini-live-token')
-    ? { ok: true, json: async () => ({ token: 'auth_tokens/test-only' }) } : { ok: false }),
+  fetch: (url) => Promise.resolve(String(url).includes('/elevenlabs/assistant/session')
+    ? { ok: true, status: 200, json: async () => ({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?test=1' }) } : { ok: false, json: async () => ({}) }),
   SupabaseAuth: { getAccessToken: () => 'test-session-not-real' },
   ClavisWorklet: { add: async () => {} },
   ClavisDirect: {
@@ -237,7 +239,7 @@ const scripts = [
 for (const f of scripts) {
   let source = fs.readFileSync(path.join(ROOT, f), 'utf8');
   if (f === 'clavis-live.js') source = source.replace('window.ClavisLive = {',
-    'window.__liveTest = { S, buildSetup, runTool, onToolCall, handleMessage, onPcm }; window.ClavisLive = {');
+    'window.__liveTest = { S, runTool, onToolCall, handleMessage, onPcm }; window.ClavisLive = {');
   vm.runInContext(source, ctx, { filename: f });
 }
 
@@ -544,15 +546,22 @@ async function runAllTests() {
   });
 
   // 12. Gemini Live Lifecycle & Stop Reason
-  await itAsync('Scenario 12: Gemini Live - stop({ reason: "user" }) does not resume legacy listener', async () => {
+  it('Committed-only caption becomes visible after the previous caption clears', () => {
+    Ear.caption.clear();
+    const caption = doc.body.children.find(element=>element.id==='clavis-ear-caption');
+    assert.ok(caption.classList.contains('is-out'));
+    Ear.caption.final('A final transcript without a partial.',true);
+    assert.ok(caption.classList.contains('is-in'));
+    assert.ok(!caption.classList.contains('is-out'),'hidden class must be removed without a live partial');
+    assert.ok(caption.style.top,'final-only captions receive their current placement');
+  });
+  await itAsync('Scenario 12: Live voice - stop({ reason: "user" }) does not resume legacy listener', async () => {
     // When mic is disabled, start() returns false immediately
     VS.setMicEnabled(false);
     Wake.wake('button');
     const blockedStart = await Live.start({ trigger: 'button' });
     assert.strictEqual(blockedStart, false, 'Live.start must return false when canProcessMic is false');
 
-    // This scenario explicitly selects Gemini; the production default is off.
-    store.clavis_gemini_off = '0';
     // When mic is enabled and key exists, starts connecting
     VS.setMicEnabled(true);
     Wake.wake('button');
@@ -692,32 +701,24 @@ async function runAllTests() {
     assert.strictEqual(r2.spoken, 'Opened Rudra24 Jobs.');
   });
 
-  await itAsync('Hybrid voice uses Groq once, preserves recent context and accepts cancellation', async () => {
+  await itAsync('ElevenLabs live voice: pong, tool result, interruption cut-off', async () => {
     const hooks = win.__liveTest;
-    const oldDirect = win.ClavisDirect;
-    let calls = 0;
-    win.ClavisDirect = {providerConfigured:()=> true, keyFor:()=> '', complete:async(payload, signal)=>{
-      calls++;
-      assert.strictEqual(payload.model, 'groq/openai/gpt-oss-20b');
-      assert.strictEqual(payload.messages.length, 3);
-      assert.ok(signal instanceof AbortSignal || signal.aborted === false);
-      payload.onToken('answer');
-      return {choices:[{message:{content:'A concise answer'}}],model:'openai/gpt-oss-20b'};
-    }};
-    hooks.S.brainHistory = [{role:'assistant', content:'previous topic'}];
-    const setup = hooks.buildSetup('gemini-3.8-live').setup;
-    assert.strictEqual(setup.contextWindowCompression.triggerTokens, 24000);
-    assert.ok(setup.tools.some(t=>t.functionDeclarations?.some(d=>d.name==='consult_brain')));
-    const out = await hooks.runTool('consult_brain', {question:'Explain this'}, new AbortController().signal);
-    assert.strictEqual(out.answer, 'A concise answer');
-    assert.strictEqual(calls, 1);
-    const controller = new AbortController();
-    hooks.S.toolRequests.set('cancel-me',controller);
-    hooks.handleMessage({toolCallCancellation:{ids:['cancel-me']}});
-    assert.strictEqual(controller.signal.aborted,true);
-    hooks.S.toolRequests.clear();
-    win.ClavisDirect = oldDirect;
-    assert.strictEqual(Live._selfTest(),true);
+    const sent = [];
+    win.WebSocket.OPEN = 1;
+    hooks.S.ws = { readyState: 1, send: (m) => sent.push(JSON.parse(m)), close() {} };
+    hooks.S.phase = 'live'; hooks.S.ready = true;
+    hooks.handleMessage({ type: 'ping', ping_event: { event_id: 7 } });
+    assert.deepStrictEqual(sent.pop(), { type: 'pong', event_id: 7 });
+    await hooks.onToolCall({ tool_call_id: 't1', tool_name: 'no_such_tool', parameters: {} });
+    const r = sent.pop();
+    assert.strictEqual(r.type, 'client_tool_result');
+    assert.strictEqual(r.tool_call_id, 't1');
+    assert.strictEqual(r.is_error, true);
+    hooks.handleMessage({ type: 'interruption', interruption_event: { event_id: 5 } });
+    assert.strictEqual(hooks.S.cutId, 5);
+    hooks.S.ws = null; hooks.S.phase = 'off'; hooks.S.ready = false;
+    clearTimeout(hooks.S.busyTimer);
+    assert.strictEqual(Live._selfTest(), true);
   });
 
   console.log(`\nAll ${passedTests}/${totalTests} pipeline tests PASSED successfully!\n`);

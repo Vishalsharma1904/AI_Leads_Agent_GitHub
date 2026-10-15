@@ -136,7 +136,7 @@
       return { x: global.innerWidth - 48, y: 24 };
     }
 
-    var EASE = 'cubic-bezier(0.18, 0.76, 0.22, 1)';
+    var EASE = 'cubic-bezier(0.22, 1, 0.36, 1)';
 
     function run(next, apply, opts) {
       opts = opts || {};
@@ -157,12 +157,25 @@
 
       var o = origin();
       var far = Math.hypot(Math.max(o.x, global.innerWidth - o.x), Math.max(o.y, global.innerHeight - o.y)) + 32;
-      var dur = Math.round(clamp(1500 + far * 0.22, 1600, 1920));
+      /* 2026-10-10: was 1600–1920 ms on a slow-start curve, on top of the
+         ~1 s style recalc this page needs for a theme swap — the owner saw
+         "nothing for 2 s". Now the switch flips at once and the reveal is
+         a short expo-out that is visibly moving from its first frame. */
+      var dur = Math.round(clamp(520 + far * 0.12, 600, 780));
 
       if (!doc.startViewTransition) { fallbackWave(next, apply, o, far, dur); return; }
 
-      root.classList.add('lx-vt-wave');
       busy = true;
+      var sw = doc.getElementById('mark-bennett-theme-btn');
+      if (sw) sw.setAttribute('aria-checked', String(next === 'dark'));
+      // Let the flipped switch paint before the page freezes for the swap.
+      // (a timer, not rAF: rAF never fires in a hidden window and would
+      // leave the swap pending forever)
+      setTimeout(function () { startWave(o, far, dur, apply); }, 34);
+    }
+
+    function startWave(o, far, dur, apply) {
+      root.classList.add('lx-vt-wave');
       var vt;
       try {
         vt = doc.startViewTransition(function () { swapTheme(apply); });
@@ -198,11 +211,12 @@
     }
 
     function settle() {
-      root.classList.remove('lx-vt-wave', 'lx-vt-fade');
       busy = false;
       global.__themeTransitioning = false;
+      // Every helper class leaves in ONE class write: each write on <html>
+      // costs a full-page style recalc here, and several in a row stuttered.
+      root.classList.remove('lx-vt-wave', 'lx-vt-fade', 'lx-theme-busy', 'theme-switching');
       doc.dispatchEvent(new CustomEvent('nexus:themechange:settled'));
-      setTimeout(function () { if (!busy) root.classList.remove('lx-theme-busy'); }, 90);
     }
 
     function fallbackWave(next, apply, o, far, dur) {
@@ -3494,7 +3508,7 @@
     }
     if (/\b(speaker|awaaz|awaz|voice\s*reply|bol\s*kar\s*jawab|reply\s*voice)\b/.test(low) && (ON_RE.test(low) || OFF_RE.test(low)) && typeof global.toggleJarvisSpeech === 'function') {
       var sp = !!global.jarvisSpeechEnabled, wantSp = !OFF_RE.test(low);
-      if (wantSp !== sp) global.toggleJarvisSpeech();
+      if (wantSp !== sp) global.toggleJarvisSpeech(wantSp);
       return finishQuick(text, wantSp ? 'Main ab bol kar jawab dunga.' : 'Theek hai, ab chup-chaap likh kar jawab dunga.');
     }
 

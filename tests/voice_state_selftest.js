@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-// These session tests explicitly opt into wake words; ordinary boot keeps them off.
+// Use explicit wake sources so session tests are independent of UI preferences.
 const store = { clavis_wake_sources: 'snap,clap,tap,typed,touch,word' };
 const doc = {
   readyState: 'complete',
@@ -99,6 +99,12 @@ assert.strictEqual(VS.set('ERROR'), true);
 assert.strictEqual(VS.set('USER_SPEAKING'), false);
 assert.strictEqual(VS.set('SLEEPING'), true);
 
+// ── voice defaults to continuous; a saved opt-out keeps short mode ──
+assert.strictEqual(VS.continuous(), true);
+store.clavis_continuous = 'false';
+assert.strictEqual(VS.continuous(), false);
+W.wake('word'); t += 11000; assert.ok(!W.isAwake(), 'default voice wake closes after 10 seconds');
+store.clavis_continuous = 'true';
 // ── continuous session: 3 min without a turn → SLEEPING (injectable clock) ──
 W.wake('word');
 VS._tick();
@@ -112,7 +118,11 @@ assert.strictEqual(VS.state(), 'SLEEPING');
 // typed turn keeps the short follow-up
 W.wake('typed'); t += 12000; assert.ok(!W.isAwake(), 'typed wake is short');
 // continuous off → old 10 s window
-store.clavis_continuous = 'false'; W.wake('word'); t += 11000; assert.ok(!W.isAwake()); delete store.clavis_continuous;
+store.clavis_continuous = 'false'; W.wake('word'); t += 11000; assert.ok(!W.isAwake());
+// Releasing cancelled work cannot resurrect a session after explicit sleep.
+W.wake('word'); W.busy(true, 'cancelled-turn'); W.sleep('manual');
+W.busy(false, 'cancelled-turn'); assert.ok(!W.isAwake(), 'stale busy release preserves sleep');
+store.clavis_continuous = 'true';
 
 // ── silent mode ──
 W.wake('word'); VS._tick();
@@ -134,4 +144,34 @@ VS.mark('first_partial', t); VS.mark('last_voice', t + 1000); VS.mark('endpoint'
 const m = VS.metrics();
 assert.strictEqual(m.last.endpoint_wait, 700); assert.strictEqual(m.last.dispatch, 50); assert.strictEqual(m.spans.dispatch.p95, 50);
 
+// Run actual scheduled callbacks: a clock-only test missed the 45-second sleep.
+{
+  let time = 1e12, serial = 0;
+  const timers = new Map(), prefs = {};
+  const sandbox = vm.createContext({window:null, document:doc, console, CustomEvent:function(){},
+    Date:{now:()=>time}, localStorage:{getItem:key=>prefs[key] ?? null},
+    setTimeout:(fn,ms)=>{timers.set(++serial,{fn,at:time+ms});return serial;},
+    clearTimeout:id=>timers.delete(id), dispatchEvent(){}, addEventListener(){}});
+  sandbox.window = sandbox;
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../clavis-wake.js'),'utf8'),sandbox);
+  const wake = sandbox.ClavisWake;
+  const advance = ms => {
+    const end = time + ms;
+    for (;;) {
+      const next = [...timers.entries()].sort((a,b)=>a[1].at-b[1].at)[0];
+      if (!next || next[1].at>end) break;
+      timers.delete(next[0]);time=next[1].at;next[1].fn();
+    }
+    time=end;
+  };
+  wake.wake('mic');advance(46000);
+  assert.ok(wake.isAwake(),'continuous mic survives the legacy 45-second check-in');
+  wake.busy(true,'answer');advance(5000);wake.busy(false,'answer');
+  advance(170000);assert.ok(wake.isAwake(),'reply starts a fresh idle window');
+  advance(11000);assert.ok(!wake.isAwake(),'bounded idle timeout still closes paid listening');
+  wake.wake('mic');wake.busy(true,'old-turn');wake.sleep('manual');advance(100000);
+  assert.ok(!wake.isAwake(),'old timers cannot revive explicit sleep');
+  prefs.clavis_continuous='false';wake.wake('mic');advance(11000);
+  assert.ok(!wake.isAwake(),'explicit short-mode preference still works');
+}
 console.log('voice_state_selftest: all passed');

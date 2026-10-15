@@ -185,12 +185,25 @@ async def scenario_calls(scenario_id: str, db: Session = Depends(get_db), user: 
 
 @router.post("/calls")
 async def call(req: CallRequest, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    from api.billing import require_calling
+    from api.limits import consume, finish_usage, fail_usage
+    from services.developer_control import reserve_provider
     _owned(db, user, req.scenario_id)
     if not re.fullmatch(r"\+[1-9]\d{7,14}", req.phone_number):
         raise HTTPException(422, "Use an E.164 phone number, e.g. +919876543210")
     if len(req.dynamic_vars) > 20 or any(len(k) > 64 or len(v) > 500 for k, v in req.dynamic_vars.items()):
         raise HTTPException(422, "Too many or oversized call variables")
-    result = await _provider("POST", "/v2/sip/call", user, db, req.model_dump(exclude_defaults=True))
+    require_calling(user, db)
+    reservation = consume(db, user, 'calls', provider='toughtongue', basis='submitted_calls')
+    submitted = False
+    try:
+        reserve_provider(db, user, 'toughtongue')
+        submitted = True
+        result = await _provider("POST", "/v2/sip/call", user, db, req.model_dump(exclude_defaults=True))
+    except BaseException as error:
+        fail_usage(db, user, 'calls', reservation, error, submitted=submitted)
+        raise
+    finish_usage(db, user, reservation, 'succeeded')
     call_id = result.get("call_id") or result.get("id") if isinstance(result, dict) else None
     if call_id:
         try:

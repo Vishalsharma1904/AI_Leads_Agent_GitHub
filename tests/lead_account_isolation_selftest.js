@@ -1,0 +1,16 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+let owner='a', rows=[], pending, writes=[];
+const window={SupabaseAuth:{getUser:()=>({id:owner,email:owner+'@example.test'})},allLeads:[{id:'legacy-other'}],UserStorage:{getJSON:()=>rows,setJSON:(k,v)=>writes.push([owner,k,v])},addEventListener(){},showView(){},syncLeadState:r=>window.allLeads=r};
+const ctx={window,document:{addEventListener(){},getElementById:()=>null,querySelector:()=>null,querySelectorAll:()=>[]},localStorage:{getItem:()=> '[{"id":"legacy-other"}]',setItem:()=>{throw new Error('unscoped write');}},console,setTimeout:()=>0,CustomEvent:class{}};
+vm.createContext(ctx);vm.runInContext(fs.readFileSync('page-leads.js','utf8'),ctx);
+(async()=>{const leads=window.LeadsCtrl;
+ assert.equal((await leads.loadLeads()).length,0,'empty own cache cannot fall back to another user');
+ window.MemoryEngine={getAllLeads:async()=>[{id:'fresh-own-a'}]};
+ assert.equal((await leads.loadLeads())[0].id,'fresh-own-a','fresh same-account DB data remains loadable after empty cache');
+ rows=null;window.MemoryEngine={getAllLeads:()=>new Promise(resolve=>pending=resolve)};
+ const stale=leads.loadLeads();owner='b';rows=[{id:'own-b'}];await leads.loadLeads();pending([{id:'old-a'}]);await stale;
+ assert.equal(leads.leads[0].id,'own-b','old read cannot repaint new account');
+ owner='c';assert.equal(leads.saveLeads(),false,'old dataset cannot save into new account');
+ owner='';assert.equal((await leads.loadLeads()).length,0);
+ console.log('PASS lead tenant isolation: empty cache, global/legacy rejection, late read, stale save, logout');
+})().catch(e=>{console.error(e);process.exitCode=1;});

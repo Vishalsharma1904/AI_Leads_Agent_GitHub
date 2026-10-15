@@ -67,6 +67,8 @@ const res = S.enqueue([
 check('queue takes only leads with a dialable number', res.added === 2 && res.skipped === 1,
   `added=${res.added} skipped=${res.skipped}`);
 check('queue normalises numbers to E.164', S.queueSnapshot()[0].lead.phone === '+919876543210');
+const duplicate = S.enqueue([{ id: 'other-id', phone: '+91-98765-43210' }]);
+check('same destination with a different lead ID is not queued twice', duplicate.added === 0 && duplicate.duplicates === 1 && S.queueSnapshot().length === 2);
 S.clearQueue();
 
 // ── handoff ───────────────────────────────────────────────────────────────
@@ -92,6 +94,9 @@ check('leads page can hand its list to the agent', html.includes('SarvamCallingU
 
 const app = read('app.js');
 check('showView renders the calling page', app.includes("viewName === 'calling'") && app.includes("calling: 'Calling Agent'"));
+check('voice setup and calling navigation stay distinct',
+  html.includes('data-tooltip="Voice AI Setup"') && html.includes('data-tooltip="Calling Agent"')
+  && html.includes('href="#voice-ai"') && html.includes('href="#calling"'));
 check('a finished lead run offers the leads instead of dialling on its own',
   app.includes('offerLeadsToCallingAgent'));
 
@@ -99,6 +104,17 @@ const ui = read('sarvam-calling-ui.js');
 check('Rudra24 AI asks before handing leads over', ui.includes("nexus:scrapedone") && ui.includes('offerLeads'));
 check('Rudra24 AI skills are registered for voice control',
   ['send_leads_to_calling_agent', 'start_calling', 'calling_status'].every((n) => ui.includes(`'${n}'`)));
+check('calling batch supports manual selection, N cap and destination confirmation',
+  ui.includes('data-select-lead=') && ui.includes('id="sc-select-all"') && ui.includes('Math.min(200')
+  && ui.includes('Destinations:') && ui.includes('submitBatch'));
+const studio = read('elevenlabs-studio.js');
+check('ElevenLabs setup editor stays on setup while call controls mount in Calling Agent',
+  studio.includes("[['agent', 'Agent'], ['knowledge', 'Knowledge'], ['tools', 'Tools']]")
+  && studio.includes("host.append(pane)") && studio.includes("$('el-calling-host')"));
+const launcher = read('Start-Clavis-legacy.bat');
+check('desktop launch starts servers without separate minimized CMD windows and opens after frontend readiness',
+  launcher.includes('start "" /b') && !launcher.includes('/min cmd /c')
+  && launcher.includes("$c.Connect('127.0.0.1',3000)") && !launcher.includes("P 8000"));
 check('customer sits right, agent sits left',
   ui.includes('sc-msg-user') && ui.includes('sc-msg-agent') && ui.includes("me ? 'Customer'"));
 check('recordings start manually; a rerender resumes only previously playing audio',

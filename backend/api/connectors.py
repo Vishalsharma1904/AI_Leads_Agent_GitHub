@@ -118,7 +118,8 @@ def _meta_graph() -> str:
 
 
 def _redirect_uri(provider: str) -> str:
-    base = os.getenv("CONNECTOR_PUBLIC_BASE_URL", "").strip().rstrip("/")
+    base = (os.getenv("CONNECTOR_PUBLIC_BASE_URL", "").strip()
+            or os.getenv("RENDER_EXTERNAL_URL", "").strip()).rstrip("/")
     if not base:
         if os.getenv("APP_ENV", "development").lower() == "production":
             raise HTTPException(status_code=503, detail="CONNECTOR_PUBLIC_BASE_URL is required")

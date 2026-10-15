@@ -268,7 +268,7 @@
   var chConvs = [];        // cached list
 
   function readMetaMap() {
-    try { return JSON.parse(localStorage.getItem('skylark_jarvis_convs') || '{}'); }
+    try { return JSON.parse(localStorage.getItem('skylark_jarvis_convs:' + (window.SupabaseAuth?.getUser?.()?.id || 'anonymous')) || '{}'); }
     catch (e) { return {}; }
   }
 
@@ -460,7 +460,19 @@
     var conv = chConvs.find(function (c) { return c.id === id; });
     if (!conv) return;
     chSelected = conv;
-    renderHistoryList(readMetaMap(), chQuery.toLowerCase().trim());
+    // Move the highlight only — re-rendering the list replayed every row's
+    // entry animation on each click.
+    document.querySelectorAll('#ch-convs .ch-item').forEach(function (row) {
+      row.classList.toggle('active', row.getAttribute('data-conv') === id);
+    });
+    var metaMap = readMetaMap();
+    var head = $('ch-detail-title'), sub = $('ch-detail-sub');
+    if (head) head.textContent = convTitle(conv, metaMap);
+    if (sub) {
+      var last = conv.messages[conv.messages.length - 1];
+      var meta = metaMap[conv.id];
+      sub.textContent = ((meta && meta.count) || conv.messages.length) + ' messages' + (last ? ' · ' + new Date(last.timestamp).toLocaleDateString(undefined, { day: 'numeric', month: 'short' }) : '');
+    }
     renderHistoryDetail();
   }
 

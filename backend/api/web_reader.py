@@ -25,10 +25,11 @@ from html.parser import HTMLParser
 from urllib.parse import urljoin, urlparse
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from api.auth_sync import get_current_user
 
-router = APIRouter(prefix="/api/v1/web", tags=["web"])
+router = APIRouter(prefix="/api/v1/web", tags=["web"], dependencies=[Depends(get_current_user)])
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/140.0 Safari/537.36")

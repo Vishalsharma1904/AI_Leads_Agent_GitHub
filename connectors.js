@@ -11,7 +11,7 @@
     { id: 'telegram', name: 'Telegram', group: 'Social', provider: 'telegram', icon: 'telegram.svg', description: 'Post through your bot to a channel or chat you manage.', setup: 'Create a bot with @BotFather, add it to a channel, and copy its token and chat ID.' },
     { id: 'instagram', name: 'Instagram', group: 'Social', provider: 'meta', icon: 'instagram.svg', description: 'Publish photos to a linked Professional account after Meta approval.', setup: 'Use an Instagram Professional account linked to a Facebook Page. Request instagram_content_publish in a Meta Business app.', docs: 'https://www.postman.com/meta/instagram/documentation/6yqw8pt/instagram-api' },
     { id: 'facebook', name: 'Facebook Pages', group: 'Social', provider: 'meta', icon: 'facebook.svg', description: 'Publish text posts to Pages you manage after Meta approval.', setup: 'Create a Meta Business app, connect a Page, and request pages_manage_posts.', docs: 'https://developers.facebook.com/docs/pages-api/posts/' },
-    { id: 'whatsapp', name: 'WhatsApp Business', group: 'Social', icon: 'whatsapp.svg', description: 'Business messaging needs an approved Meta WhatsApp account.', setup: 'Set up WhatsApp Cloud API, a business number, and approved templates.', docs: 'https://developers.facebook.com/docs/whatsapp/cloud-api/' },
+    { id: 'whatsapp', name: 'WhatsApp Business', group: 'Social', icon: 'whatsapp.svg', description: 'Connect your company number to Meta Cloud API and send approved templates.', setup: 'Connect your company account on the WhatsApp page.', docs: 'https://developers.facebook.com/documentation/business-messaging/whatsapp/embedded-signup/overview' },
     { id: 'youtube', name: 'YouTube', group: 'Social', icon: 'youtube.svg', description: 'Video upload needs YouTube API setup and Google verification.', setup: 'Enable YouTube Data API and request upload permission.', docs: 'https://developers.google.com/youtube/v3/guides/uploading_a_video' },
   ];
 
@@ -106,7 +106,17 @@
     button.type = 'button';
     button.className = 'cx-button ' + (linked ? 'cx-button-secondary' : configured ? 'cx-button-primary' : 'cx-button-secondary');
     button.textContent = linked ? 'Manage' : configured ? 'Connect' : 'Setup';
-    button.addEventListener('click', () => linked ? manage(app) : configured ? connect(app) : setup(app));
+    if (app.id === 'whatsapp') {
+      status.textContent = 'Official Meta Cloud API';
+      button.textContent = 'Open WhatsApp';
+      // This connector has its own authenticated number and template workspace.
+      button.addEventListener('click', () => {
+        window.location.hash = '#whatsapp';
+        window.WhatsAppCloud?.refresh?.();
+      });
+    } else {
+      button.addEventListener('click', () => linked ? manage(app) : configured ? connect(app) : setup(app));
+    }
     foot.append(status, button);
     card.append(top, desc, foot);
     return card;

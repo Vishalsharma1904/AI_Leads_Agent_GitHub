@@ -31,9 +31,8 @@ window.syncLeadState = function (leads, filtered) {
 
 function getSafeLeads() {
   try {
-    const savedLeads = localStorage.getItem("allLeads");
-    if (!savedLeads) return [];
-    const parsedLeads = JSON.parse(savedLeads);
+    if (!window.SupabaseAuth?.getUser?.()?.id) return [];
+    const parsedLeads = window.UserStorage?.getJSON?.('allLeads', []);
     return Array.isArray(parsedLeads) ? parsedLeads : [];
   } catch (error) {
     console.warn("[Leads] Could not read local leads:", error);
@@ -51,6 +50,7 @@ let currentView = 'dashboard';
 let selectedLocations = [];
 let selectedIndustries = new Set();
 let selectedLeadIds = new Set();
+window.addEventListener('rudra:auth-state', () => { window.syncLeadState([]); selectedLeadIds.clear(); });
 
 // ============================================================
 //  STRICT FAKE DATA SANITIZER (Zero Fake Data Guarantee)
@@ -879,7 +879,7 @@ function showView(viewName) {
     'candidate-ai': 'Candidate AI Recruiter',
     'candidate-db': 'Candidate Database',
     jarvis: 'Rudra24 AI Studio',
-    'voice-ai': 'Voice Calling AI',
+    'voice-ai': 'Voice AI Setup',
     calling: 'Calling Agent'
   };
   const breadcrumb = document.getElementById('breadcrumb-text');
@@ -2515,6 +2515,7 @@ function saveSettingsVoiceEngine() {
   const select = document.getElementById('sm-tts-model');
   if (!select || !Array.from(select.options).some(option => option.value === select.value)) return;
   ['clavis_tts_provider', 'skylark-tts-model', 'skylark-tts-engine'].forEach(key => safeLocalStorageSet(key, select.value));
+  window.ClavisVoice?.useEngine?.(select.value);
 }
 
 function loadSettingsToUI() {
@@ -2581,7 +2582,7 @@ function loadSettingsToUI() {
   // Voice
   const voiceEl = document.getElementById('sm-tts-model');
   if (voiceEl) {
-    const saved = safeLocalStorageGet('clavis_tts_provider') || safeLocalStorageGet('skylark-tts-model') || 'fish_audio';
+    const saved = safeLocalStorageGet('clavis_voice_engine') || 'auto';
     if (Array.from(voiceEl.options).some(option => option.value === saved)) voiceEl.value = saved;
   }
   const speedEl = document.getElementById('sm-speech-speed');
@@ -5157,9 +5158,9 @@ function saveVoiceSettings() {
 
   // System Settings panel fields
   saveSettingsVoiceEngine();
-  const geminiVoice = document.getElementById('sm-gemini-voice')?.value || document.getElementById('clavis-gemini-voice')?.value || 'Kore';
-  // setVoice also remembers a male pick as the fallback voice.
-  if (!window.ClavisVoice?.setVoice?.(geminiVoice)) safeLocalStorageSet('clavis_gemini_voice', geminiVoice);
+  const voice = document.getElementById('sm-elevenlabs-voice')?.value || document.getElementById('clavis-elevenlabs-voice')?.value;
+  if (voice) window.ClavisVoice?.setVoice?.(voice);
+  window.ClavisElevenVoiceSettings?.save?.();
   const speed = document.getElementById('sm-speech-speed');
   if (speed) safeLocalStorageSet('skylark-speech-speed', speed.value);
   const wakeEl = document.getElementById('clavis-wake-words');

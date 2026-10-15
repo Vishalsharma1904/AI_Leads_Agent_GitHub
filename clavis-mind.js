@@ -412,10 +412,11 @@ window.ClavisMind = (() => {
   // ══════════════════════════════════════════════════════════
   const memory = (() => {
     const KEY = 'clavis_mind_memories';
+    const memoryKey = () => KEY + ':' + (window.SupabaseAuth?.getUser?.()?.id || 'anonymous');
     let items = [];
 
     function load() {
-      try { items = JSON.parse(localStorage.getItem(KEY) || '[]'); }
+      try { items = JSON.parse(localStorage.getItem(memoryKey()) || '[]'); }
       catch { items = []; }
       if (!Array.isArray(items)) items = [];
       return items.length;
@@ -427,7 +428,7 @@ window.ClavisMind = (() => {
         items.sort((a, b) => (b.importance + b.confidence) - (a.importance + a.confidence));
         items = items.slice(0, CONFIG.maxMemories);
       }
-      try { localStorage.setItem(KEY, JSON.stringify(items)); }
+      try { localStorage.setItem(memoryKey(), JSON.stringify(items)); }
       catch (e) { console.warn('[ClavisMind] memory persist failed:', e); }
     }
 
@@ -518,6 +519,7 @@ window.ClavisMind = (() => {
     }
 
     load();
+    window.addEventListener('rudra:auth-state', load);
     return { add, correct, retrieve, decay, load, list: () => items.map(clone), count: () => items.filter((i) => i.active).length, _clear() { items = []; persist(); } };
   })();
 

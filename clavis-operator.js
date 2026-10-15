@@ -2,7 +2,7 @@
  *  ClavisOperator — the master console (operator only)
  * ------------------------------------------------------------
  *  Every company that uses the app, what it spent today, and the
- *  two dials that matter: leads/day and calls/day, plus a pause
+ *  daily leads, calls and WhatsApp allowances, plus a pause
  *  switch.
  *
  *  Nothing here is a client-side permission. The console asks the
@@ -119,6 +119,20 @@ window.ClavisOperator = (() => {
               ${bar(t.calls)}
               <span class="op-dim">${esc(t.calls.total)} lifetime</span>
             </div>
+            <label>WhatsApp messages / day
+              <select data-wa-plan aria-label="WhatsApp allowance preset">
+                <option value="20" ${t.whatsapp?.limit === 20 ? 'selected' : ''}>Basic · 20/day</option>
+                <option value="50" ${t.whatsapp?.limit === 50 ? 'selected' : ''}>Mid · 50/day</option>
+                <option value="100" ${t.whatsapp?.limit === 100 ? 'selected' : ''}>Pro · 100/day</option>
+                <option value="custom" ${![20, 50, 100].includes(t.whatsapp?.limit) ? 'selected' : ''}>Custom</option>
+              </select>
+              <input type="number" min="0" max="100000" value="${esc(t.whatsapp?.limit ?? 20)}" data-set="whatsapp_per_day" />
+            </label>
+            <div class="op-use">
+              <span>${esc(t.whatsapp?.used ?? 0)} / ${esc(t.whatsapp?.limit ?? 20)} today</span>
+              ${bar(t.whatsapp || {used: 0, limit: 20})}
+              <span class="op-dim">${esc(t.whatsapp?.total ?? 0)} lifetime · resets midnight IST</span>
+            </div>
           </div>
           <div class="op-card-foot">
             <label class="op-check"><input type="checkbox" data-set="blocked" ${t.blocked ? 'checked' : ''} /> Pause this company</label>
@@ -129,6 +143,12 @@ window.ClavisOperator = (() => {
 
     list.querySelectorAll('.op-card').forEach((card) => {
       card.querySelector('.op-save').addEventListener('click', () => save(card));
+      const preset = card.querySelector('[data-wa-plan]');
+      const allowance = card.querySelector('[data-set="whatsapp_per_day"]');
+      preset.addEventListener('change', () => {
+        if (preset.value !== 'custom') allowance.value = preset.value;
+      });
+      allowance.addEventListener('input', () => { preset.value = 'custom'; });
     });
   }
 
@@ -139,6 +159,7 @@ window.ClavisOperator = (() => {
     const patch = {
       leads_per_day: Number(read('leads_per_day').value) || 0,
       calls_per_day: Number(read('calls_per_day').value) || 0,
+      whatsapp_per_day: Number(read('whatsapp_per_day').value) || 0,
       blocked: read('blocked').checked,
     };
     const btn = card.querySelector('.op-save');

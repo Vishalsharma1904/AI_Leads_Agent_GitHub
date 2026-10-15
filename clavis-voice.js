@@ -1,36 +1,17 @@
 /* ============================================================
- * clavis-voice.js · how Rudra24 AI sounds when it speaks a reply
+ * clavis-voice.js · Rudra24 speech playback
  * ------------------------------------------------------------
- * Sir's rule: a FEMALE voice first, speaking Hindi AND English, with
- * feeling. Only when her quota runs out (or she can't say it
- * properly) does the MALE voice step in — and he must speak Hindi too.
- *
- * In order:
- *  1. Google AI Studio TTS, female voice (default "Kore"), every
- *     connected AI Studio key × both TTS models (each model has its
- *     own free quota, so a 429 on one is not the end). One natural
- *     voice for Hindi, Hinglish and English. The first sentence is
- *     synthesised on its own so speech starts in about a second, and
- *     the next part is fetched while the first one plays. The style
- *     line follows the moment: warm when he's happy, calm and steady
- *     when he's stressed, gentle when he's low (ClavisEmotionalEngine).
- *  2. Same TTS, male voice ("Charon") — when she failed on the text
- *     itself (no audio back, a server error), not on quota.
- *  3. The local backend voice (its own key and quota) in the male voice.
- *  3. (Only when its health is already known-good — never awaited.)
- *  4. ONE free browser voice for the whole reply (Hindi, Hinglish, English):
- *     Swara Online (Edge) → Google हिन्दी (Chrome) → Kalpana/Hemant → any
- *     hi voice; Madhur Online only if a male voice was chosen. Roman
- *     Hinglish → Devanagari (word-list + Google Input Tools batch + rules),
- *     ≤170-char chunks, per-utterance watchdog, Chrome keep-alive.
- *     Override: clavis_browser_voice (Settings → Browser voice).
+ * ElevenLabs streams 24 kHz PCM through the authenticated backend.
+ * Auto may use connected Cartesia before any audio starts. An explicit
+ * provider is honored, and a partly spoken answer is never replayed.
+ * Browser speech remains an explicit user selection.
  *
  * API: ClavisVoice.speak(text, {signal}) -> Promise<boolean>
  *      ClavisVoice.stop(), .setVoice(name), .status(), .isSpeaking(),
  *      .outputLevel() (RMS of what is playing — barge-in uses it),
  *      .primaryVoice(), .fallbackVoice(), .genderOf(name)
- * localStorage: clavis_gemini_voice (primary voice), clavis_voice_male
- * (fallback voice), clavis_voice_engine ('auto' | 'browser'),
+ * isSpeaking includes synthesis; isPlaying starts at the first audio chunk.
+ * localStorage: clavis_elevenlabs_voice/model, clavis_voice_engine,
  * clavis_voice_rate (browser rate, default 1).
  * ============================================================ */
 (function () {
@@ -58,7 +39,7 @@
 
   const S = {
     gen: 0, ctx: null, player: null, analyser: null, lvlBuf: null, drained: null, aborter: null,
-    ttsModel: '', rest: new Map(), lastError: '', lastVoice: '', lastEngine: '', translitCache: new Map(), speaking: false,
+    ttsModel: '', rest: new Map(), lastError: '', lastVoice: '', lastEngine: '', translitCache: new Map(), speaking: false, playbackStarted: false,
   };
 
   /* ── voices / prefs ───────────────────────────────────────── */
@@ -94,7 +75,38 @@
     if (genderOf(p) === 'male') return p;
     return MALE.includes(m) ? m : DEFAULT_MALE;
   }
-  const engine = () => localStorage.getItem('clavis_voice_engine') || 'auto';
+  const engine = () => {
+    const chosen = localStorage.getItem('clavis_voice_engine');
+    return ['auto', 'elevenlabs', 'cartesia', 'browser'].includes(chosen) ? chosen : 'auto';
+  };
+
+  function bounded(promise, milliseconds, message, cancel, signal) {
+    let timer, onAbort;
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        reject(new Error(message));
+        try { cancel?.(); } catch (_) {}
+      }, milliseconds);
+    });
+    const cancelled = new Promise((_, reject) => {
+      onAbort = () => {
+        reject(Object.assign(new Error('Voice output cancelled'), { name: 'AbortError' }));
+        try { cancel?.(); } catch (_) {}
+      };
+      if (signal?.aborted) onAbort(); else signal?.addEventListener('abort', onAbort, { once: true });
+    });
+    return Promise.race([promise, timeout, cancelled]).finally(() => {
+      clearTimeout(timer); signal?.removeEventListener('abort', onAbort);
+    });
+  }
+  const elevenRequests = new WeakMap();
+  function releaseElevenRequest(response, abort = false) {
+    const request = elevenRequests.get(response);
+    if (!request) return;
+    request.signal.removeEventListener('abort', request.cancel);
+    if (abort) request.cancel();
+    elevenRequests.delete(response);
+  }
 
   /* ── keys (every connected AI Studio key, rested ones skipped) ── */
   function keys() {
@@ -113,11 +125,25 @@
   function sentences(text) {
     return String(text || '').split(/(?<=[.!?।॥])\s+|(?<=[।॥])|\n+/).map((s) => s.trim()).filter(Boolean);
   }
-  // First chunk = first sentence (fast start); then chunks of ~260 chars.
+  // Bound every sentence too: model replies without punctuation used to
+  // exceed the backend's 2,000-character request limit and never speak.
   function chunks(text) {
     const out = [];
     let cur = '';
-    for (const s of sentences(text)) {
+    const bounded = [];
+    for (const sentence of sentences(text)) {
+      let rest = sentence;
+      while (rest.length > 600) {
+        let cut = rest.lastIndexOf(' ', 600);
+        if (cut < 300) cut = 600;
+        // Never separate a Unicode surrogate pair (emoji, supplementary text).
+        if (/^[\uDC00-\uDFFF]$/.test(rest[cut])) cut--;
+        bounded.push(rest.slice(0, cut).trim());
+        rest = rest.slice(cut).trim();
+      }
+      if (rest) bounded.push(rest);
+    }
+    for (const s of bounded) {
       if (!out.length && !cur) { out.push(s); continue; }
       if (cur && (cur + ' ' + s).length > 260) { out.push(cur); cur = s; }
       else cur = cur ? cur + ' ' + s : s;
@@ -141,6 +167,7 @@
   function genderize(text, gender) {
     const f = gender === 'female';
     let t = String(text || '');
+    if (gender !== 'male' && gender !== 'female') return t;
     t = t.replace(/\b(rah|gay|chuk|aay|sakt|chaht|[a-z]{2,}t)(a|i)(\s+(?:hoon|hun|hu|hoo)\b)/gi, (m, stem, v, tail) => stem + (f ? 'i' : 'a') + tail);
     t = t.replace(/\b([a-z]{1,12}?(?:u|oo))ng(a|i)\b/gi, (m, stem) => stem + 'ng' + (f ? 'i' : 'a'));
     t = t.replace(/(^|[\s,(])(गया|गई|गयी)(\s+हू[ँं])/g, (m, pre, w, tail) => pre + (f ? 'गई' : 'गया') + tail);
@@ -218,14 +245,14 @@
     if (!S.audioReady) S.audioReady = (async () => {
       const ctx = S.ctx = new AudioContext({ sampleRate: 24000, latencyHint: 'interactive' });
       try {
-        await window.ClavisWorklet.add(ctx, 'clavis-pcm-player-worklet.js?v=3');
+        await window.ClavisWorklet.add(ctx, 'clavis-pcm-player-worklet.js?v=5');
         S.player = new AudioWorkletNode(ctx, 'clavis-pcm-player', { outputChannelCount: [1] });
         // Metered output: barge-in compares the mic with what is playing NOW.
         S.analyser = ctx.createAnalyser();
         S.analyser.fftSize = 512;
         S.lvlBuf = new Float32Array(S.analyser.fftSize);
         S.player.connect(S.analyser).connect(ctx.destination);
-        S.player.port.onmessage = (e) => { if (e.data?.type === 'drained' && S.drained) { const r = S.drained; S.drained = null; r(); } };
+        S.player.port.onmessage = (e) => { if (e.data?.type === 'drained' && S.drained && e.data.playback_id === S.drainId) { const r = S.drained; S.drained = null; r(); } };
       } catch (error) {
         try { await ctx.close(); } catch (_) {}
         S.ctx = S.player = S.analyser = null;
@@ -246,7 +273,7 @@
     });
   })();
   function outputLevel() {
-    if (!S.speaking || !S.analyser || !['google-tts', 'cartesia'].includes(S.lastEngine)) return null;
+    if (!S.speaking || !S.analyser || !['elevenlabs', 'cartesia'].includes(S.lastEngine)) return null;
     S.analyser.getFloatTimeDomainData(S.lvlBuf);
     let s = 0;
     for (let i = 0; i < S.lvlBuf.length; i++) s += S.lvlBuf[i] * S.lvlBuf[i];
@@ -260,12 +287,18 @@
   }
   function play(buffer) {
     if (!S.player || !buffer || !buffer.byteLength) return Promise.resolve();
+    S.playbackStarted = true;
     const ms = (buffer.byteLength / 2 / 24000) * 1000 + 1500;   // safety net if "drained" never arrives
-    return new Promise((resolve) => {
-      const t = setTimeout(() => { if (S.drained === done) S.drained = null; resolve(); }, ms);
+    return new Promise((resolve, reject) => {
+      const playbackId = S.drainId = S.playbackSerial = (S.playbackSerial || 0) + 1;
+      const t = setTimeout(() => {
+        if (S.drained === done) S.drained = null;
+        S.player?.port.postMessage({ type: 'stop' });
+        reject(new Error('Voice playback did not finish. Retry the voice sample.'));
+      }, ms);
       const done = () => { clearTimeout(t); resolve(); };
       S.drained = done;
-      S.player.port.postMessage({ type: 'chunk', audio: buffer }, [buffer]);
+      S.player.port.postMessage({ type: 'chunk', audio: buffer, playback_id: playbackId }, [buffer]);
     });
   }
 
@@ -391,32 +424,36 @@
 
   async function cartesiaFetch(text, signal) {
     const base = (window.SKYLARK_CONFIG?.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
-    let token = '';
-    try { token = await window.SupabaseAuth?.getAccessToken?.(); } catch (_) {}
+    const token = await bounded(Promise.resolve(window.SupabaseAuth?.getAccessToken?.()), 15000, 'Speech sign-in check timed out. Sign in again and retry.', null, signal);
     if (!token) return null;
     const mood = cartesiaMood(text);
-    const res = await fetch(base + '/api/tts', {
-      method: 'POST', signal,
-      headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
-      body: JSON.stringify({
-        text, lang: langOf(text) === 'en' ? 'en' : 'hi',
-        engine: 'cartesia', fmt: 'pcm',
-        emotion: mood.emotion, speed: mood.speed,
-        voice_id: localStorage.getItem('clavis_cartesia_voice') || '',
-      }),
-    });
-    if (!res.ok) {
-      // Missing setup rests; a transient provider error must not mute fresh turns for two minutes.
-      if (res.status !== 401) cartesiaOff = Date.now() + (res.status === 429 ? 15000 : window.ClavisDirect?.providerConfigured?.('cartesia') ? 2000 : 120000);
-      throw Object.assign(new Error('cartesia ' + res.status), { status: res.status });
-    }
-    if (!res.headers.get('content-type')?.startsWith('audio/pcm')) throw new Error('Cartesia returned an unexpected audio format');
-    return res.arrayBuffer();
+    const controller = new AbortController(), cancel = () => controller.abort();
+    signal.addEventListener('abort', cancel, { once: true });
+    try {
+      const res = await bounded(fetch(base + '/api/tts', {
+        method: 'POST', signal: controller.signal,
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({
+          text, lang: langOf(text) === 'en' ? 'en' : 'hi',
+          engine: 'cartesia', fmt: 'pcm',
+          emotion: mood.emotion, speed: mood.speed,
+          voice_id: localStorage.getItem('clavis_cartesia_voice') || '',
+        }),
+      }), 30000, 'Cartesia speech did not start in time. Check your backend connection and retry.', cancel, signal);
+      if (!res.ok) {
+        // Missing setup rests; a transient provider error must not mute fresh turns for two minutes.
+        if (res.status !== 401) cartesiaOff = Date.now() + (res.status === 429 ? 15000 : window.ClavisDirect?.providerConfigured?.('cartesia') ? 2000 : 120000);
+        throw Object.assign(new Error('cartesia ' + res.status), { status: res.status });
+      }
+      if (!res.headers.get('content-type')?.startsWith('audio/pcm')) throw new Error('Cartesia returned an unexpected audio format');
+      return await bounded(res.arrayBuffer(), 30000, 'Cartesia audio stalled. Retry the voice sample.', cancel, signal);
+    } finally { cancel(); signal.removeEventListener('abort', cancel); }
   }
 
   async function speakCartesia(parts, id, signal, progress) {
     if (!cartesiaOn()) return false;
-    await ensureAudio();
+    await bounded(ensureAudio(), 15000, 'Voice player setup timed out. Reload the app and retry.', null, signal);
+    if (id !== S.gen || signal.aborted) return false;
     S.lastEngine = 'cartesia';
     // Sonic 3.6 understands Roman Hinglish; no transliteration network call needed.
     const lines = parts.map(text => Promise.resolve(text));
@@ -453,10 +490,275 @@
       if (id !== S.gen || signal?.aborted) return false;
       if (!buf || !buf.byteLength) { if (i === 0) throw new Error('cartesia empty'); return false; }
       next = i + 1 < parts.length ? fetchAt(i + 1).catch(() => null) : null;
+      progress.started = true;
       await play(buf);
       if (id !== S.gen) return false;
     }
     progress.i = parts.length;
+    return true;
+  }
+
+  /* ElevenLabs streams PCM directly into the existing player. Preserve an
+     odd trailing byte between reads; transport chunks are not sample-aligned.
+     The stream markers prevent a short network gap from ending playback. */
+  let elevenRestUntil = 0;
+  // Short exact acknowledgements/previews can reuse completed PCM in this tab.
+  // Never persist audio, cache partial output, or cross an account/settings boundary.
+  const elevenClips = new Map();
+  const CLIP_BYTES = 512 * 1024, CLIPS_BYTES = 2 * 1024 * 1024, CLIP_TTL = 5 * 60 * 1000;
+  let clipsOwner = '', clipsBytes = 0;
+  const voiceOwner = () => String(window.SupabaseAuth?.getUser?.()?.id || '');
+  function clearElevenClips() { elevenClips.clear(); clipsBytes = 0; clipsOwner = ''; }
+  function effectiveClipKey(owner, text, settings) {
+    // Mirror the actual ElevenLabs settings contract, including controls
+    // discarded by our backend. UI mood (S.style) never enters this request.
+    const effective = {
+      voice_id: settings.voice_id, model_id: settings.model_id,
+      stability: settings.stability, similarity_boost: settings.similarity_boost,
+      speed: settings.speed, style: settings.style, use_speaker_boost: settings.use_speaker_boost,
+    };
+    const model = window.ClavisElevenVoiceSettings?.model?.(settings.model_id);
+    if (model?.can_use_style === false) delete effective.style;
+    if (model?.can_use_speaker_boost === false) delete effective.use_speaker_boost;
+    if (['eleven_v4', 'eleven_v4_turbo', 'eleven_v3'].includes(settings.model_id)) {
+      delete effective.speed; delete effective.style; delete effective.use_speaker_boost;
+      if (settings.model_id === 'eleven_v3') {
+        delete effective.similarity_boost;
+        effective.stability = [0, .5, 1].reduce((best, mode) => Math.abs(mode - settings.stability) < Math.abs(best - settings.stability) ? mode : best, 0);
+      }
+    }
+    return JSON.stringify([owner, effective, text]);
+  }
+  function clipKey(text, settings) {
+    const owner = voiceOwner();
+    if (owner !== clipsOwner) { clearElevenClips(); clipsOwner = owner; }
+    return owner && text.length <= 300 ? effectiveClipKey(owner, text, settings) : '';
+  }
+  function savedClip(key) {
+    if (!key) return null;
+    for (const [storedKey, clip] of elevenClips) {
+      if (Date.now() - clip.at >= CLIP_TTL) { elevenClips.delete(storedKey); clipsBytes -= clip.audio.byteLength; continue; }
+      // Model metadata can arrive after the first reply. Re-normalize the
+      // at-most-eight existing identities instead of paying for the same
+      // effective request because an unsupported control disappeared.
+      const [owner, settings, text] = JSON.parse(storedKey);
+      if (storedKey !== key && effectiveClipKey(owner, text, settings) !== key) continue;
+      const replaced = storedKey !== key && elevenClips.get(key);
+      if (replaced) { elevenClips.delete(key); clipsBytes -= replaced.audio.byteLength; }
+      elevenClips.delete(storedKey); elevenClips.set(key, clip);
+      return clip.audio;
+    }
+    return null;
+  }
+  function rememberClip(key, audio) {
+    if (!key || !audio?.byteLength || audio.byteLength > CLIP_BYTES) return;
+    const replaced = elevenClips.get(key);
+    if (replaced) { elevenClips.delete(key); clipsBytes -= replaced.audio.byteLength; }
+    while (elevenClips.size >= 8 || clipsBytes + audio.byteLength > CLIPS_BYTES) {
+      const oldKey = elevenClips.keys().next().value, old = elevenClips.get(oldKey);
+      elevenClips.delete(oldKey); clipsBytes -= old.audio.byteLength;
+    }
+    elevenClips.set(key, { audio, at: Date.now() }); clipsBytes += audio.byteLength;
+  }
+  function clipResponse(audio) {
+    let sent = false;
+    return { body: { getReader: () => ({
+      read: async () => { if (sent) return { done: true }; sent = true; return { done: false, value: audio }; },
+      cancel: async () => { sent = true; }, releaseLock() {},
+    }) } };
+  }
+  function elevenSettings() {
+    const number = (key, value, min, max) => {
+      const raw = localStorage.getItem(key);
+      const parsed = raw === null ? value : Number(raw);
+      return Number.isFinite(parsed) ? Math.max(min, Math.min(max, parsed)) : value;
+    };
+    const selectedVoice = window.ClavisElevenVoiceSettings?.resolveVoice?.()?.voice_id || localStorage.getItem('clavis_elevenlabs_voice');
+    const settings = {
+      voice_id: selectedVoice && selectedVoice !== 'auto' ? selectedVoice : 'JBFqnCBsd6RMkjVDRZzb',
+      model_id: localStorage.getItem('clavis_elevenlabs_model') || 'eleven_flash_v2_5',
+      stability: number('clavis_elevenlabs_stability', .5, 0, 1),
+      similarity_boost: number('clavis_elevenlabs_similarity', .75, 0, 1),
+      style: number('clavis_elevenlabs_style', 0, 0, 1),
+      use_speaker_boost: localStorage.getItem('clavis_elevenlabs_speaker_boost') === 'true',
+      speed: number('skylark-speech-speed', 1, .7, 1.2),
+    };
+    const model = window.ClavisElevenVoiceSettings?.model?.(settings.model_id);
+    if (model?.can_use_style === false) delete settings.style;
+    if (model?.can_use_speaker_boost === false) delete settings.use_speaker_boost;
+    return settings;
+  }
+  async function elevenFetch(text, signal, settings = elevenSettings()) {
+    // Paid per character. The meter is checked before the request, not after,
+    // so the cap is a ceiling and not a report of what was already spent.
+    if (window.ClavisVoiceBudget && !window.ClavisVoiceBudget.allowTTS(text.length)) {
+      throw Object.assign(new Error(window.ClavisVoiceBudget.reason(text.length) || 'App ka local ElevenLabs voice cap is too low for this reply. Check Settings → Voice → Advanced.'), { code: 'BUDGET', budget: true });
+    }
+    const owner = voiceOwner();
+    const base = (window.SKYLARK_CONFIG?.BACKEND_URL || 'http://localhost:8000').replace(/\/$/, '');
+    const token = await bounded(Promise.resolve(window.SupabaseAuth?.getAccessToken?.()), 15000, 'Speech sign-in check timed out. Sign in again and retry.', null, signal);
+    if (!token) throw new Error('Sign in and connect ElevenLabs in Setup.');
+    if (signal.aborted || owner !== voiceOwner()) throw Object.assign(new Error('Voice output cancelled'), { name: 'AbortError' });
+    const controller = new AbortController(), cancel = () => controller.abort();
+    signal.addEventListener('abort', cancel, { once: true });
+    let res;
+    try {
+      const request = fetch(base + '/api/tts', {
+        method: 'POST', signal: controller.signal, cache: 'no-store',
+        headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
+        body: JSON.stringify({ ...settings, text, engine: 'elevenlabs', fmt: 'pcm', lang: langOf(text) === 'hinglish' ? 'hi' : langOf(text) }),
+      }).then(response => {
+        if (controller.signal.aborted) {
+          response.body?.cancel?.().catch(() => {});
+          throw Object.assign(new Error('Voice output cancelled'), { name: 'AbortError' });
+        }
+        return response;
+      });
+      res = await bounded(request, 30000, 'ElevenLabs speech did not start in time. Check your backend connection and retry.', cancel, signal);
+    } catch (error) {
+      cancel(); signal.removeEventListener('abort', cancel); throw error;
+    }
+    elevenRequests.set(res, { signal, cancel });
+    if (!res.ok) {
+      const data = await bounded(res.json().catch(() => ({})), 10000, 'Speech provider error response timed out.', cancel, signal).finally(() => releaseElevenRequest(res, true));
+      const detail = data.detail;
+      if (res.status !== 401) elevenRestUntil = Date.now() + (res.status === 429 ? 15000 : 2500);
+      throw Object.assign(new Error(typeof detail === 'string' ? detail : detail?.message || 'ElevenLabs speech is unavailable. Check Setup and account credits.'), { status: res.status, code: detail?.code });
+    }
+    if (!res.headers.get('content-type')?.startsWith('audio/pcm')) {
+      await res.body?.cancel?.().catch(() => {});
+      releaseElevenRequest(res, true);
+      throw new Error('ElevenLabs returned an unexpected audio format.');
+    }
+    const rate = res.headers.get('x-audio-sample-rate');
+    if (rate && Number(rate) !== 24000) {
+      await res.body?.cancel?.().catch(() => {});
+      releaseElevenRequest(res, true);
+      throw new Error('ElevenLabs returned an unsupported audio sample rate.');
+    }
+    window.ClavisVoiceBudget?.noteTTS?.(text.length, owner);
+    return res;
+  }
+  async function playElevenStream(response, id, signal, progress, capture) {
+    if (!response.body?.getReader) {
+      try {
+        const buffer = await bounded(response.arrayBuffer(), 30000, 'ElevenLabs audio stalled. Retry the voice sample.', () => releaseElevenRequest(response, true), signal);
+        if (!buffer.byteLength) throw new Error('ElevenLabs returned empty audio.');
+        if (buffer.byteLength % 2) throw new Error('ElevenLabs audio ended with an incomplete PCM sample.');
+        if (id !== S.gen || signal.aborted) return false;
+        progress.started = true;
+        S.playbackStarted = true;
+        await play(buffer);
+        if (capture && id === S.gen && !signal.aborted && buffer.byteLength <= CLIP_BYTES) capture.audio = new Uint8Array(buffer).slice();
+        return id === S.gen && !signal.aborted;
+      } finally { releaseElevenRequest(response, signal.aborted || id !== S.gen); }
+    }
+    const reader = response.body.getReader();
+    const current = () => id === S.gen && !signal.aborted;
+    let carry = null, bytes = 0, drainTimer = 0;
+    let captured = capture ? [] : null, capturedBytes = 0;
+    const playbackId = S.drainId = S.playbackSerial = (S.playbackSerial || 0) + 1;
+    let release, failDrain;
+    const drained = new Promise((resolve, reject) => { release = resolve; failDrain = reject; });
+    const onDrain = () => { clearTimeout(drainTimer); release(); };
+    const cancel = () => { reader.cancel().catch(() => {}); release(); };
+    signal.addEventListener('abort', cancel, { once: true });
+    try {
+      if (!current()) return false;
+      S.player.port.postMessage({ type: 'begin-stream', playback_id: playbackId });
+      S.drained = onDrain;
+      for (;;) {
+        const { value, done } = await bounded(reader.read(), 30000, 'ElevenLabs audio stalled. Retry the voice sample.', () => {
+          releaseElevenRequest(response, true); reader.cancel().catch(() => {});
+        }, signal);
+        if (!current()) return false;
+        if (done) break;
+        if (!value?.byteLength) continue;
+        if (captured) {
+          capturedBytes += value.byteLength;
+          if (capturedBytes > CLIP_BYTES) captured = null;
+          else captured.push(value.slice());
+        }
+        let chunk = value;
+        if (carry !== null) {
+          chunk = new Uint8Array(value.byteLength + 1);
+          chunk[0] = carry; chunk.set(value, 1); carry = null;
+        }
+        if (chunk.byteLength % 2) { carry = chunk[chunk.byteLength - 1]; chunk = chunk.subarray(0, -1); }
+        if (!chunk.byteLength) continue;
+        const buffer = chunk.slice().buffer;
+        bytes += buffer.byteLength;
+        progress.started = true;
+        S.playbackStarted = true;
+        S.player.port.postMessage({ type: 'chunk', audio: buffer, playback_id: playbackId }, [buffer]);
+      }
+      if (carry !== null) throw new Error('ElevenLabs audio ended with an incomplete PCM sample.');
+      if (!bytes) throw new Error('ElevenLabs returned empty audio.');
+      if (!current()) return false;
+      // Network gaps do not consume audio duration. Actual drain normally
+      // resolves immediately; the conservative watchdog never cuts a late tail.
+      drainTimer = setTimeout(() => failDrain(new Error('Voice playback did not finish. Retry the voice sample.')), bytes / 48 + 2500);
+      S.player.port.postMessage({ type: 'end-stream', playback_id: playbackId });
+      await drained;
+      if (capture && captured && current()) {
+        const audio = new Uint8Array(capturedBytes); let at = 0;
+        for (const value of captured) { audio.set(value, at); at += value.byteLength; }
+        capture.audio = audio;
+      }
+      return current();
+    } catch (error) {
+      await reader.cancel().catch(() => {});
+      if (!current()) return false;
+      if (current()) S.player.port.postMessage({ type: 'stop' });
+      throw error;
+    } finally {
+      clearTimeout(drainTimer);
+      if (S.drained === onDrain) S.drained = null;
+      signal.removeEventListener('abort', cancel);
+      if (!current()) await reader.cancel().catch(() => {});
+      reader.releaseLock();
+      releaseElevenRequest(response, !current());
+    }
+  }
+  async function speakElevenLabs(parts, id, signal, progress) {
+    const settings = elevenSettings(), owner = voiceOwner();
+    const preferredGender = localStorage.getItem('clavis_elevenlabs_gender') || 'male';
+    const gender = preferredGender === 'neutral' ? 'neutral' : window.ClavisElevenVoiceSettings?.resolveVoice?.()?.labels?.gender || preferredGender;
+    // Synthesize a complete short reply once: sentence-by-sentence HTTP
+    // requests reset prosody and leave a network gap between drained clips.
+    // Long replies retain the existing bounded chunks and cancellation.
+    const shortReply = parts.join(' ');
+    if (!progress.i && shortReply.length <= 600) parts = [shortReply];
+    const planned = parts.map(part => {
+      const original = genderize(part, gender);
+      // Native-script model replies are kept verbatim. Known Roman Hindi in
+      // canned acknowledgements is normalized locally; English/names stay intact.
+      const text = langOf(original) === 'hinglish'
+        ? (original.match(TOKEN) || []).map(token => /^[A-Z]{2,6}s?$/.test(token) ? token : WORDS[token.toLowerCase()] || token).join('') : original;
+      const key = clipKey(text, settings);
+      return { text, key, audio: savedClip(key) };
+    });
+    const requestedChars = planned.reduce((total, part) => total + (part.audio ? 0 : part.text.length), 0);
+    if (requestedChars && Date.now() < elevenRestUntil) throw new Error('ElevenLabs is resting after a provider error. Retry shortly.');
+    // Over the cap ElevenLabs is skipped entirely so `auto` moves on to
+    // Cartesia instead of failing the whole turn on the first sentence.
+    if (requestedChars && window.ClavisVoiceBudget && !window.ClavisVoiceBudget.allowTTS(requestedChars)) {
+      S.lastError = window.ClavisVoiceBudget.reason(requestedChars) || 'App ka local ElevenLabs voice cap is too low for this reply. Check Settings → Voice → Advanced.';
+      return false;
+    }
+    await bounded(ensureAudio(), 15000, 'Voice player setup timed out. Reload the app and retry.', null, signal);
+    if (id !== S.gen || signal.aborted) return false;
+    S.lastEngine = 'elevenlabs'; S.lastVoice = settings.voice_id; S.ttsModel = settings.model_id;
+    for (let i = progress.i; i < parts.length; i++) {
+      if (id !== S.gen || signal.aborted || owner !== voiceOwner()) return false;
+      progress.i = i;
+      const part = planned[i], audio = part.audio || savedClip(part.key);
+      const capture = part.key && !audio ? {} : null;
+      const response = audio ? clipResponse(audio) : await elevenFetch(part.text, signal, settings);
+      if (!await playElevenStream(response, id, signal, progress, capture)) return false;
+      if (owner === voiceOwner() && capture?.audio) rememberClip(part.key, capture.audio);
+      progress.i = i + 1;
+    }
     return true;
   }
 
@@ -911,7 +1213,7 @@
       const budget = 1500 + (text.length * 110) / u.rate;
       let endFired = false;
       const armEnd = () => { endT = setTimeout(() => { if (started || api.speaking) finish(true); else endFired = true; }, budget); };
-      u.onstart = () => { if (started) return; started = true; clearTimeout(startT); if (endFired) armEnd(); };
+      u.onstart = () => { if (started || id !== S.gen) return; started = true; S.playbackStarted = true; clearTimeout(startT); if (endFired) armEnd(); };
       u.onend = () => finish(true);
       u.onerror = (e) => {
         const code = e?.error || '';
@@ -1029,74 +1331,39 @@
     S.style = opts.style || '';
     S.aborter = new AbortController();
     S.speaking = true;
+    S.playbackStarted = false;
+    S.lastError = '';
     const cancel = () => { if (id === S.gen) stop(); };
     opts.signal?.addEventListener?.('abort', cancel, { once: true });
     try {
       const parts = chunks(clean);
-      const progress = { i: 0 };
+      const progress = { i: 0, started: false };
       const remaining = () => parts.slice(progress.i).join(' ');   // never repeat what was already said
-      const browserOnly = opts.engine === 'browser' || engine() === 'browser';
-      // One engine at a time. On 'cartesia' nothing hands over: a failure is
-      // reported and the turn stays silent, because a reply that finishes in
-      // a different voice is worse than one that does not finish.
-      const cartesiaOnly = opts.engine === 'cartesia' || engine() === 'cartesia' || (!browserOnly && window.ClavisDirect?.providerConfigured?.('cartesia'));
-      // His own voice first. Everything below is fallback now.
-      if (!browserOnly) {
+      const selected = opts.engine || engine();
+      if (selected === 'browser') return await speakBrowser(clean, id);
+      if (!['auto', 'elevenlabs', 'cartesia'].includes(selected)) {
+        S.lastError = 'Choose ElevenLabs or Cartesia in voice settings.';
+        return false;
+      }
+      try { await window.ClavisKeyVault?.ready?.(); } catch (_) {}
+      const connected = provider => !!window.ClavisDirect?.providerConfigured?.(provider);
+      const order = selected === 'auto'
+        ? ['elevenlabs', 'cartesia'].filter(connected) : [selected];
+      for (const provider of order) {
         try {
-          if (await speakCartesia(parts, id, S.aborter.signal, progress)) {
-            S.lastError = '';
-            S.lastEngine = 'cartesia';
-            return id === S.gen;
-          }
-          if (id !== S.gen) return false;
-          if (cartesiaOnly) return false;
-        } catch (e) {
-          if (id !== S.gen) return false;
-          S.lastError = e?.message || String(e);
-          if (cartesiaOnly) {
-            console.warn('[ClavisVoice] Cartesia only: ' + S.lastError + ' — staying silent instead of changing voice.');
-            return false;
-          }
+          const done = provider === 'elevenlabs'
+            ? await speakElevenLabs(parts, id, S.aborter.signal, progress)
+            : await speakCartesia(parts, id, S.aborter.signal, progress);
+          if (done) { S.lastError = ''; return id === S.gen; }
+          if (id !== S.gen || progress.started) return false;
+        } catch (error) {
+          if (id !== S.gen || S.aborter.signal.aborted) return false;
+          S.lastError = error?.message || String(error);
+          if (progress.started || selected !== 'auto') return false;
         }
       }
-      const hasKey = anyGemini();
-      if (!browserOnly && hasKey) {
-        const first = VOICES.includes(opts.voice) ? opts.voice : primaryVoice();
-        try {
-          const done = await speakGemini(parts, id, S.aborter.signal, progress, first);
-          S.lastError = '';
-          return done && id === S.gen;
-        } catch (e) {
-          if (id !== S.gen) return false;   // stopped on purpose (every stop bumps gen)
-          S.lastError = e?.message || String(e);
-          console.warn(`[ClavisVoice] ${first} unavailable (${S.lastError}) — handing over.`);
-          // She failed on the text itself (not quota): he tries the same TTS —
-          // but only before a word was said, never swapping voices mid-reply.
-          const male = fallbackVoice();
-          if (e?.contentErr && progress.i === 0 && male !== first && anyGemini()) {
-            try {
-              const done = await speakGemini(parts, id, S.aborter.signal, progress, male);
-              return done && id === S.gen;
-            } catch (e2) { if (id !== S.gen) return false; S.lastError = e2?.message || String(e2); }
-          }
-        }
-      }
-      // No key in THIS browser, but one may sit in his server vault — that
-      // is the normal case now, and it is why the robotic voice kept winning.
-      if (!browserOnly && !hasKey) {
-        const v = VOICES.includes(opts.voice) ? opts.voice : primaryVoice();
-        if (await speakVault(parts, id, S.aborter.signal, progress, v)) return id === S.gen;
-        if (id !== S.gen) return false;
-      }
-      if (opts.cloudOnly) return { remaining: remaining() };
-      // Backend voice sirf tab jab uski health PEHLE se pata ho (cached true).
-      // Band localhost ka intezaar kabhi reply ke raaste me nahi — check peeche chalta hai.
-      const L = window.LocalSpeechEngine;
-      const health = L?.healthCached?.();
-      if (!browserOnly && health == null && L?.health) L.health().catch(() => {});
-      if (!browserOnly && progress.i === 0 && health === true && await speakBackend(remaining(), id, S.aborter.signal)) return true;
-      if (id !== S.gen) return false;
-      return await speakBrowser(remaining(), id);
+      if (!order.length) S.lastError = 'Connect ElevenLabs in Setup to hear Rudra. Cartesia is the optional voice fallback.';
+      return opts.cloudOnly ? { remaining: remaining() } : false;
     } finally {
       opts.signal?.removeEventListener?.('abort', cancel);
       if (id === S.gen) S.speaking = false;
@@ -1106,6 +1373,7 @@
   function stop() {
     S.gen++;
     S.speaking = false;
+    S.playbackStarted = false;
     keepAlive(false);
     BV.cancelledAt = Date.now();
     [...BV.pending].forEach((finish) => finish(false));   // atke hue utter() promises chhod do
@@ -1115,6 +1383,13 @@
     if (S.drained) { const r = S.drained; S.drained = null; r(); }
     try { window.speechSynthesis?.cancel(); } catch (_) {}
   }
+  window.addEventListener('rudra:auth-state', () => { clearElevenClips(); stop(); });
+  window.addEventListener('clavis:vault-changed', event => {
+    const detail = event.detail;
+    const unchanged = detail?.changeType === 'refresh' || (detail?.changeType === 'credential' && detail.provider && detail.provider !== 'elevenlabs');
+    if (unchanged && detail.providers?.elevenlabs?.count > 0 && clipsOwner === voiceOwner()) return;
+    clearElevenClips();
+  });
 
   /* ── Settings: every AI Studio voice, female + male, with preview ── */
   const TRAITS = { Zephyr: 'bright', Puck: 'upbeat', Charon: 'informative, Jarvis-like', Kore: 'firm, clear', Fenrir: 'excitable', Leda: 'youthful', Orus: 'firm', Aoede: 'breezy', Callirrhoe: 'easy-going', Autonoe: 'bright', Enceladus: 'breathy', Iapetus: 'clear', Umbriel: 'easy-going', Algieba: 'smooth', Despina: 'smooth', Erinome: 'clear', Algenib: 'gravelly', Rasalgethi: 'informative', Laomedeia: 'upbeat', Achernar: 'soft', Alnilam: 'firm', Schedar: 'even', Gacrux: 'mature', Pulcherrima: 'forward', Achird: 'friendly', Zubenelgenubi: 'casual', Vindemiatrix: 'gentle', Sadachbia: 'lively', Sadaltager: 'knowledgeable', Sulafat: 'warm' };
@@ -1260,33 +1535,34 @@
     });
   }
 
-  document.addEventListener('click', () => setTimeout(mountPickers, 80), { passive: true });
-  // Backend voice ki health pehle hi pata ho, taaki pehla reply ek awaaz me aur baaki doosri me na ho.
-  window.addEventListener('load', () => setTimeout(() => { try { window.LocalSpeechEngine?.health?.().catch(() => {}); } catch (_) {} }, 1500), { once: true });
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountPickers, { once: true }); else setTimeout(mountPickers, 0);
+  // Legacy AI Studio/Fish settings helpers are intentionally not mounted.
+  // ElevenLabs settings are maintained by clavis-elevenlabs-settings.js.
 
   window.ClavisVoice = {
     speak, stop, outputLevel, primaryVoice, fallbackVoice, genderOf, genderize,
     /* 'cartesia' = only his own voice; 'browser' = only the system voice;
        'auto' = try them in order. */
     useEngine(name) {
-      const ok = ['auto', 'cartesia', 'browser'];
+      const ok = ['auto', 'elevenlabs', 'cartesia', 'browser'];
       if (!ok.includes(name)) throw new Error('engine must be one of ' + ok.join(', '));
-      try { localStorage.setItem('clavis_voice_engine', name); } catch (_) {}
+      try {
+        localStorage.setItem('clavis_voice_engine', name);
+        localStorage.setItem('clavis_tts_provider', name === 'auto' ? 'elevenlabs' : name);
+      } catch (_) {}
       return name;
     },
     engineInUse: () => engine(),
     toHinglish,
     isSpeaking: () => S.speaking,
-    resetQuota: () => { S.rest.clear(); },   // a freshly saved key → TTS tries every key again
+    isPlaying: () => S.speaking && S.playbackStarted,
+    resetQuota: () => { S.rest.clear(); elevenRestUntil = cartesiaOff = 0; },
     browserVoice: () => browserVoiceObj()?.name || '',
     listHindiVoices,
     _translitOffline: (t) => translitOffline(t, null),
     _speechChunks: speechChunks,
     setVoice(name) {
-      if (!VOICES.includes(name)) return false;
-      localStorage.setItem('clavis_gemini_voice', name);
-      if (genderOf(name) === 'male') localStorage.setItem('clavis_voice_male', name);
+      if (!/^[A-Za-z0-9_-]{1,64}$/.test(name)) return false;
+      localStorage.setItem('clavis_elevenlabs_voice', name);
       return true;
     },
     setFallbackVoice(name) { if (MALE.includes(name)) { localStorage.setItem('clavis_voice_male', name); return true; } return false; },
@@ -1294,9 +1570,11 @@
     femaleVoices: () => FEMALE.slice(),
     maleVoices: () => MALE.slice(),
     status: () => ({
-      engine: S.lastEngine || (anyGemini() && engine() !== 'browser' ? 'google-tts' : 'browser'),
-      model: S.ttsModel || null, voice: primaryVoice(), browserVoice: BV.voice?.name || '', fallback: fallbackVoice(), lastVoice: S.lastVoice,
-      keys: keys().length, resting: [...S.rest.entries()].filter(([, t]) => t > Date.now()).length, lastError: S.lastError,
+      engine: S.lastEngine || 'elevenlabs', selected: engine(),
+      model: S.ttsModel || elevenSettings().model_id, voice: elevenSettings().voice_id,
+      fallback: 'cartesia', lastVoice: S.lastVoice,
+      configured: !!window.ClavisDirect?.providerConfigured?.('elevenlabs'),
+      resting: elevenRestUntil > Date.now(), lastError: S.lastError,
     }),
     _selfTest() {
       const ok = [

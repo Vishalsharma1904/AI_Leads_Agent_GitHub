@@ -1,9 +1,8 @@
 FROM python:3.12-slim
 
 WORKDIR /app
-# The slim server list: no torch / kokoro / whisper. See the header of
-# requirements-server.txt for why that is safe (everything heavy is imported
-# lazily; only numpy is module-level).
+# Cloud runtime includes the ONNX speech gate and audio decoder; local
+# Torch/Kokoro synthesis and Whisper transcription weights stay optional.
 COPY requirements-server.txt ./
 RUN pip install --no-cache-dir -r requirements-server.txt
 # Chromium, once, at build time — so lead scraping works on the first request

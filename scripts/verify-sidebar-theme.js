@@ -78,11 +78,13 @@ const document = {
   dispatchEvent: event => body.fire(event.type, event)
 };
 const desktop = { matches: true, addEventListener() {} };
+const frames = [];
+const themeTimers = new Map(); let timerId = 0;
 const window = { innerWidth: 1000 };
 const context = vm.createContext({
   document, window, localStorage, matchMedia: () => desktop,
   CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
-  setTimeout: () => 1, clearTimeout() {}, console
+  setTimeout: fn => {themeTimers.set(++timerId, fn); return timerId;}, clearTimeout: id => themeTimers.delete(id), requestAnimationFrame: fn => frames.push(fn), console
 });
 
 const luxury = read('luxury-ui.js');
@@ -105,7 +107,8 @@ assert(sidebar.classList.contains('collapsed'));
 window.SidebarController.setWidth(228);
 assert.strictEqual(root.style.getPropertyValue('--sidebar-expanded'), '228px');
 expand.fire('click');
-assert.strictEqual(root.style.getPropertyValue('--main-left'), '228px');
+assert.strictEqual(root.style.getPropertyValue('--sidebar-width'), '228px');
+assert.strictEqual(root.style.getPropertyValue('--main-left'), '', 'removed global geometry must not return');
 assert.strictEqual(localStorage.getItem('lx-sidebar-collapsed'), 'false');
 toggle.fire('click'); toggle.fire('click');
 assert(!sidebar.classList.contains('collapsed'), 'rapid reversal must end expanded');
@@ -133,7 +136,11 @@ assert.strictEqual(autoSetting.checked, false);
 window.ThemeController.set('light', { animate: true, manual: true });
 assert.strictEqual(root.getAttribute('data-theme'), 'light');
 assert.strictEqual(theme.getAttribute('aria-checked'), 'false');
-assert(root.classList.contains('theme-transitioning'));
+assert(root.classList.contains('theme-switching'));
+assert(!root.classList.contains('theme-transitioning'), 'theme switching must not animate every page element');
+while (frames.length) frames.shift()();
+for (const fn of themeTimers.values()) fn();
+assert(!root.classList.contains('theme-switching'), 'theme settles after its scheduled frames and timer');
 window.toggleDayNightTheme();
 assert.strictEqual(root.getAttribute('data-theme'), 'dark');
 

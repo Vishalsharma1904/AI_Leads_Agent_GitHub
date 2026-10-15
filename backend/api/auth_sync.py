@@ -6,6 +6,7 @@ import os
 import re
 import secrets
 import time
+import httpx
 from typing import Any, Dict, Optional
 
 import jwt
@@ -122,7 +123,9 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
 SUPABASE_JWT_SECRET = os.getenv("SUPABASE_JWT_SECRET", "").strip()
 SUPABASE_ISSUER = f"{SUPABASE_URL}/auth/v1" if SUPABASE_URL else ""
 SUPABASE_JWKS_URL = os.getenv("SUPABASE_JWKS_URL", "").strip() or (f"{SUPABASE_ISSUER}/.well-known/jwks.json" if SUPABASE_ISSUER else "")
-_supabase_jwks = PyJWKClient(SUPABASE_JWKS_URL) if SUPABASE_JWKS_URL else None
+# Signing keys rotate rarely; a 5-minute refetch meant a network blip every few
+# minutes could fail verification and sign the user out.
+_supabase_jwks = PyJWKClient(SUPABASE_JWKS_URL, lifespan=86400, timeout=10) if SUPABASE_JWKS_URL else None
 bearer_scheme = HTTPBearer(auto_error=False)
 
 
@@ -148,7 +151,24 @@ def _verify_supabase_token(token: str) -> Dict[str, Any]:
         algorithm = str(header.get("alg", ""))
         if algorithm == "HS256":
             if not SUPABASE_JWT_SECRET:
-                raise jwt.InvalidTokenError("symmetric verification is not configured")
+                # A portable family app must not ship the project's signing
+                # secret. Have Supabase verify legacy tokens itself.
+                public_key = os.getenv('SUPABASE_PUBLISHABLE_KEY', '')
+                if not public_key:
+                    raise jwt.InvalidTokenError('public auth key unavailable')
+                response = httpx.get(SUPABASE_ISSUER + '/user', headers={'apikey':public_key,'Authorization':'Bearer '+token}, timeout=5)
+                response.raise_for_status()
+                verified = response.json()
+                if not verified.get('id') or not verified.get('email') or verified.get('is_anonymous'):
+                    raise jwt.InvalidTokenError('a signed-in account is required')
+                # The remote /user request verified this exact token. Preserve
+                # its session binding while taking owner provider from server metadata.
+                remote_claims = jwt.decode(token, options={'verify_signature': False})
+                if remote_claims.get('sub') != verified['id'] or float(remote_claims.get('exp', 0)) <= time.time():
+                    raise jwt.InvalidTokenError('expired or mismatched remote token')
+                return {**remote_claims, 'sub': verified['id'], 'email': verified['email'],
+                        'user_metadata': verified.get('user_metadata') or {},
+                        'app_metadata': verified.get('app_metadata') or {}, 'role': 'authenticated'}
             key = SUPABASE_JWT_SECRET
             algorithms = ["HS256"]
         else:
@@ -166,11 +186,17 @@ def _verify_supabase_token(token: str) -> Dict[str, Any]:
     except (jwt.PyJWTError, Exception) as exc:
         if isinstance(exc, HTTPException):
             raise
+        # Internet/Supabase unreachable is NOT a bad session. Answering 401 here
+        # made the app sign the user out on every network blip (login loop).
+        unreachable = isinstance(exc, (jwt.PyJWKClientConnectionError, httpx.TransportError)) or (
+            isinstance(exc, httpx.HTTPStatusError) and exc.response.status_code >= 500)
+        if unreachable:
+            raise HTTPException(status_code=503, detail="Sign-in service unreachable; retry shortly") from None
         raise HTTPException(status_code=401, detail="Invalid or expired Supabase session") from None
 
 
 def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
-                     db: Session = Depends(get_db)) -> UserAccount:
+                     db: Session = Depends(get_db), request: Request = None) -> UserAccount:
     if not credentials or credentials.scheme.lower() != "bearer":
         raise HTTPException(status_code=401, detail="Authentication required")
     claims = _verify_supabase_token(credentials.credentials)
@@ -196,6 +222,14 @@ def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_
         user.last_login = time.time()
     db.commit()
     db.refresh(user)
+    from services.developer_control import check_session, check_access, feature_for_path, owner_claims
+    user._verified_owner = owner_claims(user, claims)
+    user._session_claims = {key:claims.get(key) for key in ('session_id','iat','exp')}
+    check_session(db, user, claims)
+    if request:
+        feature = feature_for_path(request.url.path, request.method)
+        if feature:
+            check_access(db, user, feature)
     return user
 
 
@@ -213,6 +247,29 @@ async def authenticate_websocket(websocket: WebSocket, origins) -> Optional[Dict
         if payload.get("type") != "auth":
             raise ValueError("Authentication must precede audio")
         claims = await asyncio.to_thread(_verify_supabase_token, str(payload.get("token", "")))
+        from services.developer_control import check_session, check_access, feature_for_path, owner_claims
+        with SessionLocal() as policy_db:
+            member = policy_db.query(UserAccount).filter_by(id=str(claims['sub'])).first()
+            if not member:
+                raise ValueError('Sign in before opening a voice connection')
+            member._verified_owner = owner_claims(member, claims)
+            check_session(policy_db, member, claims)
+            check_access(policy_db, member, feature_for_path(websocket.url.path))
+        async def watch_access():
+            try:
+                while websocket.client_state.name == 'CONNECTED':
+                    await asyncio.sleep(5)
+                    with SessionLocal() as policy_db:
+                        member = policy_db.query(UserAccount).filter_by(id=str(claims['sub'])).first()
+                        if not member:
+                            raise ValueError('Account removed')
+                        member._verified_owner = owner_claims(member, claims)
+                        check_session(policy_db, member, claims)
+                        check_access(policy_db, member, feature_for_path(websocket.url.path))
+            except Exception:
+                if websocket.client_state.name == 'CONNECTED':
+                    await websocket.close(code=1008)
+        asyncio.create_task(watch_access())
         await websocket.send_json({"type": "authenticated"})
         return claims
     except Exception:

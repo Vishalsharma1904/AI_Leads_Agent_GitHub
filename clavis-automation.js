@@ -1096,7 +1096,7 @@
   async function fetchFromBackend(url) {
     const base = window.SKYLARK_CONFIG?.BACKEND_URL || 'http://localhost:8000';
     const res = await withTimeout(fetch(`${base}/api/v1/web/read`, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url, follow_contact: true }),
+      method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await window.SupabaseAuth?.getAccessToken?.() || '') }, body: JSON.stringify({ url, follow_contact: true }),
     }), 15000, 'backend read');
     if (!res.ok) throw new Error(`backend ${res.status}`);
     const d = await res.json();

@@ -20,13 +20,17 @@ services:
     envVars:
       - key: APP_ENV
         value: production
+      - key: CLAVIS_MANAGED_ACCESS
+        value: "true"
+      - key: DEVELOPER_EMAILS
+        value: vishalsharma190405@gmail.com
+      - key: CLAVIS_RELEASE_HOSTS
+        sync: false
 
-      # Production refuses SQLite on purpose — one file on one disk is not a
-      # place to keep customers' billing rows.
+      # Use the existing Supabase PostgreSQL database. Enter its connection
+      # URL privately; this blueprint must not provision a second database.
       - key: DATABASE_URL
-        fromDatabase:
-          name: rudra24-db
-          property: connectionString
+        sync: false
 
       # Tables come from backend/migrations/*.sql in production, not from
       # create_all. Run them once against this database, then leave this false.
@@ -40,11 +44,11 @@ services:
       - key: ALLOWED_HOSTS
         sync: false         # your API hostname, e.g. rudra24-api.onrender.com
 
-      # Vault key for the encrypted provider credentials. Generate once with
-      # `python -c "import secrets;print(secrets.token_hex(32))"`.
+      # Restore the existing vault master key when reusing saved credentials.
+      # Generate a new key only for a new, empty credential vault.
       # CHANGING IT MAKES EVERY SAVED API KEY UNREADABLE.
       - key: CREDENTIAL_MASTER_KEY
-        generateValue: true
+        sync: false
 
       # OAuth callback base URL, e.g. https://rudra24-api.onrender.com
       - key: CONNECTOR_PUBLIC_BASE_URL
@@ -82,8 +86,8 @@ services:
       - key: CLAVIS_ADMIN_EMAILS
         sync: false
 
-      # Platform API keys — set these and every customer runs on yours without
-      # ever seeing one. A customer who saves their own key overrides it.
+      # Optional server integrations. In managed mode, assign shared or
+      # individual provider access explicitly in the developer panel vault.
       - key: SARVAM_API_KEY
         sync: false
       - key: GEMINI_API_KEY
@@ -107,8 +111,3 @@ services:
       # one at runtime on a read-only container.
       - key: CLAVIS_AUTO_INSTALL_BROWSER
         value: "false"
-
-databases:
-  - name: rudra24-db
-    plan: basic-256mb
-    region: singapore

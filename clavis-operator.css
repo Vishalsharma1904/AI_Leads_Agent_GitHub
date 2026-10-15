@@ -87,7 +87,8 @@
   align-items: center;
 }
 #op-root .op-grid > label { display: flex; flex-direction: column; gap: 5px; font-size: 11.5px; font-weight: 600; color: var(--cr-mute, #6B6862); }
-#op-root .op-grid input[type="number"] {
+#op-root .op-grid input[type="number"],
+#op-root .op-grid select {
   font: inherit;
   font-size: 13.5px;
   padding: 7px 10px;
@@ -115,7 +116,8 @@
 html[data-theme="dark"] #op-root .op-sheet { background: #121211; border-color: rgba(201, 219, 160, 0.14); }
 html[data-theme="dark"] #op-root .op-card,
 html[data-theme="dark"] #op-root .op-btn { background: #181916; border-color: rgba(201, 219, 160, 0.13); }
-html[data-theme="dark"] #op-root .op-grid input[type="number"] { background: #111310; border-color: rgba(201, 219, 160, 0.13); }
+html[data-theme="dark"] #op-root .op-grid input[type="number"],
+html[data-theme="dark"] #op-root .op-grid select { background: #111310; border-color: rgba(201, 219, 160, 0.13); }
 
 @media (max-width: 640px) {
   #op-root .op-grid { grid-template-columns: 1fr; }

@@ -313,7 +313,7 @@
         });
         return { records, report, requested: quantity };
       }
-      if (state === 'failed') throw new Error(status.job?.error || 'Candidate provider failed');
+      if (state === 'failed' || state === 'paused') throw new Error(status.job?.error || 'Candidate sourcing is paused');
     }
     throw new Error('Candidate job timed out while waiting for the provider');
   }

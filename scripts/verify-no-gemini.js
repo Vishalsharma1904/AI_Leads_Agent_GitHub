@@ -28,10 +28,10 @@ check('groq leads the vault chain',
   /var CHAIN = \['groq'/.test(vault));
 
 // the Live socket is the thing that actually 403'd
-check('Live reports no gemini keys while AI Studio is off',
-  /function geminiOn\(\)/.test(live) && /if \(!geminiOn\(\)\) return \[\];/.test(live));
+check('Live voice never talks to Google (ElevenLabs only)',
+  !/generativelanguage|gemini-live-token|geminiKeys/.test(live) && /assistant\/session/.test(live));
 check('the mic tap no longer asks for an AI Studio key',
-  /function promptKey\(\)[\s\S]{0,400}?if \(!geminiOn\(\)\) return false;/.test(live));
+  /promptKey: \(\) => false/.test(live));
 
 // a stale hint that sent people to a key which could never work
 check('the vision error names a provider that actually has a vision model',

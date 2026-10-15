@@ -25,6 +25,8 @@ def test_missing_column_is_added_and_rerun_is_a_no_op():
 
     os.environ["DATABASE_URL"] = f"sqlite:///{db}"
     os.environ["APP_ENV"] = "development"
+    os.environ["USE_POSTGRES_DEV"] = "true"
+    os.environ["AUTO_CREATE_SCHEMA"] = "false"
     for mod in [m for m in list(sys.modules) if m.startswith("api.")]:
         del sys.modules[mod]
 

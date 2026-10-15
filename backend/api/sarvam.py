@@ -298,11 +298,12 @@ async def place_call(req: CallRequest, db: Session = Depends(get_db), user: User
             "agent_variables": {str(k)[:64]: str(v)[:500] for k, v in list(req.agent_variables.items())[:40]},
         },
     }
+    from services.developer_control import reserve_provider
+    reserve_provider(db, user, 'sarvam')
     data = await _sarvam("POST", f"/api/outbounds/v1{_org_path(row)}/outbounds", _key(user, db), payload=body)
     attempt = data.get("attempt_id") if isinstance(data, dict) else None
     if not attempt:
         raise HTTPException(502, "Sarvam accepted the request but returned no attempt id")
-    record_call(db, user.id)      # counted only once Sarvam has accepted it
     try:
         from api.crm_automation import track_call
         track_call(db, user.id, "sarvam", str(attempt), phone)

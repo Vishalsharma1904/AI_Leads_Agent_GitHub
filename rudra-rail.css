@@ -11,6 +11,14 @@
  * are no per-frame JavaScript geometry writes or competing springs.
  * ============================================================ */
 
+/* One duration for the rail and the page sheet. --csb-spring was never
+   defined anywhere, which made both transition declarations below invalid
+   at computed-value time: the rule did nothing and an older sheet's slower
+   timing won. Defined here, and shorter than the 1400ms fallback. */
+:root { --csb-rail: 650ms; --csb-spring: cubic-bezier(.32, .72, 0, 1); }
+/* 2026-10-10: same behaviour as before (peek and pin both push the page),
+   just slower and softer with no overshoot. */
+
 @media (min-width: 769px) {
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.sidebar,
   html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body aside#sidebar.sidebar,
@@ -57,3 +65,13 @@ html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not
    exactly where the pin is — and the drag died on it. Nothing listens
    to either. .ccv-pt / .ccv-lead stay clickable. */
 html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-pin, html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-pin *, html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-me, html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) .ccv-me * { pointer-events: none !important; }
+
+/* Labels arrive after the rail is under way and leave before it narrows. (2026-10-10) */
+@media (min-width: 769px) {
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) { transition: opacity 360ms ease 160ms, color 180ms ease !important; }
+  html:not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr):not(#rr) body #sidebar.collapsed:not(.au-peek) :is(.nav-item > span, .nav-sub-item > span, .nav-label-wrap, .sidebar-brand-title, .logo-text, #logo-brand-text, .chevron-arrow, .nav-section-label) { transition: opacity 180ms ease, color 180ms ease !important; }
+}
+
+/* Log out — pinned under the scrolling nav, always reachable (2026-10-11) */
+#sidebar .sidebar-logout-wrap { flex: 0 0 auto; padding: 6px 8px 12px; border-top: 1px solid rgba(255,255,255,.08); }
+#sidebar .sidebar-logout-wrap .nav-item { width: 100%; box-sizing: border-box; }

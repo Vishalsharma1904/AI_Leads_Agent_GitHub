@@ -1,52 +1,42 @@
-"""Speech endpoints for the Rudra24 AI browser chat UI.
-
-Browser Groq transcription uses the signed-in account's server vault key.
-Groq uploads pass the installed Silero speech gate before cloud transcription;
-no local Whisper transcription model is loaded. The legacy socket still uses
-Google Gemini and wraps raw PCM16 in a WAV header.
-
-The turn-detection (VAD) and worklet/websocket contract are unchanged from
-before, so jarvis_ui.js / clavis-local-speech.js needed no protocol changes
--- only the engine behind the socket changed.
-
-NOTE: services/speech/kokoro_engine.py, stt_engine.py, scheduler.py and
-performance.py still exist and are still used -- by
-services/conversation/orchestrator.py, the Exotel phone-call pipeline. That
-is a separate feature nobody asked to change, so it was left alone.
-"""
+"""ElevenLabs realtime credentials/metadata and Groq transcription fallback."""
 from __future__ import annotations
 
-import json
 import asyncio
+import io
 import logging
+import math
 import os
-import re
-import time
-from typing import Optional
+import wave
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, WebSocket
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 from api.auth_sync import UserAccount, get_current_user, authenticate_websocket, get_db
 from api.credentials import get_provider_secret
 from sqlalchemy.orm import Session
 import httpx
 
 from services.speech import gemini_client
-from services.speech.audio import pcm16_to_wav, prepare_transcription_wav
-from services.speech.contracts import new_generation_id
-from services.speech.vad import VADTurnTracker, get_vad_engine
+from services.speech import elevenlabs_client
 
 logger = logging.getLogger(__name__)
 router = APIRouter(tags=["speech"])
 _WS_ORIGINS = {value.strip() for value in os.getenv("CORS_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000,http://localhost:3210").split(",") if value.strip()}
 
 
+def prepare_transcription_wav(data: bytes):
+    # The persistent ElevenLabs path needs no scipy/torch startup cost. Load
+    # the existing local speech gate only when Groq upload fallback is used.
+    from services.speech.audio import prepare_transcription_wav as prepare
+    return prepare(data)
+
+
 def speech_health() -> dict:
-    gemini = gemini_client.health()
     return {
-        "engine": "gemini",
-        "tts": gemini,
-        "stt": gemini,
-        "vad": get_vad_engine().health(),
+        "engine": "elevenlabs",
+        "tts": {"engine": "elevenlabs", "model": elevenlabs_client.DEFAULT_MODEL_ID, "sample_rate": 24000},
+        "stt": {"engine": "elevenlabs", "model": "scribe_v2_realtime"},
+        "fallbacks": {"stt": "groq", "tts": "cartesia"},
         "strict_local_voice": False,
     }
 
@@ -54,6 +44,93 @@ def speech_health() -> dict:
 @router.get("/api/speech/health")
 async def speech_health_endpoint(user: UserAccount = Depends(get_current_user)):
     return speech_health()
+
+
+class ElevenLabsTokenRequest(BaseModel):
+    language: str = Field(default="", max_length=16)
+
+
+@router.post("/api/speech/elevenlabs-token")
+async def elevenlabs_token(req: ElevenLabsTokenRequest, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    key = get_provider_secret("elevenlabs", user, db)
+    if not key:
+        raise HTTPException(503, detail={"code": "ELEVENLABS_KEY_MISSING", "message": "Connect ElevenLabs in Setup first."})
+    # Language/VAD belong in the browser's Scribe connection parameters. The
+    # documented token endpoint accepts the token type, without a JSON body.
+    from services.developer_control import reserve_provider
+    from api.limits import consume, finish_usage, fail_usage
+    reservation = consume(db, user, 'voice_sessions', provider='elevenlabs', basis='token_requested')
+    submitted = False
+    try:
+        reserve_provider(db, user, 'elevenlabs')
+        submitted = True
+        data = await elevenlabs_client.request_json("POST", "/v1/single-use-token/realtime_scribe", key)
+        token = data.get("token") if isinstance(data, dict) else None
+        if not isinstance(token, str) or not token or len(token) > 8192 or token == key:
+            raise elevenlabs_client.provider_error(502)
+    except BaseException as exc:
+        fail_usage(db, user, 'voice_sessions', reservation, exc, submitted=submitted)
+        raise
+    finish_usage(db, user, reservation, 'issued', 'token_issued')
+    return JSONResponse({"token": token, "provider": "elevenlabs", "model_id": "scribe_v2_realtime", "expires_in": 900,
+                         "allowance_basis": "Issued sessions; vendor connection duration is not hard-capped by the app"},
+                        headers={"Cache-Control": "no-store"})
+
+
+@router.get("/api/speech/elevenlabs-config")
+async def elevenlabs_config(db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user),
+                           voice_page_token: str = Query(default="", max_length=256), search: str = Query(default="", max_length=120)):
+    key = get_provider_secret("elevenlabs", user, db)
+    defaults = {"voice_id": elevenlabs_client.DEFAULT_VOICE_ID, "model_id": elevenlabs_client.DEFAULT_MODEL_ID,
+                "stt_model_id": "scribe_v2_realtime", "sample_rate": 24000, "stability": .5,
+                "similarity_boost": .75, "style": 0, "use_speaker_boost": True, "speed": 1}
+    result = {"provider": "elevenlabs", "configured": bool(key), "voices": [], "models": [], "subscription": None,
+              "defaults": defaults, "voices_has_more": False, "voices_next_page_token": None, "errors": {}}
+    if not key:
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
+    params = {"page_size": 100, "include_total_count": "false"}
+    if isinstance(voice_page_token, str) and voice_page_token:
+        params["next_page_token"] = voice_page_token
+    if isinstance(search, str) and search:
+        params["search"] = search
+    responses = await asyncio.gather(
+        elevenlabs_client.request_json("GET", "/v2/voices", key, params=params),
+        elevenlabs_client.request_json("GET", "/v1/models", key),
+        elevenlabs_client.request_json("GET", "/v1/user/subscription", key), return_exceptions=True)
+    # Permission scopes vary by key; a subscription-read error should not
+    # empty a working voice list. Only publish the fields needed by the UI.
+    for resource, data in zip(("voices", "models", "subscription"), responses):
+        if isinstance(data, HTTPException):
+            result["errors"][resource] = data.detail
+            continue
+        if isinstance(data, BaseException):
+            result["errors"][resource] = elevenlabs_client.provider_error(502).detail
+            continue
+        if resource == "voices" and isinstance(data, dict) and isinstance(data.get("voices"), list):
+            result[resource] = [{**{field: voice.get(field) for field in ("voice_id", "name", "category", "labels", "description", "preview_url", "available_for_tiers")},
+                                "verified_languages": [{field: item.get(field) for field in ("language", "locale", "accent")} for item in (voice.get("verified_languages") if isinstance(voice.get("verified_languages"), list) else [])[:20] if isinstance(item, dict)]}
+                                for voice in data["voices"][:200] if isinstance(voice, dict) and voice.get("voice_id")]
+            result["voices_has_more"] = data.get("has_more") is True
+            result["voices_next_page_token"] = data.get("next_page_token") if isinstance(data.get("next_page_token"), str) else None
+        elif resource == "models" and isinstance(data, list):
+            fields = ("model_id", "name", "description", "languages", "can_do_text_to_speech", "can_use_style", "can_use_speaker_boost",
+                      "requires_alpha_access", "maximum_text_length_per_request", "model_rates")
+            result[resource] = [{field: model.get(field) for field in fields} for model in data[:100]
+                                if isinstance(model, dict) and model.get("can_do_text_to_speech") is True]
+        elif resource == "subscription" and isinstance(data, dict):
+            from services.developer_control import ProviderAssignment
+            assignment = db.query(ProviderAssignment).filter_by(user_id=user.id, provider='elevenlabs').first()
+            if assignment and assignment.mode == 'shared':
+                result[resource] = {'managed': True, 'basis': 'Shared provider account; see your app usage allowance'}
+                continue
+            fields = ("tier", "character_count", "character_limit", "next_character_count_reset_unix", "status", "currency", "billing_period",
+                      "can_extend_character_limit", "voice_limit", "can_use_instant_voice_cloning", "can_use_professional_voice_cloning")
+            result[resource] = {field: data.get(field) for field in fields}
+            count, limit = data.get("character_count"), data.get("character_limit")
+            result[resource]["remaining_characters"] = max(0, limit - count) if type(count) is int and type(limit) is int else None
+        else:
+            result["errors"][resource] = elevenlabs_client.provider_error(502).detail
+    return JSONResponse(result, headers={"Cache-Control": "no-store"})
 
 
 @router.post("/api/speech/transcribe")
@@ -64,7 +141,7 @@ async def transcribe_audio(file: UploadFile = File(...), language_hint: str = ""
         raise HTTPException(status_code=400, detail="audio is required")
     if len(data) > 8 * 1024 * 1024:
         raise HTTPException(status_code=413, detail="audio is too large")
-    if provider not in {"groq", "gemini"}:
+    if provider != "groq":
         raise HTTPException(status_code=422, detail="Unsupported transcription provider")
     if provider == "groq":
         key = get_provider_secret("groq", user, db)
@@ -79,11 +156,22 @@ async def transcribe_audio(file: UploadFile = File(...), language_hint: str = ""
             raise HTTPException(status_code=503, detail="Voice audio validation is unavailable") from None
         if data is None:
             return {"text":"", "reason":"no_speech", "language":"", "duration":0, "provider":"groq"}
+        with wave.open(io.BytesIO(data), 'rb') as wav:
+            submitted_seconds = wav.getnframes() / wav.getframerate()
+        if not 0 < submitted_seconds <= 60:
+            raise HTTPException(422, 'Voice recording must be under 60 seconds')
+        from api.limits import consume, finish_usage, fail_usage
+        reservation = consume(db, user, 'voice_seconds', math.ceil(submitted_seconds),
+                              provider='groq', basis='submitted_audio_seconds')
+        submitted = False
         fields = {"model": "whisper-large-v3", "temperature": "0", "response_format": "verbose_json"}
         language = language_hint.split("-")[0].lower()
         if language in {"hi", "en"}:
             fields["language"] = language
         try:
+            from services.developer_control import reserve_provider
+            reserve_provider(db, user, 'groq')
+            submitted = True
             async with httpx.AsyncClient(timeout=20.0) as client:
                 response = await client.post("https://api.groq.com/openai/v1/audio/transcriptions",
                     headers={"Authorization": f"Bearer {key}"}, data=fields,
@@ -92,6 +180,8 @@ async def transcribe_audio(file: UploadFile = File(...), language_hint: str = ""
                 raise HTTPException(status_code=422, detail="Groq rejected the connected key")
             if response.status_code == 429:
                 raise HTTPException(status_code=429, detail="Groq speech request limit reached. Check the connected provider's allowance in Setup.")
+            if 400 <= response.status_code < 500:
+                raise HTTPException(status_code=422, detail="Groq rejected the transcription request")
             response.raise_for_status()
             result = response.json()
             if not isinstance(result, dict) or not isinstance(result.get("text", ""), str):
@@ -106,232 +196,42 @@ async def transcribe_audio(file: UploadFile = File(...), language_hint: str = ""
                           or (float(segment.get("no_speech_prob", 0)) > .6
                               and float(segment.get("avg_logprob", 0)) < -1)
                           for segment in segments)
-        except HTTPException:
+        except HTTPException as exc:
+            fail_usage(db, user, 'voice_seconds', reservation, exc, submitted=submitted)
             raise
         except (httpx.HTTPError, ValueError, TypeError) as exc:
+            fail_usage(db, user, 'voice_seconds', reservation, exc, submitted=submitted)
             logger.warning("Groq transcription unavailable: %s", type(exc).__name__)
             raise HTTPException(status_code=503, detail="Groq speech transcription is temporarily unavailable") from None
+        except BaseException as exc:
+            fail_usage(db, user, 'voice_seconds', reservation, exc, submitted=submitted)
+            raise
+        finish_usage(db, user, reservation, 'succeeded')
+        duration = result.get('duration')
+        if type(duration) in (int, float) and math.isfinite(duration) and duration >= 0:
+            from services.developer_control import record_usage
+            record_usage(db, user, 'stt_seconds', duration, request_id=reservation['usage_id'],
+                         provider='groq', state='succeeded', basis='provider_reported')
+            db.commit()
         # Whisper can hallucinate a canned transcript for a silent recording.
         return {"text": "" if silent or unclear else str(result.get("text") or "").strip(),
                 "reason": "no_speech" if silent else "unclear_audio" if unclear else "",
                 "language": result.get("language") or language_hint, "duration": result.get("duration") or 0,
                 "provider": "groq"}
-    try:
-        text = await gemini_client.transcribe_wav(data, language_hint)
-    except Exception as exc:
-        logger.exception("Gemini transcription failed")
-        raise HTTPException(status_code=503, detail="Speech transcription is temporarily unavailable") from exc
-    return {"text": text, "language": language_hint, "duration": 0.0}
 
 
 @router.websocket("/ws/speech/input")
-async def speech_input_socket(websocket: WebSocket):
-    claims = await authenticate_websocket(websocket, _WS_ORIGINS)
-    if not claims:
-        return
-    audio = bytearray()
-    language_hint = ""
-    generation_id = new_generation_id()
-    # The worklet sends 512 samples (32 ms) per frame. Seven stable frames
-    # gives a ~224 ms speech gate; eleven quiet frames gives ~352 ms hangover.
-    tracker = VADTurnTracker(get_vad_engine(), pre_roll_frames=4, hangover_frames=11, start_frames=7)
-    capturing = False
-
-    async def emit_final() -> None:
-        nonlocal capturing
-        if not audio or not capturing:
-            return
-        try:
-            # Gemini needs a real WAV file, not a bare PCM16 buffer.
-            wav_bytes = pcm16_to_wav(bytes(audio), 16000)
-            text = await gemini_client.transcribe_wav(wav_bytes, language_hint)
-            await websocket.send_json({
-                "type": "final", "generation_id": generation_id,
-                "text": text, "language": language_hint, "duration": 0.0,
-            })
-        except Exception as exc:
-            await websocket.send_json({"type": "error", "generation_id": generation_id, "error": "Speech transcription unavailable"})
-        audio.clear()
-        tracker.reset()
-        capturing = False
-    try:
-        while True:
-            message = await websocket.receive()
-            if time.time() >= claims["exp"]:
-                await websocket.close(code=1008)
-                return
-            if message.get("bytes") is not None:
-                frame = message["bytes"]
-                if len(frame) > 65536 or len(audio) + len(frame) > 8 * 1024 * 1024:
-                    await websocket.close(code=1009)
-                    return
-                state, active = tracker.feed(frame)
-                if state == "speech_start":
-                    audio.clear()
-                    audio.extend(tracker.take_pre_roll())
-                    capturing = True
-                elif capturing:
-                    audio.extend(frame)
-                await websocket.send_json({
-                    "type": "vad",
-                    "state": state,
-                    "generation_id": generation_id,
-                    "active": active,
-                    "bytes": len(audio) if capturing else 0,
-                })
-                if state == "speech_end":
-                    await emit_final()
-                continue
-            raw = message.get("text")
-            if not raw:
-                continue
-            payload = json.loads(raw)
-            message_type = payload.get("type")
-            if message_type == "start":
-                audio.clear()
-                tracker.reset()
-                capturing = False
-                generation_id = payload.get("generation_id") or new_generation_id()
-                language_hint = str(payload.get("language_hint") or "")
-                await websocket.send_json({"type": "ready", "generation_id": generation_id})
-            elif message_type == "cancel":
-                audio.clear()
-                tracker.reset()
-                capturing = False
-                await websocket.send_json({"type": "cancelled", "generation_id": generation_id})
-            elif message_type == "stop":
-                if payload.get("generation_id") and payload.get("generation_id") != generation_id:
-                    continue
-                await emit_final()
-    except (WebSocketDisconnect, RuntimeError):
-        return
-
-
-_SENTENCE_BOUNDARY = re.compile(r"[.!?।…]+[\"')\]]*\s+")
-
-
-class _TextToSpeechScheduler:
-    """Buffers streamed reply text into sentences and speaks each one
-    through Gemini as soon as it is complete, so playback can start before
-    the whole reply has finished generating.
-
-    ponytail: sentences are synthesized one at a time, in order (simplest
-    correct thing -- guaranteed ordering, no reorder buffer). If the gap
-    between sentences is ever noticeable, synthesize the next sentence
-    concurrently while the previous one is still playing and hold results
-    in a small ordered queue.
-    """
-
-    def __init__(self, on_audio, generation_id: str, voice: str = ""):
-        self.generation_id = generation_id
-        self._on_audio = on_audio
-        self._voice = voice
-        self._buffer = ""
-        self._cancelled = False
-        self._sequence = 0
-
-    async def push_text(self, delta: str) -> None:
-        self._buffer += delta
-        while True:
-            match = _SENTENCE_BOUNDARY.search(self._buffer)
-            if not match:
-                break
-            sentence, self._buffer = self._buffer[:match.end()], self._buffer[match.end():]
-            sentence = sentence.strip()
-            if sentence:
-                await self._speak(sentence)
-
-    async def finish(self) -> None:
-        tail = self._buffer.strip()
-        self._buffer = ""
-        if tail:
-            await self._speak(tail)
-
-    async def _speak(self, sentence: str) -> None:
-        if self._cancelled:
-            return
-        try:
-            audio = await gemini_client.synthesize(sentence, self._voice)
-        except Exception as exc:
-            logger.warning("Gemini TTS failed for a segment, skipping it: %s", exc)
-            return
-        if self._cancelled:
-            return
-        await self._on_audio(audio, self._sequence)
-        self._sequence += 1
-
-    def cancel(self) -> None:
-        self._cancelled = True
-
-
 @router.websocket("/ws/speech/output")
-async def speech_output_socket(websocket: WebSocket):
-    claims = await authenticate_websocket(websocket, _WS_ORIGINS)
-    if not claims:
+async def retired_speech_socket(websocket: WebSocket):
+    if not await authenticate_websocket(websocket, _WS_ORIGINS):
         return
-    scheduler: Optional[_TextToSpeechScheduler] = None
-    socket_closed = False
-    try:
-        while True:
-            message = await websocket.receive_text()
-            if time.time() >= claims["exp"] or len(message) > 16384:
-                await websocket.close(code=1008)
-                return
-            payload = json.loads(message)
-            message_type = payload.get("type")
-            if message_type == "start":
-                socket_closed = False
-                if scheduler:
-                    scheduler.cancel()
-                generation_id = payload.get("generation_id") or new_generation_id()
-                voice_settings = payload.get("voice_settings") or {}
-                voice = str(voice_settings.get("voice") or "")
-
-                async def on_audio(audio: bytes, sequence: int):
-                    nonlocal socket_closed
-                    if socket_closed:
-                        return
-                    try:
-                        await websocket.send_json({
-                            "type": "audio", "generation_id": generation_id,
-                            "sample_rate": 24000, "sequence": sequence,
-                        })
-                        await websocket.send_bytes(audio)
-                        await websocket.send_json({
-                            "type": "segment_end", "generation_id": generation_id, "sequence": sequence,
-                        })
-                    except (WebSocketDisconnect, RuntimeError):
-                        # The browser may cancel/close while Gemini is still
-                        # finishing a call. Do not turn that normal barge-in
-                        # race into an ASGI traceback.
-                        socket_closed = True
-
-                scheduler = _TextToSpeechScheduler(on_audio, generation_id, voice)
-                await websocket.send_json({"type": "ready", "generation_id": generation_id})
-            elif message_type == "text_delta" and scheduler:
-                if payload.get("generation_id") in {None, "", scheduler.generation_id}:
-                    await scheduler.push_text(str(payload.get("text") or ""))
-            elif message_type == "finish" and scheduler:
-                if payload.get("generation_id") not in {None, "", scheduler.generation_id}:
-                    continue
-                generation_id = scheduler.generation_id
-                await scheduler.finish()
-                if not socket_closed:
-                    await websocket.send_json({"type": "done", "generation_id": generation_id})
-                scheduler = None
-            elif message_type == "cancel":
-                generation_id = scheduler.generation_id if scheduler else payload.get("generation_id", "")
-                if scheduler:
-                    scheduler.cancel()
-                    scheduler = None
-                if not socket_closed:
-                    await websocket.send_json({"type": "cancelled", "generation_id": generation_id})
-    except (WebSocketDisconnect, RuntimeError):
-        if scheduler:
-            scheduler.cancel()
+    await websocket.send_json({"type": "error", "code": "VOICE_SOCKET_RETIRED",
+                               "error": "Use ElevenLabs realtime speech in Rudra voice settings."})
+    await websocket.close(code=1008)
 
 
 async def synthesize_gemini_wav(text: str, voice: str = "", api_key: str = "") -> bytes:
-    """One-shot text -> WAV, for the simple /api/tts REST endpoint."""
+    """Historical helper; active Rudra speech never selects Gemini."""
+    from services.speech.audio import pcm16_to_wav
     pcm = await gemini_client.synthesize(text, voice, api_key=api_key)
     return pcm16_to_wav(pcm, 24000)

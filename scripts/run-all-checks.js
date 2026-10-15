@@ -29,11 +29,27 @@ const SUITES = [
   'verify-enterprise-contract',
   'verify-clavis-voice',
   'verify-sarvam-calling',
+  '../tests/calling_batch_ui_selftest',
+  '../tests/lead_account_isolation_selftest',
+  '../tests/storage_identity_selftest',
+  '../tests/personal_memory_isolation_selftest',
+  '../tests/ahead_selftest',
+  '../tests/eleven_live_voice_test',
+  '../tests/voice_entry_routing_test',
   'verify-lead-pipeline',
   'verify-metro-and-authority',
   'verify-no-gemini',
   'verify-quiet',
-  'verify-caption'
+  'verify-caption',
+  'verify-voice-routing',
+  '../tests/adaptive_performance_selftest',
+  '../tests/update_delivery_selftest',
+  '../tests/vault_security_selftest',
+  '../tests/cloud_sync_isolation_selftest',
+  '../tests/local_engine_proxy_selftest',
+  '../tests/desktop_discovery_selftest',
+  '../tests/composer_sizing_selftest',
+  '../tests/perf_guard_selftest'
 ];
 
 let failed = 0;
@@ -47,7 +63,10 @@ for (const file of jsFiles) {
     // Spawning Node once per script made the gate appear hung on Windows
     // machines with many root scripts. vm.Script performs the same parse-only
     // check in-process and keeps the gate deterministic and fast.
-    new vm.Script(fs.readFileSync(path.join(ROOT, file), 'utf8'), { filename: file });
+    if (file === 'middleware.js') {
+      // Vercel's entrypoint is ESM; Node otherwise treats this .js as CommonJS.
+      execFileSync(process.execPath, ['--input-type=module', '--check'], { input: fs.readFileSync(path.join(ROOT, file), 'utf8'), stdio: ['pipe', 'pipe', 'pipe'] });
+    } else new vm.Script(fs.readFileSync(path.join(ROOT, file), 'utf8'), { filename: file });
   } catch (err) {
     broken.push(file);
   }

@@ -566,11 +566,13 @@ const MemoryEngine = (() => {
   }
 
   async function getAllLeads() {
+    const ownerDB = getCurrentDBName();
     const database = await openDB();
+    if (getCurrentDBName() !== ownerDB) return [];
     return new Promise((resolve, reject) => {
       const tx  = database.transaction(LEADS_STORE, 'readonly');
       const req = tx.objectStore(LEADS_STORE).getAll();
-      req.onsuccess = () => resolve(req.result || []);
+      req.onsuccess = () => resolve(getCurrentDBName() === ownerDB ? req.result || [] : []);
       req.onerror   = e => reject(e.target.error);
     });
   }

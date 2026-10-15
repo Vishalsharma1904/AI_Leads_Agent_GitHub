@@ -16,7 +16,7 @@
  */
 const fs = require('node:fs');
 const path = require('node:path');
-const { backendOrigin } = require('../electron/runtime-config');
+const { backendOrigin, serviceConfigURL } = require('../electron/runtime-config');
 const globModule = require('minimatch'); // already supplied by electron-builder
 const minimatch = globModule.minimatch || globModule;
 
@@ -70,6 +70,11 @@ const MUST_SHIP = [
   'desktop-setup.js',
   'desktop-setup.css',
   'serve-clavis.js',
+  'api/public-config.js',
+  'api/omnidimension.js',
+  'api/grok-voice.js',
+  'public-auth-config.json',
+  'omnidimension-contract.json',
   'config.js',
   'composer-sizing.js',
   'sidebar-hover-scroll.js',
@@ -83,6 +88,12 @@ const MUST_SHIP = [
   'assets/rudra24-icon.png',
   'vendor/maplibre/maplibre-gl.js',
   'vendor/maplibre/maplibre-gl.css',
+  'vendor/supabase/supabase.js',
+  'rudra-login.css',
+  'assets/login/login-film-narrated.mp4',
+  'assets/login/login-poster.png',
+  'fonts/eb-garamond-latin-variable.woff2',
+  'fonts/eb-garamond-latin-italic-variable.woff2',
 ];
 
 let failed = 0;
@@ -126,6 +137,7 @@ const strict = process.argv.includes('--strict');
 if (strict) {
   try {
     if (cfg.backendUrl) backendOrigin(cfg.backendUrl);
+    if (cfg.serviceConfigUrl) serviceConfigURL(cfg.serviceConfigUrl);
     else if (!cfg.firstRunSetup) throw new Error('Missing server URL and first-run setup.');
   } catch (error) { console.error('  CONFIG  ' + error.message); failed++; }
 }

@@ -1247,10 +1247,7 @@ const RealScraper = (() => {
           const saved = saveToDb && window.MemoryEngine?.addLead ? await window.MemoryEngine.addLead(lead) : { success: true };
           if (saved?.success) { added++; cb.onLead(lead); }
         }
-        if (window.SarvamCalling?.enqueue) {
-          const queued = window.SarvamCalling.enqueue(leads.filter(lead => lead.phone).slice(0, 25));
-          cb.onLog('info', `${queued.added} leads added to calling queue; awaiting your Start approval.`);
-        }
+        if (leads.some(lead => lead.phone)) cb.onLog('info', 'Contacts are ready. Use Send to calling to choose your agent and start a call.');
         const exported = autoExcel && leads.length
           ? exportExcel(leads, `${locations[0] || 'leads'}-${leads.length}`) : false;
         cb.onComplete({ source: 'backend', added, dupes: leads.length - added, total: leads.length,

@@ -53,7 +53,7 @@ const ChatEngine = (() => {
     
     const honorific = window.UserProfileManager?.getHonorificName?.() || 'Sir';
     const owner = (window.UserProfileManager?.getProfile?.().company)
-      || localStorage.getItem('skylark-owner-name')
+      || window.UserStorage?.getItem?.('skylark-owner-name')
       || honorific;
 
     return `Your name is Rudra. You are a Senior B2B Revenue & Growth Architect working directly for "${owner}" / "${honorific}".

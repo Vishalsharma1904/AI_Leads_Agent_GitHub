@@ -545,7 +545,7 @@ def create_activity(record_id: str, body: ActivityWrite, db: Session = Depends(g
             raise HTTPException(422, "Invalid conversation channel")
         key = "manual:" + body.idempotencyKey if body.idempotencyKey else None
         item = db.query(CRMActivity).filter_by(owner_user_id=user.id, idempotency_key=key).first() if key else None
-        if item and (item.record_id != record_id or item.kind != body.kind):
+        if item and (item.record_id != record_id or item.kind != body.kind or item.note != body.note):
             raise HTTPException(409, "Idempotency key belongs to another activity")
         if not item:
             item = _activity(db, user.id, record_id, body.kind, body.note, occurred_at, channel=body.channel, outcome=body.outcome,

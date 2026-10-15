@@ -7,7 +7,7 @@
  *
  *   full   the orb renders at up to 2x DPR
  *   lite   (auto on <= 4 GB RAM or <= 4 cores) the orb renders at 1x DPR;
- *          only an explicit "Smooth" pick also drops backdrop blur
+ *          Auto also reduces expensive backdrop blur
  *
  * Settings → Performance: Auto / Smooth (lite) / Max quality.
  * localStorage: clavis_perf_mode ('auto' | 'lite' | 'full').
@@ -17,12 +17,36 @@
   if (window.ClavisPerf) return;
   const KEY = 'clavis_perf_mode';
   const mode = () => { try { return localStorage.getItem(KEY) || 'auto'; } catch (_) { return 'auto'; } };
+  let hardware = null, measured = null, lastSample = 0, sampling = false, goodSamples = 0;
   function detect() {
-    const mem = Number(navigator.deviceMemory) || 8;
-    const cores = Number(navigator.hardwareConcurrency) || 8;
-    return mem <= 4 || cores <= 4 ? 'lite' : 'full';
+    const mem = Number(hardware?.memoryGB || navigator.deviceMemory) || null;
+    const cores = Number(hardware?.cores || navigator.hardwareConcurrency) || null;
+    if ((mem !== null && mem <= 4.25) || (cores !== null && cores <= 4)) return 'lite';
+    if (measured === 'lite') return 'lite';
+    return mem !== null && mem >= 7 || measured === 'full' ? 'full' : 'lite';
   }
   const tier = () => (mode() === 'auto' ? detect() : mode());
+  function sample() {
+    if (sampling || document.hidden || mode() !== 'auto' || Date.now() - lastSample < 30000) return;
+    sampling = true; lastSample = Date.now();
+    const frames = []; let previous = 0;
+    const tick = now => {
+      if (document.hidden) { sampling = false; return; }
+      if (previous) frames.push(now - previous); previous = now;
+      if (frames.length < 90) { requestAnimationFrame(tick); return; }
+      sampling = false; frames.sort((a,b) => a-b);
+      const p95 = frames[Math.floor(frames.length*.95)];
+      const before = tier();
+      if (p95 > 33) { measured = 'lite'; goodSamples = 0; }
+      else if (p95 <= 20 && ++goodSamples >= 2) measured = 'full';
+      if (before !== tier()) { apply(); window.dispatchEvent(new CustomEvent('rudra:perf-tier', {detail:{tier:tier(),p95}})); }
+    };
+    requestAnimationFrame(tick);
+  }
+  function readHardware() {
+    if (!window.RudraDesktop?.hardware) return;
+    window.RudraDesktop.hardware().then(value => { hardware = value; const before = document.documentElement.getAttribute('data-perf'); apply(); if (before !== tier()) window.dispatchEvent(new CustomEvent('rudra:perf-tier',{detail:{tier:tier()}})); }).catch(()=>{});
+  }
 
   function apply() {
     const t = tier();
@@ -39,8 +63,7 @@
     document.documentElement.setAttribute('data-perf', t);
     let st = document.getElementById('cx-perf-style');
     if (!st) { st = document.createElement('style'); st.id = 'cx-perf-style'; document.head.appendChild(st); }
-    // Blur is only removed when he explicitly picks "Smooth" — Auto never
-    // changes how the app looks.
+    // Auto lightens expensive glass effects on constrained devices.
     /* ── Always on, every tier ───────────────────────────────
        Three things cost frames on EVERY machine here, and none of them is
        something anyone chose to look at:
@@ -80,7 +103,7 @@
       /* A dragged window does not need to re-run its own entry animation. */
       .cts.is-dragging * { transition: none !important; }
     `;
-    st.textContent = ALWAYS + (lite && mode() === 'lite' ? `
+    st.textContent = ALWAYS + (lite ? `
       html[data-perf="lite"] *, html[data-perf="lite"] *::before, html[data-perf="lite"] *::after {
         backdrop-filter: none !important; -webkit-backdrop-filter: none !important;
       }
@@ -136,6 +159,21 @@
   apply();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchSidebar, { once: true });
   else watchSidebar();
-  document.addEventListener('click', () => { watchSidebar(); setTimeout(mount, 80); }, { passive: true });
-  window.ClavisPerf = { tier, mode, set, detect };
+  document.addEventListener('click', () => { if (!document.getElementById('cx-perf-mode')) setTimeout(mount, 80); }, { passive: true });
+  document.addEventListener('pointerdown', sample, {passive:true});
+  document.addEventListener('keydown', sample, {passive:true});
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded',readHardware,{once:true}); else readHardware();
+  window.ClavisPerf = { tier, mode, set, detect, sample };
+})();
+
+/* Idle saver (2026-10-14): jab window minimise / dusri app par ho, saari CSS
+   animations ruk jaati hain (GPU/CPU 0). Wapas aate hi wahin se chalti hain.
+   Canvas/WebGL orb pehle se hi hidden hone par ruk jata hai (clavis-orb.js). */
+(function () {
+  var s = document.createElement('style');
+  s.textContent = 'html.app-idle *,html.app-idle *::before,html.app-idle *::after{animation-play-state:paused!important}';
+  (document.head || document.documentElement).appendChild(s);
+  function set() { document.documentElement.classList.toggle('app-idle', document.hidden); }
+  document.addEventListener('visibilitychange', set);
+  set();
 })();

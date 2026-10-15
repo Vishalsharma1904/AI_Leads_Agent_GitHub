@@ -23,7 +23,8 @@ vm.runInContext(source.slice(source.indexOf('const SETTINGS_PREFERENCE_KEYS'), s
 const keys = vm.runInContext('SETTINGS_PREFERENCE_KEYS', context);
 for (const id of Object.keys(keys)) inputs.set(id, { type: 'checkbox', checked: true, value: 'on' });
 inputs.set('sm-home-page', { type: 'select-one', value: 'chat', options: [{ value: 'chat' }, { value: 'dashboard' }] });
-inputs.set('sm-tts-model', { type: 'select-one', value: 'fish_audio', options: [{ value: 'fish_audio' }, { value: 'gemini' }] });
+inputs.set('sm-tts-model', { type: 'select-one', value: 'elevenlabs', options: [{ value: 'auto' }, { value: 'elevenlabs' }, { value: 'cartesia' }] });
+context.window.ClavisVoice = { useEngine: value => values.set('clavis_voice_engine', value) };
 
 (async () => {
   for (const checked of [false, true]) {
@@ -34,11 +35,11 @@ inputs.set('sm-tts-model', { type: 'select-one', value: 'fish_audio', options: [
     }
     for (const input of inputs.values()) if (input.type === 'checkbox') input.checked = !checked;
     inputs.get('sm-home-page').value = 'dashboard';
-    inputs.get('sm-tts-model').value = 'gemini';
+    inputs.get('sm-tts-model').value = 'cartesia';
     context.loadSettingsToUI(); context.loadSettingsToUI();
     for (const [id, input] of inputs) if (input.type === 'checkbox') assert.equal(input.checked, checked, id);
     assert.equal(inputs.get('sm-home-page').value, 'chat');
-    assert.equal(inputs.get('sm-tts-model').value, 'fish_audio', 'Opening Settings must not switch the selected voice provider');
+    assert.equal(inputs.get('sm-tts-model').value, 'elevenlabs', 'Opening Settings must not switch the selected voice provider');
     assert.ok(industries.has('hotels'), 'Opening Settings twice must not deselect industries');
   }
   values.set(keys['sm-toasts'], 'on'); inputs.get('sm-toasts').checked = false;
@@ -49,7 +50,7 @@ inputs.set('sm-tts-model', { type: 'select-one', value: 'fish_audio', options: [
   assert.equal(accentCalls, 0, 'Saving without the old accent control must preserve the active palette');
   vm.runInContext(source.slice(source.indexOf('function saveVoiceSettings()'), source.indexOf('function saveJarvisSettings()')), context);
   context.saveVoiceSettings();
-  assert.equal(values.get('skylark-tts-engine'), 'fish_audio', 'Voice Save must preserve the chosen engine');
+  assert.equal(values.get('skylark-tts-engine'), 'elevenlabs', 'Voice Save must preserve the chosen engine');
   vm.runInContext(source.slice(source.indexOf('function handleHashChange()'), source.indexOf('function bindNavigation()')), context);
   values.set('skylark-home-page', 'chat'); context.handleHashChange(); assert.equal(context.lastView, 'chat');
   context.location.hash = '#leads'; context.handleHashChange(); assert.equal(context.lastView, 'leads');

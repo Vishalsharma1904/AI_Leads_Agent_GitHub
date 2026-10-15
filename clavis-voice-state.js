@@ -88,6 +88,12 @@
     // Auth scripts load after this module. A hidden login is not a session.
     if (!root.SupabaseAuth?.getSession?.()?.user || root.SupabaseAuth.isRecoveryMode?.()) return false;
     if (auth && !auth.classList?.contains('ag-hidden') && auth.style?.display !== 'none') return false;
+    // The two tests above only know the two ways auth-antigravity hides the
+    // login card. Anything else that leaves it painted — a class those tests
+    // do not know, a stuck overlay, a recovery card over an active view — let
+    // the listening dot and the spoken greeting through on the sign-in screen.
+    // Whether it is on screen is the actual question, so ask that instead.
+    if (auth?.getClientRects && auth.getClientRects().length) return false;
     if (shell?.style?.display === 'none') return false;
     return Boolean(view?.classList?.contains('active'));
   }
@@ -472,7 +478,7 @@
     const row = (k, v) => `<div><span>${k}</span><b>${v}</b></div>`;
     let h = row('state', S.state) + row('mic', (mic.owner || 'none') + (mic.restarts ? ` · ${mic.restarts} restarts` : ''))
       + row('wake', w.awake ? `awake · ${Math.max(0, Math.round(((w.until || 0) - now()) / 1000))} s${w.busy ? ' · busy' : ''}` : 'asleep')
-      + row('session', ls('clavis_continuous', 'true') !== 'false' ? 'continuous' : 'follow-up only')
+      + row('session', ls('clavis_continuous', 'true') === 'true' ? 'continuous' : 'follow-up only')
       + row('micEnabled', String(capabilities.micEnabled))
       + row('voiceOut', String(capabilities.voiceOutputEnabled))
       + row('ASR', ext.asr || '–') + row('LLM', ext.llm || '–') + row('TTS', ext.tts || '–');
@@ -530,11 +536,11 @@
     const f = doc.createElement('div');
     f.className = 'smodal-field';
     f.innerHTML = '<div class="smodal-field-left"><label class="smodal-label" for="sm-continuous-toggle">Continuous conversation</label>'
-      + '<span class="smodal-hint">After you wake Rudra24 AI, keep talking without its name until you say "so jao" / "bas karo", or 3 minutes of quiet</span></div>'
+      + '<span class="smodal-hint">When enabled, keep talking without its name until "so jao" / "bas karo", or 3 minutes of quiet. Paid live speech stays connected.</span></div>'
       + '<label class="smodal-switch"><input type="checkbox" id="sm-continuous-toggle"><span class="smodal-switch-track"><span class="smodal-switch-thumb"></span></span></label>';
     anchor.after(f);
     const cb = f.querySelector('input');
-    cb.checked = ls('clavis_continuous', 'true') !== 'false';
+    cb.checked = ls('clavis_continuous', 'true') === 'true';
     cb.addEventListener('change', () => { try { root.localStorage.setItem('clavis_continuous', cb.checked ? 'true' : 'false'); } catch (_) {} });
   }
   try {
@@ -560,7 +566,7 @@
     DONE_END, DANGLING_END, isFragment, endpointDelay, decide, isHold, isRelease, stripHold, HOLD_MAX_MS,
     parseStop, parseYesNo, stripDirectives,
     mark, metrics, togglePanel,
-    continuous: () => ls('clavis_continuous', 'true') !== 'false',
+    continuous: () => ls('clavis_continuous', 'true') === 'true',
     _tick: tick, _setClock: (fn) => { clock = typeof fn === 'function' ? fn : () => Date.now(); },
   };
 })(typeof window !== 'undefined' ? window : globalThis);

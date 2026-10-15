@@ -2,7 +2,7 @@
 (function (global) {
   'use strict';
   if (global.ClavisComposerSizing) return;
-  var states = new WeakMap(), pending = new Set(), raf = 0;
+  var states = new WeakMap(), attached = new Set(), pending = new Set(), raf = 0;
   var properties = ['font-family','font-size','font-weight','font-style','line-height','letter-spacing','word-spacing','padding-top','padding-right','padding-bottom','padding-left','border-top-width','border-bottom-width','box-sizing','text-indent','tab-size','font-feature-settings','font-variation-settings','font-kerning','font-optical-sizing'];
   function schedule(input) {
     if (!input) return;
@@ -70,20 +70,30 @@
     mirror.style.cssText = 'position:fixed!important;left:-10000px!important;top:0!important;height:0!important;min-height:0!important;max-height:none!important;visibility:hidden!important;pointer-events:none!important;overflow:hidden!important;transition:none!important;contain:layout style!important;white-space:pre-wrap!important;overflow-wrap:break-word!important;resize:none!important;';
     document.body.appendChild(mirror);
     var state = { input:input, mirror:mirror, min:options.min || (peek ? 20 : 28), max:options.max || (peek ? 124 : 208), dirty:true, width:0, height:null, onSize:options.onSize };
-    states.set(input,state);
+    states.set(input,state); attached.add(state);
     if (input.rows !== 1) input.rows = 1;
-    ['input','focus','compositionend'].forEach(function (event) { input.addEventListener(event,function(){ schedule(input); }); });
+    state.handler = function(){ schedule(input); };
+    ['input','focus','compositionend'].forEach(function (event) { input.addEventListener(event,state.handler); });
     if (global.ResizeObserver) {
       var lastWidth = -1;
-      new ResizeObserver(function(entries){var w=entries[0].contentRect.width;if(w!==lastWidth){lastWidth=w;state.dirty=true;schedule(input);}}).observe(input);
+      state.observer = new ResizeObserver(function(entries){var w=entries[0].contentRect.width;if(w!==lastWidth){lastWidth=w;state.dirty=true;schedule(input);}}); state.observer.observe(input);
     }
     schedule(input); return state;
   }
+  function detach(input) {
+    var state = states.get(input); if (!state) return;
+    state.observer?.disconnect(); state.mirror.remove();
+    ['input','focus','compositionend'].forEach(function(event){input.removeEventListener(event,state.handler);});
+    pending.delete(input); attached.delete(state); states.delete(input);
+  }
+  function cleanup() { attached.forEach(function(state){if(state.input.isConnected === false) detach(state.input);}); }
   function invalidate() {
-    document.querySelectorAll('#jarvis-input,#chat-input,#candidate-ai-input,.cts-composer-input').forEach(function(input){var s=states.get(input);if(s){s.dirty=true;s.value=null;}schedule(input);});
+    cleanup();
+    attached.forEach(function(state){state.dirty=true;state.value=null;schedule(state.input);});
   }
   function install() {
     document.querySelectorAll('#jarvis-input,#chat-input,#candidate-ai-input').forEach(function(el){attach(el);});
+    new MutationObserver(function(records){if(records.some(function(record){return record.removedNodes.length;}))cleanup();}).observe(document.body,{childList:true,subtree:true});
     new MutationObserver(invalidate).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme','data-ui-font','data-rudra-flow']});
     document.addEventListener('visibilitychange',function(){if(document.hidden){cancelAnimationFrame(raf);raf=0;}else invalidate();});
     global.addEventListener('hashchange',invalidate);
@@ -92,6 +102,6 @@
     document.addEventListener('nexus:settingschange',invalidate);
     if(document.fonts){document.fonts.ready.then(invalidate);document.fonts.addEventListener?.('loadingdone',invalidate);}
   }
-  global.ClavisComposerSizing = { attach:attach, request:schedule, invalidate:invalidate };
+  global.ClavisComposerSizing = { attach:attach, request:schedule, invalidate:invalidate, detach:detach };
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',install,{once:true});else install();
 })(window);

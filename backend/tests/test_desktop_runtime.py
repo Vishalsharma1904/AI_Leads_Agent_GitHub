@@ -7,10 +7,21 @@ from unittest.mock import AsyncMock, patch
 
 import numpy as np
 import main
+from api import auth_sync
+from sqlalchemy import create_engine, inspect
 from services.speech.vad import AdaptiveVAD
 
 
 class DesktopRuntimeTests(unittest.TestCase):
+    def test_disabled_schema_repair_does_not_mutate_existing_tables(self):
+        engine = create_engine('sqlite:///:memory:')
+        try:
+            with engine.begin() as db: db.exec_driver_sql('CREATE TABLE tenant_limits (owner_user_id TEXT PRIMARY KEY)')
+            with patch.object(auth_sync,'engine',engine),patch.object(auth_sync,'AUTO_CREATE_SCHEMA',False):
+                asyncio.run(main.sync_db_columns())
+            self.assertEqual([column['name'] for column in inspect(engine).get_columns('tenant_limits')],['owner_user_id'])
+        finally: engine.dispose()
+
     def test_cloud_startup_does_not_load_kokoro_and_explicit_opt_in_works(self):
         async def run():
             warm = AsyncMock()

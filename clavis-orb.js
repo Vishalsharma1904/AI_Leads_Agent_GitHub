@@ -523,12 +523,16 @@ html:not(#_):not(#_):not(#_) body:not(#_):not(#_):not(#_) .cxo-fb > .gl {
     document.addEventListener('visibilitychange', onVis);
     const onWinResize = () => { resize(); kick(); };
     window.addEventListener('resize', onWinResize);
-    let ro = null;
+    let ro = null, roTimer = 0;
     if (typeof ResizeObserver !== 'undefined') {
       ro = new ResizeObserver((entries) => {
         const box = entries[0] && entries[0].contentRect;
         if (box && box.width && box.height) { hostW = box.width; hostH = box.height; }
-        resize(); kick();
+        /* Trailing resize: while the rail or a window animates, the host
+           changes size every frame and reallocating the GL buffer each
+           frame stutters. The canvas just stretches until it settles. */
+        clearTimeout(roTimer);
+        roTimer = setTimeout(() => { resize(); kick(); }, 140);
       });
       ro.observe(host);
     }

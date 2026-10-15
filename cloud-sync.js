@@ -10,7 +10,13 @@ window.CloudSyncManager = (function () {
   const LAST_SYNC_KEY = 'skylark_last_cloud_sync';
   const SYNC_STATUS_KEY = 'skylark_sync_status';
   const PENDING_PREFIX = 'skylark_pending_cloud_';
-  const SENSITIVE_SETTING = /(api[_-]?key|access[_-]?key|token|secret|password|credential|webhook|proxy)/i;
+  const SENSITIVE_SETTING = /(api[_-]?key|access[_-]?key|token|secret|password|credential|webhook|proxy|url|endpoint|host)/i;
+  let identityEpoch = 0;
+  let lastActivityState = '';
+  const identity = () => ({ id: window.SupabaseAuth?.getUser?.()?.id, epoch: identityEpoch });
+  const sameIdentity = expected => !!expected.id && expected.id === window.SupabaseAuth?.getUser?.()?.id && expected.epoch === identityEpoch;
+  function requireIdentity(expected) { if (!sameIdentity(expected)) throw new Error('Account changed during cloud sync'); }
+  window.addEventListener('rudra:auth-state', () => { identityEpoch++; lastActivityState = ''; clearTimeout(pushDebounceTimer); pushDebounceTimer = null; });
   let pushDebounceTimer = null;
   let isSyncing = false;
   let isRestoring = false;
@@ -20,6 +26,7 @@ window.CloudSyncManager = (function () {
   // this guard that forms an infinite init⇄pull loop that pins the main thread
   // and makes the entire UI unclickable. See pullLatest().
   const _pullGuard = {};
+  const _pulledVersion = {};
 
   // Cloud snapshots must never become a second secret store. Only bounded
   // primitive UI preferences are synchronized; provider credentials, URLs
@@ -65,6 +72,15 @@ window.CloudSyncManager = (function () {
   }
 
   function updateStatusUI(status, message) {
+    const cloudState = status === 'synced' ? (hasPendingChanges(getActiveEmail()) ? 'pending' : 'synced')
+      : status === 'offline' ? 'offline' : hasPendingChanges(getActiveEmail()) ? 'pending' : '';
+    if (cloudState && cloudState !== lastActivityState && window.RudraAccountControl) {
+      lastActivityState = cloudState;
+      const epoch = identityEpoch;
+      Promise.resolve(window.RudraAccountControl.activity('sync', cloudState)).then(result => {
+        if (result === false && epoch === identityEpoch && lastActivityState === cloudState) lastActivityState = '';
+      });
+    }
     try {
       localStorage.setItem(SYNC_STATUS_KEY, status);
       const badges = document.querySelectorAll('.ag-cloud-sync-status, #topbar-sync-status, #settings-sync-status, .cloud-sync-pill');
@@ -89,8 +105,9 @@ window.CloudSyncManager = (function () {
   /**
    * Restores a cloud data bundle (leads, candidates, settings, profile) into local memory & DB.
    */
-  async function restoreCloudBundle(data, userProfile) {
+  async function restoreCloudBundle(data, userProfile, expected = identity()) {
     if (!data && !userProfile) return;
+    requireIdentity(expected);
     isRestoring = true;
     updateStatusUI('syncing', 'Restoring account data…');
 
@@ -115,6 +132,7 @@ window.CloudSyncManager = (function () {
         }
         if (window.MemoryEngine && typeof window.MemoryEngine.saveAllLeads === 'function') {
           await window.MemoryEngine.saveAllLeads(leads);
+          requireIdentity(expected);
         }
       }
 
@@ -127,6 +145,7 @@ window.CloudSyncManager = (function () {
         }
         if (window.MemoryEngine && typeof window.MemoryEngine.saveAllCandidates === 'function') {
           await window.MemoryEngine.saveAllCandidates(candidates);
+          requireIdentity(expected);
         }
       }
 
@@ -146,6 +165,7 @@ window.CloudSyncManager = (function () {
 
       // 5. Replace account-scoped chat, memory, scripts and task records together.
       await window.MemoryEngine?.replaceCloudCollections?.(snapshot);
+      requireIdentity(expected);
 
       // 6. Refresh UI components. IndexedDB remains the offline cache.
       if (typeof window.LeadsCtrl !== 'undefined' && typeof window.LeadsCtrl.init === 'function') {
@@ -169,7 +189,7 @@ window.CloudSyncManager = (function () {
       console.log(`✅ [CloudSync] Account (${email}) successfully synchronized with ${leads.length} leads.`);
     } catch (err) {
       console.warn('⚠️ [CloudSync] Error restoring cloud bundle:', err);
-      updateStatusUI('offline', 'Cloud data could not be restored');
+      if (sameIdentity(expected)) updateStatusUI('offline', 'Cloud data could not be restored');
       throw err;
     } finally {
       isRestoring = false;
@@ -180,6 +200,7 @@ window.CloudSyncManager = (function () {
    * Pulls the latest cloud data for a given email address.
    */
   async function pullLatest(email) {
+    const expected = identity();
     const targetEmail = (email || getActiveEmail() || '').trim().toLowerCase();
     const authenticatedUser = window.SupabaseAuth?.getUser?.();
     const client = window.SupabaseAuth?.getClient?.();
@@ -200,14 +221,23 @@ window.CloudSyncManager = (function () {
     _pullGuard[targetEmail] = _nowTs;
 
     updateStatusUI('syncing', 'Checking for updates…');
+    const readVersion = changeVersion;
     try {
       const { data, error } = await client.from('clavis_user_data')
         .select('payload,updated_at')
         .eq('user_id', authenticatedUser.id)
         .maybeSingle();
       if (error) throw error;
+      requireIdentity(expected);
+      if (changeVersion !== readVersion || hasPendingChanges(targetEmail) || pushDebounceTimer || isSyncing) return null;
+      // Same cloud version as last time: nothing to restore. Re-restoring on
+      // every focus/minute rewrote all leads and kicked off a full CRM
+      // re-sync each time — the main source of background CPU and lag.
+      if (data?.payload && data.updated_at && _pulledVersion[targetEmail] === data.updated_at) return null;
       if (data?.payload) {
-        await restoreCloudBundle(data.payload, null);
+        await restoreCloudBundle(data.payload, null, expected);
+        _pulledVersion[targetEmail] = data.updated_at;
+        requireIdentity(expected);
         window.CRMBridge?.notifyCloud?.();
         return data.payload;
       }
@@ -215,7 +245,7 @@ window.CloudSyncManager = (function () {
       return null;
     } catch (e) {
       console.warn('[CloudSync] Cloud read failed:', e.message);
-      updateStatusUI('offline', 'Cloud sync unavailable; local data remains on this device');
+      if (sameIdentity(expected)) updateStatusUI('offline', 'Cloud sync unavailable; local data remains on this device');
       return null;
     }
   }
@@ -224,6 +254,7 @@ window.CloudSyncManager = (function () {
    * Gathers all local leads, settings, profile, and pushes to backend cloud storage.
    */
   async function pushNow() {
+    const expected = identity();
     const email = getActiveEmail();
     const authenticatedUser = window.SupabaseAuth?.getUser?.();
     const client = window.SupabaseAuth?.getClient?.();
@@ -265,6 +296,7 @@ window.CloudSyncManager = (function () {
       }
 
       // 2. Gather settings
+      requireIdentity(expected);
       const settings = sanitizeSettings(window.SKYLARK_CONFIG || {});
 
       // 3. Gather profile
@@ -291,19 +323,20 @@ window.CloudSyncManager = (function () {
         updated_at: new Date().toISOString()
       }, { onConflict: 'user_id' });
       if (error) throw error;
+      requireIdentity(expected);
       setPendingChanges(email, changeVersion !== startedVersion);
       saved = true;
       localStorage.setItem(LAST_SYNC_KEY, String(Date.now()));
       updateStatusUI('synced', `Saved to ${email} at ${new Date().toLocaleTimeString()}`);
       return true;
     } catch (e) {
-      setPendingChanges(email, true);
+      if (sameIdentity(expected)) setPendingChanges(email, true);
       console.warn('[CloudSync] Cloud save failed:', e.message);
-      updateStatusUI('offline', 'Cloud save failed; data remains on this device');
+      if (sameIdentity(expected)) updateStatusUI('offline', 'Cloud save failed; data remains on this device');
       return false;
     } finally {
       isSyncing = false;
-      if (saved && hasPendingChanges(email) && !pushDebounceTimer) schedulePush();
+      if (sameIdentity(expected) && saved && hasPendingChanges(email) && !pushDebounceTimer) schedulePush();
     }
   }
 
@@ -340,7 +373,7 @@ window.CloudSyncManager = (function () {
     setActiveEmail(cleanEmail);
 
     // 3. Switch User Storage and IndexedDB
-    const uid = window.UserStorage ? window.UserStorage.emailToUserId(cleanEmail) : `usr_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
+    const uid = window.UserStorage ? window.UserStorage.getUserId() : 'usr_default';
     if (window.MemoryEngine && typeof window.MemoryEngine.switchUser === 'function') {
       await window.MemoryEngine.switchUser(uid);
     }
@@ -354,7 +387,7 @@ window.CloudSyncManager = (function () {
     const baseName = cleanEmail.split('@')[0].replace(/[._-]/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
     const profile = {
       ...profileUpdates,
-      id: uid,
+      id: window.SupabaseAuth?.getUser?.()?.id || uid,
       email: cleanEmail,
       name: profileUpdates.name || baseName,
       company: profileUpdates.company || 'Enterprise',

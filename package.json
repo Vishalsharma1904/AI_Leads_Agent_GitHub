@@ -1,6 +1,6 @@
 {
   "name": "rudra24-ai",
-  "version": "1.0.6",
+  "version": "1.0.9",
   "description": "Rudra24 AI desktop lead generation and assistant app.",
   "main": "electron/main.js",
   "scripts": {
@@ -14,8 +14,12 @@
     "test:speech": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/test-speech.ps1",
     "desktop": "electron .",
     "dist:win": "node electron/prepare-build.js && node scripts/check-installer-contents.js --strict && electron-builder --win nsis",
+    "dist:customer": "node electron/prepare-build.js --customer && node scripts/check-installer-contents.js --strict && electron-builder --win nsis",
     "check:installer": "node scripts/check-installer-contents.js",
-    "build:motion": "node scripts/build-motion-ui.js"
+    "build:motion": "node scripts/build-motion-ui.js",
+    "build:ui-release": "node scripts/build-ui-release.js",
+    "build:web-release": "node scripts/build-ui-release.js --web",
+    "check:updates": "node tests/update_delivery_selftest.js"
   },
   "keywords": [],
   "author": "",
@@ -33,6 +37,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.116.0",
+    "electron-updater": "^6.6.8",
     "motion": "14.0.0",
     "ogl": "^1.0.11",
     "react": "19.3.0",
@@ -54,10 +59,16 @@
       "*.png",
       "*.jpg",
       "manifest.json",
+      "public-auth-config.json",
+      "omnidimension-contract.json",
+      "api/public-config.js",
+      "api/omnidimension.js",
+      "api/grok-voice.js",
       "audio/**/*",
       "assets/**/*",
       "fonts/**/*",
       "vendor/maplibre/**/*",
+      "vendor/supabase/**/*",
       "electron/**/*",
       "clavis-bridge/bridge.js",
       "!secrets.local.js",
@@ -91,6 +102,7 @@
         }
       ],
       "requestedExecutionLevel": "asInvoker",
+      "verifyUpdateCodeSignature": true,
       "artifactName": "Rudra24-AI-Setup-${version}.${ext}"
     },
     "electronLanguages": [
@@ -120,6 +132,6 @@
       "uninstallDisplayName": "Rudra24 AI",
       "license": "installer/LICENSE.txt"
     },
-    "copyright": "Copyright \u00a9 Rudra24 Digital"
+    "copyright": "Copyright © Rudra24 Digital"
   }
 }

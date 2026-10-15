@@ -31,12 +31,15 @@
   width: min(400px, calc(100vw - 32px));
   pointer-events: none;
   opacity: 0;
-  transform: translateY(-2px);
+  /* Arrives from slightly above and a hair small, so it reads as settling
+     into place rather than blinking on. transform + opacity only: both are
+     composited, so none of this touches layout or style recalc. */
+  transform: translate3d(0, -8px, 0) scale(0.975);
+  transform-origin: 100% 100%;
   filter: none;
   transition:
-    opacity 320ms cubic-bezier(0.23, 1, 0.32, 1),
-    transform 320ms cubic-bezier(0.23, 1, 0.32, 1),
-    filter 320ms cubic-bezier(0.23, 1, 0.32, 1);
+    opacity 380ms cubic-bezier(0.16, 1, 0.3, 1),
+    transform 460ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 html[data-theme="dark"] #clavis-ear-caption {
   --ce-fresh: #c9dba0;
@@ -55,16 +58,16 @@ html[data-theme="dark"] #clavis-ear-caption {
   }
 }
 
-#clavis-ear-caption.is-in { opacity: 1; transform: none; filter: none; }
+#clavis-ear-caption.is-in { opacity: 1; transform: translate3d(0, 0, 0) scale(1); filter: none; }
 
 /* A feathered frosted veil — no card edge, just enough calm behind the
    words that they stay readable over the page, the orb or a map. */
 #clavis-ear-caption.is-out {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translate3d(0, -10px, 0) scale(0.985);
   filter: none;
-  transition-duration: 0.15s;
-  transition-timing-function: cubic-bezier(0.32, 0, 0.24, 1);
+  transition-duration: 220ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.9, 0.3);
 }
 #clavis-ear-caption.is-dropped .ce-line { opacity: 0.35; transition: opacity 0.2s; }
 
@@ -119,16 +122,21 @@ html[data-theme="dark"] #clavis-ear-caption {
 #clavis-ear-caption .ce-w:first-child { margin-left: 0; }
 #clavis-ear-caption .ce-w.ce-now { opacity: 1; }
 #clavis-ear-caption .ce-c {
-  animation: ceType 200ms ease-out both;
+  display: inline-block;
+  animation: ceType 260ms cubic-bezier(0.2, 0.9, 0.25, 1) both;
 }
-/* The typewriter: one character at a time, soft, never a hard blink. */
+/* The typewriter: each character lifts into the line instead of just
+   appearing. Transform and opacity only — a per-character `filter` would
+   put every glyph on its own blur pass while he is still speaking. */
 @keyframes ceType {
-  from { opacity: 0; }
-  to   { opacity: 1; }
+  from { opacity: 0; transform: translate3d(0, 0.26em, 0) scale(0.92); }
+  to   { opacity: 1; transform: translate3d(0, 0, 0) scale(1); }
 }
 
 /* A single breathing dot while Rudra24 AI listens — no container. It sits on the
    baseline of the line he is speaking. */
+/* The dot says which of three things is true, because the words alone
+   cannot: waiting for him to start, hearing him right now, or done. */
 #clavis-ear-caption .ce-dot {
   flex: none;
   width: 7px;
@@ -139,16 +147,34 @@ html[data-theme="dark"] #clavis-ear-caption {
   box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent);
   opacity: 0;
   transform: scale(0.6);
-  transition: opacity 0.3s, transform 0.3s;
+  transition: opacity 300ms cubic-bezier(0.16, 1, 0.3, 1),
+              transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+              background-color 300ms ease;
 }
+/* Open mic, nothing said yet: a slow, quiet breath. */
 #clavis-ear-caption.is-listening .ce-dot {
   opacity: 1;
   transform: none;
-  animation: ceBreath 1.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation: ceBreath 2.4s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+#clavis-ear-caption.is-listening.is-idle .ce-dot { opacity: 0.72; }
+/* Words are arriving: faster, brighter, with a ring that keeps pace. */
+#clavis-ear-caption.is-listening:not(.is-idle) .ce-dot {
+  animation-duration: 1.15s;
+}
+/* The turn was taken: one outward ring, then it rests. */
+#clavis-ear-caption.is-settled .ce-dot {
+  opacity: 1;
+  animation: ceSettle 620ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes ceBreath {
   0%, 100% { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 45%, transparent); }
-  50%      { transform: scale(1.18); box-shadow: 0 0 0 6px color-mix(in srgb, var(--ce-dot) 0%, transparent); }
+  50%      { transform: scale(1.22); box-shadow: 0 0 0 7px color-mix(in srgb, var(--ce-dot) 0%, transparent); }
+}
+@keyframes ceSettle {
+  0%   { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 55%, transparent); }
+  55%  { transform: scale(0.82); box-shadow: 0 0 0 10px color-mix(in srgb, var(--ce-dot) 0%, transparent); }
+  100% { transform: scale(1);    box-shadow: 0 0 0 0 color-mix(in srgb, var(--ce-dot) 0%, transparent); }
 }
 
 @media (max-width: 640px) {
@@ -159,8 +185,9 @@ html[data-theme="dark"] #clavis-ear-caption {
   #clavis-ear-caption, #clavis-ear-caption .ce-w {
     transition: opacity 0.2s; animation: none; filter: none; transform: none;
   }
-  #clavis-ear-caption .ce-c { animation: none; opacity: 1; }
-  #clavis-ear-caption.is-listening .ce-dot { animation: none; }
+  #clavis-ear-caption .ce-c { animation: none; opacity: 1; transform: none; }
+  #clavis-ear-caption.is-listening .ce-dot,
+  #clavis-ear-caption.is-settled .ce-dot { animation: none; }
 }
 
 /* ── Voice ID sheet ──────────────────────────────────────────── */

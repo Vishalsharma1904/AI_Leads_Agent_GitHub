@@ -10,6 +10,7 @@ from collections import defaultdict, deque
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, HTTPException, Depends, Response
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -22,7 +23,7 @@ from api.auth_sync import router as auth_sync_router
 from api.email_sender import router as email_router
 from api.outlook_bridge import router as outlook_router
 from api.sms_fast2sms import router as sms_router
-from api.lead_jobs import router as lead_jobs_router
+from api.lead_jobs import router as lead_jobs_router, recover_stale_jobs
 from api.crm import router as crm_router
 from api.crm_automation import router as crm_automation_router
 from api.textbee import router as textbee_router
@@ -37,6 +38,10 @@ from api.web_reader import router as web_reader_router
 from api.developer_insights import router as developer_insights_router
 from api.toughtongue import router as toughtongue_router
 from api.sarvam import router as sarvam_router
+from api.elevenlabs import router as elevenlabs_router, batch_history_worker
+from api.pitch import router as pitch_router
+from api.whatsapp import router as whatsapp_router
+from api.mobile_jobs import router as mobile_jobs_router, worker as outreach_worker
 from api.billing import router as billing_router
 from api.limits import router as limits_router
 from api.composio_tools import router as composio_router
@@ -51,7 +56,7 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Jarvis Voice Calling Agent API",
-    description="Backend API for the Rudra24 AI Voice Assistant (Exotel + OpenRouter)",
+    description="Rudra24 AI: ElevenLabs voice and calling, Groq intelligence, and business tools",
     version="1.1.0"
 )
 
@@ -66,6 +71,9 @@ if APP_ENV := os.getenv("APP_ENV", "development").strip().lower():
 allowed_hosts = [host.strip() for host in os.getenv(
     "ALLOWED_HOSTS", "localhost,127.0.0.1"
 ).split(",") if host.strip()]
+render_hostname = os.getenv("RENDER_EXTERNAL_HOSTNAME", "").strip()
+if render_hostname and render_hostname not in allowed_hosts:
+    allowed_hosts.append(render_hostname)
 
 app.add_middleware(
     CORSMiddleware,
@@ -79,7 +87,7 @@ if APP_ENV == "production":
 
 MAX_REQUEST_BYTES = int(os.getenv("MAX_REQUEST_BYTES", str(10 * 1024 * 1024)))
 _rate_windows = defaultdict(deque)
-_RATE_LIMITED_PREFIXES = ("/api/auth/", "/api/credentials", "/api/speech/", "/api/tts", "/api/v1/ai/", "/api/v1/lead-jobs", "/api/v1/toughtongue", "/api/v1/sarvam", "/api/v1/billing/order", "/api/email/", "/api/sms/", "/api/crm", "/api/textbee")
+_RATE_LIMITED_PREFIXES = ("/api/auth/", "/api/credentials", "/api/speech/", "/api/tts", "/api/v1/ai/", "/api/v1/lead-jobs", "/api/v1/pitch", "/api/v1/toughtongue", "/api/v1/sarvam", "/api/v1/elevenlabs", "/api/v1/billing/order", "/api/email/", "/api/sms/", "/api/crm", "/api/textbee")
 
 @app.middleware("http")
 async def security_controls(request, call_next):
@@ -109,6 +117,8 @@ async def security_controls(request, call_next):
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     return response
 
+from api.control import router as control_router
+app.include_router(control_router)
 app.include_router(auth_sync_router)
 app.include_router(email_router)
 app.include_router(outlook_router)
@@ -128,6 +138,10 @@ app.include_router(web_reader_router)
 app.include_router(developer_insights_router)
 app.include_router(toughtongue_router)
 app.include_router(sarvam_router)
+app.include_router(elevenlabs_router)
+app.include_router(pitch_router)
+app.include_router(whatsapp_router)
+app.include_router(mobile_jobs_router)
 app.include_router(billing_router)
 app.include_router(limits_router)
 app.include_router(composio_router)
@@ -140,7 +154,9 @@ async def sync_db_columns():
     model since the DB file was created 500s on first query and the app just
     says "backend is unavailable"."""
     try:
-        from api.auth_sync import ensure_columns
+        from api.auth_sync import AUTO_CREATE_SCHEMA, ensure_columns
+        if not AUTO_CREATE_SCHEMA:
+            return
         ensure_columns()
         from api.crm import ensure_crm_indexes
         ensure_crm_indexes()
@@ -149,12 +165,36 @@ async def sync_db_columns():
 
 
 @app.on_event("startup")
+async def probe_lead_browser():
+    from services.leads.browser_runtime import warm_status_in_background
+    warm_status_in_background()
+
+
+@app.on_event("startup")
 async def start_connector_worker():
+    from api.auth_sync import SessionLocal
+    recover_stale_jobs(SessionLocal)
     app.state.connector_worker = asyncio.create_task(connector_job_worker())
+    app.state.outreach_worker = asyncio.create_task(outreach_worker())
+    app.state.call_history_worker = asyncio.create_task(batch_history_worker())
 
 
 @app.on_event("shutdown")
 async def stop_connector_worker():
+    history = getattr(app.state, "call_history_worker", None)
+    if history:
+        history.cancel()
+        try:
+            await history
+        except asyncio.CancelledError:
+            pass
+    outreach = getattr(app.state, "outreach_worker", None)
+    if outreach:
+        outreach.cancel()
+        try:
+            await outreach
+        except asyncio.CancelledError:
+            pass
     worker = getattr(app.state, "connector_worker", None)
     if worker:
         worker.cancel()
@@ -207,11 +247,11 @@ async def health_check():
         db_status = "error"
     try:
         from services.leads.browser_runtime import status as lead_browser_status
-        lead_browser = await asyncio.to_thread(lead_browser_status)
+        lead_browser = lead_browser_status()
     except Exception:
         lead_browser = {"browser_ready": False, "browser_path": None}
-    return {
-        "status": "healthy",
+    return JSONResponse({
+        "status": "healthy" if db_status == "ok" else "degraded",
         "services": {
             "api": "ok",
             "openrouter": "configured" if openrouter_ok else "missing_keys",
@@ -219,12 +259,12 @@ async def health_check():
             "db": db_status,
             "redis": "pending",
             "chromadb": "pending",
-            "lead_browser": "ok" if lead_browser.get("browser_ready") else "missing",
+            "lead_browser": {True: "ok", False: "missing"}.get(lead_browser.get("browser_ready"), "checking"),
         },
         # The UI shows this verbatim: without the browser, leads come back with
         # no phone and no e-mail, and the honest fix is one command.
         "lead_browser": lead_browser,
-    }
+    }, status_code=200 if db_status == "ok" else 503)
 
 
 @app.get("/api/capabilities")
@@ -259,7 +299,7 @@ class OutboundCallRequest(BaseModel):
 
 
 @app.post("/api/calls/outbound")
-async def start_outbound_call(req: OutboundCallRequest, user: UserAccount = Depends(get_current_user)):
+async def start_outbound_call(req: OutboundCallRequest, user: UserAccount = Depends(get_current_user), db=Depends(__import__('api.auth_sync', fromlist=['get_db']).get_db)):
     """
     Places a real outbound call via Exotel and connects it to Rudra24 AI's
     live voice pipeline over /ws/audio. Requires EXOTEL_* env vars and a
@@ -274,6 +314,10 @@ async def start_outbound_call(req: OutboundCallRequest, user: UserAccount = Depe
     if not caller_id:
         raise HTTPException(status_code=400, detail="No caller_id provided and EXOTEL_CALLER_ID is not set")
 
+    from api.billing import require_calling
+    from api.limits import consume
+    require_calling(user, db)
+    consume(db, user, 'calls')
     result = await exotel.make_outbound_call(
         to_number=req.to_number,
         caller_id=caller_id,

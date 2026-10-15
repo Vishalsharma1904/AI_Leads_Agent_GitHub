@@ -77,6 +77,12 @@
       this.readyResolve = null;
       this.readyReject = null;
       this.sharedStream = null;
+      this.voiceStream = null;
+      this._microphoneGeneration = 0;
+      this._inputGeneration = 0;
+      this._microphoneOwner = window.SupabaseAuth?.getUser?.()?.id;
+      this._sharedStreamPending = null;
+      this._voiceStreamPending = null;
       this.healthCache = null;
       this.healthOkUntil = 0;
       this.healthFailureUntil = 0;
@@ -93,7 +99,7 @@
       const ctl = typeof AbortController !== 'undefined' ? new AbortController() : null;
       const timer = ctl ? setTimeout(() => ctl.abort(), 700) : null;
       try {
-        const token = window.SupabaseAuth?.getAccessToken?.();
+        const token = await window.SupabaseAuth?.getAccessToken?.();
         if (!token) throw new Error('Sign in before using voice.');
         const response = await fetch(`${backendBase()}${API_HEALTH_PATH}`, { cache: 'no-store', signal: ctl?.signal,
           headers: { Authorization: 'Bearer ' + token } });
@@ -101,8 +107,8 @@
         this.healthCache = await response.json();
         this.healthFailureUntil = 0;
         this.healthOkUntil = Date.now() + 60000;
-        if (!this.healthCache.tts?.ready) localStatus('Gemini voice not configured', 'loading');
-        else localStatus('Gemini voice ready', 'ready');
+        if (!window.ClavisDirect?.providerConfigured?.('elevenlabs')) localStatus('Connect ElevenLabs in Setup', 'loading');
+        else localStatus('ElevenLabs voice connected', 'ready');
         return this.healthCache;
       } catch (error) {
         // A protected/missing speech backend should fall back to browser TTS
@@ -141,44 +147,49 @@
       if (this.audioContext.state === 'suspended') await this.audioContext.resume();
     }
 
-    async acquireSharedMicrophone() {
+    async acquireMicrophone(processed) {
       if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) {
         throw new Error('Microphone is disabled');
       }
-      if (this.sharedStream?.getTracks?.().some((track) => track.readyState === 'live')) return this.sharedStream;
+      const owner = window.SupabaseAuth?.getUser?.()?.id;
+      if (this._microphoneOwner !== owner) { this.releaseMicrophone(); this._microphoneOwner = owner; }
+      const streamKey = processed ? 'voiceStream' : 'sharedStream';
+      const pendingKey = processed ? '_voiceStreamPending' : '_sharedStreamPending';
+      if (this[streamKey]?.getTracks?.().some(track => track.readyState === 'live')) return this[streamKey];
+      if (this[pendingKey]) return this[pendingKey];
       if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser cannot access a microphone.');
-      this.sharedStream = await navigator.mediaDevices.getUserMedia({
-        // One shared raw stream serves speech plus clap/snap detection. Asking
-        // for separate streams was the source of repeat permission prompts;
-        // browser noise suppression/AGC also flattens short snap transients.
-        audio: { echoCancellation: true, noiseSuppression: false, autoGainControl: false, channelCount: 1 },
+      const generation = this._microphoneGeneration;
+      const pending = navigator.mediaDevices.getUserMedia({
+        // Raw capture preserves clap/snap transients; processed capture serves
+        // speech and Voice ID. Concurrent callers share one stream per mode.
+        audio: { echoCancellation: true, noiseSuppression: processed, autoGainControl: false, channelCount: 1 },
         video: false,
-      });
-      localStorage.setItem(SHARED_STREAM_KEY, 'true');
-      document.documentElement.dataset.clavisMic = 'granted';
-      microphoneStatus('Microphone ready · Hands-Free and Clap / Snap can stay on', 'ready');
-      window.dispatchEvent(new CustomEvent('clavis:mic-granted'));
-      return this.sharedStream;
+      }).then(stream => {
+        if (generation !== this._microphoneGeneration || owner !== window.SupabaseAuth?.getUser?.()?.id
+            || (window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic())) {
+          stream.getTracks().forEach(track => track.stop());
+          throw Object.assign(new Error('Microphone acquisition cancelled'), { name: 'AbortError' });
+        }
+        this[streamKey] = stream;
+        if (!processed) {
+          localStorage.setItem(SHARED_STREAM_KEY, 'true');
+          document.documentElement.dataset.clavisMic = 'granted';
+          microphoneStatus('Microphone ready · Hands-Free and Clap / Snap can stay on', 'ready');
+          window.dispatchEvent(new CustomEvent('clavis:mic-granted'));
+        }
+        return stream;
+      }).finally(() => { if (this[pendingKey] === pending) this[pendingKey] = null; });
+      this[pendingKey] = pending;
+      return pending;
     }
 
+    acquireSharedMicrophone() { return this.acquireMicrophone(false); }
+
     // Voice paths (barge-in, Voice ID, echo tap) get their own processed
-    // stream — echo cancellation + noise suppression + auto gain ON. The raw
+    // stream — echo cancellation + noise suppression, auto gain OFF. The raw
     // shared stream above stays raw for the clap / snap detector. A second
     // getUserMedia on an already-granted mic never prompts.
-    async acquireVoiceMicrophone() {
-      if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) {
-        throw new Error('Microphone is disabled');
-      }
-      if (this.voiceStream?.getTracks?.().some((track) => track.readyState === 'live')) return this.voiceStream;
-      if (!navigator.mediaDevices?.getUserMedia) throw new Error('This browser cannot access a microphone.');
-      if (!this._voiceStreamPending) {
-        this._voiceStreamPending = navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
-          video: false,
-        }).then((s) => { this.voiceStream = s; return s; }).finally(() => { this._voiceStreamPending = null; });
-      }
-      return this._voiceStreamPending;
-    }
+    acquireVoiceMicrophone() { return this.acquireMicrophone(true); }
 
     getSharedMicrophone() { return this.sharedStream; }
 
@@ -299,42 +310,69 @@
         this.stopInput();
         return false;
       }
+      const inputOwner = window.SupabaseAuth?.getUser?.()?.id, inputGeneration = this._microphoneGeneration;
+      const inputRun = ++this._inputGeneration;
+      const current = () => inputRun === this._inputGeneration && inputGeneration === this._microphoneGeneration
+        && inputOwner === window.SupabaseAuth?.getUser?.()?.id && window.ClavisVoiceState?.canProcessMic?.() !== false;
+      try {
       await this.ensureAudioContext();
-      const stream = await this.acquireSharedMicrophone();
+      if (!current()) return false;
+      const stream = await this.acquireVoiceMicrophone();
+      if (!current()) return false;
+      await window.ClavisEar?.tap?.start?.('local', stream);
+      if (!current()) return false;
       await window.ClavisWorklet.add(this.audioContext, 'clavis-mic-capture-worklet.js?v=2');
+      if (!current()) return false;
+      let segmentSince;
       const generationId = options.generationId || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
       const socket = new WebSocket(websocketUrl(WS_INPUT_PATH));
       socket._generationId = generationId;
       this.inputSocket = socket;
       const ready = new Promise((resolve, reject) => { socket._readyResolve = resolve; socket._readyReject = reject; });
       socket.onopen = () => {
+        if (!current() || this.inputSocket !== socket) { socket.close(); return; }
         socket.send(JSON.stringify({ type: 'auth', token: window.SupabaseAuth?.getAccessToken?.() || '' }));
         socket.send(JSON.stringify({ type: 'start', generation_id: generationId,
           language_hint: options.languageHint || localStorage.getItem('clavis_voice_language') || '' }));
       };
       socket.onmessage = (event) => {
+        if (this.inputSocket !== socket || !current()) return;
         let payload;
         try { payload = JSON.parse(event.data); } catch (_) { return; }
         if (payload.generation_id !== generationId) return;
-        if (payload.type === 'ready') socket._readyResolve?.(true);
+        if (payload.type === 'ready') { window.ClavisEar?.tap?.consume?.(); socket._readyResolve?.(true); }
         if (payload.type === 'vad') options.onVad?.(payload);
-        if (payload.type === 'partial') options.onPartial?.(payload.text || '');
+        if (payload.type === 'partial') {
+          const voiceEvidence = window.ClavisEar?.voiceId?.capture?.(segmentSince);
+          segmentSince ??= voiceEvidence?.since;
+          const meta = { source: 'local', voiceEvidence, since: voiceEvidence?.since, until: voiceEvidence?.until };
+          if (!window.ClavisEar?.voiceId?.required?.() || window.ClavisEar.voiceId.check(meta).verdict === 'owner') options.onPartial?.(payload.text || '', meta);
+        }
         if (payload.type === 'final') {
-          options.onFinal?.(payload.text || '');
+          const voiceEvidence = window.ClavisEar?.voiceId?.capture?.(segmentSince);
+          segmentSince = undefined;
+          const meta = { source: 'local', voiceEvidence, since: voiceEvidence?.since, until: voiceEvidence?.until };
+          if (!window.ClavisEar?.voiceId?.required?.() || window.ClavisEar.voiceId.check(meta).verdict === 'owner') options.onFinal?.(payload.text || '', meta);
+          window.ClavisEar?.tap?.consume?.();
           if (!options.persistent) this.stopInput();
         }
         if (payload.type === 'error') options.onError?.(new Error(payload.error || 'Speech recognition failed'));
       };
       socket.onerror = () => {
+        if (this.inputSocket !== socket || !current()) return;
         socket._readyReject?.(new Error('Speech recognition WebSocket connection failed'));
         options.onError?.(new Error('Speech recognition WebSocket connection failed'));
+        this.stopInput();
       };
-      socket.onclose = () => { if (this.inputSocket === socket) this.inputSocket = null; };
-      await ready;
+      socket.onclose = () => {
+        socket._readyResolve?.(false);
+        if (this.inputSocket === socket) { this.inputSocket = null; this.stopInput(); }
+      };
+      if (!(await ready) || !current() || this.inputSocket !== socket) return false;
       this.captureSource = this.audioContext.createMediaStreamSource(stream);
       this.captureNode = new AudioWorkletNode(this.audioContext, 'clavis-mic-capture', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] });
       this.captureNode.port.onmessage = (event) => {
-        if (event.data?.type !== 'pcm' || socket.readyState !== WebSocket.OPEN) return;
+        if (!current() || this.inputSocket !== socket || event.data?.type !== 'pcm' || socket.readyState !== WebSocket.OPEN) return;
         socket.send(floatToPcm16(new Float32Array(event.data.audio)));
       };
       const silent = this.audioContext.createGain();
@@ -345,10 +383,16 @@
       microphoneStatus('Listening · speak naturally', 'listening');
       localStatus('Listening', 'listening');
       return true;
+      } catch (error) {
+        if (current()) this.stopInput();
+        throw error;
+      }
     }
 
     stopInput() {
+      this._inputGeneration++;
       const socket = this.inputSocket;
+      socket?._readyResolve?.(false);
       if (socket?.readyState === WebSocket.OPEN) {
         try { socket.send(JSON.stringify({ type: 'stop', generation_id: socket._generationId })); } catch (_) {}
       }
@@ -357,11 +401,14 @@
       this.captureSource = null;
       try { socket?.close(); } catch (_) {}
       this.inputSocket = null;
+      window.ClavisEar?.tap?.stop?.('local');
       if (localStorage.getItem(SHARED_STREAM_KEY) === 'true') microphoneStatus('Microphone ready · Hands-Free and Clap / Snap can stay on', 'ready');
       document.querySelectorAll('.jarvis-composer-mic-btn, #jarvis-voice-btn').forEach((el) => el.classList.remove('recording'));
     }
 
     releaseMicrophone() {
+      this._microphoneGeneration++;
+      this._sharedStreamPending = null; this._voiceStreamPending = null;
       this.stopInput();
       if (this.sharedStream) {
         try { this.sharedStream.getTracks().forEach((t) => t.stop()); } catch (_) {}
@@ -379,18 +426,23 @@
   }
 
   window.LocalSpeechEngine = new LocalSpeechEngine();
+  window.addEventListener('rudra:auth-state', () => {
+    const engine = window.LocalSpeechEngine, owner = window.SupabaseAuth?.getUser?.()?.id;
+    if (engine._microphoneOwner !== owner) { engine.releaseMicrophone(); engine._microphoneOwner = owner; }
+  });
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => window.LocalSpeechEngine.releaseMicrophone());
   if (typeof window !== 'undefined' && window.ClavisVoiceState?.registerAudioCleanup) {
     window.ClavisVoiceState.registerAudioCleanup(() => window.LocalSpeechEngine?.releaseMicrophone?.());
   }
   window.startLocalJarvisVoiceInput = function (options = {}) {
     const btn = document.getElementById('jarvis-composer-voice-btn') || document.getElementById('jarvis-voice-btn');
     const status = document.getElementById('jarvis-composer-status');
-    const onFinal = (text) => {
+    const onFinal = (text, meta) => {
       btn?.classList.remove('recording');
       if (status) status.textContent = '';
       const value = String(text || '').trim();
-      if (value && typeof options.onFinal === 'function') options.onFinal(value);
-      else if (value && typeof window.commitJarvisVoiceInput === 'function') window.commitJarvisVoiceInput(value);
+      if (value && typeof options.onFinal === 'function') options.onFinal(value, meta);
+      else if (value && typeof window.commitJarvisVoiceInput === 'function') window.commitJarvisVoiceInput(value, meta);
     };
     const onError = (error) => {
       btn?.classList.remove('recording');
@@ -404,7 +456,7 @@
       return;
     }
     window.LocalSpeechEngine.startInput({ ...options, onFinal, onError })
-      .then(() => btn?.classList.add('recording'))
+      .then(started => { if (started) btn?.classList.add('recording'); })
       .catch(onError);
   };
 })();

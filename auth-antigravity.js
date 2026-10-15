@@ -6,7 +6,7 @@
 'use strict';
 
 const RUDRA_APP_NAME = 'Rudra24 AI';
-const RUDRA_APP_DESCRIPTION = 'Your business workspace. Sign in to continue.';
+const RUDRA_APP_DESCRIPTION = 'Leads, calls and follow-ups in one calm workspace.';
 
 // ──────────────────────────────────────────────
 //  0. USER-SCOPED STORAGE ENGINE (Multi-Tenant / Multi-User Silo)
@@ -15,13 +15,13 @@ window.UserStorage = {
   emailToUserId(email) {
     if (!email) return 'usr_default';
     const clean = String(email).trim().toLowerCase();
-    const safe = clean.replace(/[^a-z0-9]/g, '_');
+    const safe = encodeURIComponent(clean);
     return `usr_${safe}`;
   },
 
   getUserId() {
-    const verifiedEmail = window.SupabaseAuth?.getUser?.()?.email;
-    if (verifiedEmail) return this.emailToUserId(verifiedEmail);
+    const verifiedUser = window.SupabaseAuth?.getUser?.();
+    if (verifiedUser?.id) return 'usr_' + verifiedUser.id;
     return 'usr_default';
   },
 
@@ -399,27 +399,148 @@ window.UserProfileManager = {
 // ──────────────────────────────────────────────
 //  2. 3D MOUSE PHYSICS & AMBIENT SPOTLIGHT
 // ──────────────────────────────────────────────
+// DOM timing does not prove that the deferred workspace scripts executed.
+const requiredWorkspaceModules = [
+  ['app.js', () => typeof window.showView === 'function'],
+  ['jarvis.js', () => typeof window.JarvisEngine?.sendMessage === 'function'],
+  ['jarvis_ui.js', () => typeof window.bindJarvisUIButtons === 'function'],
+  ['clavis-voice-state.js', () => typeof window.ClavisVoiceState?.canProcessMic === 'function'],
+  ['clavis-ear.js', () => typeof window.ClavisEar?.judge === 'function'],
+  ['clavis-voice.js', () => typeof window.ClavisVoice?.speak === 'function'],
+  ['clavis-elevenlabs-stt.js', () => typeof window.ClavisElevenSTT?.start === 'function'],
+];
+const missingWorkspaceModules = () => requiredWorkspaceModules.filter(([, ready]) => !ready()).map(([file]) => file);
+
 window.AntigravityAuth = {
   currentTab: 'signup', // 'signup' or 'login'
   captchaAnswer: null,
   mouse: { x: 0, y: 0, targetX: 0, targetY: 0 },
   rafId: null,
   _transitioningUserId: '',
+  _initialized: false,
+  _modulesReady: document.readyState !== 'loading' && !missingWorkspaceModules().length,
+  _pendingWorkspace: false,
 
   init() {
+    if (this._initialized) return;
+    this._initialized = true;
     this.bindMouseEffects();
     this.generateCaptcha();
     this.bindFormEvents();
     this.checkInitialSession();
   },
 
+  revealLogin() {
+    const screen = document.getElementById('auth-screen');
+    if (!screen?.classList.contains('is-checking') || this._logoMoving) return;
+    const skin = document.querySelector('link[href^="rudra-login.css"]');
+    if (skin && !skin.sheet && skin.dataset?.loadFailed !== '1' && !this._loginSkinFailed) {
+      if (!this._waitingLoginSkin) {
+        this._waitingLoginSkin = true;
+        skin.addEventListener('load', () => { this._waitingLoginSkin = false; this.revealLogin(); }, { once: true });
+        skin.addEventListener('error', () => { this._loginSkinFailed = true; this._waitingLoginSkin = false; this.revealLogin(); }, { once: true });
+      }
+      return;
+    }
+    const source = screen.querySelector?.('.rl-splash img');
+    const target = screen.querySelector?.('.rl-brand img');
+    const name = screen.querySelector?.('.rl-brand span');
+    const reveal = () => {
+      screen.classList.remove('is-checking', 'rl-wait', 'rl-landing');
+      if (typeof performance !== 'undefined') performance.mark('rudra:login-visible');
+    };
+    if (!source?.animate || !target || document.hidden || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { reveal(); return; }
+    const from = source.getBoundingClientRect(), to = target.getBoundingClientRect();
+    if (!from.width || !to.width) { reveal(); return; }
+    this._logoMoving = true;
+    /* Intro (owner's brief): 1) the logo alone in the centre for ~2 s while the
+       film is already decoded behind the scenes; 2) it glides in ONE straight,
+       eased line to its corner (~0.7 s); 3) the name appears letter by letter,
+       each blurred -> sharp, the whole word within ~0.5 s; 4) the sign-in and
+       the film rise softly together and the film starts at that very moment. */
+    const HOLD = 2000, FLIGHT = 720;
+    const dx = to.x + to.width / 2 - from.x - from.width / 2;
+    const dy = to.y + to.height / 2 - from.y - from.height / 2;
+    const endScale = to.width / from.width;
+    const fullName = name ? (name.dataset.fullName || name.textContent || 'Rudra24 AI') : '';
+    if (name) {
+      name.dataset.fullName = fullName; name.textContent = '';
+      name.setAttribute('aria-label', fullName);
+    }
+    // Warm the film while the logo rests, so it can start the instant it appears.
+    const film = document.getElementById('rl-film-video');
+    if (film) { try { film.preload = 'auto'; if (film.readyState < 3) film.load(); } catch (e) {} }
+    // Stage stays hidden (rl-wait) but the screen is "open", so only the logo shows.
+    screen.classList.add('rl-landing', 'rl-wait');
+    screen.classList.remove('is-checking');
+    const flight = source.animate(
+      [{ transform: 'translate(0,0) scale(1)' }, { transform: `translate(${dx.toFixed(2)}px, ${dy.toFixed(2)}px) scale(${endScale.toFixed(4)})` }],
+      { duration: FLIGHT, delay: HOLD, easing: 'cubic-bezier(.65,0,.25,1)', fill: 'both' });
+    let done = false;
+    const finish = () => {
+      if (done) return; done = true;
+      flight.cancel(); source.style.visibility = 'hidden';
+      screen.classList.remove('rl-landing');
+      this._logoMoving = false;
+      // Name: blur -> sharp per letter, ~0.5 s in total.
+      const STAGGER = 24, LETTER = 240;
+      if (name) {
+        name.textContent = '';
+        [...fullName].forEach((ch, i) => {
+          const el = document.createElement('span');
+          el.className = 'rl-ch'; el.setAttribute('aria-hidden', 'true');
+          el.textContent = ch === ' ' ? ' ' : ch;
+          name.appendChild(el);
+          el.animate(
+            [{ opacity: 0, filter: 'blur(7px)', transform: 'translateY(2px)' }, { opacity: 1, filter: 'blur(0)', transform: 'none' }],
+            { duration: LETTER, delay: i * STAGGER, easing: 'cubic-bezier(.2,.7,.2,1)', fill: 'both' });
+        });
+      }
+      const typed = (fullName.length - 1) * STAGGER + LETTER;
+      // Panel + film pop up as the last letters settle; the film plays right then.
+      setTimeout(() => { reveal(); }, Math.max(0, typed - 120));
+      setTimeout(() => { if (name) name.textContent = fullName; }, typed + 900);
+    };
+    flight.finished.then(finish, finish);
+    // Safety: a backgrounded window never runs the frames — land it anyway.
+    setTimeout(() => { if (!done) { try { flight.finish(); } catch (e) { finish(); } } }, HOLD + FLIGHT + 1200);
+  },
+
+  showWorkspaceBootError() {
+    if (window.SupabaseAuth?.isRecoveryMode?.()) return;
+    const screen = document.getElementById('auth-screen');
+    if (screen) {
+      screen.style.display = '';
+      screen.classList.remove('ag-hidden', 'is-checking', 'rl-wait', 'rl-landing');
+    }
+    const shell = document.getElementById('app-shell');
+    if (shell) shell.style.display = 'none';
+    const progress = document.getElementById('ag-auth-progress');
+    if (progress) progress.hidden = true;
+    const feedback = document.getElementById('ag-auth-feedback');
+    if (feedback) {
+      feedback.hidden = false;
+      const message = feedback.querySelector('[data-auth-message]');
+      if (message) message.textContent = 'The app did not finish loading. Retry connection to reload it.';
+    }
+  },
+
   async checkInitialSession() {
+    if (this._workspaceBootError) { window.location.reload(); return; }
     const feedback = document.getElementById('ag-auth-feedback');
     if (feedback) feedback.hidden = true;
     // Keep a useful sign-in screen visible while scripts or auth config load.
     // Voice stays gated by the verified session, not by screen visibility.
     const authScreen = document.getElementById('auth-screen');
     const appShell = document.getElementById('app-shell');
+    const alreadyIn = !!window.SupabaseAuth?.getSession?.() && !window.SupabaseAuth?.isRecoveryMode?.()
+      && appShell && appShell.style.display === 'flex';
+    if (alreadyIn) {
+      // A late async controller may miss the original Supabase notification.
+      // Visible markup does not prove its stored profile belongs to this user.
+      await this.handleSupabaseSession(window.SupabaseAuth.getSession());
+      return;
+    }
     if (authScreen) {
       authScreen.style.display = '';
       authScreen.classList.remove('ag-hidden');
@@ -436,7 +557,19 @@ window.AntigravityAuth = {
     const googleText = document.getElementById('ag-google-btn-text');
     if (googleText) googleText.textContent = 'Continue with Google';
     this.switchTab('login');
+    // Reveal public sign-in promptly; restoring a session still gates the workspace.
+    const reveal = () => { if (!window.SupabaseAuth?.getSession?.() || window.SupabaseAuth?.isRecoveryMode?.()) this.revealLogin(); };
+    const revealTimer = setTimeout(reveal, 120);
     const ready = await window.SupabaseAuth?.init?.();
+    clearTimeout(revealTimer);
+    reveal();
+    // Supabase may already have been initialised (and handed us the session)
+    // by another module before this ran — in that case the lines above just
+    // re-showed the login over a valid session. Finish the hand-off instead.
+    if (ready?.success && window.SupabaseAuth?.getSession?.() && !window.SupabaseAuth?.isRecoveryMode?.()
+        && appShell && appShell.style.display === 'none') {
+      await this.handleSupabaseSession(window.SupabaseAuth.getSession());
+    }
     const progress = document.getElementById('ag-auth-progress');
     if (progress) progress.hidden = true;
     for (const id of ['ag-tab-login', 'ag-tab-signup']) {
@@ -515,7 +648,7 @@ window.AntigravityAuth = {
       signupFields.forEach(el => el.style.display = '');
       if (forgotRow) forgotRow.style.display = 'none';
       if (submitBtn) {
-        submitBtn.innerHTML = `<span>Create Account &amp; Sync</span> <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
+        submitBtn.innerHTML = `<span>Create account</span> <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
       }
       if (cardTitle) cardTitle.textContent = RUDRA_APP_NAME;
       if (cardSub) cardSub.textContent = RUDRA_APP_DESCRIPTION;
@@ -525,7 +658,7 @@ window.AntigravityAuth = {
       signupFields.forEach(el => el.style.display = 'none');
       if (forgotRow) forgotRow.style.display = 'flex';
       if (submitBtn) {
-        submitBtn.innerHTML = `<span>Sign In</span> <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
+        submitBtn.innerHTML = `<span>Continue with email</span> <svg width="16" height="16" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10.293 3.293a1 1 0 011.414 0l6 6a1 1 0 010 1.414l-6 6a1 1 0 01-1.414-1.414L14.586 11H3a1 1 0 110-2h11.586l-4.293-4.293a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>`;
       }
 
       if (isKnownDevice) {
@@ -592,6 +725,10 @@ window.AntigravityAuth = {
     if (button) button.disabled = true;
     if (label) label.textContent = 'Connecting to Google…';
     window.SupabaseAuth?.signInWithGoogle?.().then((result) => {
+      if (result?.external) {
+        if (button) button.disabled = false;
+        if (label) label.textContent = 'Continue with Google';
+      }
       if (!result?.success) {
         if (button) button.disabled = false;
         if (label) label.textContent = 'Continue with Google';
@@ -624,18 +761,27 @@ window.AntigravityAuth = {
       window.dispatchEvent(new Event('clavis:workspace-change'));
       return;
     }
-    const authUser = nextSession.user;
-    if (this._transitioningUserId === authUser.id ||
-        (authScreen?.classList.contains('ag-hidden') && appShell?.style.display === 'flex')) return;
-    this._transitioningUserId = authUser.id;
-    const metadata = authUser.user_metadata || {};
+    const verifiedUser = window.SupabaseAuth?.getSession?.()?.user;
+    if (!verifiedUser?.id || verifiedUser.id !== nextSession.user.id || window.SupabaseAuth?.isRecoveryMode?.()) return;
+    const authUser = verifiedUser;
+    if (this._transitioningUserId === authUser.id) return;
     const email = String(authUser.email || '').trim().toLowerCase();
-    if (!email) { this._transitioningUserId = ''; return; }
+    if (!email) return;
     const previousEmail = localStorage.getItem('skylark_active_email') || '';
-    if (previousEmail && previousEmail !== email) {
+    const storedProfile = window.UserProfileManager.getProfile();
+    const sameIdentity = storedProfile.id === authUser.id && storedProfile.email === email && previousEmail === email;
+    if (sameIdentity && authScreen?.classList.contains('ag-hidden') && appShell?.style.display === 'flex') return;
+    this._transitioningUserId = authUser.id;
+    if (!sameIdentity) {
       window.allLeads = [];
+      window.filteredLeads = [];
       window.all_candidates = [];
+      // saveProfile merges existing fields. Remove another account's profile
+      // before merging only verified identity and this account's metadata.
+      localStorage.removeItem('skylark_user_profile');
+      localStorage.removeItem('skylark_user');
     }
+    const metadata = authUser.user_metadata || {};
     const name = String(metadata.full_name || metadata.name || email.split('@')[0] || 'User').trim();
     const profile = window.UserProfileManager.saveProfile({
       id: authUser.id,
@@ -1256,6 +1402,8 @@ window.AntigravityAuth = {
   // Works regardless of overlay presence or CSS issues.
   transitionToApp() {
     if (!window.SupabaseAuth?.getSession?.() || window.SupabaseAuth?.isRecoveryMode?.()) return;
+    if (!this._modulesReady) { this._pendingWorkspace = true; return; }
+    this._pendingWorkspace = false;
     // Step 1: Mark as logged in (belt AND suspenders)
     localStorage.setItem('skylark_logged_in', 'true');
 
@@ -1341,6 +1489,10 @@ window.AntigravityAuth = {
       authScreen.style.display = '';  // let CSS flex !important take over
     }
     window.dispatchEvent(new Event('clavis:workspace-change'));
+    if (authScreen) authScreen.classList.remove('is-checking', 'rl-wait', 'rl-landing', 'ag-exit-soft');
+    const pw = document.getElementById('ag-input-password');
+    if (pw) { pw.value = ''; pw.type = 'password'; }
+    document.getElementById('topbar-profile-menu')?.classList.remove('open');
     this.switchTab('login');
     this.generateCaptcha();
     this.showToast('Signed out successfully', 'info');
@@ -1358,17 +1510,17 @@ window.AntigravityAuth = {
       bottom: 24px;
       left: 50%;
       transform: translateX(-50%) translateY(20px);
-      background: ${type === 'error' ? '#EF4444' : type === 'success' ? '#10B981' : '#231F1C'};
-      color: #FFFFFF;
-      padding: 10px 18px;
-      border-radius: 999px;
+      background: ${type === 'error' ? '#9B3A2A' : type === 'success' ? 'var(--cc-accent, #0E4D3C)' : 'var(--cc-ink, #1C1B12)'};
+      color: ${type === 'success' ? 'var(--cc-on-accent, #FDFBF2)' : '#FDFBF2'};
+      padding: 10px 16px;
+      border-radius: 10px;
       font-size: 13px;
-      font-weight: 600;
-      font-family: 'Inter', sans-serif;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.25);
+      font-weight: 500;
+      font-family: var(--cc-sans, 'Geist', system-ui, sans-serif);
+      box-shadow: var(--cc-sh-pop, 0 10px 30px -8px rgba(0,0,0,0.3));
       z-index: 100000;
       opacity: 0;
-      transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+      transition: opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1), transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
       display: flex;
       align-items: center;
       gap: 8px;
@@ -1486,8 +1638,23 @@ document.addEventListener('click', (e) => {
 });
 
 // Auto-initialize on load
-window.addEventListener('DOMContentLoaded', () => {
-  window.AntigravityAuth.init();
+if (document.getElementById('auth-screen')) window.AntigravityAuth.init();
+const finishAuthBoot = (event) => {
+  if (document.readyState === 'loading') return;
+  const auth = window.AntigravityAuth;
+  const missing = missingWorkspaceModules();
+  auth._modulesReady = !missing.length && !auth._workspaceScriptFailed;
+  if (!auth._modulesReady) {
+    if (document.readyState === 'complete' || event?.type === 'DOMContentLoaded') {
+      auth._workspaceBootError = true;
+      console.warn('[Auth] Required workspace scripts did not initialize:', auth._workspaceScriptFailed || missing);
+      auth.showWorkspaceBootError();
+    }
+    return;
+  }
+  auth._workspaceBootError = false;
+  auth.init();
+  if (auth._pendingWorkspace) auth.transitionToApp();
   window.UserProfileManager.syncUI();
 
   // Load saved app name into auth card title
@@ -1496,7 +1663,19 @@ window.addEventListener('DOMContentLoaded', () => {
   // Sync transition overlay app name
   const transText = document.querySelector('.ag-trans-app-name');
   if (transText) transText.textContent = savedAppName && savedAppName !== 'Neural Lead Intelligence' ? savedAppName : RUDRA_APP_NAME;
-});
+};
+window.addEventListener('error', event => {
+  if (window.AntigravityAuth._modulesReady) return;
+  const file = String(event.target?.src || event.filename || '').split(/[?#]/)[0].split('/').pop();
+  if (!requiredWorkspaceModules.some(([name]) => name === file)) return;
+  window.AntigravityAuth._workspaceScriptFailed = file;
+  window.AntigravityAuth._workspaceBootError = true;
+  window.AntigravityAuth.showWorkspaceBootError();
+}, true);
+document.addEventListener('readystatechange', finishAuthBoot);
+window.addEventListener('DOMContentLoaded', finishAuthBoot, { once: true });
+window.addEventListener('load', finishAuthBoot, { once: true });
+finishAuthBoot();
 
 // ══════════════════════════════════════════════════════════════
 //  CINEMATIC TRANSITION CANVAS — Particle burst + radial wipe
@@ -1595,3 +1774,60 @@ function stopTransitionCanvas() {
 
 window.startTransitionCanvas = startTransitionCanvas;
 window.stopTransitionCanvas  = stopTransitionCanvas;
+
+// Safety net: if init() never runs, the sign-in card must still appear.
+setTimeout(() => window.AntigravityAuth.revealLogin(), 500);
+
+// Login film: plays only while the sign-in screen is actually on screen
+// (and never for reduced-motion users), so it costs nothing inside the app.
+(function () {
+  const v = document.getElementById('rl-film-video');
+  if (!v || !('IntersectionObserver' in window)) return;
+  const screen = document.getElementById('auth-screen');
+  const calm = window.matchMedia('(prefers-reduced-motion: reduce)');
+  let visible = false, soundAllowed = false, optedIn = false, generation = 0;
+  v.controls = false;
+  // Soft, clear narration: the file is loudness-normalised (-20 LUFS) and
+  // the element fades in to a gentle level instead of starting abruptly.
+  const VOL = 0.32;
+  let ramp = 0;
+  const fadeIn = () => {
+    cancelAnimationFrame(ramp);
+    const t0 = performance.now();
+    const step = (t) => { const k = Math.min(1, (t - t0) / 2200); v.volume = VOL * k * k; if (k < 1) ramp = requestAnimationFrame(step); };
+    v.volume = 0; ramp = requestAnimationFrame(step);
+  };
+  v.volume = VOL;
+  let wasMuted = true;
+  const play = () => {
+    const current = ++generation;
+    if (!visible || screen?.classList.contains('is-checking') || screen?.classList.contains('rl-wait') || screen?.classList.contains('ag-hidden') || document.hidden || (calm.matches && !optedIn)) { v.muted = true; v.pause(); return; }
+    v.preload = 'auto';
+    v.muted = !soundAllowed;
+    if (wasMuted && !v.muted) fadeIn();
+    wasMuted = v.muted;
+    v.play().catch(error => {
+      if (current !== generation || error.name !== 'NotAllowedError' || !visible || document.hidden || (calm.matches && !optedIn)) return;
+      soundAllowed = false; v.muted = true; wasMuted = true;
+      v.play().catch(() => {});
+    });
+  };
+  // Try quiet narration where permitted; browsers otherwise keep autoplay muted.
+  soundAllowed = true;
+  new IntersectionObserver(([e]) => {
+    visible = e.isIntersecting; play();
+  }).observe(v);
+  if (screen) new MutationObserver(play).observe(screen, { attributes: true, attributeFilter: ['class'] });
+  screen?.addEventListener('pointerdown', event => {
+    if (!event.isTrusted) return;
+    soundAllowed = true; play();
+  });
+  v.addEventListener('keydown', event => {
+    if (!event.isTrusted || !['Enter', ' '].includes(event.key)) return;
+    event.preventDefault(); optedIn = true; soundAllowed = true; play();
+  });
+  v.addEventListener('click', event => { if (event.isTrusted) { optedIn = true; soundAllowed = true; play(); } });
+  document.addEventListener('visibilitychange', play);
+  window.addEventListener('clavis:workspace-change', play);
+  calm.addEventListener('change', () => { optedIn = false; play(); });
+})();

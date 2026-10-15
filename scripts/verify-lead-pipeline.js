@@ -137,10 +137,10 @@ check('vendor / hiring / staff-size are not guessed from a review count',
   && !ag.includes("status: 'Verified Client Lead'"));
 
 const jv = read('jarvis.js');
-check('Rudra24 AI never asks which city / how many for a lead search',
-  jv.includes('LEADS ARE NEVER AMBIGUOUS'));
+check('Rudra24 AI distinguishes saved leads from sourcing and retains new-search defaults',
+  jv.includes('DISTINGUISH VIEW FROM SEARCH') && jv.includes('requested count, else 20') && jv.includes('else Gurugram'));
 check('Rudra24 AI offers the calling agent once the leads are in',
-  jv.includes('calling agent ko de doon'));
+  jv.includes('After a confirmed new batch offer its calling handoff once'));
 check('the realtime voice brain says the same', read('clavis-live.js').includes('LEADS ARE NEVER AMBIGUOUS'));
 
 // ── listening speed ───────────────────────────────────────────────────────

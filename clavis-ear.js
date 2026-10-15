@@ -10,13 +10,10 @@
  *     spelling ("लीड्स" and "leads" reduce to the same skeleton
  *     "lds") — and dropped when it is just Rudra24 AI's own voice.
  *
- *  2. VOICE ID (opt-in, beta). Sir reads one line once; a compact
- *     voiceprint (MFCC means + pitch) is kept in localStorage and
- *     slowly adapts to him over time. In open-mic moments (the
- *     follow-up window after a reply) a voice that clearly isn't
- *     his is ignored — unless it says "Rudra", so anyone may still
- *     call Rudra24 AI by name. Honest scope: a room-level heuristic that
- *     filters TV / background chatter, not a security lock.
+ *  2. VOICE ID (beta). Owner-only policy is independent of calibration.
+ *     Account/device-bound MFCC + pitch samples gate every spoken action,
+ *     including names and stop words. Unknown samples fail closed. This is
+ *     an acoustic similarity filter, not biometric or distance verification.
  *
  *  3. DOUBLE-TALK DETECTOR, used by barge-in and the Live mic gate:
  *     it learns how loud Rudra24 AI's own echo is relative to what is
@@ -45,11 +42,19 @@
 
   const now = () => Date.now();
   const LS = {
-    print: 'clavis_voiceprint_v1', vid: 'clavis_voice_id_enabled', caption: 'clavis_live_caption',
+    print: 'clavis_voiceprint_v2', vid: 'clavis_voice_id_enabled', caption: 'clavis_live_caption',
     k: 'clavis_echo_k',
   };
   const lsGet = (k) => { try { return localStorage.getItem(k); } catch (_) { return null; } };
   const lsSet = (k, v) => { try { localStorage.setItem(k, v); } catch (_) {} };
+  const account = () => window.SupabaseAuth?.getUser?.()?.id || '';
+  const microphoneDevice = (stream) => (stream?.getAudioTracks?.()[0] || stream?.getTracks?.()[0])?.getSettings?.().deviceId || '';
+  const scoped = (key) => account() ? key + ':' + account() : null;
+  let evidenceEpoch = 0, enrollment = null;
+  let sessionPrint = null, sessionArmed = false, sessionVectors = [], sessionSamples = new WeakSet();
+  const evidenceSamples = new WeakMap();
+  const abortEnrollment = () => { enrollment?.abort(); enrollment = null; };
+  const resetEvidence = () => { evidenceEpoch++; };
 
   /* ── 1. text → sound skeleton ──────────────────────────────── */
   const CONS = {
@@ -198,6 +203,18 @@
     if (!t) return { accept: false, reason: 'empty', text: '' };
     const byName = named(t);
     const speakingNow = isSpeaking();
+    if (voiceId.required()) {
+      const voice = voiceId.check(ctx);
+      if (voice.verdict !== 'owner') {
+        // A session profile is intentionally temporary and is cleared on sleep.
+        // Let a wake phrase open listening only; the command still passes
+        // commitJarvisVoiceInput's first-speaker check before it can run.
+        const wake = voiceId.mode?.() === 'session' && !voiceId.profile() && !ctx.session && byName
+          && !speakingNow && window.ClavisWake?.match?.(t);
+        if (wake) return { accept: true, wakeOnly: true, reason: 'session-wake-only', text: t, voice };
+        return { accept: false, reason: 'not-owner', text: t, voice };
+      }
+    }
     const gap = msSinceSpoke();
     const e = echo(t, 12000);
 
@@ -213,11 +230,15 @@
       // A conversation in the room shouldn't cut Rudra24 AI off.
       // Other new words interrupt only when they are HIS voice (Voice ID) —
       // a video or people in the room must never cut Rudra24 AI off.
-      const his = voiceId.enabled() && voiceId.verdict(ctx.since || now() - 4000).verdict === 'owner';
+      const his = voiceId.required() || voiceId.enabled() && voiceId.check(ctx).verdict === 'owner';
       if (e.fresh >= 2 && his) return { accept: true, barge: true, reason: 'his-voice', text: t };
       // Sir cutting in with a clear new instruction ("nahi, mujhe Noida ki
       // list chahiye") is heard and done — chatter without a request is not.
       if (e.fresh >= 4 && e.score < 0.25 && ASK_NOW_RE.test(t)) return { accept: true, barge: true, reason: 'new-request', text: t };
+      if (speakingNow && ctx.session && !voiceId.enabled() && e.fresh >= 2 && e.score < 0.25 && looksLikeRequest(t)) return { accept: true, barge: true, reason: 'new-question', text: t };
+      // A conversation remains a conversation when the reply just ended.
+      // Short answers need no imperative; echo and enrolled owner checks stay.
+      if (!speakingNow && ctx.session && (!voiceId.enabled() || voiceId.check(ctx).verdict === 'owner')) return { accept: true, barge: false, reason: 'conversation', text: t };
       // Answering right after Clavis finished ("haan, Noida ki bhi dikhao"):
       // clearly new words, not an echo, a Hindi/Hinglish request.
       if (!speakingNow && ctx.openMic && !voiceId.enabled() && e.fresh >= 3 && e.score < 0.3 && ASK_NOW_RE.test(t)) return { accept: true, barge: false, reason: 'conversation', text: t };
@@ -230,8 +251,8 @@
     // Open mic (no "Rudra" said): only his registered voice counts. "Sounds
     // like a request" was not enough — "I'm going to go to the next video"
     // from a video in the room passed that test and opened photos.
-    if (ctx.openMic && !byName) {
-      const v = voiceId.enabled() ? voiceId.verdict(ctx.since || now() - 6000) : { verdict: 'unknown' };
+    if (ctx.openMic && !byName && (!ctx.session || voiceId.enabled())) {
+      const v = voiceId.required() || voiceId.enabled() ? voiceId.check(ctx) : { verdict: 'unknown' };
       // Without Voice ID, the few seconds right after a reply still work like
       // a conversation — but only for a Hindi / Hinglish request, never
       // English chatter from a video ("go to the next video").
@@ -248,61 +269,87 @@
   const MEL_BANDS = 24, NCEP = 12, FRAME_MS = 32, KEEP_MS = 20000;
   const tap = {
     users: new Set(), stream: null, ctx: null, an: null, timer: 0, fbuf: null, tbuf: null, mel: null, frames: [],
-    floor: 0.006, lastRms: 0, starting: null,
-    async ensure() {
+    floor: 0.006, lastRms: 0, starting: null, generation: 0, source: null,
+    device: '', owner: '', consumedAt: 0,
+    async ensure(inputStream) {
       if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
       if (this.an) return true;
       if (this.starting) return this.starting;
-      this.starting = (async () => {
+      const generation = this.generation;
+      const pending = (async () => {
+        let stream = null;
         try {
           if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
-          this.stream = await (window.LocalSpeechEngine?.acquireVoiceMicrophone?.() || navigator.mediaDevices.getUserMedia({
-            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
+          const captureOwner = account();
+          const shared = Boolean(inputStream || window.LocalSpeechEngine?.acquireVoiceMicrophone);
+          const microphone = inputStream || await (window.LocalSpeechEngine?.acquireVoiceMicrophone?.() || navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false, channelCount: 1 },
           }));
+          // Each observer owns a clone; ending a feature tap cannot end STT.
+          stream = shared ? microphone.clone() : microphone;
+          if (generation !== this.generation || captureOwner !== account() || !this.users.size || window.ClavisVoiceState?.canProcessMic?.() === false) {
+            stream.getTracks().forEach(track => track.stop());
+            return false;
+          }
+          this.stream = stream;
+          const device = microphoneDevice(stream);
+          if (this.device && device !== this.device || this.owner && captureOwner !== this.owner) resetEvidence();
+          this.device = device; this.owner = captureOwner;
           this.ctx = new (window.AudioContext || window.webkitAudioContext)();
-          const src = this.ctx.createMediaStreamSource(this.stream);
+          this.source = this.ctx.createMediaStreamSource(this.stream);
           this.an = this.ctx.createAnalyser();
           this.an.fftSize = 1024;
           this.an.smoothingTimeConstant = 0;
-          src.connect(this.an);
+          this.source.connect(this.an);
           this.fbuf = new Float32Array(this.an.frequencyBinCount);
           this.tbuf = new Float32Array(this.an.fftSize);
           this.mel = melBank(this.ctx.sampleRate, this.an.fftSize);
           return true;
         } catch (err) {
-          this.an = null;
+          if (generation === this.generation) this.releaseAll();
+          else stream?.getTracks().forEach(track => track.stop());
           return false;
-        } finally { this.starting = null; }
-      })();
-      return this.starting;
+        }
+      })().finally(() => { if (this.starting === pending) this.starting = null; });
+      this.starting = pending;
+      return pending;
     },
-    async start(tag) {
+    async start(tag, inputStream) {
       if (typeof window !== 'undefined' && window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) return false;
       // Never ask for the mic just to listen for echo; only reuse a granted one.
       if (lsGet('clavis_mic_permission_granted') !== 'true' && tag !== 'enroll') return false;
+      if (inputStream && this.an && microphoneDevice(inputStream) !== this.device) this.releaseAll();
       this.users.add(tag);
-      if (!(await this.ensure())) { this.users.delete(tag); return false; }
-      if (this.ctx.state === 'suspended') { try { await this.ctx.resume(); } catch (_) {} }
+      const generation = this.generation;
+      if (!(await this.ensure(inputStream))) { if (generation === this.generation) this.users.delete(tag); return false; }
+      const context = this.ctx;
+      if (context?.state === 'suspended') { try { await context.resume(); } catch (_) {} }
+      if (!context || generation !== this.generation || this.ctx !== context || !this.users.has(tag) || window.ClavisVoiceState?.canProcessMic?.() === false) return false;
       if (!this.timer && this.users.size) this.timer = setInterval(() => this.tick(), FRAME_MS);
       return true;
     },
     stop(tag) {
       this.users.delete(tag);
-      if (!this.users.size && this.timer) { clearInterval(this.timer); this.timer = 0; }
+      if (!this.users.size) this.releaseAll(true);
     },
-    releaseAll() {
+    releaseAll(preserveEvidence = false) {
+      this.generation++;
+      if (!preserveEvidence) { window.ClavisEar?.voiceId?.endSession?.(); resetEvidence(); abortEnrollment(); }
       this.users.clear();
       if (this.timer) { clearInterval(this.timer); this.timer = 0; }
+      try { this.source?.disconnect(); } catch (_) {}
+      this.source = null;
       if (this.stream) {
         try { this.stream.getTracks().forEach((t) => t.stop()); } catch (_) {}
         this.stream = null;
       }
       if (this.ctx) {
-        try { this.ctx.close(); } catch (_) {}
+        try { this.ctx.close()?.catch?.(() => {}); } catch (_) {}
         this.ctx = null;
       }
       this.an = null;
       this.starting = null;
+      this.frames = []; this.floor = 0.006; this.lastRms = 0; this.consumedAt = 0;
     },
     level() { return this.lastRms; },
     tick() {
@@ -327,6 +374,9 @@
       this.frames.push({ t, v, r });
     },
     since(t0, t1 = now()) { return this.frames.filter((f) => f.t >= t0 && f.t <= t1).map((f) => f.v); },
+    consume(until = now()) { this.consumedAt = Math.max(this.consumedAt, until); },
+    snapshot(since, until) { return captureEvidence(since, until); },
+    utterance() { return captureEvidence(); },
   };
 
   function melBank(rate, fft) {
@@ -336,7 +386,8 @@
     const pts = [];
     for (let i = 0; i < MEL_BANDS + 2; i++) pts.push(melToHz(lo + (hi - lo) * i / (MEL_BANDS + 1)));
     const binHz = rate / fft;
-    return pts.slice(1, -1).map((c, i) => ({ lo: pts[i] / binHz, c: c / binHz, hi: pts[i + 2] / binHz }));
+    return pts.slice(1, -1).map((c, i) => ({ lo: pts[i] / binHz, c: c / binHz, hi: pts[i + 2] / binHz,
+      dct: Array.from({length:NCEP}, (_, j) => Math.cos(Math.PI * (j + 1) * (i + 0.5) / MEL_BANDS)) }));
   }
   function mfcc(dbSpectrum, bank) {
     const logE = new Array(bank.length);
@@ -357,7 +408,7 @@
     const n = logE.length;
     for (let c = 1; c <= NCEP; c++) {
       let s = 0;
-      for (let b = 0; b < n; b++) s += logE[b] * Math.cos(Math.PI * c * (b + 0.5) / n);
+      for (let b = 0; b < n; b++) s += logE[b] * bank[b].dct[c - 1];
       out.push(s / n);
     }
     return out.every(Number.isFinite) ? out : null;
@@ -400,47 +451,113 @@
     }
     return Math.sqrt(s / m.length);
   }
+  function captureEvidence(since, until = now()) {
+    let frames = tap.frames.filter(f => f.t <= until && f.t > (since == null ? tap.consumedAt : since - 1));
+    if (since == null && frames.length) {
+      let start = frames.length - 1;
+      while (start > 0 && frames[start].t - frames[start - 1].t <= 500) start--;
+      frames = frames.slice(start);
+      if (until - frames[frames.length - 1].t > 2500) frames = [];
+    }
+    const evidence = Object.freeze({ since: frames[0]?.t || until, until,
+      owner: tap.owner, device: tap.device, frames: frames.length });
+    evidenceSamples.set(evidence, { epoch: evidenceEpoch, profileAt: voiceId.profile()?.at,
+      vectors: frames.map(f => f.v.slice()), created: now() });
+    return evidence;
+  }
   const voiceId = {
-    profile() { try { return JSON.parse(lsGet(LS.print) || 'null'); } catch (_) { return null; } },
-    enabled() { return !!this.profile() && lsGet(LS.vid) !== 'false'; },
-    setEnabled(on) { lsSet(LS.vid, on ? 'true' : 'false'); return this.enabled(); },
-    clear() { try { localStorage.removeItem(LS.print); } catch (_) {} },
+    required() { return this.mode() === 'session' || !scoped(LS.vid) || lsGet(scoped(LS.vid)) !== 'false'; },
+    mode() { return lsGet(scoped('clavis_speaker_mode')) === 'registered' ? 'registered' : 'session'; },
+    setMode(mode) { if (scoped('clavis_speaker_mode')) lsSet(scoped('clavis_speaker_mode'), mode === 'registered' ? 'registered' : 'session'); this.endSession(); syncUi(); },
+    beginSession() { if (sessionArmed) return; sessionArmed = true; sessionPrint = null; sessionVectors = []; sessionSamples = new WeakSet(); },
+    endSession() { sessionArmed = false; sessionPrint = null; sessionVectors = []; sessionSamples = new WeakSet(); resetEvidence(); },
+    establish(evidence) {
+      if (this.mode() !== 'session' || sessionPrint || !sessionArmed || isSpeaking()) return false;
+      const sample = evidenceSamples.get(evidence);
+      if (!sample || sample.epoch !== evidenceEpoch || evidence.owner !== account() || evidence.device !== tap.device || !tap.device || now() - sample.created > 30000) return false;
+      if (sessionSamples.has(evidence)) return false;
+      sessionSamples.add(evidence);
+      // Only final utterances contribute; overlapping partials never train the reference.
+      sessionVectors.push(...sample.vectors);
+      if (sessionVectors.length < 60) return false;
+      const base = stats(sessionVectors);
+      sessionPrint = { ...base, v: 2, owner: account(), device: tap.device, at: now(), n: sessionVectors.length, thr: 1.6 };
+      sessionVectors = []; resetEvidence();
+      return true;
+    },
+    profile() {
+      if (this.mode() === 'session') return sessionPrint?.owner === account() && sessionPrint.device === tap.device ? sessionPrint : null;
+      try {
+        const p = JSON.parse(lsGet(scoped(LS.print)) || 'null');
+        return p?.v === 2 && p.owner === account() && typeof p.device === 'string' && p.device
+          && Number.isFinite(p.at) && p.n >= 60 && Number.isFinite(p.thr) && p.thr >= 0.55 && p.thr <= 1.6
+          && Array.isArray(p.mu) && Array.isArray(p.sd) && p.mu.length === NCEP + 1 && p.sd.length === p.mu.length
+          && p.mu.every(Number.isFinite) && p.sd.every(x => Number.isFinite(x) && x > 0) ? p : null;
+      } catch (_) { return null; }
+    },
+    enabled() { return this.required() && !!this.profile(); },
+    setEnabled(on) { if (scoped(LS.vid)) lsSet(scoped(LS.vid), on ? 'true' : 'false'); resetEvidence(); return this.required(); },
+    clear() { abortEnrollment(); resetEvidence(); try { localStorage.removeItem(scoped(LS.print)); } catch (_) {} },
+    capture(since, until) { return captureEvidence(since, until); },
+    check(ctx = {}) { return this.verdict(ctx.since, ctx.until, ctx.voiceEvidence); },
+    isEnrolling() { return Boolean(enrollment); },
+    cancelEnrollment() { abortEnrollment(); tap.stop('enroll'); },
     status() {
       const p = this.profile();
-      return p ? { enrolled: true, enabled: this.enabled(), frames: p.n, threshold: p.thr, since: p.at } : { enrolled: false, enabled: false };
+      const ready = Boolean(p && p.device === tap.device && account() === tap.owner);
+      return { enrolled: Boolean(p), enabled: this.required(), required: this.required(), ready,
+        reason: !p ? 'calibration-required' : !ready ? 'microphone-check-required' : '',
+        frames: p?.n || 0, threshold: p?.thr, since: p?.at };
     },
-    verdict(t0, t1) {
+    verdict(t0, t1, suppliedEvidence) {
+      if (!this.required()) return { verdict: 'owner', reason: 'filter-disabled' };
+      if (enrollment || window.ClavisVoiceState?.canProcessMic?.() === false) return { verdict: 'unknown', reason: 'capture-unavailable' };
       const p = this.profile();
       if (!p) return { verdict: 'unknown', reason: 'not-enrolled' };
-      const vs = tap.since(t0, t1);
+      const evidence = suppliedEvidence || captureEvidence(t0, t1);
+      const sample = evidenceSamples.get(evidence);
+      if (!sample || sample.epoch !== evidenceEpoch || sample.profileAt !== p.at || now() - sample.created > 30000
+          || evidence.owner !== account() || evidence.device !== p.device || evidence.device !== tap.device) {
+        return { verdict: 'unknown', reason: 'stale-or-mismatched-evidence' };
+      }
+      const vs = sample.vectors;
       if (vs.length < 12) return { verdict: 'unknown', reason: 'too-short', frames: vs.length };
       const d = dist(meanOf(vs), p);
       const verdict = d <= p.thr ? 'owner' : d > p.thr * 1.35 ? 'other' : 'unsure';
-      // Personalises over time: confident matches nudge the print toward
-      // how sir sounds now (mic, room, time of day), never an impostor.
-      if (verdict === 'owner' && d < p.thr * 0.7 && vs.length >= 20) {
-        const m = meanOf(vs);
-        p.mu = p.mu.map((x, i) => x * 0.96 + m[i] * 0.04);
-        p.adapted = (p.adapted || 0) + 1;
-        lsSet(LS.print, JSON.stringify(p));
-      }
+      // ponytail: MFCC/pitch similarity is not biometric/replay verification;
+      // explicit recalibration only, speaker embeddings if this filter falls short.
       return { verdict, distance: +d.toFixed(3), threshold: p.thr, frames: vs.length };
     },
     async enroll({ seconds = 9, onProgress } = {}) {
-      const ok = await tap.start('enroll');
-      if (!ok) throw new Error('Microphone nahi mila — permission allow karein.');
-      const t0 = now();
+      this.cancelEnrollment();
+      const controller = new AbortController(), enrollmentOwner = account();
+      controller.owner = enrollmentOwner;
+      enrollment = controller;
+      const aborted = () => Object.assign(new Error('Voice calibration cancelled'), { name: 'AbortError' });
+      let vs, device, t0;
       try {
-        await new Promise((resolve) => {
+        const ok = await tap.start('enroll');
+        if (controller.signal.aborted || enrollmentOwner !== account()) throw aborted();
+        if (!ok) throw new Error('Microphone nahi mila — permission allow karein.');
+        device = tap.device; t0 = now();
+        if (!device || !enrollmentOwner) throw new Error('Sign in and reconnect your microphone before calibration.');
+        await new Promise((resolve, reject) => {
+          const cancel = () => { clearInterval(iv); reject(aborted()); };
           const iv = setInterval(() => {
+            if (controller.signal.aborted || enrollmentOwner !== account() || tap.device !== device || !tap.an) { cancel(); return; }
             const voiced = tap.since(t0).length;
             const el = now() - t0;
             onProgress?.(Math.min(1, Math.max(voiced / 150, el / (seconds * 1000) * 0.6)), voiced);
-            if (voiced >= 150 || el > seconds * 1000) { clearInterval(iv); resolve(); }
+            if (voiced >= 150 || el > seconds * 1000) { clearInterval(iv); controller.signal.removeEventListener('abort', cancel); resolve(); }
           }, 150);
+          controller.signal.addEventListener('abort', cancel, { once: true });
         });
-      } finally { tap.stop('enroll'); }
-      const vs = tap.since(t0);
+        vs = tap.since(t0).map(v => v.slice());
+        if (controller.signal.aborted || enrollmentOwner !== account() || device !== tap.device) throw aborted();
+      } finally {
+        if (enrollment === controller || !enrollment) tap.stop('enroll');
+        if (enrollment === controller) enrollment = null;
+      }
       if (vs.length < 60) throw new Error('Awaaz kam aayi — thoda paas aakar, normal awaaz me dobara boliye.');
       const base = stats(vs);
       // Calibrate: how far do sir's OWN chunks fall from his print?
@@ -451,9 +568,10 @@
         const rest = vs.slice(0, c * q).concat(vs.slice((c + 1) * q));
         worst = Math.max(worst, dist(meanOf(chunk), stats(rest)));
       }
-      const p = { v: 1, at: now(), n: vs.length, mu: base.mu, sd: base.sd, thr: +Math.min(1.6, Math.max(0.55, worst * 2.5)).toFixed(3) };
-      lsSet(LS.print, JSON.stringify(p));
-      lsSet(LS.vid, 'true');
+      const p = { v: 2, owner: enrollmentOwner, device, at: now(), n: vs.length, mu: base.mu, sd: base.sd, thr: +Math.min(1.6, Math.max(0.55, worst * 2.5)).toFixed(3) };
+      resetEvidence();
+      lsSet(scoped(LS.print), JSON.stringify(p));
+      lsSet(scoped(LS.vid), 'true');
       return this.status();
     },
     openEnroll() { return enrollSheet(); },
@@ -775,7 +893,10 @@
       if (cap.el?.classList.contains('is-out')) lastPlaceMeasure = 0;
       place();
       render(t, false);
-      cap.el.classList.remove('is-out', 'is-dropped', 'is-idle');
+      // is-settled drives the one-shot ring the dot plays when a turn is
+      // taken. Left on, the next sentence's dot would sit still instead of
+      // breathing, so the new turn clears it here.
+      cap.el.classList.remove('is-out', 'is-dropped', 'is-idle', 'is-settled');
       cap.el.classList.add('is-in', 'is-listening');
       caption._touched = now();
     },
@@ -787,9 +908,11 @@
         this.clear(260);
         return;
       }
+      if (cap.el?.classList.contains('is-out')) lastPlaceMeasure = 0;
       if (text) render(text, true);
       if (!cap.el) return;
-      cap.el.classList.remove('is-listening', 'is-dropped', 'is-idle');
+      place();
+      cap.el.classList.remove('is-out', 'is-listening', 'is-dropped', 'is-idle');
       cap.el.classList.add('is-in', 'is-settled');
       clearTimeout(cap.hideTimer);
       cap.hideTimer = setTimeout(() => this.clear(), 2600);
@@ -798,6 +921,7 @@
       if (!capEnabled()) { this.clear(); return; }
       capEnsure();
       cap.el.classList.toggle('is-listening', !!on);
+      if (on) cap.el.classList.remove('is-settled');
       if (on && !cap.words.length) cap.el.classList.add('is-in', 'is-idle');
       if (!on) cap.el.classList.remove('is-idle');
     },
@@ -842,14 +966,14 @@
     const fill = el.querySelector('.cv-fill');
     const close = () => { el.classList.remove('is-in'); setTimeout(() => el.remove(), 320); };
     return new Promise((resolve) => {
-      el.querySelector('.cv-cancel').onclick = () => { close(); resolve(null); };
+      el.querySelector('.cv-cancel').onclick = () => { voiceId.cancelEnrollment(); close(); resolve(null); };
       el.querySelector('.cv-start').onclick = async (ev) => {
         ev.currentTarget.disabled = true;
         el.classList.add('is-recording');
         status.textContent = 'Sun raha hoon… line padhiye.';
         try {
           const res = await voiceId.enroll({ onProgress: (p) => { fill.style.strokeDashoffset = String(119.4 * (1 - p)); } });
-          status.textContent = 'Ho gaya — ab main aapki awaaz pehchanta hoon.';
+          status.textContent = 'Calibration saved — only matching voice samples can act. This beta filter can make mistakes.';
           el.classList.remove('is-recording');
           el.classList.add('is-done');
           setTimeout(close, 1300);
@@ -907,12 +1031,20 @@
   // Settings panel: reflect the stored Voice ID / caption state.
   function syncUi() {
     const st = voiceId.status();
+    const hint = document.getElementById('sm-voiceid-hint');
+    if (hint && !document.getElementById('clavis-speaker-mode')) {
+      const select = document.createElement('select'); select.id = 'clavis-speaker-mode'; select.setAttribute('aria-label', 'Speaker policy');
+      select.innerHTML = '<option value="session">First speaker per conversation</option><option value="registered">Registered owner only</option>';
+      select.onchange = () => voiceId.setMode(select.value); hint.before(select);
+    }
+    const policy = document.getElementById('clavis-speaker-mode'); if (policy) policy.value = voiceId.mode();
     const t = document.getElementById('sm-voiceid-toggle');
     if (t) { t.checked = st.enabled; t.disabled = !st.enrolled; }
     const b = document.getElementById('sm-voiceid-btn');
     if (b) b.textContent = st.enrolled ? 'Re-register voice' : 'Register my voice';
     const h = document.getElementById('sm-voiceid-hint');
-    if (h && st.enrolled) h.textContent = 'Registered — background voices are ignored unless they say “Rudra”.';
+    if (h && voiceId.mode() === 'session') { h.textContent = 'Tap mic/orb and speak normally. The first speaker is followed for this conversation; background speech cannot execute commands. Best-effort acoustic matching.'; return; }
+    if (h) h.textContent = st.enrolled ? 'Owner-only filter: names and stop words also need a matching voice. Beta, not biometric verification.' : 'Owner-only filter needs calibration on this account and microphone before spoken commands can act.';
     const c = document.getElementById('sm-live-caption-toggle');
     if (c) c.checked = capEnabled();
   }
@@ -974,13 +1106,27 @@
     lsSet(CONSENT, JSON.stringify({ at: now(), mic: true, screen: false, proactive: false }));
     const card = document.getElementById('clavis-voiceid-sheet');
     // Leave voice enrolment dialogs alone; dismiss only the permission card.
-    if (card?.querySelector('.cv-start')) card.remove();
+    if (card?.getAttribute('aria-label') === 'Rudra24 AI permissions') card.remove();
   });
   window.addEventListener('rudra:auth-state', () => {
+    voiceId.endSession();
+    if (enrollment && enrollment.owner !== account()) abortEnrollment();
+    if (tap.owner !== account()) tap.releaseAll();
     if (!window.ClavisVoiceState?.isClavisWorkspace?.()) {
+      voiceId.cancelEnrollment();
       document.getElementById('clavis-voiceid-sheet')?.remove();
     }
+    syncUi();
   });
+  window.addEventListener('clavis:workspace-change', () => {
+    if (!window.ClavisVoiceState?.isClavisWorkspace?.()) tap.releaseAll();
+  });
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => {
+    voiceId.endSession();
+    tap.releaseAll(); tap.device = ''; tap.owner = ''; syncUi();
+  });
+  window.addEventListener('clavis:wake-change', event => { if (!event.detail?.awake) voiceId.endSession(); });
+  window.addEventListener('clavis:capability-change', event => { if (event.detail?.capability === 'micEnabled' && !event.detail.value) voiceId.endSession(); });
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', syncUi, { once: true }); else setTimeout(syncUi, 0);
 
   window.ClavisEar = {

@@ -1,26 +1,25 @@
-"""One-shot speech output (used outside the live chat voice socket).
+"""ElevenLabs speech output, with an optional Cartesia fallback before audio.
 
-Cartesia first, Gemini second. Cartesia leads because AI Studio made billing
-mandatory, which quietly knocked the whole chain down to the browser's
-built-in voice -- the robotic one. Cartesia also takes an explicit emotion
-per request, which is what makes this sound like a person rather than a
-screen reader.
-
-Both keys live in the server vault and are never handed to the browser.
+Live PCM is signed 16-bit little-endian at 24 kHz. Explicit engine selections
+are honored; Gemini is retired from the active speech path.
 """
 
 import logging
 import os
+import time
+from typing import Literal
 
 from fastapi import APIRouter, HTTPException, Depends
-from fastapi.responses import Response
-from pydantic import BaseModel, Field
+from fastapi.responses import Response, StreamingResponse
+from pydantic import BaseModel, Field, model_validator
 from sqlalchemy.orm import Session
 
 from api.auth_sync import UserAccount, get_current_user, get_db
 from api.credentials import get_provider_secret
+from api.limits import consume, finish_usage, fail_usage
 
-from api.speech import speech_health, synthesize_gemini_wav
+from api.speech import speech_health
+from services.speech import elevenlabs_client
 
 logger = logging.getLogger(__name__)
 
@@ -42,17 +41,66 @@ CARTESIA_EMOTIONS = {
 }
 
 
+class PronunciationDictionaryLocator(BaseModel):
+    pronunciation_dictionary_id: str = Field(min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+    version_id: str | None = Field(default=None, min_length=1, max_length=128, pattern=r"^[A-Za-z0-9_-]+$")
+
+
 class TTSRequest(BaseModel):
     text: str = Field(min_length=1, max_length=2000)
     lang: str = Field(default="en", max_length=16)
     voice: str = Field(default="", max_length=40)
-    # Cartesia extras. All optional, all ignored by the Gemini path.
-    engine: str = Field(default="", max_length=16)      # "cartesia" | "gemini" | ""
+    engine: Literal["", "elevenlabs", "cartesia"] = ""
     emotion: str = Field(default="", max_length=24)
     speed: float = Field(default=1.0, ge=0.6, le=1.5)
     volume: float = Field(default=1.0, ge=0.5, le=2.0)
-    voice_id: str = Field(default="", max_length=64)    # Cartesia voice uuid
-    fmt: str = Field(default="wav", max_length=8)       # "wav" | "pcm"
+    voice_id: str = Field(default="", max_length=64, pattern=r"^[A-Za-z0-9_-]*$")
+    fmt: Literal["wav", "pcm"] = "wav"
+    model_id: str = Field(default=elevenlabs_client.DEFAULT_MODEL_ID, min_length=1, max_length=80, pattern=r"^[A-Za-z0-9_-]+$")
+    stability: float = Field(default=.5, ge=0, le=1)
+    similarity_boost: float = Field(default=.75, ge=0, le=1)
+    style: float | None = Field(default=None, ge=0, le=1)
+    use_speaker_boost: bool | None = None
+    pronunciation_dictionary_locators: list[PronunciationDictionaryLocator] = Field(default_factory=list, max_length=3)
+    apply_text_normalization: Literal["auto", "on", "off"] = "auto"
+    previous_text: str = Field(default="", max_length=2000)
+    seed: int | None = Field(default=None, ge=0, le=4294967295)
+
+    @model_validator(mode="after")
+    def elevenlabs_speed_range(self):
+        if self.engine != "cartesia" and not .7 <= self.speed <= 1.2:
+            raise ValueError("ElevenLabs voice speed must be between 0.7 and 1.2")
+        return self
+
+
+def elevenlabs_body(req: TTSRequest, text: str) -> dict:
+    body = {"text": text, "model_id": req.model_id,
+            "voice_settings": {"stability": req.stability, "similarity_boost": req.similarity_boost, "speed": req.speed},
+            "apply_text_normalization": req.apply_text_normalization}
+    if req.style is not None:
+        body["voice_settings"]["style"] = req.style
+    if req.use_speaker_boost is not None:
+        body["voice_settings"]["use_speaker_boost"] = req.use_speaker_boost
+    if req.model_id in {"eleven_v4", "eleven_v4_turbo"}:
+        # These current models support stability/similarity only. Sending the
+        # older pacing/style controls can reject an otherwise valid request.
+        for setting in ("style", "speed", "use_speaker_boost"):
+            body["voice_settings"].pop(setting, None)
+    elif req.model_id == "eleven_v3":
+        # v3 has three stability modes and does not support the v2
+        # similarity, speed or speaker-boost controls.
+        body["voice_settings"] = {"stability": min((0., .5, 1.), key=lambda mode: abs(mode - req.stability))}
+    # Auto language is preferable for natural Hindi/English code switching.
+    language = (req.lang or "").strip().lower().split("-")[0]
+    if language and language not in {"auto", "hinglish"} and len(language) == 2 and language.isalpha() and req.model_id != "eleven_multilingual_v2":
+        body["language_code"] = language
+    if req.pronunciation_dictionary_locators:
+        body["pronunciation_dictionary_locators"] = [locator.model_dump(exclude_none=True) for locator in req.pronunciation_dictionary_locators]
+    if req.previous_text:
+        body["previous_text"] = req.previous_text
+    if req.seed is not None:
+        body["seed"] = req.seed
+    return body
 
 
 async def synthesize_cartesia(
@@ -98,9 +146,39 @@ async def synthesize_cartesia(
             },
         )
     if res.status_code != 200:
-        detail = res.text[:200]
-        raise RuntimeError(f"cartesia {res.status_code}: {detail}")
+        if res.status_code in {401, 403}:
+            raise HTTPException(422, detail={"code": "CARTESIA_KEY_INVALID", "message": "Cartesia rejected the connected key. Reconnect it in Setup."})
+        if res.status_code == 429:
+            raise HTTPException(429, detail={"code": "CARTESIA_RATE_LIMIT", "message": "Cartesia's allowance or concurrency limit was reached."})
+        raise HTTPException(502, detail={"code": "CARTESIA_UNAVAILABLE", "message": "Cartesia speech is temporarily unavailable."})
     return res.content
+
+
+def metered_audio(response, db, user, reservation):
+    if not isinstance(response, StreamingResponse):
+        finish_usage(db, user, reservation, 'succeeded')
+        return response
+    original, bind = response.body_iterator, db.get_bind()
+    async def chunks():
+        complete, checked_at = False, 0
+        try:
+            async for chunk in original:
+                if time.monotonic() - checked_at >= 5:
+                    from services.developer_control import check_access, check_session
+                    with Session(bind=bind) as policy_db:
+                        check_access(policy_db, user, 'voice')
+                        if getattr(user, '_session_claims', None): check_session(policy_db, user, user._session_claims)
+                    checked_at = time.monotonic()
+                yield chunk
+            complete = True
+        finally:
+            try:
+                if hasattr(original, 'aclose'): await original.aclose()
+            finally:
+                with Session(bind=bind) as usage_db:
+                    finish_usage(usage_db, user, reservation, 'succeeded' if complete else 'unknown')
+    response.body_iterator = chunks()
+    return response
 
 
 @router.get("/health")
@@ -114,55 +192,59 @@ async def synthesize(
     db: Session = Depends(get_db),
     user: UserAccount = Depends(get_current_user),
 ):
-    """Speak text with the user's OWN Gemini key.
-
-    The browser cannot do this itself: a key saved to the server vault is
-    never handed back to the page (that is the point of the vault), so the
-    browser's Gemini TTS had no key and silently fell back to the robotic
-    built-in `speechSynthesis` voice. The key lives here, so synthesis
-    belongs here too. GEMINI_API_KEY in backend/.env stays the fallback for
-    a workspace that has not connected its own key.
-    """
+    """Speak through the chosen tenant provider. Fallback ends at first audio."""
     text = (req.text or "").strip()
     if not text:
         raise HTTPException(status_code=400, detail="text is required")
-    if len(text) > 2000:
-        text = text[:2000]  # guard against runaway synthesis
-
-    want = (req.engine or "").strip().lower()
-    pcm = (req.fmt or "").lower() == "pcm"
-    if want not in {"", "cartesia", "gemini"} or req.fmt not in {"wav", "pcm"}:
-        raise HTTPException(status_code=422, detail="Unsupported speech engine or audio format")
-
-    # Cartesia first unless the caller explicitly asked for Gemini.
-    if want != "gemini":
-        ckey = get_provider_secret("cartesia", user, db) or os.getenv("CARTESIA_API_KEY") or ""
-        if ckey:
+    want, pcm = req.engine, req.fmt == "pcm"
+    error = None
+    if want != "cartesia":
+        key = get_provider_secret("elevenlabs", user, db)
+        if key:
+            reservation = consume(db, user, 'tts_characters', len(text), provider='elevenlabs', basis='submitted_characters')
+            submitted = False
             try:
-                audio = await synthesize_cartesia(
-                    text, api_key=ckey, voice_id=req.voice_id.strip(),
-                    lang=req.lang, emotion=req.emotion, speed=req.speed,
-                    volume=req.volume, pcm=pcm,
-                )
-                return Response(
-                    content=audio,
-                    media_type="audio/pcm" if pcm else "audio/wav",
-                    headers={"X-TTS-Engine": "cartesia"},
-                )
-            except Exception as exc:
-                logger.warning("Cartesia TTS unavailable: %s", type(exc).__name__)
-                if want == "cartesia" or pcm:
-                    raise HTTPException(status_code=503, detail="Cartesia speech is temporarily unavailable") from None
-        elif want == "cartesia":
-            raise HTTPException(status_code=503, detail="No Cartesia key connected")
+                from services.developer_control import reserve_provider
+                reserve_provider(db, user, 'elevenlabs')
+                submitted = True
+                response = await elevenlabs_client.synthesize_response(
+                    key, req.voice_id or elevenlabs_client.DEFAULT_VOICE_ID, elevenlabs_body(req, text), pcm=pcm)
+                return metered_audio(response, db, user, reservation)
+            except HTTPException as exc:
+                fail_usage(db, user, 'tts_characters', reservation, exc, submitted=submitted)
+                if want == "elevenlabs":
+                    raise
+                error = exc
+            except BaseException as exc:
+                fail_usage(db, user, 'tts_characters', reservation, exc, submitted=submitted)
+                raise
+        elif want == "elevenlabs":
+            raise HTTPException(503, detail={"code": "ELEVENLABS_KEY_MISSING", "message": "Connect ElevenLabs in Setup first."})
 
-    if pcm:
-        raise HTTPException(status_code=422, detail="Raw PCM requires Cartesia")
-
-    key = get_provider_secret("gemini", user, db) or ""
-    try:
-        wav = await synthesize_gemini_wav(text, req.voice.strip(), api_key=key)
-    except Exception as exc:
-        logger.warning("tts failed: %s", exc)
-        raise HTTPException(status_code=503, detail="Gemini TTS is temporarily unavailable") from exc
-    return Response(content=wav, media_type="audio/wav", headers={"X-TTS-Engine": "gemini"})
+    ckey = get_provider_secret("cartesia", user, db)
+    if ckey:
+        reservation = consume(db, user, 'tts_characters', len(text), provider='cartesia', basis='submitted_characters')
+        submitted = False
+        try:
+            from services.developer_control import reserve_provider
+            reserve_provider(db, user, 'cartesia')
+            submitted = True
+            audio = await synthesize_cartesia(
+                text, api_key=ckey, voice_id=req.voice_id if want == "cartesia" else "",
+                lang=req.lang, emotion=req.emotion, speed=req.speed, volume=req.volume, pcm=pcm)
+            finish_usage(db, user, reservation, 'succeeded')
+            return Response(content=audio, media_type="audio/pcm" if pcm else "audio/wav",
+                            headers={"X-TTS-Engine": "cartesia", "X-Audio-Sample-Rate": "24000", "Cache-Control": "no-store"})
+        except HTTPException as exc:
+            fail_usage(db, user, 'tts_characters', reservation, exc, submitted=submitted)
+            raise
+        except Exception as exc:
+            fail_usage(db, user, 'tts_characters', reservation, exc, submitted=submitted)
+            logger.warning("Cartesia TTS unavailable: %s", type(exc).__name__)
+            raise HTTPException(503, detail="Cartesia speech is temporarily unavailable") from None
+        except BaseException as exc:
+            fail_usage(db, user, 'tts_characters', reservation, exc, submitted=submitted)
+            raise
+    if error:
+        raise error
+    raise HTTPException(503, detail={"code": "VOICE_KEY_MISSING", "message": "Connect ElevenLabs or Cartesia in Setup first."})

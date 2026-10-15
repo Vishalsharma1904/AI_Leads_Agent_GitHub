@@ -29,9 +29,11 @@ echo.
 :: ("'node' is not recognized"). Common install folders bhi dekh lo.
 set "HAVE_NODE="
 set "NODE_DIR="
+if exist "%~dp0runtime\node\node.exe" set "NODE_DIR=%~dp0runtime\node"
+if defined NODE_DIR set "PATH=%NODE_DIR%;%PATH%"
 where node >nul 2>&1 && set "HAVE_NODE=1"
 if defined HAVE_NODE goto :node_done
-if exist "%ProgramFiles%\nodejs\node.exe" set "NODE_DIR=%ProgramFiles%\nodejs"
+if not defined NODE_DIR if exist "%ProgramFiles%\nodejs\node.exe" set "NODE_DIR=%ProgramFiles%\nodejs"
 if not defined NODE_DIR if exist "%LOCALAPPDATA%\Programs\nodejs\node.exe" set "NODE_DIR=%LOCALAPPDATA%\Programs\nodejs"
 if not defined NODE_DIR if defined NVM_SYMLINK if exist "%NVM_SYMLINK%\node.exe" set "NODE_DIR=%NVM_SYMLINK%"
 if not defined NODE_DIR if exist "%APPDATA%\nvm\current\node.exe" set "NODE_DIR=%APPDATA%\nvm\current"
@@ -60,10 +62,10 @@ if "%NEED_FE%"=="0" (
 )
 echo   - frontend  : http://localhost:3000
 if defined HAVE_NODE (
-  start "Rudra24 AI Server" /min cmd /c "node serve-clavis.js >logs\frontend.log 2>&1"
+  start "" /b node serve-clavis.js >>logs\frontend.log 2>&1
 ) else (
   echo     [!] Node.js nahi mila - PowerShell server use kar raha hoon
-  start "Rudra24 AI Server" /min cmd /c "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\serve-clavis.ps1 >logs\frontend.log 2>&1"
+  start "" /b powershell -NoProfile -ExecutionPolicy Bypass -File scripts\serve-clavis.ps1 >>logs\frontend.log 2>&1
 )
 
 :backend
@@ -74,9 +76,9 @@ if "%NEED_BE%"=="0" (
 )
 echo   - backend   : http://localhost:8000
 if exist "%~dp0backend-runtime\ClavisBackend.exe" (
-  start "Rudra24 AI Backend" /min cmd /c "backend-runtime\ClavisBackend.exe >logs\backend.log 2>&1"
+  start "" /b backend-runtime\ClavisBackend.exe >>logs\backend.log 2>&1
 ) else (
-  start "Rudra24 AI Backend" /min cmd /c "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-backend.ps1 >logs\backend.log 2>&1"
+  start "" /b powershell -NoProfile -ExecutionPolicy Bypass -File scripts\start-backend.ps1 >>logs\backend.log 2>&1
 )
 
 :bridge
@@ -89,15 +91,15 @@ if not defined HAVE_NODE (
 echo   - pc bridge : http://127.0.0.1:8777
 rem Full PC control (apps, windows, mouse/keyboard, files) for Clavis only:
 rem the bridge refuses every web page except localhost:3000.
-start "Rudra24 AI PC Bridge" /min cmd /c "set CLAVIS_BRIDGE_ALLOW_CONTROL=1&& node clavis-bridge\bridge.js >logs\bridge.log 2>&1"
+set "CLAVIS_BRIDGE_ALLOW_CONTROL=1"
+start "" /b node clavis-bridge\bridge.js >>logs\bridge.log 2>&1
 
 :wait
 :: --- asli readiness check (fixed sleep nahi) ---
 echo.
-echo   Servers ka wait kar raha hoon...
-set "WAIT_ATTEMPTS=150"
-if not exist "backend\.deps-ready" set "WAIT_ATTEMPTS=1800"
-powershell -NoProfile -Command "function P($p){try{$c=New-Object Net.Sockets.TcpClient;$c.Connect('127.0.0.1',$p);$c.Close();$true}catch{$false}}; for($i=0;$i -lt %WAIT_ATTEMPTS%;$i++){ if((P 3000) -and (P 8000)){exit 0}; Start-Sleep -Milliseconds 400 }; exit 1"
+echo   Frontend ready hone ka wait kar raha hoon...
+set "WAIT_ATTEMPTS=100"
+powershell -NoProfile -Command "for($i=0;$i -lt %WAIT_ATTEMPTS%;$i++){try{$c=New-Object Net.Sockets.TcpClient;$c.Connect('127.0.0.1',3000);$c.Close();exit 0}catch{};Start-Sleep -Milliseconds 400};exit 1"
 if errorlevel 1 (
   echo.
   echo   [X] Server time par start nahi hua.
@@ -108,8 +110,17 @@ if errorlevel 1 (
   exit /b 1
 )
 
-if "%NO_BROWSER%"=="1" goto :after_browser
+echo   API backend ready hone ka wait kar raha hoon...
+powershell -NoProfile -Command "for($i=0;$i -lt 600;$i++){try{$h=Invoke-RestMethod 'http://127.0.0.1:8000/health' -TimeoutSec 2;if($h.status -eq 'healthy' -and $h.services.db -eq 'ok'){exit 0}}catch{};Start-Sleep -Milliseconds 400};exit 1"
+if errorlevel 1 (
+  echo   [X] API backend start nahi hua. Setup screen abhi nahi khulegi.
+  echo       logs\backend.log aur logs\backend-install.log dekhiye.
+  if "%NO_BROWSER%"=="1" exit /b 1
+  pause
+  exit /b 1
+)
 set "APP_URL=http://localhost:3000/index.html#jarvis"
+if "%NO_BROWSER%"=="1" goto :after_browser
 
 set "CHROME="
 if exist "%PROGRAMFILES%\Google\Chrome\Application\chrome.exe" set "CHROME=%PROGRAMFILES%\Google\Chrome\Application\chrome.exe"
@@ -119,20 +130,19 @@ if exist "%LOCALAPPDATA%\Google\Chrome\Application\chrome.exe" set "CHROME=%LOCA
 if not "%CHROME%"=="" (
   rem --force-device-scale-factor=1 rasterisation scale pin karta hai. 125%% display
   rem par fractional scale se fonts smeared lagte the.
-  start "" "%CHROME%" --app=%APP_URL% --start-maximized --force-device-scale-factor=1 --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required
+  rem --profile-directory: kai Chrome profiles ho to "Who's using Chrome?" picker aata tha
+rem aur har baar alag profile = dobara login. Hamesha ek hi profile.
+  start "" "%CHROME%" --profile-directory=Default --app=%APP_URL% --start-maximized --force-device-scale-factor=1 --no-first-run --no-default-browser-check --autoplay-policy=no-user-gesture-required
 ) else (
   start "" %APP_URL%
 )
 
 :after_browser
-:: Desktop shortcut - sirf pehli baar
-if not exist "%USERPROFILE%\Desktop\Rudra24 AI.lnk" (
-  powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install_Shortcut.ps1" -AppDir "%~dp0" -BatchFile "%~dp0Clavis-App.vbs" >nul 2>&1
-  if exist "%USERPROFILE%\Desktop\Rudra24 AI.lnk" echo   Desktop par "Rudra24 AI" shortcut bana diya.
-)
+:: Repair the existing shortcut too; older versions stored malformed arguments.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0Install_Shortcut.ps1" >nul 2>&1
+if exist "%USERPROFILE%\Desktop\Rudra24 AI.lnk" echo   Desktop shortcut verified.
 
 echo.
 echo   Rudra24 AI ready: %APP_URL%
 echo   Ise band karne ke liye Stop-Clavis.bat chalaiye.
 echo.
-timeout /t 4 /nobreak >nul

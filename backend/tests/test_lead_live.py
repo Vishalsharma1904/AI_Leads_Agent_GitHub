@@ -1,7 +1,7 @@
 import asyncio
 import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from api import lead_jobs as api
@@ -39,11 +39,26 @@ class LeadLiveTest(unittest.IsolatedAsyncioTestCase):
             items[0]['email'] = 'observed@example.test'
             await asyncio.Event().wait()
         events = []
-        with patch.object(api, 'enrich_public_websites', side_effect=blocked):
+        with patch.object(api, 'recover_company_websites', new=AsyncMock()), patch.object(api, 'enrich_public_websites', side_effect=blocked):
             result = await asyncio.wait_for(api._bounded_enrichment(rows, events.append, timeout=.03), .5)
         self.assertEqual(result[0]['phone'], '+919811100042')
         self.assertEqual(result[0]['email'], 'observed@example.test')
         self.assertTrue(any(e.get('type') == 'timeout' for e in events))
+
+    async def test_short_deadline_does_not_wait_a_second_for_crawler_cleanup(self):
+        release = asyncio.Event()
+        rows = [{'id':'one','title':'Observed company','email':'observed@example.test'}]
+        async def stubborn(items, **kwargs):
+            try: await release.wait()
+            except asyncio.CancelledError: await release.wait()
+            return items
+        try:
+            with patch.object(api, 'recover_company_websites', new=AsyncMock()), patch.object(api, 'enrich_public_websites', side_effect=stubborn):
+                result = await asyncio.wait_for(api._bounded_enrichment(rows, timeout=.03), .5)
+            self.assertEqual(result[0]['email'], 'observed@example.test')
+        finally:
+            release.set()
+            await asyncio.sleep(0)
 
     async def test_stream_emits_observed_company_progress_and_final_rows(self):
         self.assertTrue(callable(getattr(api, '_enrichment_events', None)), 'company progress must stream before completion')

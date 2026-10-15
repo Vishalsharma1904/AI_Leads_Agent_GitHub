@@ -3,6 +3,8 @@ import json
 import os
 import re
 import base64
+import asyncio
+import time
 from typing import Any
 
 import httpx
@@ -83,18 +85,60 @@ def gemini_payload(messages: list[dict[str, str]]) -> tuple[list[dict[str, Any]]
     return contents, system_instruction
 
 
+def response_text(content: Any) -> str:
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "".join(part["text"] for part in content if isinstance(part, dict) and
+                       part.get("type") in ("text", "output_text") and isinstance(part.get("text"), str))
+    return ""
+
+
+def usable_tools(calls: Any) -> bool:
+    if not isinstance(calls, list) or not calls or len(calls) > 64:
+        return False
+    for call in calls:
+        function = call.get("function") if isinstance(call, dict) else None
+        if not isinstance(function, dict) or not isinstance(function.get("name"), str) or not function["name"].strip():
+            return False
+        try:
+            arguments = json.loads(function.get("arguments", ""))
+        except (TypeError, ValueError):
+            return False
+        if not isinstance(arguments, dict):
+            return False
+    return True
+
+
 def normalize_gemini_response(data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict):
         raise provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.",
                              True, "RETRY", 502)
     candidates = data.get("candidates", [])
-    parts = candidates[0].get("content", {}).get("parts", []) if candidates else []
-    content = "".join(str(part.get("text", "")) for part in parts if isinstance(part, dict))
+    candidate = candidates[0] if isinstance(candidates, list) and candidates and isinstance(candidates[0], dict) else {}
+    parts = candidate.get("content", {}).get("parts", []) if isinstance(candidate.get("content", {}), dict) else []
+    content = "".join(part["text"] for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str)) if isinstance(parts, list) else ""
     if not content.strip():
         raise provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.",
                              True, "RETRY", 502)
     return {"success": True, "choices": [{"message": {"role": "assistant", "content": content}}],
             "usage": data.get("usageMetadata", {})}
+
+
+def normalize_completion(provider: str, data: Any) -> dict[str, Any]:
+    if provider == "gemini":
+        try:
+            return normalize_gemini_response(data)
+        except HTTPException as error:
+            raise _TryNext(error) from None
+    choices = data.get("choices", []) if isinstance(data, dict) else []
+    message = choices[0].get("message", {}) if isinstance(choices, list) and choices and isinstance(choices[0], dict) else {}
+    text = response_text(message.get("content")) if isinstance(message, dict) else ""
+    calls = message.get("tool_calls") if isinstance(message, dict) else None
+    if (calls and not usable_tools(calls)) or not (text.strip() or usable_tools(calls)):
+        raise _TryNext(provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.", True, "RETRY", 502))
+    first = {**choices[0], "message": {**message, "content": text or None}}
+    return {"success": True, "choices": [first, *choices[1:]], "usage": data.get("usage", {}), "model": data.get("model", "")}
 
 
 def stream_text(provider: str, data: dict[str, Any]) -> str:
@@ -105,12 +149,12 @@ def stream_text(provider: str, data: dict[str, Any]) -> str:
         candidate = candidates[0] if isinstance(candidates, list) and candidates else {}
         content = candidate.get("content", {}) if isinstance(candidate, dict) else {}
         parts = content.get("parts", []) if isinstance(content, dict) else []
-        return "".join(part["text"] for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str))
+        return "".join(part["text"] for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str)) if isinstance(parts, list) else ""
     choices = data.get("choices", [])
     choice = choices[0] if isinstance(choices, list) and choices else {}
     delta = choice.get("delta", {}) if isinstance(choice, dict) else {}
     content = delta.get("content", "") if isinstance(delta, dict) else ""
-    return content if isinstance(content, str) else ""
+    return response_text(content)
 
 
 def stream_tool_calls(provider: str, data: dict[str, Any]) -> list[dict[str, Any]]:
@@ -127,7 +171,21 @@ def stream_tool_calls(provider: str, data: dict[str, Any]) -> list[dict[str, Any
     choice = choices[0] if isinstance(choices, list) and choices else {}
     delta = choice.get("delta", {}) if isinstance(choice, dict) else {}
     calls = delta.get("tool_calls") if isinstance(delta, dict) else None
-    return calls if isinstance(calls, list) else []
+    if not isinstance(calls, list):
+        return []
+    output = []
+    for call in calls[:64]:
+        if not isinstance(call, dict):
+            continue
+        index = call.get("index", 0)
+        if not isinstance(index, int) or isinstance(index, bool) or not 0 <= index < 64:
+            continue
+        function = call.get("function")
+        if not isinstance(function, dict):
+            continue
+        if any(isinstance(function.get(key), str) and function[key] for key in ("name", "arguments")) or isinstance(call.get("id"), str):
+            output.append(call)
+    return output
 
 
 # Pehle: ek provider fail hua -> poora jawab mar gaya. Ab agla provider try
@@ -160,15 +218,19 @@ class _TryNext(Exception):
 def build_candidates(provider: str, model: str, user: UserAccount, db) -> list[tuple[str, str, str]]:
     """(provider, model, key) — pehla wahi jo maanga gaya, phir backup."""
     out: list[tuple[str, str, str]] = []
-    seen: set[str] = set()
+    seen: set[tuple[str, str]] = set()
+    secrets: dict[str, str | None] = {}
 
     def add(name: str, model_id: str) -> None:
-        if name in seen or name not in AI_PROVIDER_CONFIG or not model_id:
+        candidate = (name, model_id)
+        if candidate in seen or name not in AI_PROVIDER_CONFIG or not model_id:
             return
-        key = get_provider_secret(name, user, db)
+        if name not in secrets:
+            secrets[name] = get_provider_secret(name, user, db)
+        key = secrets[name]
         if not key:
             return
-        seen.add(name)
+        seen.add(candidate)
         out.append((name, model_id, key))
 
     add(provider, model)
@@ -208,7 +270,7 @@ def build_upstream(provider: str, model: str, key: str, req: ChatRequest):
     if provider == "openrouter":
         headers["X-Title"] = "Rudra24 AI"
     body = {"model": model, "messages": req.messages, "temperature": req.temperature,
-            "max_tokens": max_tokens}
+            ("max_completion_tokens" if provider == "groq" else "max_tokens"): max_tokens}
     # Forward the tools. Without this the model was asked to "open the map"
     # with no map tool in front of it, so it answered with nothing at all.
     if req.tools:
@@ -222,7 +284,7 @@ def build_upstream(provider: str, model: str, key: str, req: ChatRequest):
     return f"{base_url}/chat/completions", None, headers, body
 
 
-def upstream_error(provider: str, status: int, body: str = "") -> HTTPException:
+def upstream_error(provider: str, status: int, body: str = "", retry_after: str = "") -> HTTPException:
     """Upstream ke status ko app ke error me badalta hai."""
     if status in (401, 403) or (status == 404 and provider == "gemini"):
         # Gemini 404 = galat key ya hataya hua model. Chup-chaap 502 dene se
@@ -230,14 +292,22 @@ def upstream_error(provider: str, status: int, body: str = "") -> HTTPException:
         message = GEMINI_KEY_HINT if provider == "gemini" else "The provider credential was rejected."
         return provider_error("AI_CREDENTIAL_INVALID", message, False, "OPEN_CREDENTIAL_SETUP", 502)
     if status == 429:
+        retry = None
+        try:
+            value = float(retry_after)
+            if 0 < value <= 86400:
+                retry = value
+        except (TypeError, ValueError):
+            pass
         if re.search(r"per day|\b[rt]pd\b|daily", body, re.I):
-            return provider_error("AI_PROVIDER_DAILY_LIMIT", "The connected AI provider's daily limit was reached.",
-                                  False, "OPEN_CREDENTIAL_SETUP", 429)
-        if re.search(r"per minute|\b[rt]pm\b", body, re.I):
-            return provider_error("AI_RATE_LIMITED", "The AI provider's per-minute limit was reached.",
-                                  True, "RETRY", 429)
-        return provider_error("AI_RATE_LIMITED", "The AI provider rate limit was reached.",
-                              True, "RETRY", 429)
+            error = provider_error("AI_PROVIDER_DAILY_LIMIT", "The connected AI provider's daily limit was reached.",
+                                   False, "OPEN_CREDENTIAL_SETUP", 429)
+        else:
+            message = "The AI provider's per-minute limit was reached." if re.search(r"per minute|\b[rt]pm\b", body, re.I) else "The AI provider rate limit was reached."
+            error = provider_error("AI_RATE_LIMITED", message, True, "RETRY", 429)
+        if retry is not None:
+            error.detail["retry_after_seconds"] = retry
+        return error
     return provider_error("AI_BACKEND_UNAVAILABLE", "The AI provider rejected the request.",
                           True, "RETRY", 502)
 
@@ -258,18 +328,37 @@ async def run_provider(req: ChatRequest, provider: str, model: str, key: str):
             await client.aclose()
             raise _TryNext(provider_error("AI_BACKEND_UNAVAILABLE", "The AI provider is unavailable.",
                                           True, "RETRY", 502))
+        except BaseException:
+            # Total turn deadlines and caller cancellation can interrupt the
+            # header wait before an upstream response exists.
+            await client.aclose()
+            raise
         if upstream.is_error:
             status = upstream.status_code
             try:
                 body = (await upstream.aread()).decode("utf-8", errors="replace")
             except httpx.HTTPError:
                 body = ""
-            await upstream.aclose()
-            await client.aclose()
+            finally:
+                await upstream.aclose()
+                await client.aclose()
             # Pehla byte jaane se pehle hi pata chal gaya — fallback safe hai.
-            raise _TryNext(upstream_error(provider, status, body))
+            raise _TryNext(upstream_error(provider, status, body, upstream.headers.get("retry-after", "")))
+
+        if "application/json" in upstream.headers.get("content-type", "").lower():
+            # Some compatible providers ignore stream=true and return a complete
+            # JSON answer. Keep that answer instead of treating it as empty SSE.
+            try:
+                await upstream.aread()
+                return normalize_completion(provider, upstream.json())
+            except (ValueError, httpx.HTTPError):
+                raise _TryNext(provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.", True, "RETRY", 502)) from None
+            finally:
+                await upstream.aclose()
+                await client.aclose()
 
         async def events():
+            emitted, whitespace = False, ""
             try:
                 async for line in upstream.aiter_lines():
                     if not line.startswith("data:"):
@@ -281,32 +370,73 @@ async def run_provider(req: ChatRequest, provider: str, model: str, key: str):
                         chunk = json.loads(raw)
                     except (json.JSONDecodeError, TypeError, ValueError):
                         continue
+                    if isinstance(chunk, dict) and chunk.get("error"):
+                        detail = chunk["error"] if isinstance(chunk["error"], dict) else {}
+                        code = detail.get("code", detail.get("status", 502))
+                        if isinstance(code, str) and "rate_limit" in code.lower():
+                            code = 429
+                        code = int(code) if isinstance(code, (int, str)) and str(code).isdigit() else 502
+                        raise _TryNext(upstream_error(provider, code))
                     delta = stream_text(provider, chunk)
                     if delta:
-                        yield "data: " + json.dumps({"text": delta}, ensure_ascii=False) + "\n\n"
+                        if not emitted and not delta.strip():
+                            whitespace = (whitespace + delta)[-4096:]
+                        else:
+                            delta, whitespace = whitespace + delta, ""
+                            emitted = True
+                            yield "data: " + json.dumps({"text": delta}, ensure_ascii=False) + "\n\n"
                     # A tool call carries no text. Forwarding it is the
                     # difference between the browser acting on the request
                     # and reporting "received an empty reply".
                     calls = stream_tool_calls(provider, chunk)
                     if calls:
+                        emitted = True
                         yield "data: " + json.dumps({"tool_calls": calls}, ensure_ascii=False) + "\n\n"
+                if not emitted:
+                    raise _TryNext(provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.", True, "RETRY", 502))
                 yield "data: [DONE]\n\n"
+            except _TryNext as error:
+                if not emitted:
+                    raise
+                yield "data: " + json.dumps({"error": error.error.detail}) + "\n\n"
             except httpx.TimeoutException:
+                if not emitted:
+                    raise _TryNext(provider_error("AI_TIMEOUT", "The AI provider took too long to respond.", True, "RETRY", 504)) from None
                 yield 'data: {"error":{"code":"AI_TIMEOUT","message":"The AI provider took too long to respond.","retryable":true,"action":"RETRY"}}\n\n'
             except httpx.HTTPError:
+                if not emitted:
+                    raise _TryNext(provider_error("AI_BACKEND_UNAVAILABLE", "The AI provider is unavailable.", True, "RETRY", 502)) from None
                 yield 'data: {"error":{"code":"AI_BACKEND_UNAVAILABLE","message":"The AI provider is unavailable.","retryable":true,"action":"RETRY"}}\n\n'
             finally:
                 await upstream.aclose()
                 await client.aclose()
 
-        return StreamingResponse(events(), media_type="text/event-stream",
+        stream = events()
+        try:
+            # Commit response headers only after a usable text/tool event. Empty
+            # HTTP200 streams can then advance to another configured candidate.
+            first = await asyncio.wait_for(anext(stream), timeout=20)
+        except asyncio.TimeoutError:
+            await stream.aclose()
+            raise _TryNext(provider_error("AI_TIMEOUT", "The AI provider took too long to respond.", True, "RETRY", 504)) from None
+        except BaseException:
+            await stream.aclose()
+            raise
+        async def primed_events():
+            try:
+                yield first
+                async for event in stream:
+                    yield event
+            finally:
+                await stream.aclose()
+        return StreamingResponse(primed_events(), media_type="text/event-stream",
                                  headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
 
     try:
         async with httpx.AsyncClient(timeout=httpx.Timeout(20.0, connect=5.0)) as client:
             response = await client.post(url, params=params, headers=headers, json=body)
             if response.is_error:
-                raise _TryNext(upstream_error(provider, response.status_code, response.text))
+                raise _TryNext(upstream_error(provider, response.status_code, response.text, response.headers.get("retry-after", "")))
             data = response.json()
     except httpx.TimeoutException:
         raise _TryNext(provider_error("AI_TIMEOUT", "The AI provider took too long to respond.",
@@ -315,24 +445,21 @@ async def run_provider(req: ChatRequest, provider: str, model: str, key: str):
         raise _TryNext(provider_error("AI_BACKEND_UNAVAILABLE", "The AI provider is unavailable.",
                                       True, "RETRY", 502))
 
-    if provider == "gemini":
-        reply = normalize_gemini_response(data)
-        text = reply.get("choices", [{}])[0].get("message", {}).get("content", "")
-        if not text:
-            raise _TryNext(provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.",
-                                          True, "RETRY", 502))
-        return reply
-    choices = data.get("choices", [])
-    if not isinstance(choices, list) or not choices or not choices[0].get("message", {}).get("content"):
-        raise _TryNext(provider_error("AI_EMPTY_RESPONSE", "The AI provider returned no usable reply.",
-                                      True, "RETRY", 502))
-    return {"success": True, "choices": choices, "usage": data.get("usage", {})}
+    return normalize_completion(provider, data)
 
 
 @router.post("/chat")
 async def chat(req: ChatRequest, db=Depends(get_db), user: UserAccount = Depends(get_current_user)):
     provider, model = resolve_provider(req.model)
+    browser_search = any(tool.get("type") == "browser_search" for tool in req.tools)
+    search_models = {"openai/gpt-oss-20b", "openai/gpt-oss-120b"}
+    if browser_search and (provider != "groq" or model not in search_models or req.images or req.stream):
+        raise HTTPException(status_code=422, detail="Browser search requires a supported Groq GPT-OSS model, without images or streaming.")
     candidates = build_candidates("gemini", "gemini-3.8-flash", user, db) if req.images else build_candidates(provider, model, user, db)
+    if browser_search:
+        # A generic fallback cannot fulfill required browser search. Never
+        # silently replace a current-facts answer with an ungrounded model.
+        candidates = [candidate for candidate in candidates if candidate[0] == "groq" and candidate[1] in search_models]
     if req.images:
         candidates = [candidate for candidate in candidates if candidate[0] == "gemini"]
     if not candidates:
@@ -340,17 +467,36 @@ async def chat(req: ChatRequest, db=Depends(get_db), user: UserAccount = Depends
                              f"{provider} credential is not configured for this workspace",
                              False, "OPEN_CREDENTIAL_SETUP", 503)
     reservation = consume(db, user, "ai")
+    deadline = asyncio.get_running_loop().time() + (5 if browser_search else 40)
     try:
         last: HTTPException | None = None
         for index, (name, model_id, key) in enumerate(candidates):
             try:
-                reply = await run_provider(req, name, model_id, key)
+                remaining = deadline - asyncio.get_running_loop().time()
+                if remaining <= 0:
+                    raise provider_error("AI_TIMEOUT", "The AI providers took too long to return a reply.", True, "RETRY", 504)
+                try:
+                    from services.developer_control import reserve_provider, check_access
+                    check_access(db, user, 'ai')
+                    key = get_provider_secret(name, user, db)
+                    if not key: raise HTTPException(403, 'Provider disabled or disconnected')
+                    reserve_provider(db, user, name)
+                    reply = await asyncio.wait_for(run_provider(req, name, model_id, key), timeout=remaining)
+                except asyncio.TimeoutError:
+                    raise provider_error("AI_TIMEOUT", "The AI providers took too long to return a reply.", True, "RETRY", 504) from None
                 if isinstance(reply, StreamingResponse):
                     original = reply.body_iterator
                     async def metered_stream():
                         emitted = False
+                        last_access_check = 0
                         try:
                             async for event in original:
+                                if time.monotonic() - last_access_check >= 5:
+                                    from services.developer_control import check_session
+                                    with SessionLocal() as access_db:
+                                        check_access(access_db, user, 'ai')
+                                        if getattr(user, '_session_claims', None): check_session(access_db, user, user._session_claims)
+                                    last_access_check = time.monotonic()
                                 # DONE/errors do not constitute a useful AI response.
                                 if event.startswith('data: {'):
                                     frame = json.loads(event[6:])
@@ -359,8 +505,22 @@ async def chat(req: ChatRequest, db=Depends(get_db), user: UserAccount = Depends
                         finally:
                             if not emitted:
                                 with SessionLocal() as quota_db:
-                                    refund(quota_db, user, "ai", reservation["day"])
+                                    refund(quota_db, user, "ai", reservation["day"], reservation.get("usage_id"))
+                            else:
+                                with SessionLocal() as usage_db:
+                                    from services.developer_control import UsageEvent
+                                    usage_db.query(UsageEvent).filter_by(id=reservation.get('usage_id'), user_id=user.id).update({UsageEvent.state: 'succeeded', UsageEvent.provider: name}, synchronize_session=False)
+                                    usage_db.commit()
                     reply.body_iterator = metered_stream()
+                if not isinstance(reply, StreamingResponse):
+                    from services.developer_control import UsageEvent, record_usage
+                    event = db.query(UsageEvent).filter_by(id=reservation.get('usage_id')).first()
+                    if event: event.state, event.provider = 'succeeded', name
+                    reported = (reply.get('usage') or {}) if isinstance(reply, dict) else {}
+                    total = reported.get('total_tokens', reported.get('totalTokenCount'))
+                    if isinstance(total, int) and total >= 0:
+                        record_usage(db, user, 'ai_tokens', total, provider=name, state='succeeded', basis='provider_reported')
+                    db.commit()
                 return reply
             except _TryNext as exc:
                 last = exc.error
@@ -368,5 +528,5 @@ async def chat(req: ChatRequest, db=Depends(get_db), user: UserAccount = Depends
                     raise last from None
         raise last  # pragma: no cover
     except BaseException:
-        refund(db, user, "ai", reservation["day"])
+        refund(db, user, "ai", reservation["day"], reservation.get("usage_id"))
         raise

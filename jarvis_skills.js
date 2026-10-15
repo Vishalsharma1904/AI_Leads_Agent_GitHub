@@ -57,26 +57,39 @@ const JarvisSkills = (() => {
   // Single choke point for EVERY skill call — the agentic loop, voice commands
   // and Dev Mode all route through here, so the risk gate and the result check
   // belong here rather than in each caller.
-  async function invoke(name, params = {}) {
+  async function invoke(name, params = {}, options = {}) {
     const skill = registry.get(name);
     if (!skill) return { success: false, error: `Unknown skill: ${name}` };
+    const owner = window.SupabaseAuth?.getUser?.()?.id;
+    const checkActive = () => {
+      if (options.signal?.aborted || owner !== window.SupabaseAuth?.getUser?.()?.id) {
+        throw Object.assign(new Error('Task cancelled'), { name: 'AbortError', code: 'AI_CANCELLED' });
+      }
+    };
+    checkActive();
 
     // Risk gate: anything at or above the configured risk level needs an
     // explicit yes from the owner before it runs.
     const gate = await window.ClavisMind?.safety?.gate?.(name, params || {});
+    checkActive();
     if (gate && !gate.allowed) {
       return { success: false, error: `Not run — ${gate.reason}.`, riskLevel: gate.riskLevel, denied: true };
     }
 
     try {
-      const result = await skill.run(params || {});
-      const outcome = { success: true, result };
+      const result = await skill.run(params || {}, { signal: options.signal, checkActive });
+      checkActive();
+      const outcome = result?.success === false
+        ? { success: false, error: result.error || 'The requested step did not complete.', result }
+        : { success: true, result };
       window.ClavisMind?.emit?.({
-        type: 'tool.completed', source: 'tool', importance: 0.4,
+        type: outcome.success ? 'tool.completed' : 'tool.failed', source: 'tool', importance: 0.4,
         metadata: { tool: name, riskLevel: gate?.riskLevel ?? 0 },
       });
       return outcome;
     } catch (err) {
+      checkActive();
+      if (err?.name === 'AbortError' || err?.code === 'AI_CANCELLED') throw err;
       const outcome = { success: false, error: err?.message || String(err) };
       // Tell the model whether this is worth one retry instead of letting it
       // guess (or worse, report success it never got).
@@ -269,12 +282,8 @@ const JarvisSkills = (() => {
       return hit.run();
     },
   });
-  // The live map (tabs / sections / buttons actually on the page) is read at prompt time.
-  try {
-    const s = registry.get('app_action');
-    const base = s.description;
-    Object.defineProperty(s, 'description', { enumerable: true, get: () => base + (window.ClavisAppMap ? ' ' + window.ClavisAppMap.describe() : '') });
-  } catch (_) {}
+  // The existing resolver handles names at execution time; its full UI map
+  // need not be repeated in every model prompt.
 
   register('filter_leads', {
     description: 'Filter the Leads page table by industry/city/status and show it.',
@@ -328,7 +337,7 @@ const JarvisSkills = (() => {
     description: 'Draft and SEND a real email to one recipient via the configured Gmail/Outlook webhook. Always shows the owner a confirmation preview first — nothing is sent without approval. Use for one-off emails like "email the Taj Hotel manager our security quote".',
     params: { to: 'recipient email address', subject: 'subject line', body: 'full email body (plain text; line breaks become paragraphs)', cc: 'optional comma-separated CC addresses', bcc: 'optional comma-separated BCC addresses' },
     builtin: true,
-    run: async ({ to, subject, body, cc = '', bcc = '' }) => {
+    run: async ({ to, subject, body, cc = '', bcc = '' }, { checkActive }) => {
       if (!window.EmailCtrl?._sendOne) throw new Error('Email module not loaded — open the Email page once, then retry.');
       to = String(to || '').trim();
       subject = String(subject || '').trim();
@@ -345,7 +354,8 @@ const JarvisSkills = (() => {
       const preview = `To: ${to}${cc ? `\nCc: ${cc}` : ''}${bcc ? `\nBcc: ${bcc}` : ''}\nSubject: ${subject}\n\n${body}`;
       const confirmFn = window.clavisConfirm || ((msg) => Promise.resolve(window.confirm(msg)));
       const approved = await confirmFn(preview, { title: 'Send this email?', okLabel: 'Send', cancelLabel: 'Cancel' });
-      if (!approved) return 'Email cancelled by the owner — nothing was sent.';
+      checkActive();
+      if (!approved) return { success: false, cancelled: true, error: 'Email cancelled by the owner — nothing was sent.' };
 
       const htmlBody = /<[a-z][\s\S]*>/i.test(body) ? body : body.replace(/\n/g, '<br>');
       const result = await window.EmailCtrl._sendOne({ to, subject, htmlBody, cc, bcc });
@@ -644,7 +654,7 @@ const JarvisSkills = (() => {
   }
 
   register('search_web', {
-    description: 'Look up anything real-world LIVE on the internet before stating it — news, prices, weather, people, companies, dates, events, "who is / what is / latest". Use this BEFORE answering anything you are not 100% certain of or that may have changed. Never state such a fact from memory alone.',
+    description: 'Look up current real-world facts LIVE — news, prices, weather, scores, recent events, a specific person or company, "latest / aaj / abhi". Not for greetings, small talk, opinions, app help or settled general knowledge you already know; answer those directly.',
     params: { query: 'what to look up, e.g. "Sanjay Dutt parents" or "gold price in Delhi today"' },
     builtin: true,
     run: async ({ query }) => {

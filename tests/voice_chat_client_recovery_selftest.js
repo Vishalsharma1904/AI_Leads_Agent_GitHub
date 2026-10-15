@@ -1,0 +1,41 @@
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync(require('node:path').join(__dirname, '../ai-chat-client.js'), 'utf8');
+function client(fetch, auth = {getAccessToken: () => 'test-session'}) {
+  const window = { SupabaseAuth: auth, SKYLARK_CONFIG: {BACKEND_URL: 'https://backend.test'} };
+  vm.runInNewContext(source, { window, fetch, AbortController, TextDecoder, Uint8Array, setTimeout, clearTimeout });
+  return window.NexusAIChat;
+}
+(async () => {
+  const tool = {id:'call1',type:'function',function:{name:'get_lead_stats',arguments:'{}'}};
+  const reply = await client(async () => new Response(JSON.stringify({choices:[{message:{content:null,tool_calls:[tool]}}]}), {headers:{'content-type':'application/json'}})).complete({model:'groq/test'});
+  assert.equal(reply.choices[0].message.tool_calls[0].function.name, 'get_lead_stats', 'Tool-only JSON reply must reach execution');
+  await assert.rejects(client(async () => new Response(JSON.stringify({detail:{code:'AI_RATE_LIMITED',retryable:true,retry_after_seconds:12.5}}), {status:429})).complete({model:'groq/test'}), error => error.retryAfterSeconds === 12.5);
+  let deliveries = 0;
+  await assert.rejects(client(async () => new Response('data: {"text":"Partial reply"}\n\ndata: {"error":{"code":"AI_TIMEOUT","message":"timeout"}}\n\n', {headers:{'content-type':'text/event-stream'}})).complete({model:'groq/test'}, undefined, () => {deliveries++;}), error => error.code === 'AI_TIMEOUT' && error.partialResponse === true);
+  assert.ok(deliveries <= 1, 'A failed stream never starts another answer');
+  await assert.rejects(client(async () => {throw new TypeError('network down');}).complete({model:'groq/test'}), error => error.code === 'AI_BACKEND_UNAVAILABLE');
+  let requests = 0;
+  await assert.rejects(client(async () => { requests++; return Response.json({detail:{code:'AI_EMPTY_RESPONSE',message:'No usable candidate',retryable:true}}, {status:502}); }).complete({model:'groq/test'}), error => error.code === 'AI_EMPTY_RESPONSE');
+  assert.equal(requests, 1, 'Server exhausted configured candidates; browser must not repeat the complete fallback chain');
+  const events = 'data: {"tool_calls":[{"index":0,"id":"call1","function":{"name":"get_lead_stats","arguments":"{"}}],"text":"Checking"}\n\ndata: {"tool_calls":[{"index":0,"function":{"arguments":"}"}}]}\n\ndata: [DONE]\n\n';
+  const tokens = [];
+  const streamed = await client(async () => new Response(events, {headers:{'content-type':'text/event-stream'}})).complete({model:'groq/test'}, undefined, value => tokens.push(value));
+  assert.equal(streamed.choices[0].message.content, 'Checking', 'Tool and text in same event are both retained');
+  assert.deepEqual(tokens, ['Checking']);
+  assert.equal(streamed.choices[0].message.tool_calls[0].function.arguments, '{}');
+  const buffered = await client(async () => new Response(events, {headers:{'content-type':'text/event-stream'}})).complete({model:'groq/test',stream:true});
+  assert.equal(buffered.choices[0].message.content, 'Checking', 'SSE is assembled even without token callback');
+  await assert.rejects(client(async () => Response.json({choices:[{message:{content:{reasoning:'wrong type'}}}]})).complete({model:'groq/test'}), error => error.code === 'AI_EMPTY_RESPONSE');
+  await assert.rejects(client(async () => new Response('data: {"tool_calls":[null,{"index":999999999,"function":{"arguments":"{}"}}]}\n\ndata: [DONE]\n\n', {headers:{'content-type':'text/event-stream'}})).complete({model:'groq/test'}, undefined, () => {}), error => error.code === 'AI_EMPTY_RESPONSE');
+  await assert.rejects(client(async () => new Response('data: {"tool_calls":[{"index":0,"function":{"name":"get_lead_stats","arguments":"{"}}]}\n\ndata: [DONE]\n\n', {headers:{'content-type':'text/event-stream'}})).complete({model:'groq/test'}, undefined, () => {}), error => error.code === 'AI_INVALID_RESPONSE' && error.partialResponse);
+  const cancelled = new AbortController(); cancelled.abort(); let abortedRequests = 0;
+  await assert.rejects(client(async () => { abortedRequests++; return Response.json({}); }).complete({model:'groq/test'}, cancelled.signal), error => error.code === 'AI_CANCELLED');
+  assert.equal(abortedRequests, 0, 'Cancelled request must not consume provider credits');
+  let user = 'owner-a', release;
+  const pending = client(() => new Promise(resolve => { release = resolve; }), {getAccessToken: () => 'token-' + user, getUser: () => ({id:user})}).complete({model:'groq/test'});
+  user = 'owner-b'; release(Response.json({choices:[{message:{content:'Private answer for A'}}]}));
+  await assert.rejects(pending, error => error.code === 'AI_CANCELLED');
+  console.log('PASS voice AI client: tool execution, provider retry time and partial failure');
+})().catch(error => { console.error(error); process.exitCode = 1; });

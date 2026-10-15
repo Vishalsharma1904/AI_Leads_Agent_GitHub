@@ -11,47 +11,60 @@
     error.status = status || 0;
     return error;
   }
-  /* A model that answers with nothing is the one failure worth retrying by
-     itself: the request was fine, the turn just came back blank, and the
-     user only sees "could not reply". Nothing was streamed to the screen in
-     that case, so one clean re-ask is invisible — and it is one re-ask, not
-     a loop, so a model that is truly stuck still surfaces its error. */
-  async function complete(payload, signal, onToken) {
-    try {
-      return await attempt(payload, signal, onToken);
-    } catch (error) {
-      if (error?.code !== 'AI_EMPTY_RESPONSE' || signal?.aborted) throw error;
-      await new Promise(function (r) { setTimeout(r, 400); });
-      if (signal?.aborted) throw error;
-      return attempt(payload, signal, onToken);
-    }
+  // The backend tries configured candidates before sending the first usable
+  // event. Repeating the whole request here repeats charges and cannot safely
+  // recover a partially received tool turn.
+  const complete = (payload, signal, onToken) => attempt(payload, signal, onToken);
+  function responseText(content) {
+    if (typeof content === 'string') return content;
+    return Array.isArray(content) ? content.filter(part => ['text', 'output_text'].includes(part?.type) && typeof part.text === 'string').map(part => part.text).join('') : '';
+  }
+  function usableTools(calls) {
+    if (!Array.isArray(calls) || !calls.length || calls.length > 64) return false;
+    return calls.every(call => {
+      if (typeof call?.function?.name !== 'string' || !call.function.name.trim() || typeof call.function.arguments !== 'string') return false;
+      try { const value = JSON.parse(call.function.arguments); return value !== null && typeof value === 'object' && !Array.isArray(value); } catch (_) { return false; }
+    });
   }
 
   async function attempt(payload, signal, onToken) {
     if (!token()) throw createError('AI_AUTH_REQUIRED', 'Sign in before using AI chat', false, 'SIGN_IN', 401);
+    if (signal?.aborted) throw createError('AI_CANCELLED', 'Request cancelled', false, 'NONE', 0);
+    const owner = window.SupabaseAuth?.getUser?.()?.id;
+    const auth = token();
+    const checkAccount = () => {
+      if (!token() || (owner ? owner !== window.SupabaseAuth?.getUser?.()?.id : auth !== token())) {
+        throw createError('AI_CANCELLED', 'Account changed; request cancelled', false, 'NONE', 0);
+      }
+    };
     const base = window.SKYLARK_CONFIG?.BACKEND_URL || 'http://localhost:8000';
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort('timeout'), DEFAULT_TIMEOUT);
     const abort = () => controller.abort(signal?.reason || 'cancelled');
+    let receivedPartial = false;
     if (signal?.aborted) abort();
     else signal?.addEventListener('abort', abort, { once: true });
     try {
       const response = await fetch(`${base}/api/v1/ai/chat`, {
         method: 'POST', signal: controller.signal,
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token()}` },
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}` },
         body: JSON.stringify(typeof onToken === 'function' ? { ...payload, stream: true } : payload)
       });
+      checkAccount();
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
         const detail = data?.detail;
         if (detail && typeof detail === 'object') {
-          throw createError(detail.code, detail.message, detail.retryable, detail.action, response.status);
+          const error = createError(detail.code, detail.message, detail.retryable, detail.action, response.status);
+          const retry = Number(detail.retry_after_seconds);
+          if (Number.isFinite(retry) && retry > 0 && retry <= 86400) error.retryAfterSeconds = retry;
+          throw error;
         }
         throw createError(response.status === 401 ? 'AI_AUTH_REQUIRED' : 'AI_BACKEND_UNAVAILABLE',
           typeof detail === 'string' ? detail : 'AI service request failed', response.status >= 500, 'RETRY', response.status);
       }
 
-      if (typeof onToken === 'function' && response.headers.get('content-type')?.includes('text/event-stream') && response.body?.getReader) {
+      if (response.headers.get('content-type')?.includes('text/event-stream') && response.body?.getReader) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '', dataLines = [], fullText = '', done = false;
@@ -65,6 +78,8 @@
           if (raw === '[DONE]') { done = true; return; }
           let message;
           try { message = JSON.parse(raw); } catch (_) { return; }
+          checkAccount();
+          if (!message || typeof message !== 'object') return;
           if (message.error) {
             const error = message.error;
             throw createError(error.code, error.message, error.retryable, error.action, error.status);
@@ -73,20 +88,25 @@
             // OpenAI streams a call in fragments: the first carries the name,
             // later ones append argument text to the same index.
             message.tool_calls.forEach((frag) => {
-              const i = Number(frag.index) || 0;
+              if (!frag || typeof frag !== 'object' || !frag.function || typeof frag.function !== 'object') return;
+              const i = frag.index === undefined ? 0 : frag.index;
+              if (!Number.isInteger(i) || i < 0 || i >= 64) return;
+              if (![frag.id, frag.function.name, frag.function.arguments].some(value => typeof value === 'string' && value)) return;
+              receivedPartial = true;
               const slot = toolCalls[i] || (toolCalls[i] = { id: '', type: 'function', function: { name: '', arguments: '' } });
-              if (frag.id) slot.id = frag.id;
-              if (frag.function?.name) slot.function.name = frag.function.name;
+              if (typeof frag.id === 'string' && frag.id) slot.id = frag.id;
+              if (typeof frag.function.name === 'string' && frag.function.name) slot.function.name += frag.function.name;
               if (typeof frag.function?.arguments === 'string') slot.function.arguments += frag.function.arguments;
             });
-            return;
           }
           if (typeof message.text === 'string' && message.text) {
+            receivedPartial = true;
             fullText += message.text;
             // UI/TTS work must not block the network reader. Preserve delivery order.
             const text = message.text;
             delivery = delivery.then(() => {
-              if (!controller.signal.aborted && !deliveryError) return onToken(text);
+              checkAccount();
+              if (!controller.signal.aborted && !deliveryError && typeof onToken === 'function') return onToken(text);
             }).catch(error => { deliveryError = error; });
           }
         };
@@ -105,9 +125,11 @@
           }
         } finally { await reader.cancel().catch(() => {}); reader.releaseLock(); }
         await delivery;
+        checkAccount();
         if (deliveryError) throw deliveryError;
         if (controller.signal.aborted) throw createError(signal?.aborted ? 'AI_CANCELLED' : 'AI_TIMEOUT', 'AI stream stopped', false, 'RETRY', 0);
         const calls = toolCalls.filter(Boolean);
+        if (calls.length && !usableTools(calls)) throw createError('AI_INVALID_RESPONSE', 'The AI provider returned an incomplete tool request. Please retry this turn.', true, 'RETRY', 502);
         // Empty text AND no tool call is a genuinely empty answer. Empty text
         // WITH a tool call is the normal shape of "do this" — not an error.
         if (!fullText.trim() && !calls.length) throw createError('AI_EMPTY_RESPONSE', 'Rudra24 AI received an empty reply', true, 'RETRY', 502);
@@ -117,15 +139,26 @@
       }
 
       const data = await response.json().catch(() => ({}));
-      if (!Array.isArray(data.choices) || !data.choices[0]?.message?.content) {
+      checkAccount();
+      const message = data.choices?.[0]?.message;
+      const text = responseText(message?.content);
+      if (!Array.isArray(data.choices) || !(text.trim() || usableTools(message?.tool_calls))) {
         throw createError('AI_EMPTY_RESPONSE', 'Rudra24 AI received an empty reply', true, 'RETRY', 502);
       }
+      if (message?.tool_calls?.length && !usableTools(message.tool_calls)) throw createError('AI_INVALID_RESPONSE', 'The AI provider returned an incomplete tool request. Please retry this turn.', true, 'RETRY', 502);
+      message.content = text || null;
       return data;
     } catch (error) {
-      if (error?.code) throw error;
-      if (signal?.aborted) throw createError('AI_CANCELLED', 'Request cancelled', false, 'NONE', 0);
-      if (controller.signal.aborted) throw createError('AI_TIMEOUT', 'The AI request timed out', true, 'RETRY', 504);
-      throw createError('AI_BACKEND_UNAVAILABLE', 'Rudra24 AI backend is unavailable', true, 'RETRY', 0);
+      let failure = error;
+      if (!error?.code) {
+        failure = signal?.aborted ? createError('AI_CANCELLED', 'Request cancelled', false, 'NONE', 0)
+          : controller.signal.aborted ? createError('AI_TIMEOUT', 'The AI request timed out', true, 'RETRY', 504)
+          : createError('AI_BACKEND_UNAVAILABLE', 'Rudra24 AI backend is unavailable', true, 'RETRY', 0);
+      }
+      // Cancel queued token delivery before the UI handles a broken stream.
+      controller.abort('request failed');
+      if (receivedPartial) failure.partialResponse = true;
+      throw failure;
     } finally {
       clearTimeout(timeout);
       signal?.removeEventListener('abort', abort);

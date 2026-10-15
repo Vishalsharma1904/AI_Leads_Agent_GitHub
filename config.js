@@ -27,8 +27,8 @@ window.SKYLARK_CONFIG = {
   // 🪙🪙🪙 GROQ API KEYS (up to 5) 🪙🪙🪙
   GROQ_API_KEYS: [],
 
-  // xAI / Grok keys are optional. Prefer the credential dialog so keys stay
-  // in the browser's local origin storage rather than source control.
+  // xAI / Grok keys are optional. The credential dialog saves them in the
+  // authenticated server vault, never browser storage or source control.
   XAI_API_KEYS: [],
 
   // 🪙🪙🪙 NVIDIA NIM API KEYS 🪙🪙🪙
@@ -73,9 +73,10 @@ window.SKYLARK_CONFIG = {
   // Desktop build injects its own URL. On a deployed host the backend is
   // reached same-origin, so vercel.json's /api rewrite proxies it: no CORS,
   // no mixed content, and the backend's real hostname never reaches the
-  // browser. Only a local dev page talks to localhost:8000 directly.
+  // browser. Local static-server fallback talks to the IPv4 engine directly.
   BACKEND_URL: window.CLAVIS_DESKTOP_BACKEND_URL
-    || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? 'http://localhost:8000' : location.origin),
+    || (window.CLAVIS_LOCAL_ENGINE_PROXY ? location.origin
+      : location.protocol === 'file:' || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) ? 'http://127.0.0.1:8000' : location.origin),
   // Public OAuth configuration is supplied by the backend at runtime.
   // Never load a credentials file into this static application.
   GOOGLE_CLIENT_ID: '',

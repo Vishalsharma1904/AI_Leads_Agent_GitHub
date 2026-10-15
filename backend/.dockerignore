@@ -7,3 +7,9 @@ __pycache__/
 *.pyc
 tests/
 storage/
+.family-providers.json
+*.db
+*.sqlite
+*.sqlite3
+*.jks
+*.keystore

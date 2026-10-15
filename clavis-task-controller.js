@@ -110,15 +110,15 @@
      ClavisCommands.route / JarvisEngine.sendMessage / ChatEngine.sendMessage
      ke wrappers apna naya 'composer' task bana dete the — wahi low-confidence
      "Rudra24 AI · Thinking… · Stop" panel pop hota tha. Ab: current task abhi
-     chal raha hai aur (same text hai ya ~1.5 s pehle shuru hua) → wahi lo. */
+     chal raha hai aur same text hai → wahi lo. An explicit taskId also
+     preserves the owner when another task becomes current meanwhile. */
   var REUSE_WINDOW_MS = 1500;
   function normText(t) { return String(t || '').toLowerCase().replace(/\s+/g, ' ').trim(); }
   function reusable(text) {
     var t = current();
     if (!t || t.phase === 'completed' || t.phase === 'failed') return null;
     var same = normText(t._text) && normText(t._text) === normText(text);
-    var recent = Date.now() - (t.startedAt || 0) <= REUSE_WINDOW_MS;
-    return (same || recent) ? t : null;
+    return same ? t : null;
   }
   /** Spelling-clean the heading shown at the top of the panel. Runs after
    * the instant local title is already on screen (same instant-local +
@@ -424,7 +424,7 @@
          proves there is real work, and only then is one begun. */
       var id = null;
       try {
-        var active = current();
+        var active = options?.taskId ? Store.get(options.taskId) : reusable(text);
         if (active && !['completed', 'failed'].includes(active.phase)) id = active.id;
       } catch (e) {
         console.warn('[ClavisTask] could not read the active task for ChatEngine', e);
@@ -436,6 +436,7 @@
         try {
           id = begin(text, {
             source: detectSource(),
+            display: 'window',
             auto: true,
             onCancel: function () { try { global.stopChatGeneration && global.stopChatGeneration(); } catch (e) {} }
           });
@@ -504,6 +505,10 @@
     var original = engine.sendMessage.bind(engine);
 
     engine.sendMessage = function (text, signal, onStep, onTextDelta, extra) {
+      // The UI owns this turn's task, tool metrics and completion. Wrapping
+      // its callbacks again counted each tool twice and could create a second
+      // task after slow local command routing or a concurrent task switch.
+      if (extra?.taskId && Store.get(extra.taskId)) return original(text, signal, onStep, onTextDelta, extra);
       if (extra?.source === 'composer' && (extra.answerOnly || global.ClavisAppMap?.guide?.isQuestion(text))) return original(text, signal, onStep, onTextDelta, extra);
       /* This wrapper sits on the reply path. Nothing in here may throw:
          a panel that fails to open is a cosmetic bug, but a throw before
@@ -521,7 +526,8 @@
           reused = true;
         } else {
           id = begin(text, {
-            source: detectSource(),
+            source: extra?.source || detectSource(),
+            display: extra?.display || 'auto',
             auto: true,
             attachments: atts,
             images: imgs,
@@ -616,7 +622,8 @@
     if (wrapped.commands || !cmds || typeof cmds.route !== 'function') return false;
     var original = cmds.route.bind(cmds);
 
-    cmds.route = function (text) {
+    cmds.route = function (text, options) {
+      if (options?.taskId && Store.get(options.taskId)) return original(text);
       var probe;
       try { probe = Model.IntentClassifier.label(text); }
       catch (e) { return original(text); }   // never block a device command

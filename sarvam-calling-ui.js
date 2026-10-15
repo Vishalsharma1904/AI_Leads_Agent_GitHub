@@ -18,8 +18,8 @@
   if (window.SarvamCallingUI) return;
   const S = () => window.SarvamCalling;
 
-  const ui = { tab: 'queue', openThreadId: null, threads: [], queue: [], running: false, mounted: false,
-    demoPhone: '', reviewLang: 'en', busy: new Set(), error: '' };
+  const ui = { tab: 'queue', openThreadId: null, threads: [], queue: [], selected: new Set(), batchJobs: [], batchBusy: false, batchRequestId: '', batchLeadIds: [], running: false, mounted: false, backend: 'checking', backendCheck: null,
+    demoPhone: '', reviewLang: 'en', busy: new Set(), error: '', batchError: '', batchRefresh: null, leadFetch: null, leadEpoch: 0, batchLimit: null };
 
   const esc = (s) => String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
@@ -61,17 +61,23 @@
     return `
     <div class="view-header">
       <div>
-        <h1 class="view-title">Voice Calling Setup</h1>
-        <div class="view-subtitle">Apne number par test kijiye. Har call ki recording, poori conversation aur AI review ek jagah.</div>
+        <h1 class="view-title">Calling Agent</h1>
+        <div class="view-subtitle">Leads chuniye, calls bhejiye, aur unka status aur transcript dekhiye.</div>
       </div>
       <div class="view-header-actions">
+        <button class="sc-btn" type="button" onclick="showView('voice-ai')">${icon('settings')} Voice AI Setup</button>
+        <button id="sc-fetch-leads" class="sc-btn sc-btn-primary" type="button" onclick="SarvamCallingUI.pullLeads()">${icon('download')} Fetch leads</button>
+        <div id="sc-sarvam-actions" hidden>
         <button class="sc-btn" type="button" onclick="SarvamCallingUI.syncCalls()">${icon('refresh-cw')} Sync calls</button>
-        <button class="sc-btn" type="button" onclick="SarvamCallingUI.openSetup()">${icon('sliders')} Agent setup</button>
-        <button class="sc-btn sc-btn-primary" type="button" onclick="SarvamCallingUI.pullLeads()">${icon('download')} Leads laao</button>
+        </div>
       </div>
     </div>
+    <div class="sc-backend-status" id="sc-backend-status" data-state="checking" role="status" aria-live="polite">
+      <span>Backend check ho raha hai…</span><button class="sc-btn sc-btn-small" type="button" onclick="SarvamCallingUI.checkBackend()" hidden>Retry</button>
+    </div>
+    <div id="el-calling-host" hidden></div>
     <div class="sc-banner" id="sc-banner" hidden></div>
-    <section class="sc-demo" aria-label="Demo call">
+    <section class="sc-demo" id="sc-sarvam-demo" aria-label="Demo call">
       <div><span class="sc-eyebrow">TEST YOUR AGENT</span><h2>Sabse pehle, khud baat kijiye.</h2>
         <p class="sc-dim">Sirf aapke number par ek real phone call. Lead queue se koi number dial nahi hoga. Provider ke calling charges lagenge.</p></div>
       <form onsubmit="event.preventDefault(); SarvamCallingUI.demo()">
@@ -105,10 +111,68 @@
     refreshIcons();
     reloadThreads();
     renderAll();
+    selectProvider(window.VoiceProvider?.current?.() === 'sarvam' ? 'sarvam' : 'elevenlabs');
+    if (window.VoiceProvider?.current?.() === 'elevenlabs') refreshBatchJobs().catch(() => {});
+    checkBackend();
+    el.addEventListener('input', event => {
+      if (event.target.id === 'sc-batch-n') {
+        const value = Number(event.target.value);
+        ui.batchLimit = Number.isFinite(value) && value > 0 ? Math.min(200, Math.max(1, Math.floor(value))) : null;
+      }
+    });
+    el.addEventListener('change', event => {
+      if (event.target.id === 'sc-select-all') {
+        ui.queue.filter(item => item.status === 'pending').forEach(item => event.target.checked ? ui.selected.add(item.id) : ui.selected.delete(item.id));
+        renderAll();
+      } else if (event.target.matches('[data-select-lead]')) {
+        event.target.checked ? ui.selected.add(event.target.dataset.selectLead) : ui.selected.delete(event.target.dataset.selectLead);
+        renderAll();
+      }
+    });
+  }
+
+  function selectProvider(provider) {
+    const sarvam = provider === 'sarvam';
+    const actions = document.getElementById('sc-sarvam-actions');
+    if (actions) actions.hidden = !sarvam;
+    const demo = document.getElementById('sc-sarvam-demo');
+    if (demo) demo.hidden = !sarvam;
+    const calls = document.getElementById('el-calling-host');
+    if (calls) calls.hidden = sarvam;
+    if (sarvam) window.ElevenLabsStudio?.stop?.();
+    else window.ElevenLabsStudio?.mountCalling?.(calls);
+    renderAll();
   }
 
   function refreshIcons() {
     try { window.ClavisIcons?.apply?.(root()); } catch (_) {}
+  }
+
+  async function checkBackend() {
+    if (ui.backendCheck) return ui.backendCheck;
+    const status = $('#sc-backend-status');
+    const button = status?.querySelector('button');
+    ui.backend = 'checking';
+    if (status) { status.dataset.state = ui.backend; status.querySelector('span').textContent = 'Backend check ho raha hai…'; if (button) button.hidden = true; }
+    const base = location.port === '8000' ? '' : (window.SKYLARK_CONFIG?.BACKEND_URL || 'http://localhost:8000').replace(/\/+$/, '');
+    ui.backendCheck = (async () => {
+      const controller = new AbortController();
+      const deadline = setTimeout(() => controller.abort(), 5000);
+      try {
+        const response = await fetch(`${base}/`, { signal: controller.signal });
+        const data = await response.json().catch(() => ({}));
+        ui.backend = response.ok && /API is running$/i.test(data.message || '') ? 'ready' : 'degraded';
+      } catch (_) { ui.backend = 'offline'; }
+      finally { clearTimeout(deadline); ui.backendCheck = null; }
+      const label = $('#sc-backend-status');
+      if (label) {
+        label.dataset.state = ui.backend;
+        label.querySelector('span').textContent = ui.backend === 'ready' ? 'Backend reachable' : ui.backend === 'degraded' ? 'Backend is responding unexpectedly' : 'Backend offline · checking again in 5s';
+        const retry = label.querySelector('button'); if (retry) retry.hidden = ui.backend === 'ready';
+      }
+      return ui.backend;
+    })();
+    return ui.backendCheck;
   }
 
   /* ── render: rail ────────────────────────────────────────── */
@@ -130,10 +194,14 @@
   function queueList() {
     if (!ui.queue.length) {
       return `<div class="sc-empty">${icon('list')}<p>Queue khaali hai.</p>
-        <p class="sc-dim">Leads page se "Send to Voice Calling" dabaiye, ya Rudra24 AI se boliye "leads calling agent ko de do".</p></div>`;
+        <p class="sc-dim">Fetch leads se saved contacts yahan laaiye. Phir leads chuniye aur calls review kijiye.</p>
+        <button class="sc-btn" type="button" onclick="SarvamCallingUI.pullLeads()">${icon('download')} Fetch leads</button></div>`;
     }
-    return ui.queue.map((i) => `
+    const pending = ui.queue.filter(item => item.status === 'pending');
+    const allSelected = pending.length > 0 && pending.every(item => ui.selected.has(item.id));
+    return `<label class="sc-select-all"><input id="sc-select-all" type="checkbox" ${allSelected ? 'checked' : ''} ${ui.batchBusy ? 'disabled' : ''}><span>Sab pending leads chunein (${pending.length})</span></label>` + ui.queue.map((i) => `
       <div class="sc-row ${i.status !== 'pending' ? 'is-' + (TONE[i.status] || 'dim') : ''}">
+        ${i.status === 'pending' ? `<label class="sc-row-select"><input type="checkbox" data-select-lead="${esc(i.id)}" ${ui.selected.has(i.id) ? 'checked' : ''} ${ui.batchBusy ? 'disabled' : ''} aria-label="${esc(i.lead.company || i.lead.name || i.lead.phone)} chunein"></label>` : ''}
         <div class="sc-row-main">
           <div class="sc-row-title">${esc(i.lead.company || i.lead.name || 'Unknown')}</div>
           <div class="sc-row-sub">${esc(i.lead.phone)}${i.lead.city ? ' · ' + esc(i.lead.city) : ''}</div>
@@ -296,22 +364,37 @@
   }
 
   function batchCard() {
-    const pending = ui.queue.filter((i) => i.status === 'pending').length;
+    const pending = ui.queue.filter((i) => i.status === 'pending');
+    const selected = pending.filter(item => ui.selected.has(item.id));
     const cfg = S().getConfig();
+    if (window.VoiceProvider?.current?.() === 'elevenlabs') return `<section class="sc-card" aria-label="ElevenLabs batch calls">
+      <div class="sc-card-head">${icon('phone-outgoing')}<h3>ElevenLabs batch</h3></div>
+      <label class="sc-field"><span>Selected calls limit · max 200</span><input id="sc-batch-n" type="number" min="1" max="200" value="${Math.max(1, Math.min(200, ui.batchLimit ?? (selected.length || cfg.batchSize || 10)))}" ${ui.batchBusy ? 'disabled' : ''}></label>
+      <p class="sc-dim sc-small">${selected.length} lead${selected.length === 1 ? '' : 's'} selected. Queue order se pehle N numbers jayenge. Provider concurrency 1 rahegi.</p>
+      ${ui.batchError ? `<p class="sc-row-err" role="status">${esc(ui.batchError)}</p>` : ''}
+      <div class="sc-card-actions">${ui.batchBusy ? '<button class="sc-btn" disabled>Submitting…</button>' : `<button class="sc-btn sc-btn-primary" ${selected.length ? '' : 'disabled'} onclick="SarvamCallingUI.start()">${icon('play')} Review &amp; submit</button>`}
+      <button class="sc-btn" type="button" onclick="SarvamCallingUI.refreshBatchJobs({refreshActive:true})">${icon('refresh-cw')} Refresh jobs</button></div>
+      ${batchJobsMarkup()}
+    </section>`;
     return `<div class="sc-card">
       <div class="sc-card-head">${icon('phone-outgoing')}<h3>Batch</h3></div>
       <label class="sc-field">
-        <span>Kitni calls karni hain?</span>
-        <input id="sc-batch-n" type="number" min="1" max="200" value="${Math.min(pending || cfg.batchSize, cfg.batchSize)}" ${ui.running ? 'disabled' : ''}>
+        <span>Selected calls limit · max 200</span>
+        <input id="sc-batch-n" type="number" min="1" max="200" value="${Math.max(1, Math.min(200, ui.batchLimit ?? (selected.length || cfg.batchSize || 10)))}" ${ui.running || ui.batchBusy ? 'disabled' : ''}>
       </label>
-      <div class="sc-dim sc-small">${pending} queue me · har call ke beech ${cfg.gapSeconds}s gap</div>
+      <div class="sc-dim sc-small">${selected.length} selected · ${pending.length} pending · har call ke beech ${cfg.gapSeconds}s gap</div>
       <div class="sc-card-actions">
-        ${ui.running
-          ? `<button class="sc-btn sc-btn-danger" onclick="SarvamCallingUI.stop()">${icon('square')} Rok do</button>`
-          : `<button class="sc-btn sc-btn-primary" ${pending ? '' : 'disabled'} onclick="SarvamCallingUI.start()">${icon('play')} Calling shuru</button>`}
+        ${ui.running || ui.batchBusy
+          ? ui.running ? `<button class="sc-btn sc-btn-danger" onclick="SarvamCallingUI.stop()">${icon('square')} Rok do</button>` : '<button class="sc-btn" disabled>Submitting…</button>'
+          : `<button class="sc-btn sc-btn-primary" ${selected.length ? '' : 'disabled'} onclick="SarvamCallingUI.start()">${icon('play')} Review &amp; start</button>`}
         ${!ui.running && ui.queue.length ? `<button class="sc-btn" onclick="SarvamCallingUI.clear()">Queue khaali</button>` : ''}
       </div>
     </div>`;
+  }
+
+  function batchJobsMarkup() {
+    if (!ui.batchJobs.length) return '<p class="sc-dim sc-small">Is account ke saved batch jobs yahan dikhenge.</p>';
+    return `<div class="sc-batch-jobs"><h4>Saved batch jobs</h4>${ui.batchJobs.slice(0, 10).map(job => `<article class="sc-batch-job"><div><strong>${esc(job.name || 'Calling batch')}</strong><span>${esc(job.status || 'unknown')} · ${job.provider?.total_calls_finished ?? 0}/${job.provider?.total_calls_scheduled ?? job.recipients?.length ?? 0}</span></div><div class="sc-card-actions"><button class="sc-btn sc-btn-small" onclick="SarvamCallingUI.refreshBatchJob('${esc(job.request_id)}')">Refresh</button>${['pending', 'in_progress', 'submitting', 'unknown'].includes(job.status) && job.batch_id ? `<button class="sc-btn sc-btn-small sc-btn-danger" onclick="SarvamCallingUI.cancelBatchJob('${esc(job.batch_id)}')">Cancel</button>` : ''}</div>${job.uncertain ? '<p class="sc-row-err">Status confirm nahi hua. Refresh karein; duplicate batch dobara submit nahi hoga.</p>' : ''}<ul>${(job.recipients || []).map(r => `<li>${esc(r.phone_number || '')} · ${esc(r.status || 'pending')}${r.conversation_id ? ` · ${esc(r.conversation_id)}` : ''}</li>`).join('')}</ul></article>`).join('')}</div>`;
   }
 
   /* Owner ne yahi maanga: number, company, aur ek-do column. */
@@ -538,8 +621,55 @@
   }
 
   async function start() {
-    const n = Number($('#sc-batch-n')?.value) || S().getConfig().batchSize;
-    const res = await S().start({ limit: n });
+    if (ui.batchBusy) return;
+    const selected = ui.queue.filter(item => item.status === 'pending' && ui.selected.has(item.id));
+    if (!selected.length) { toast('warning', 'Leads chuniye', 'Call shuru karne se pehle kam se kam ek pending lead select kijiye.'); return; }
+    const rawLimit = Number($('#sc-batch-n')?.value) || S().getConfig().batchSize || 10;
+    const limit = Math.min(200, Math.max(1, Math.floor(rawLimit)), selected.length);
+    ui.batchLimit = limit;
+    const batch = selected.slice(0, limit);
+    const destinations = batch.map(item => `${item.lead.company || item.lead.name || 'Contact'} — ${item.lead.phone}`).join('\n');
+    const provider = window.VoiceProvider?.current();
+    const verb = provider === 'elevenlabs' ? 'ElevenLabs batch' : 'Sarvam calls';
+    if (provider === 'elevenlabs' && ui.batchRequestId) {
+      await refreshBatchJob(ui.batchRequestId).catch(() => {});
+      toast('warning', 'Pehle status check karein', 'Pending ya uncertain batch dobara submit nahi kiya gaya.');
+      return;
+    }
+    if (provider === 'elevenlabs') {
+      const setup = window.ElevenLabsStudio?.batchConfiguration?.();
+      if (!setup?.agentReady) { toast('warning', 'Agent setup adhoora', 'Voice AI Setup me saved agent select karke changes save karein.'); window.ElevenLabsStudio?.open?.(); return; }
+      if (!setup.phoneNumberId) { toast('warning', 'Outbound number missing', 'Voice AI Setup me verified outbound number connect karke Calling Agent me select karein.'); window.ElevenLabsStudio?.open?.(); return; }
+    }
+    ui.batchBusy = true; ui.batchError = ''; renderAll();
+    if (!window.confirm(`${limit} real phone call${limit === 1 ? '' : 's'} ${verb} ke liye submit hongi. Calls ka provider charge lag sakta hai. Destinations:\n\n${destinations}\n\nProceed?`)) {
+      ui.batchBusy = false; renderAll(); return;
+    }
+    if (provider === 'elevenlabs') {
+      try {
+        const result = await window.ElevenLabsStudio?.submitBatch?.(batch.map(item => item.lead));
+        if (!result) throw new Error('ElevenLabs calling panel load nahi hua. Refresh karke retry karein.');
+        if (result.uncertain) {
+          ui.batchRequestId = result.request_id; ui.batchLeadIds = batch.map(item => item.id);
+          ui.batchError = 'Provider status uncertain hai. Refresh jobs dabakar pehle reconcile karein; request dobara submit nahi hogi.';
+        } else {
+          batch.forEach(item => { S().removeFromQueue(item.id); ui.selected.delete(item.id); });
+          ui.batchRequestId = ''; ui.batchLeadIds = [];
+          await refreshBatchJobs();
+          toast('success', 'Batch accepted', `${limit} recipient provider job me add hue; connection status refresh karke dekhiye.`);
+        }
+      } catch (error) {
+        ui.batchRequestId = window.ElevenLabsStudio?.lastBatchRequest?.() || ui.batchRequestId;
+        ui.batchLeadIds = batch.map(item => item.id); ui.batchError = error.message;
+        if (ui.batchRequestId) await refreshBatchJob(ui.batchRequestId).catch(() => {});
+        toast('error', 'Batch status check karein', error.message);
+      } finally { ui.batchBusy = false; renderAll(); }
+      return;
+    }
+    let res;
+    try { res = await S().start({ limit, leadIds: batch.map(item => item.id) }); }
+    catch (error) { toast('error', 'Call start nahi hui', error.message); return; }
+    finally { ui.batchBusy = false; renderAll(); }
     if (res.ok) return;
     if (res.reason === 'config') {
       banner(`Setup adhoora: ${res.missing.map((m) => m.label).join(', ')}.`, 'Setup kholo', openSetup);
@@ -557,6 +687,7 @@
 
   function demoNumber(value) { ui.demoPhone = value; }
   async function demo() {
+    if (window.VoiceProvider?.current?.() !== 'sarvam') { window.ElevenLabsStudio?.openCalling?.(); return; }
     const phone = $('#sc-demo-phone')?.value || ui.demoPhone;
     ui.demoPhone = phone;
     const note = $('#sc-demo-note');
@@ -603,11 +734,40 @@
     refreshIcons();
   }
 
-  /** Leads page se jo abhi filter me dikh rahe hain, wo utha lo. */
-  function pullLeads() {
-    const leads = (window.filteredLeads?.length ? window.filteredLeads : window.allLeads) || [];
-    if (!leads.length) { toast('warning', 'Koi lead nahi', 'Pehle agent chalakar leads nikaliye.'); return; }
-    sendLeads(leads, { silent: false });
+  /** Calling imports saved contacts; the Leads page preserves its current filter. */
+  async function pullLeads() {
+    if (ui.leadFetch) return ui.leadFetch;
+    const epoch = ui.leadEpoch;
+    const owner = window.UserStorage?.getUserId?.();
+    const fromLeads = document.getElementById('view-leads')?.classList.contains('active');
+    const button = $('#sc-fetch-leads');
+    if (button) { button.disabled = true; button.textContent = 'Fetching leads…'; }
+    ui.leadFetch = (async () => {
+      try {
+        let leads;
+        if (fromLeads) {
+          leads = Array.isArray(window.LeadsCtrl?.filtered) ? window.LeadsCtrl.filtered : window.filteredLeads;
+        } else {
+          leads = window.UserStorage?.getJSON?.('allLeads', null);
+          if (!Array.isArray(leads) || !leads.length) {
+            leads = window.MemoryEngine?.getAllLeads ? await window.MemoryEngine.getAllLeads() : window.allLeads;
+          }
+        }
+        if (epoch !== ui.leadEpoch || owner !== window.UserStorage?.getUserId?.()) return;
+        if (!Array.isArray(leads) || !leads.length) {
+          toast('warning', 'Koi lead nahi', fromLeads ? 'Current filter mein koi lead nahi. Filter badaliye.' : 'Saved leads nahi mile. Leads page par contacts add kijiye ya Run Agent chalaiye.');
+          return;
+        }
+        return sendLeads(leads, { silent: false });
+      } catch (error) {
+        if (epoch === ui.leadEpoch) toast('error', 'Leads load nahi hue', error.message);
+      }
+    })();
+    try { return await ui.leadFetch; }
+    finally {
+      ui.leadFetch = null;
+      if (button) { button.disabled = false; button.innerHTML = `${icon('download')} Fetch leads`; refreshIcons(); }
+    }
   }
 
   /** Public entry — leads page ka button aur Rudra24 AI dono yahi bulate hain. */
@@ -616,16 +776,60 @@
     ui.tab = 'queue';
     if (!silent) {
       toast('success', `${res.added} leads calling agent ko mil gaye`,
-        res.skipped ? `${res.skipped} ke paas valid number nahi tha.` : '');
+        [res.skipped ? `${res.skipped} ke paas valid number nahi tha.` : '', res.duplicates ? `${res.duplicates} duplicate contacts skip hue.` : ''].filter(Boolean).join(' '));
     }
     goToPage();
-    return res;
+    return { ...res, provider: window.VoiceProvider?.current?.() };
   }
 
   function goToPage() {
     try { window.showView?.('calling'); } catch (_) {}
     mount();
+    selectProvider(window.VoiceProvider?.current?.() === 'sarvam' ? 'sarvam' : 'elevenlabs');
     renderAll();
+  }
+
+  async function refreshBatchJobs({ refreshActive = false } = {}) {
+    if (ui.batchRefresh) return ui.batchRefresh;
+    ui.batchRefresh = (async () => {
+      try {
+        const data = await window.ElevenLabsStudio?.loadBatchCalls?.();
+        ui.batchJobs = data?.batch_calls || [];
+        let refreshError = '';
+        const active = refreshActive ? ui.batchJobs.filter(job => job.uncertain || ['pending', 'in_progress', 'submitting', 'unknown'].includes(job.status)) : [];
+        for (const job of active.slice(0, 10)) {
+          try { await window.ElevenLabsStudio.refreshBatchCall(job.batch_id || job.request_id); }
+          catch (error) { refreshError ||= error.message; if (error.status === 409 || error.status === 401) break; }
+        }
+        if (active.length) {
+          const latest = await window.ElevenLabsStudio?.loadBatchCalls?.();
+          ui.batchJobs = latest?.batch_calls || ui.batchJobs;
+        }
+        ui.batchError = refreshError;
+        renderAll();
+        return ui.batchJobs;
+      } catch (error) { ui.batchError = error.status === 404 ? 'Calling backend update load nahi hua. Rudra24 AI restart karke Refresh jobs dabaiye.' : error.message; renderAll(); throw error; }
+    })();
+    try { return await ui.batchRefresh; }
+    finally { ui.batchRefresh = null; }
+  }
+  async function refreshBatchJob(id) {
+    if (!id) return;
+    try {
+      const job = await window.ElevenLabsStudio?.refreshBatchCall?.(id);
+      await refreshBatchJobs();
+      if (job?.batch_id && ui.batchRequestId === id && !job.uncertain) {
+        ui.batchLeadIds.forEach(leadId => { S().removeFromQueue(leadId); ui.selected.delete(leadId); });
+        ui.batchRequestId = ''; ui.batchLeadIds = [];
+      }
+      ui.batchError = job?.uncertain ? 'Provider ka status abhi confirm nahi hua. Dobara submit na karein; kuch der baad status refresh karein.' : '';
+      renderAll(); return job;
+    } catch (error) { ui.batchError = error.message; renderAll(); throw error; }
+  }
+  async function cancelBatchJob(id) {
+    if (!id || !window.confirm('ElevenLabs se is batch ko cancel karne ki request bhejein? Already-connected calls rukna guaranteed nahi hai.')) return;
+    try { await window.ElevenLabsStudio?.cancelBatchCall?.(id); await refreshBatchJobs(); toast('info', 'Cancel status refreshed', 'Recipient status provider se dobara load hua.'); }
+    catch (error) { ui.batchError = error.message; renderAll(); toast('error', 'Batch cancel', error.message); }
   }
 
   /* Rudra24 AI leads nikaalne ke baad khud poochhta hai — blocking confirm
@@ -868,7 +1072,7 @@
     requestAnimationFrame(() => { pending = false; renderAll(); });
   }
 
-  window.addEventListener('sarvam:queue', (e) => { ui.queue = e.detail.items || []; schedule(); });
+  window.addEventListener('sarvam:queue', (e) => { ui.queue = e.detail.items || []; const pending = new Set(ui.queue.filter(item => item.status === 'pending').map(item => item.id)); ui.selected.forEach(id => { if (!pending.has(id)) ui.selected.delete(id); }); schedule(); });
   window.addEventListener('sarvam:run', (e) => { ui.running = Boolean(e.detail.running); schedule(); });
   window.addEventListener('sarvam:thread', async (e) => {
     const t = e.detail.thread;
@@ -880,7 +1084,7 @@
     schedule();
   });
   window.addEventListener('sarvam:config', schedule);
-  window.addEventListener('rudra:auth-state', () => { ui.threads = []; ui.openThreadId = null; reloadThreads().then(schedule); });
+  window.addEventListener('rudra:auth-state', () => { ui.leadEpoch++; ui.batchLimit = null; ui.threads = []; ui.openThreadId = null; ui.batchJobs = []; ui.selected.clear(); ui.batchRequestId = ''; ui.batchLeadIds = []; ui.batchError = ''; reloadThreads().then(schedule); });
 
   /* Rudra24 AI jab leads nikaalta hai (clavis-task-controller.js -> RealScraper)
      to woh yeh event chhodta hai. Yahi wo jagah hai jahan Rudra24 AI khud se
@@ -892,8 +1096,9 @@
   });
 
   window.addEventListener('hashchange', () => {
-    if (location.hash === '#calling') { mount(); schedule(); }
+    if (location.hash === '#calling') { mount(); checkBackend(); selectProvider(window.VoiceProvider?.current?.() === 'sarvam' ? 'sarvam' : 'elevenlabs'); if (window.VoiceProvider?.current?.() === 'elevenlabs') refreshBatchJobs().catch(() => {}); schedule(); }
   });
+  if (typeof document !== 'undefined') setInterval(() => { if (location.hash === '#calling' && !document.hidden) checkBackend(); }, 5000);
 
   /* ── Rudra24 AI skills ───────────────────────────────────────── */
 
@@ -912,6 +1117,7 @@
         const list = count ? all.slice(0, Number(count) || 10) : all;
         if (!list.length) return 'Abhi koi lead nahi hai. Pehle leads nikaalni padengi.';
         const r = sendLeads(list);
+        if (r.provider === 'elevenlabs') return `${r.added} contacts ElevenLabs calling studio mein taiyar hain. Koi call abhi nahi hui. Contact chuniye, number check kijiye aur Place call dabaiye.`;
         return `${r.added} leads calling agent ki queue me daal diye${r.skipped ? `, ${r.skipped} ke number nahi the` : ''}. `
           + 'Ab "calling shuru karo" boliye.';
       },
@@ -921,6 +1127,10 @@
       description: 'Calling agent se queue ke leads ko ek-ek karke call karwao. Awaaz phone par jaati hai, app me nahi.',
       params: { how_many: 'kitni calls karni hain, jaise 10 ya 20' },
       run: async ({ how_many }) => {
+        if (window.VoiceProvider?.current?.() !== 'sarvam') {
+          goToPage();
+          return 'Calling Agent khol diya. Leads manually select kijiye, N limit set kijiye aur destination preview confirm karke batch submit kijiye. Maine koi call start nahi ki.';
+        }
         const n = Number(how_many) || S().getConfig().batchSize;
         goToPage();
         const res = await S().start({ limit: n });
@@ -936,6 +1146,10 @@
       description: 'Calling agent ka abhi ka haal: kitni calls hui, kaun interested nikla, kiski meeting lagi.',
       params: {},
       run: async () => {
+        if (window.VoiceProvider?.current?.() !== 'sarvam') {
+          window.ElevenLabsStudio?.openCalling?.();
+          return window.ElevenLabsStudio?.callingStatus?.() || 'ElevenLabs studio is loading. Please try again.';
+        }
         const threads = await reloadThreads();
         if (!threads.length) return 'Abhi tak koi call nahi hui.';
         const today = threads.filter((t) => Date.now() - (t.startedAt || 0) < 86400e3);
@@ -963,12 +1177,14 @@
   } else { boot(); }
 
   window.SarvamCallingUI = {
+    selectProvider, checkBackend,
     mount, goToPage, setTab, open, drop, clear, start, stop, pullLeads,
     sendLeads, offerLeads,
     openSetup, closeSetup, saveSetup, copyPrompt, fetchDeployments, openVault,
     saveMail, openMail, copyMail, redraft, downloadIcs,
     reloadThreads, render: renderAll,
     demo, demoNumber, reviewLanguage, makeSummary, refreshCall, recordingError, flagCall, downloadTranscript, syncCalls,
+    refreshBatchJobs, refreshBatchJob, cancelBatchJob,
   };
 
   /** Leads page ka button aur baaki app isi ko bulate hain. */
@@ -1032,16 +1248,18 @@ window.VoiceProvider = (() => {
   }
 
   function current() {
-    try { return localStorage.getItem(LS) || 'toughtongue'; } catch (_) { return 'toughtongue'; }
+    try { return localStorage.getItem(LS) || 'elevenlabs'; } catch (_) { return 'elevenlabs'; }
   }
 
   function select(which) {
-    if (!['toughtongue', 'sarvam', 'omnidimension', 'grok'].includes(which)) which = 'toughtongue';
+    if (!['elevenlabs', 'toughtongue', 'sarvam', 'omnidimension', 'grok'].includes(which)) which = 'elevenlabs';
+    const elevenlabs = which === 'elevenlabs';
     const sarvam = which === 'sarvam';
     const omni = which === 'omnidimension';
     const grok = which === 'grok';
     if (!grok) window.GrokStudio?.stop?.();
     if (!omni) window.OmniStudio?.stop?.();
+    if (!elevenlabs) window.ElevenLabsStudio?.stop?.();
     try { localStorage.setItem(LS, which); } catch (_) {}
     const picker = $('vp-provider');
     if (picker) picker.value = which;
@@ -1051,18 +1269,20 @@ window.VoiceProvider = (() => {
     const omniPanel = $('vp-omnidimension');
     if (omniPanel) omniPanel.hidden = !omni;
     if ($('vp-grok')) $('vp-grok').hidden = !grok;
+    if ($('vp-elevenlabs')) $('vp-elevenlabs').hidden = !elevenlabs;
     // The Tough Tongue surface and its header buttons step aside together.
     const tt = document.querySelector('#view-voice-ai .tt-grid');
-    if (tt) tt.hidden = sarvam || omni || grok;
+    if (tt) tt.hidden = elevenlabs || sarvam || omni || grok;
     const ttStatus = document.querySelector('#view-voice-ai #tt-status');
-    if (ttStatus) ttStatus.hidden = sarvam || omni || grok;
-    document.querySelectorAll('#view-voice-ai [data-vp-tt]').forEach((b) => { b.hidden = sarvam || omni || grok; });
+    if (ttStatus) ttStatus.hidden = elevenlabs || sarvam || omni || grok;
+    document.querySelectorAll('#view-voice-ai [data-vp-tt]').forEach((b) => { b.hidden = elevenlabs || sarvam || omni || grok; });
     const label = document.querySelector('#view-voice-ai [data-voice-ai-status]');
-    if (label) label.textContent = grok ? 'Grok · xAI' : omni ? 'OmniDimension' : sarvam ? 'Sarvam AI' : 'Tough Tongue AI';
+    if (label) label.textContent = elevenlabs ? 'ElevenLabs + Groq' : grok ? 'Grok · xAI' : omni ? 'OmniDimension' : sarvam ? 'Sarvam AI' : 'Tough Tongue AI';
 
     if (sarvam) { refresh(); loadPlan(); }
     if (omni) window.OmniStudio?.refresh?.();
     if (grok) window.GrokStudio?.refresh?.();
+    if (elevenlabs) { window.ElevenLabsStudio?.attachForView?.(); window.ElevenLabsStudio?.refresh?.(); }
     return which;
   }
 

@@ -529,12 +529,16 @@
   /** Leads queue me. Bina valid number wale chup-chaap skip. */
   function enqueue(leads) {
     const list = Array.isArray(leads) ? leads : [leads];
-    let added = 0, skipped = 0;
+    let added = 0, skipped = 0, duplicates = 0;
+    const active = q.items.filter(item => item.status !== 'failed');
+    const ids = new Set(active.map(item => item.id));
+    const phones = new Set(active.map(item => item.lead.phone));
     list.forEach((lead) => {
       const phone = normalizePhone(lead?.phone || lead?.mobile || lead?.contactNumber);
       if (!phone) { skipped++; return; }
       const id = leadKey(lead);
-      if (q.items.some((i) => i.id === id && i.status !== 'failed')) return;
+      if (ids.has(id) || phones.has(phone)) { duplicates++; return; }
+      ids.add(id); phones.add(phone);
       q.items.push({
         id, lead: { ...lead, phone },
         status: 'pending', attemptId: null, interactionId: null,
@@ -543,7 +547,7 @@
       added++;
     });
     emit('queue', { items: queueSnapshot(), added, skipped });
-    return { added, skipped, total: q.items.length };
+    return { added, skipped, duplicates, total: q.items.length };
   }
 
   function queueSnapshot() {
@@ -708,7 +712,7 @@
   }
 
   /** Queue chalao: ek ke baad ek, `limit` tak. */
-  async function start({ limit } = {}) {
+  async function start({ limit, leadIds } = {}) {
     if (q.running) return { ok: false, reason: 'already-running' };
     const missing = missingFields();
     if (missing.length) return { ok: false, reason: 'config', missing };
@@ -719,6 +723,7 @@
     }
 
     q.limit = Math.max(1, Number(limit) || Number(config.batchSize) || 10);
+    const selectedIds = Array.isArray(leadIds) ? new Set(leadIds.map(String)) : null;
     q.running = true;
     q.stopRequested = false;
     emit('run', { running: true, limit: q.limit });
@@ -727,7 +732,7 @@
     let quotaHit = '';
     try {
       while (!q.stopRequested && done < q.limit) {
-        const item = q.items.find((i) => i.status === 'pending');
+        const item = q.items.find((i) => i.status === 'pending' && (!selectedIds || selectedIds.has(i.id)));
         if (!item) break;
         try {
           await runOne(item);
@@ -736,7 +741,7 @@
           throw e;
         }
         done++;
-        if (!q.stopRequested && done < q.limit && q.items.some((i) => i.status === 'pending')) {
+        if (!q.stopRequested && done < q.limit && q.items.some((i) => i.status === 'pending' && (!selectedIds || selectedIds.has(i.id)))) {
           await sleep(Math.max(0, Number(config.gapSeconds) || 0) * 1000);
         }
       }
@@ -747,7 +752,7 @@
     }
     // The queue survives in IndexedDB, so whatever is still pending is simply
     // tomorrow's work — nothing is lost and nothing is re-scraped.
-    const waiting = q.items.filter((i) => i.status === 'pending').length;
+    const waiting = q.items.filter((i) => i.status === 'pending' && (!selectedIds || selectedIds.has(i.id))).length;
     return quotaHit
       ? { ok: true, completed: done, quota: quotaHit, waiting }
       : { ok: true, completed: done, waiting };

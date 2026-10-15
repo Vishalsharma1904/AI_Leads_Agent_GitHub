@@ -25,6 +25,7 @@
   if (window.ClavisBusiness) return;
 
   const KEY = 'clavis_business_profile';
+  const profileKey = () => KEY + ':' + (window.SupabaseAuth?.getUser?.()?.id || 'anonymous');
   const P = (label, service, buyers, competitors, detect) => ({ label, service, buyers, competitors, detect });
   const PRESETS = {
     security: P('Security & Housekeeping', 'security guards, housekeeping and manpower staffing',
@@ -77,7 +78,7 @@
       /\b(insurance|loan|loans|finance|financial services|mutual fund)\b/),
   };
 
-  const lsGet = () => { try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (_) { return null; } };
+  const lsGet = () => { try { return JSON.parse(localStorage.getItem(profileKey()) || 'null'); } catch (_) { return null; } };
 
   function profile() {
     const saved = lsGet() || {};
@@ -100,7 +101,7 @@
     if (extra.label) v.label = String(extra.label).slice(0, 60);
     if (Array.isArray(extra.buyers)) v.buyers = extra.buyers.map((s) => String(s).trim()).filter(Boolean).slice(0, 12);
     if (id === 'custom' && extra.service && !v.competitors) v.competitors = String(extra.service).split(/[,/&]| and /).map((s) => s.trim()).filter((s) => s.length > 3).map((s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
-    try { localStorage.setItem(KEY, JSON.stringify(v)); } catch (_) {}
+    try { localStorage.setItem(profileKey(), JSON.stringify(v)); } catch (_) {}
     try { window.dispatchEvent(new CustomEvent('clavis:business', { detail: profile() })); } catch (_) {}
     applyCopy();
     return profile();
@@ -176,7 +177,7 @@
   // Settings: "Your business" picker in the System Settings modal.
   function mountPicker() {
     if (document.getElementById('sm-business-profile')) return;
-    const anchor = document.getElementById('sm-gemini-voice')?.closest('.smodal-field');
+    const anchor = document.getElementById('sm-elevenlabs-voice')?.closest('.smodal-field');
     if (!anchor) return;
     const p = profile();
     const row = document.createElement('div');

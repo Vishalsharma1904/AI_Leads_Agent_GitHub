@@ -112,12 +112,14 @@ const approvedPostThemeStyles = postThemeStyles.every(file => [
   'clavis-live.css', 'clavis-canvas.css', 'clavis-motion.css', 'clavis-window-refine.css',
   'clavis-composer-iq.css', 'clavis-ear.css', 'clavis-olive.css', 'clavis-silk.css',
   'clavis-setup.css', 'clavis-final.css', 'clavis-claude.css', 'clavis-manual.css',
-  'developer-insights.css', 'clavis-voice-refine.css',
+  'developer-insights.css', 'developer-control.css', 'clavis-voice-refine.css',
   'sarvam-calling.css', 'clavis-enterprise.css', 'rudra-brand.css', 'connectors.css',
   'clavis-operator.css', 'rudra-auth-claude.css', 'clavis-task-polish.css',
   'outreach-pages.css', 'clavis-refined.css', 'clavis-cream.css', 'rudra-readability.css',
   'rudra-flow.css', 'crm.css', 'crm-business.css', 'crm-insights.css', 'rudra-motion-ui.css',
-  'quiet-entry.css', 'composer-refine.css', 'chat-claude.css', 'app-guide.css'
+  'quiet-entry.css', 'composer-refine.css', 'chat-claude.css', 'app-guide.css',
+  'elevenlabs-studio.css', 'clavis-elevenlabs.css', 'perf-fix.css', 'rudra-rail.css',
+  'voice-workspace-polish.css', 'chat-history.css'
 ].includes(file));
 check('theme-flow.css loads LAST among base stylesheets',
   themeFlowIndex >= 0 && approvedPostThemeStyles,

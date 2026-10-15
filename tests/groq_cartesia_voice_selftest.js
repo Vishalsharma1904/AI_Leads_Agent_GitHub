@@ -11,24 +11,28 @@ const controls = between('const groqCapture =', '// A batch recognizer');
 const settle = () => new Promise(resolve => setImmediate(resolve));
 
 async function queueChecks() {
-  const calls = [], ctl = new AbortController();
-  let release;
-  const c = vm.createContext({speakJarvisText: async (text, opts) => {
+  const calls = [], ctl = new AbortController(), timers = new Map();
+  let release, serial = 0;
+  const c = vm.createContext({setTimeout:(fn,ms)=>{timers.set(++serial,{fn,ms});return serial;},clearTimeout:id=>timers.delete(id),stopJarvisSpeech(){},
+    speakJarvisText: async (text, opts) => {
     if (text === 'Theek hai sir.' && !opts.forceRepeat) return false;
     calls.push(text);
-    if (text === 'Noida ki list ready hai.') await new Promise(resolve => { release = resolve; opts.signal.addEventListener('abort', resolve, {once:true}); });
+    if (text === 'Theek hai sir. Noida ki list ready hai.') await new Promise(resolve => { release = resolve; opts.signal.addEventListener('abort', resolve, {once:true}); });
     return !opts.signal.aborted;
   }});
   vm.runInContext(queue + '\nthis.make = clavisStreamSpeaker;', c);
   const q = c.make(ctl.signal);
-  q.push('Theek hai sir.'); q.push('Noida ki list ready hai.');
+  q.push('Theek hai sir. '); q.push('Noida ki list ready hai.');
   await settle();
+  assert.equal(calls.length,0,'first speech chunks coalesce for up to 200ms');
+  assert.equal([...timers.values()][0].ms,200);
   let finished = false;
   const done = q.finish().then(() => { finished = true; });
   await settle(); assert.equal(finished, false, 'turn waits for playback, not only generation');
-  assert.deepEqual(calls, ['Theek hai sir.', 'Noida ki list ready hai.']);
+  assert.deepEqual(calls, ['Theek hai sir. Noida ki list ready hai.']);
+  assert.equal(timers.size,0,'finish immediately flushes and clears the coalescing timer');
   ctl.abort(); await done;
-  q.push('Stale audio must not play.'); assert.equal(calls.length, 2);
+  q.push('Stale audio must not play.'); assert.equal(calls.length, 1);
 }
 
 async function engineChecks() {
@@ -49,8 +53,8 @@ async function engineChecks() {
   for (const question of ['What is CRM?', 'Aur iska fayda']) {
     const parts = [];
     const reply = await w.JarvisEngine.sendMessage(question,ctl.signal,null,text => parts.push(text),{source:'voice'});
-    assert.equal(parts.join(' '),reply.text,'streamed sentences must not replay the complete answer');
-    spoken.push(parts.join(' '));
+    assert.equal(parts.join('').trim(),reply.text,'streamed sentences must not replay the complete answer');
+    spoken.push(parts.join('').trim());
   }
   assert.equal(requests.length,2,'one conversational request per turn');
   assert.ok(requests.every(request => request.messages[0].content.length < 2600),'voice questions and contextual follow-ups both use a bounded prompt without the tool catalogue');
@@ -120,11 +124,14 @@ async function audioReadyChecks() {
 }
 
 async function bargeCaptureChecks() {
-  let level = 0, enabled = true, stopped = 0, captured, releaseMic, acquisitions = 0;
-  const recorders = [];
+  let level = 0, enabled = true, stopped = 0, captured, captureMeta, releaseMic, acquisitions = 0, verdict = 'unknown', checkedEvidence;
+  const recorders = [], tapStarts = [], tapStops = [];
   const makeStream = () => ({getTracks:() => [{stop:() => stopped++}],clone:makeStream});
   const w = {ClavisVoiceState:{canProcessMic:() => enabled,registerAudioCleanup() {}},
     ClavisDirect:{providerConfigured:() => true},SupabaseAuth:{getUser:() => ({id:'owner-a'})},
+    ClavisEar:{voiceId:{required:()=>true,capture:(since,until)=>({since,until,owner:'owner-a'}),
+      check:({voiceEvidence})=>{checkedEvidence=voiceEvidence;return {verdict,reason:verdict==='unknown'?'too-short':'mismatch'};}},
+      tap:{start:async(tag,stream)=>tapStarts.push({tag,stream}),stop:tag=>tapStops.push(tag)}},
     LocalSpeechEngine:{acquireVoiceMicrophone:async () => makeStream()}};
   class Recorder {
     static isTypeSupported() {return true;}
@@ -144,18 +151,33 @@ async function bargeCaptureChecks() {
   const code = fs.readFileSync(path.join(__dirname,'..','clavis-barge-in.js'),'utf8').replace('return { arm,','return { _tick:tick, arm,');
   vm.runInContext(code,c);
   const barge = w.ClavisBargeIn;
-  await barge.arm(capture => {captured=capture;});
+  await barge.arm((capture,meta) => {captured=capture;captureMeta=meta;});
   for(let i=0;i<6;i++) barge._tick();
   level=.12; barge._tick();
   assert.equal(recorders.length,1,'first voiced frame starts capture before interruption confirmation');
   recorders[0].ondataavailable({data:new Blob(['first words'])});
   for(let i=0;i<6;i++) barge._tick();
+  assert.equal(captured,undefined,'too-short owner evidence keeps gathering audio without interrupting');
+  assert.equal(barge._isArmed(),true);assert.equal(recorders[0].state,'recording');
+  verdict='owner';barge._tick();
   assert.ok(captured); assert.equal(captured.recorder.state,'recording');
+  assert.equal(captured.voiceEvidence,checkedEvidence,'capture carries the exact approved owner evidence');
+  assert.equal(captureMeta.voiceEvidence,checkedEvidence,'callback retains evidence even when no recorder is available');
   assert.equal(await captured.chunks[0].text(),'first words');
   const h = captureHarness(); await h.ctx.start({capture:captured});
   captured.recorder.stop(); await settle();
   assert.ok((await h.uploads[0].blob.text()).startsWith('first words'),'Groq upload preserves early interruption audio');
   h.resolve('New question'); await captured.recorder.done; assert.deepEqual(h.sent,['New question']);
+
+  level=0;verdict='other';let unwanted=0;
+  await barge.arm(()=>unwanted++);
+  for(let i=0;i<6;i++)barge._tick();
+  level=.12;for(let i=0;i<7;i++)barge._tick();
+  assert.equal(unwanted,0,'another speaker cannot interrupt playback');
+  assert.equal(recorders.at(-1).state,'inactive','rejected candidate releases its recorder');
+  assert.equal(barge._isArmed(),true,'owner listening remains armed after a background speaker');
+  assert.ok(tapStarts.length>0&&tapStarts.every(tap=>tap.tag==='barge'&&tap.stream.getTracks));
+  assert.ok(tapStops.every(tag=>tag==='barge'),'barge lifecycle cannot stop other audio consumers');
 
   barge.cleanup(); level=0;
   w.LocalSpeechEngine.acquireVoiceMicrophone=() => {acquisitions++;return new Promise(resolve => {releaseMic=resolve;});};
@@ -214,7 +236,7 @@ function noiseAndRomanChecks() {
 
 function captureHarness() {
   const uploads = [], sent = [], timers = [];
-  let resolveSTT, currentOwner = 'owner-a', enabled = true, trackStops = 0;
+  let resolveSTT, currentOwner = 'owner-a', enabled = true, trackStops = 0, ownerAccepted = true;
   const VS = {canProcessMic: () => enabled, registerAudioCleanup() {}, mark() {}, setMicEnabled: v => { enabled = v; }, mic: {
     claim(_owner, fn) { this.stopFn = fn; }, release() { const fn = this.stopFn; this.stopFn = null; fn?.(); },
   }};
@@ -232,11 +254,12 @@ function captureHarness() {
     AbortController, Blob, console, CLAVIS_VS:VS, isGroqRecording:false, groqMediaRecorder:null,
     setTimeout: fn => {timers.push(fn); return timers.length;}, clearTimeout() {},
     clavisSpeakingNow: () => false, clavisIsAwake: () => true,
+    clavisVoiceVerdict:()=>({accept:ownerAccepted,reason:ownerAccepted?'owner':'not-owner'}),
     clavisSilenceWatch: () => Object.assign(() => {}, {heard:() => true}), setJarvisStatus() {},
     clavisShowVoicePreview() {}, commitJarvisVoiceInput:async text => {sent.push(text);}, scheduleHandsFreeRelisten() {},
   };
   vm.createContext(ctx); vm.runInContext(controls + recorder + '\nthis.start = legacyStartGroqWhisperVoiceInput; this.cancel = stopGroqCapture;',ctx);
-  return {ctx,uploads,sent,timers, resolve:text => resolveSTT(text), owner:value => {currentOwner = value;}, stops:() => trackStops};
+  return {ctx,uploads,sent,timers, resolve:text => resolveSTT(text), owner:value => {currentOwner = value;}, acceptOwner:value=>{ownerAccepted=value;}, stops:() => trackStops};
 }
 
 (async () => {
@@ -262,6 +285,9 @@ function captureHarness() {
   await h.ctx.start(); const third = h.ctx.groqMediaRecorder;
   third.stop(); await settle(); h.owner('owner-b'); h.resolve('Another account transcript'); await third.done;
   assert.equal(h.sent.length,1,'account switch blocks pending transcript');
+  await h.ctx.start(); const rejected=h.ctx.groqMediaRecorder;
+  rejected.stop(); await settle(); h.acceptOwner(false); h.resolve('Background speaker question'); await rejected.done;
+  assert.equal(h.sent.length,1,'unverified speaker cannot launch a Groq fallback turn');
   assert.ok(h.stops() >= 3);
   console.log('Groq capture + Cartesia reply ownership: PASS');
 })().catch(error => {console.error(error); process.exitCode=1;});

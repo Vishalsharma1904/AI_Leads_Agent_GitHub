@@ -1,0 +1,131 @@
+/* Calling studio uses the existing app tokens and native controls. */
+:is(#vp-elevenlabs, #el-calling-host) { color: var(--foreground, var(--gray-900)); min-width: 0; }
+:is(#vp-elevenlabs, #el-calling-host) [hidden] { display: none !important; }
+:is(#vp-elevenlabs, #el-calling-host) .el-intro { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin: 20px 0 8px; }
+:is(#vp-elevenlabs, #el-calling-host) h2 { margin: 5px 0 8px; font-size: 24px; font-weight: 600; }
+:is(#vp-elevenlabs, #el-calling-host) h3 { margin: 0 0 14px; font-size: 16px; font-weight: 600; }
+:is(#vp-elevenlabs, #el-calling-host) p { line-height: 1.6; }
+:is(#vp-elevenlabs, #el-calling-host) .el-intro p { margin: 0; font-size: 13px; color: var(--muted-foreground, var(--gray-600)); }
+:is(#vp-elevenlabs, #el-calling-host) a { color: var(--foreground, var(--gray-800)); font-size: 12px; text-underline-offset: 3px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-eyebrow { font-size: 10px; letter-spacing: .12em; color: var(--muted-foreground, var(--gray-600)); }
+:is(#vp-elevenlabs, #el-calling-host) .el-status { min-height: 20px; margin: 12px 0 18px; font-size: 13px; color: var(--muted-foreground, var(--gray-600)); }
+:is(#vp-elevenlabs, #el-calling-host) .el-status[data-error="true"] { color: var(--destructive, #b34e41); }
+:is(#vp-elevenlabs, #el-calling-host) .el-layout { display: grid; grid-template-columns: minmax(200px, 260px) minmax(0, 1fr); gap: 24px; align-items: start; }
+:is(#vp-elevenlabs, #el-calling-host) .el-panel { min-width: 0; padding: 24px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, var(--card-bg, transparent)); }
+:is(#vp-elevenlabs, #el-calling-host) .el-note { font-size: 12px; color: var(--muted-foreground, var(--gray-600)); overflow-wrap: anywhere; }
+:is(#vp-elevenlabs, #el-calling-host) .el-field { display: grid; gap: 7px; margin: 0 0 18px; font-size: 12px; font-weight: 500; min-width: 0; }
+:is(#vp-elevenlabs, #el-calling-host) .el-field input, :is(#vp-elevenlabs, #el-calling-host) .el-field textarea, :is(#vp-elevenlabs, #el-calling-host) .el-field select { font: inherit; color: inherit; min-width: 0; width: 100%; box-sizing: border-box; border: 1px solid var(--border); border-radius: 7px; padding: 11px 12px; background: var(--background, var(--input-bg, transparent)); }
+:is(#vp-elevenlabs, #el-calling-host) .el-field textarea { resize: vertical; line-height: 1.65; }
+:is(#vp-elevenlabs, #el-calling-host) .el-field select { appearance: auto; min-height: 42px; cursor: pointer; }
+:is(#vp-elevenlabs, #el-calling-host) .el-field select option { background: var(--background, #fff); color: var(--foreground, #222); }
+:is(#vp-elevenlabs, #el-calling-host) .el-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 20px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-check { display: flex; gap: 9px; align-items: flex-start; font-size: 12px; font-weight: 400; line-height: 1.6; margin: 12px 0; }
+:is(#vp-elevenlabs, #el-calling-host) .el-check input { flex: 0 0 auto; margin: 3px 0 0; accent-color: var(--foreground, #596b3a); }
+:is(#vp-elevenlabs, #el-calling-host) .el-btn { border: 1px solid var(--border); background: var(--surface, transparent); border-radius: 7px; padding: 10px 14px; color: inherit; font: inherit; font-size: 12px; cursor: pointer; min-height: 40px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-btn:hover { background: var(--muted, var(--hover-bg, rgba(128,128,128,.08))); }
+:is(#vp-elevenlabs, #el-calling-host) .el-btn.el-primary { background: var(--foreground, #293225); color: var(--background, #fff); border-color: transparent; }
+:is(#vp-elevenlabs, #el-calling-host) button:disabled { opacity: .5; cursor: wait; }
+:is(#vp-elevenlabs, #el-calling-host) :is(input, select, textarea, button, summary, a):focus-visible { outline: 2px solid var(--ring, #75814d); outline-offset: 3px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+:is(#vp-elevenlabs, #el-calling-host) .el-row { display: flex; justify-content: space-between; gap: 16px; align-items: center; }
+:is(#vp-elevenlabs, #el-calling-host) .el-row h3 { margin: 0; }
+:is(#vp-elevenlabs, #el-calling-host) .el-spaced { margin-top: 24px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-agent-list { display: grid; gap: 6px; font-size: 12px; margin-bottom: 18px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-agent-list button { text-align: left; border: 1px solid transparent; border-radius: 6px; padding: 12px 10px; background: transparent; color: inherit; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+:is(#vp-elevenlabs, #el-calling-host) .el-agent-list button:hover, :is(#vp-elevenlabs, #el-calling-host) .el-agent-list button[aria-current="true"] { background: var(--muted, var(--hover-bg, rgba(128,128,128,.08))); border-color: var(--border); }
+:is(#vp-elevenlabs, #el-calling-host) .el-tabs { display: flex; border-bottom: 1px solid var(--border); margin: -5px 0 25px; gap: 20px; overflow-x: auto; }
+:is(#vp-elevenlabs, #el-calling-host) .el-tabs button { padding: 12px 0; font: inherit; font-size: 13px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted-foreground, var(--gray-600)); cursor: pointer; flex-shrink: 0; }
+:is(#vp-elevenlabs, #el-calling-host) .el-tabs button[aria-selected="true"] { color: var(--foreground, var(--gray-900)); border-bottom-color: currentColor; }
+:is(#vp-elevenlabs, #el-calling-host) .el-advanced { border-top: 1px solid var(--border); padding: 17px 0; margin-top: 8px; }
+:is(#vp-elevenlabs, #el-calling-host) summary { cursor: pointer; font-size: 13px; padding: 3px 0; }
+:is(#vp-elevenlabs, #el-calling-host) details[open] > summary { margin-bottom: 22px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-save-actions { margin-top: 20px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-resource-list { padding: 5px 0 18px; font-size: 12px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-transcript { max-height: 340px; overflow-y: auto; border-top: 1px solid var(--border); margin-top: 20px; font-size: 13px; overflow-wrap: anywhere; }
+:is(#vp-elevenlabs, #el-calling-host) .el-transcript p { margin: 12px 0; }
+:is(#vp-elevenlabs, #el-calling-host) .el-transcript [data-role="agent"] { color: var(--muted-foreground, var(--gray-600)); }
+:is(#vp-elevenlabs, #el-calling-host) .el-call-list { display: grid; gap: 8px; margin: 16px 0; font-size: 12px; }
+:is(#vp-elevenlabs, #el-calling-host) .el-conversation { padding: 14px 0; border: 0; border-bottom: 1px solid var(--border); text-align: left; background: transparent; color: inherit; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+:is(#vp-elevenlabs, #el-calling-host) audio { width: 100%; margin-top: 15px; }
+:is(#vp-elevenlabs, #el-calling-host) #el-conversation-detail { border-top: 1px solid var(--border); padding-top: 24px; margin-top: 24px; }
+@media (max-width: 900px) { :is(#vp-elevenlabs, #el-calling-host) .el-layout { grid-template-columns: 1fr; } :is(#vp-elevenlabs, #el-calling-host) .el-rail { display: block; } }
+@media (max-width: 540px) { :is(#vp-elevenlabs, #el-calling-host) .el-intro { align-items: flex-start; flex-direction: column; gap: 12px; } :is(#vp-elevenlabs, #el-calling-host) .el-panel { padding: 18px; } :is(#vp-elevenlabs, #el-calling-host) .el-fields { grid-template-columns: 1fr; } :is(#vp-elevenlabs, #el-calling-host) .el-tabs { gap: 17px; } :is(#vp-elevenlabs, #el-calling-host) .el-row { flex-wrap: wrap; } }
+@media (prefers-reduced-motion: reduce) { :is(#vp-elevenlabs, #el-calling-host) *, :is(#vp-elevenlabs, #el-calling-host) *::before, :is(#vp-elevenlabs, #el-calling-host) *::after { scroll-behavior: auto !important; animation: none !important; transition: none !important; } }
+
+/* A button mid-request says so. Before this it only went grey, which on a
+   slow network is indistinguishable from a button that simply does nothing. */
+:is(#vp-elevenlabs, #el-calling-host) [aria-busy="true"] {
+  position: relative;
+  color: transparent !important;
+  pointer-events: none;
+  cursor: progress;
+}
+:is(#vp-elevenlabs, #el-calling-host) [aria-busy="true"]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  color: var(--foreground, #2a2f1f);
+  animation: elSpin 620ms linear infinite;
+}
+:is(#vp-elevenlabs, #el-calling-host) .el-primary[aria-busy="true"]::after { color: #fff; }
+@keyframes elSpin { to { transform: rotate(1turn); } }
+@media (prefers-reduced-motion: reduce) {
+  :is(#vp-elevenlabs, #el-calling-host) [aria-busy="true"]::after { animation-duration: 1.6s; }
+}
+
+/* Pitch documents. One row per document: whether it goes out, what it is,
+   how big, and a way to drop it. The tick is the whole control — a checkbox
+   plus a label reads as two things when it is really one decision. */
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--border);
+}
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-row:last-child { border-bottom: 0; }
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 13.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-meta {
+  flex: none;
+  font-size: 12px;
+  color: var(--muted-foreground, #6b6f5c);
+  font-variant-numeric: tabular-nums;
+}
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-meta[data-status="failed"] { color: #a33a2a; }
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-meta[data-status="partial"] { color: #8a6d1f; }
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-tick {
+  flex: none;
+  min-width: 104px;
+  font-size: 12px;
+  transition: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+}
+:is(#vp-elevenlabs, #el-calling-host) .el-doc-tick[data-on="true"] {
+  background: var(--olive-600, #4a6b35);
+  border-color: var(--olive-600, #4a6b35);
+  color: #fff;
+}
+/* The tool URL carries a signing token: wrap it, never truncate it, so a
+   half-copied token cannot be pasted into the agent by mistake. */
+:is(#vp-elevenlabs, #el-calling-host) .el-hook {
+  overflow-wrap: anywhere;
+  user-select: all;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+  line-height: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(#vp-elevenlabs, #el-calling-host) .el-doc-tick { transition: none; }
+}

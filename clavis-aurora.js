@@ -692,6 +692,13 @@
   }
 
   function cancelSettle(el) {
+    if (glide) {
+      cancelAnimationFrame(glide.raf);
+      var g = glide; glide = null;
+      var now = g.el.getBoundingClientRect();
+      commitDrag(g.el, now.left, now.top, g.b);
+      return;
+    }
     if (!dragSettleTimer) return;
     clearTimeout(dragSettleTimer);
     dragSettleTimer = 0;
@@ -727,8 +734,14 @@
     el.classList.remove('is-settling', 'is-snapped-left', 'is-snapped-right');
     el.classList.add('is-dragging');
     place(el, r.left, r.top, b);
-    el.style.setProperty('transition', 'transform ' + duration + 'ms cubic-bezier(.34, 1.2, .64, 1), box-shadow 260ms cubic-bezier(.22, 1, .36, 1)', 'important');
+    /* The window glides after the pointer on a damped spring (glideStep):
+       slow and soft like before, but continuous. The old CSS transition was
+       re-started every frame, so each restart dropped the velocity to zero
+       and the motion stuttered. */
+    el.style.setProperty('transition', 'box-shadow 260ms cubic-bezier(.22, 1, .36, 1)', 'important');
     el.style.setProperty('transform', 'translate3d(0px, 0px, 0)', 'important');
+    glide = { el: el, b: b, baseL: r.left, baseT: r.top, tx: 0, ty: 0, x: 0, y: 0,
+              released: false, last: 0, raf: 0, tau: duration ? GLIDE_TAU : 0 };
 
     doc.addEventListener('pointermove', onPointerMove, true);
     doc.addEventListener('pointerup', onPointerUp, true);
@@ -740,29 +753,45 @@
     e.preventDefault();
   }
 
+  /* Damped follow, frame-rate independent. GLIDE_TAU is the time constant:
+     ~63% of the way in 130 ms, settled (<0.3 px) in ~0.7 s, never overshoots. */
+  var GLIDE_TAU = 0.13;
+  var glide = null;
+
+  function glideStep(now) {
+    var g = glide;
+    if (!g) return;
+    g.raf = 0;
+    var dt = g.last ? Math.min(0.05, (now - g.last) / 1000) : 1 / 60;
+    g.last = now;
+    var k = g.tau ? 1 - Math.exp(-dt / g.tau) : 1;
+    g.x += (g.tx - g.x) * k;
+    g.y += (g.ty - g.y) * k;
+    if (Math.abs(g.tx - g.x) < 0.3 && Math.abs(g.ty - g.y) < 0.3) { g.x = g.tx; g.y = g.ty; }
+    g.el.style.setProperty('transform', 'translate3d(' + g.x.toFixed(2) + 'px, ' + g.y.toFixed(2) + 'px, 0)', 'important');
+    if (g.x !== g.tx || g.y !== g.ty) { g.raf = requestAnimationFrame(glideStep); return; }
+    g.last = 0;
+    if (g.released) {
+      glide = null;
+      commitDrag(g.el, g.baseL + g.tx, g.baseT + g.ty, g.b);
+    }
+  }
+  function glideTo(tx, ty) {
+    if (!glide) return;
+    glide.tx = tx; glide.ty = ty;
+    if (!glide.raf) glide.raf = requestAnimationFrame(glideStep);
+  }
+
   function onPointerMove(e) {
     if (!drag) return;
+    var dx = e.clientX - drag.startX;
+    var dy = e.clientY - drag.startY;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.moved = true;
     drag.nextClientX = e.clientX;
     drag.nextClientY = e.clientY;
-    if (dragRaf) {
-      e.stopPropagation();
-      e.preventDefault();
-      return;
-    }
-    dragRaf = requestAnimationFrame(function () {
-      dragRaf = 0;
-      if (!drag) return;
-      var cx = drag.nextClientX;
-      var cy = drag.nextClientY;
-      var dx = cx - drag.startX;
-      var dy = cy - drag.startY;
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) drag.moved = true;
-
-      // The reference panel eases each RAF target with a 480ms spring.
-      var left = clamp(drag.baseL + dx, MARGIN, drag.bounds.maxL);
-      var top = clamp(drag.baseT + dy, MARGIN, drag.bounds.maxT);
-      drag.el.style.setProperty('transform', 'translate3d(' + (left - drag.baseL) + 'px, ' + (top - drag.baseT) + 'px, 0)', 'important');
-    });
+    var left = clamp(drag.baseL + dx, MARGIN, drag.bounds.maxL);
+    var top = clamp(drag.baseT + dy, MARGIN, drag.bounds.maxT);
+    glideTo(left - drag.baseL, top - drag.baseT);
     e.stopPropagation();
     e.preventDefault();
   }
@@ -787,6 +816,7 @@
     doc.removeEventListener('pointercancel', onPointerUp, true);
 
     if (!moved) {
+      if (glide) { cancelAnimationFrame(glide.raf); glide = null; }
       commitDrag(el, baseL, baseT, b);
       return;
     }
@@ -794,12 +824,9 @@
     // Exactly where released: "jha roku vhi ruk jaye jase phle hota tha" - zero drift or jumping
     var finalLeft = clamp(baseL + (cx - startX), MARGIN, b.maxL);
     var finalTop = clamp(baseT + (cy - startY), MARGIN, b.maxT);
-    el.style.setProperty('transform', 'translate3d(' + (finalLeft - baseL) + 'px, ' + (finalTop - baseT) + 'px, 0)', 'important');
-    if (duration) {
-      dragSettleTimer = setTimeout(function () {
-        dragSettleTimer = 0;
-        commitDrag(el, finalLeft, finalTop, b);
-      }, duration + 20);
+    if (glide) {
+      glide.released = true;
+      glideTo(finalLeft - baseL, finalTop - baseT);   // lands exactly there, then commits
     } else {
       commitDrag(el, finalLeft, finalTop, b);
     }

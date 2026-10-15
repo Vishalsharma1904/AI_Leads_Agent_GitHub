@@ -1,0 +1,42 @@
+const assert = require('node:assert/strict'), fs = require('node:fs'), vm = require('node:vm');
+const values = new Map();
+const window = {localStorage:{getItem:key=>values.get(key)??null,setItem:(key,value)=>values.set(key,value),removeItem:key=>values.delete(key)},dispatchEvent(){}};
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../clavis-voice-budget.js'),'utf8'),{window,Date,console,CustomEvent:class{}});
+assert.equal(window.ClavisVoiceBudget.allowTTS(10),true);
+window.ClavisVoiceBudget.noteTTS(4000);
+assert.equal(window.ClavisVoiceBudget.allowTTS(1),false);
+assert.match(window.ClavisVoiceBudget.reason(),/local.*cap/);
+assert.doesNotMatch(window.ClavisVoiceBudget.reason(),/Cartesia par|Groq.*chal raha|aaj ki limit poori/);
+values.set('clavis_eleven_cap_chars_day','8000');
+assert.equal(window.ClavisVoiceBudget.allowTTS(1000),true,'Changing local cap recovers paid voice without resetting usage');
+assert.equal(window.ClavisVoiceBudget.allowTTS(5000),false);
+assert.match(window.ClavisVoiceBudget.reason(5000),/local.*cap/,'Oversized request needs an explanation even when some characters remain');
+values.set('clavis_eleven_cap_stt_day','0');assert.equal(window.ClavisVoiceBudget.allowSTT(),false);
+assert.equal(window.ClavisVoiceBudget.remainingSTT(),0);
+values.set('clavis_eleven_cap_stt_day','900'); window.ClavisVoiceBudget.noteSTT(120);
+assert.equal(window.ClavisVoiceBudget.remainingSTT(),780,'Continuous session receives actual remaining time');
+console.log('PASS local voice caps: defaults, accurate source, adjustable limits and explicit zero');
+
+let owner = '';
+const scoped = new Map();
+const scopedWindow = { SupabaseAuth:{getUser:()=>owner ? {id:owner}:null}, localStorage:{getItem:key=>scoped.get(key)??null,setItem:(key,value)=>scoped.set(key,value),removeItem:key=>scoped.delete(key)},dispatchEvent(){} };
+vm.runInNewContext(fs.readFileSync(require('node:path').join(__dirname,'../clavis-voice-budget.js'),'utf8'),{window:scopedWindow,Date,console,CustomEvent:class{}});
+const budget = scopedWindow.ClavisVoiceBudget;
+budget.noteTTS(50); owner = 'tenant-a';
+assert.equal(budget.status().chars.day,50,'Existing unscoped usage conservatively migrates without a free reset');
+budget.noteTTS(100); owner = 'tenant-b';
+assert.equal(budget.status().chars.day,0,'A different account has its own local meter');
+budget.noteTTS(25); budget.noteSTT(12.5,'tenant-a');
+assert.equal(budget.status().chars.day,25);
+assert.equal(budget.status().stt.day,0,'Late cleanup of prior account does not consume new listening allowance');
+owner = 'tenant-a';
+assert.equal(budget.status().chars.day,150);
+assert.equal(budget.status().stt.day,12.5,'Session usage books to its original account');
+budget.reset(); assert.equal(budget.status().chars.day,0);
+owner = 'tenant-b'; assert.equal(budget.status().chars.day,25,'Reset touches only current account');
+for (const corrupt of ['null','7','true','"string"','[]','{']) {
+  scoped.set('clavis_eleven_usage_v1:tenant-b',corrupt);
+  assert.equal(budget.status().chars.day,0,'Corrupt storage type does not break budget admission: '+corrupt);
+  budget.noteTTS(10); assert.equal(budget.status().chars.day,10);
+}
+console.log('PASS account-scoped local usage and legacy migration');

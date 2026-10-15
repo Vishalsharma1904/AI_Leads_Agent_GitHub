@@ -1652,7 +1652,7 @@
       }
     }
     // Run independent sources together; either may be unavailable or slow.
-    const backend = getJSON(`${BACKEND()}/api/v1/web/images?q=${encodeURIComponent(u.search || u.raw)}&n=${n + 3}`, {}, 7000)
+    const backend = getJSON(`${BACKEND()}/api/v1/web/images?q=${encodeURIComponent(u.search || u.raw)}&n=${n + 3}`, {headers:{Authorization:'Bearer ' + (await window.SupabaseAuth?.getAccessToken?.() || '')}}, 7000)
       .then((r) => {
         const items = keepOnSubject(Array.isArray(r.items) ? r.items : [], u).slice(0, n);
         if (!items.length) throw new Error('No backend images');
@@ -1858,7 +1858,7 @@
     let data = null;
     try {
       const res = await withTimeout(fetch(`${BACKEND()}/api/v1/web/read`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: u, screenshot: true, follow_contact: true }),
+        method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (await window.SupabaseAuth?.getAccessToken?.() || '') }, body: JSON.stringify({ url: u, screenshot: true, follow_contact: true }),
       }), 40000, 'Website read');
       if (res.ok) data = await res.json();
     } catch (_) { /* backend off: screenshot service + summary only */ }

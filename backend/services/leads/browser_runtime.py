@@ -33,17 +33,31 @@ _attempted = False          # one install attempt per process, no retry storms
 _state: bool | None = None  # cached answer once we know it
 
 
+_PATH_PROBE = ("from playwright.sync_api import sync_playwright\n"
+               "with sync_playwright() as p: print(p.chromium.executable_path)")
+_known_path: str | None = None
+
+
 def browser_path() -> str | None:
-    """The Chromium binary Playwright will actually launch, or None."""
+    """The Chromium binary Playwright will actually launch, or None.
+
+    Asked in a child process with a timeout. In-process sync_playwright()
+    on Windows could hang forever (seen: /health never answering, orphan
+    node.exe drivers piling up), which made the launcher and the app report
+    "backend not available" while the server was actually up.
+    """
+    global _known_path
+    if _known_path and os.path.exists(_known_path):
+        return _known_path
     try:
-        from playwright.sync_api import sync_playwright
+        done = subprocess.run([sys.executable, "-c", _PATH_PROBE], env=_clean_env(),
+                              stdin=subprocess.DEVNULL, capture_output=True, timeout=60)
+        path = done.stdout.decode("utf-8", "replace").strip().splitlines()[-1] if done.returncode == 0 and done.stdout.strip() else None
     except Exception:
-        return None
-    try:
-        with sync_playwright() as p:
-            return p.chromium.executable_path
-    except Exception:
-        return None
+        path = None
+    if path:
+        _known_path = path
+    return path
 
 
 def browser_ready() -> bool:
@@ -110,10 +124,17 @@ def ensure_browser(timeout: int = 900) -> bool:
 
 
 def status() -> dict:
-    """For /health and the app's own diagnostics."""
-    path = browser_path()
+    """For /health: answers instantly from what is already known, never
+    launches anything. browser_ready is None until the first probe ran."""
+    path = _known_path
+    ready = bool(path and os.path.exists(path)) if path else (_state if _state is not None else None)
     return {
         "browser_path": path,
-        "browser_ready": bool(path and os.path.exists(path)),
+        "browser_ready": ready,
         "install_attempted": _attempted,
     }
+
+
+def warm_status_in_background() -> None:
+    """Fill the /health answer once at startup without blocking the server."""
+    threading.Thread(target=browser_path, name="lead-browser-probe", daemon=True).start()

@@ -47,38 +47,43 @@ window.SupabaseAuth = (() => {
       return { success: false, error: 'Supabase client could not load.' };
     }
     if (!config) {
-      for (let attempt = 0; attempt < 15 && !config; attempt++) {
+      const endpoints = isLocalDev && API_BASE !== '/api'
+        ? ['/api/public-config', `${API_BASE}/public-config`] : [`${API_BASE}/public-config`];
+      for (let attempt = 0; attempt < 3 && !config; attempt++) {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
         try {
-          const response = await fetch(`${API_BASE}/public-config`, { headers: { Accept: 'application/json' } });
+          const response = await fetch(endpoints[attempt % endpoints.length], { priority: 'high', signal: controller.signal, headers: { Accept: 'application/json' } });
           if (!response.ok) throw new Error(`HTTP ${response.status}`);
           config = await response.json();
         } catch (_) {
-          // The local static app can sign in for serverless integrations even
-          // when the separate calling backend is stopped.
-          if (isLocalDev && API_BASE !== '/api') {
-            try {
-              const fallback = await fetch('/api/public-config', { headers: { Accept: 'application/json' } });
-              if (fallback.ok) { config = await fallback.json(); break; }
-            } catch (_) {}
-          }
-          if (attempt < 14) await new Promise(resolve => setTimeout(resolve, 1000));
-        }
+          // Retry the trusted public config without blocking on calling startup.
+        } finally { clearTimeout(timeout); }
       }
       if (!config) {
-        // "Check your internet connection" was a guess, and usually the wrong
-        // one: by far the commonest cause is that the backend simply is not
-        // running. Name the address we actually tried and what to do about it,
-        // so this costs nobody fifteen minutes.
-        const target = API_BASE.replace(/\/api$/, '') || window.location.origin;
-        const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1)(:|$|\/)/i.test(target);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 8000);
+        try {
+          const response = await fetch('./public-auth-config.json', { signal: controller.signal, cache: 'no-store' });
+          if (!response.ok) throw new Error('Public sign-in settings unavailable');
+          const value = await response.json();
+          let publicKey = String(value.supabase_publishable_key || '').startsWith('sb_publishable_');
+          if (!publicKey) {
+            try { publicKey = JSON.parse(atob(value.supabase_publishable_key.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).role === 'anon'; }
+            catch (_) { publicKey = false; }
+          }
+          if (/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/.test(value.supabase_url) && publicKey) {
+            config = { supabase_url: value.supabase_url, supabase_publishable_key: value.supabase_publishable_key };
+          }
+        } catch (_) { /* Preserve the recoverable sign-in error below. */ }
+        finally { clearTimeout(timeout); }
+      }
+      if (!config) {
+        const target = endpoints[0];
         return {
           success: false,
-          error: isLocal
-            ? `Backend ${target} par chal nahi raha, isliye sign-in nahi ho sakta. `
-              + 'App folder me "npm run backend" chalaiye (ya Start-Clavis), phir Retry dabaiye.'
-            : `Rudra24 AI service (${target}) se baat nahi ho paayi. `
-              + 'Internet check kijiye — agar internet theek hai to service abhi down hai.',
-          code: 'BACKEND_UNREACHABLE',
+          error: 'Sign-in service ki configuration load nahi hui. Retry connection dabaiye.',
+          code: 'AUTH_CONFIG_UNAVAILABLE',
           target
         };
       }
@@ -130,13 +135,19 @@ window.SupabaseAuth = (() => {
   async function signInWithGoogle() {
     const ready = await init();
     if (!ready.success || !client) return ready;
-    const redirectTo = config?.supabase_redirect_url || `${window.location.origin}/`;
+    const desktop = typeof window.RudraDesktop?.googleSignIn === 'function';
+    const redirectTo = desktop ? `${window.location.origin}/` : config?.supabase_redirect_url || `${window.location.origin}/`;
     try {
+      // The normal browser owns saved Gmail accounts. PKCE verification stays
+      // in this app; the desktop bridge returns only the one-use auth code.
+      const queryParams = { prompt: 'select_account' };
       const result = await client.auth.signInWithOAuth({
         provider: 'google',
-        options: { redirectTo }
+        options: { redirectTo, queryParams, ...(desktop ? { skipBrowserRedirect: true } : {}) }
       });
-      return result.error ? authFailure(result.error, 'Google sign-in failed.') : { success: true };
+      if (result.error) return authFailure(result.error, 'Google sign-in failed.');
+      if (desktop) await window.RudraDesktop.googleSignIn(result.data.url);
+      return { success: true, external: desktop };
     } catch (error) { return authFailure(error, 'Google sign-in failed.'); }
   }
 

@@ -45,46 +45,56 @@ const LeadsCtrl = {
   },
 
   async loadLeads() {
+    const identity = () => window.SupabaseAuth?.getUser?.()?.id || '';
+    const owner = identity();
+    const generation = this._loadGeneration = (this._loadGeneration || 0) + 1;
+    const apply = rows => {
+      if (identity() !== owner || generation !== this._loadGeneration) return [];
+      this.leads = Array.isArray(rows) ? rows : [];
+      this._owner = owner;
+      window.syncLeadState?.(this.leads);
+      window.allLeads = this.leads;
+      return this.leads;
+    };
+    if (!owner) return apply([]);
     try {
       // CRITICAL: Always load from active user's scoped storage first
       // Never use window.allLeads directly as it might be from a different user session
       
       // 1. Get active user's email for proper data scoping
       const activeEmail = window.CloudSyncManager?.getActiveEmail?.() || 
-                         localStorage.getItem('skylark_active_email') || '';
+                         window.SupabaseAuth?.getUser?.()?.email || '';
       
       console.log(`[LeadsCtrl] Loading leads for active user: ${activeEmail || 'default'}`);
       
       // 2. Try UserStorage scoped storage (user-specific localStorage)
       if (window.UserStorage) {
         const scoped = window.UserStorage.getJSON('allLeads', null);
-        if (Array.isArray(scoped) && scoped.length > 0) {
-          this.leads = scoped;
-          window.allLeads = this.leads;
-          console.log(`[LeadsCtrl] Loaded ${scoped.length} leads from UserStorage`);
-          return this.leads;
-        }
+        if (Array.isArray(scoped) && scoped.length) return apply(scoped);
       }
 
       // 3. Try active user's isolated IndexedDB
       if (window.MemoryEngine && typeof window.MemoryEngine.getAllLeads === 'function') {
         const dbLeads = await window.MemoryEngine.getAllLeads();
+        if (identity() !== owner || generation !== this._loadGeneration) return [];
         if (Array.isArray(dbLeads) && dbLeads.length > 0) {
-          this.leads = dbLeads;
-          window.allLeads = this.leads;
+          apply(dbLeads);
           if (window.UserStorage) window.UserStorage.setJSON('allLeads', this.leads);
           console.log(`[LeadsCtrl] Loaded ${dbLeads.length} leads from IndexedDB`);
           return this.leads;
         }
       }
+      // An explicitly empty cache may coexist with newly saved own IDB rows.
+      // After checking that same-account DB, retain empty rather than legacy data.
+      if (Array.isArray(window.UserStorage?.getJSON?.('allLeads', null))) return apply([]);
       
       // 4. Try cloud pull as fallback
       if (activeEmail && activeEmail.includes('@') && window.CloudSyncManager && window.location.protocol !== 'file:') {
         console.log('[LeadsCtrl] No local data found, attempting cloud pull...');
         const cloudData = await window.CloudSyncManager.pullLatest(activeEmail);
+        if (identity() !== owner || generation !== this._loadGeneration) return [];
         if (cloudData && cloudData.leads && Array.isArray(cloudData.leads)) {
-          this.leads = cloudData.leads;
-          window.allLeads = this.leads;
+          apply(cloudData.leads);
           if (window.UserStorage) window.UserStorage.setJSON('allLeads', this.leads);
           console.log(`[LeadsCtrl] Loaded ${this.leads.length} leads from cloud`);
           return this.leads;
@@ -92,32 +102,22 @@ const LeadsCtrl = {
       }
 
       // 5. Last resort: check if window.allLeads has data (but verify it's for current user)
-      if (Array.isArray(window.allLeads) && window.allLeads.length > 0) {
-        this.leads = window.allLeads;
-        console.log(`[LeadsCtrl] Using in-memory leads (${this.leads.length})`);
-        return this.leads;
-      }
-      
-      // 6. Final fallback - empty array
-      const raw = localStorage.getItem('allLeads');
-      this.leads = raw ? JSON.parse(raw) : [];
-      window.allLeads = this.leads;
-      console.log(`[LeadsCtrl] No leads found, starting fresh`);
+      return apply([]);
     } catch (e) {
       console.warn('[LeadsCtrl] Error loading leads:', e);
-      this.leads = [];
-      window.allLeads = [];
+      return apply([]);
     }
     return this.leads;
   },
 
   saveLeads() {
+    if (!this._owner || this._owner !== window.SupabaseAuth?.getUser?.()?.id) return false;
     try {
       window.allLeads = this.leads;
       if (window.UserStorage) {
         window.UserStorage.setJSON('allLeads', this.leads);
       }
-      localStorage.setItem('allLeads', JSON.stringify(this.leads));
+      window.syncLeadState?.(this.leads);
 
       if (window.MemoryEngine && typeof window.MemoryEngine.saveAllLeads === 'function') {
         window.MemoryEngine.saveAllLeads(this.leads);
@@ -1021,6 +1021,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // Hook into showView for instant refresh
 const prevShowViewForLeads = window.showView;
+window.addEventListener('rudra:auth-state', () => {
+  LeadsCtrl._loadGeneration = (LeadsCtrl._loadGeneration || 0) + 1;
+  LeadsCtrl._owner = '';
+  LeadsCtrl.leads = []; LeadsCtrl.filtered = []; LeadsCtrl.selectedIds?.clear?.();
+  window.syncLeadState?.([]); window.allLeads = [];
+  LeadsCtrl.render();
+});
 window.showView = function(viewName) {
   if (typeof prevShowViewForLeads === 'function') prevShowViewForLeads(viewName);
   if (viewName === 'all-leads') {

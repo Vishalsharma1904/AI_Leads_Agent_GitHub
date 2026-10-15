@@ -13,6 +13,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM
+from cryptography.exceptions import InvalidTag
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import Column, Integer, String, Text, Float, UniqueConstraint
@@ -20,6 +21,9 @@ from sqlalchemy.orm import Session
 import httpx
 
 from api.auth_sync import AUTO_CREATE_SCHEMA, Base, UserAccount, get_current_user, get_db
+
+
+from services.developer_control import ProviderAssignment, assigned_secret, managed_access
 
 
 class ProviderCredential(Base):
@@ -60,7 +64,10 @@ AI_PROVIDER_CONFIG = {
     "perplexity": {"env": "PERPLEXITY_API_KEY", "base_url": "https://api.perplexity.ai"},
     "gemini": {"env": "GEMINI_API_KEY", "base_url": "https://generativelanguage.googleapis.com"},
 }
-ALLOWED_PROVIDERS = {"apify", "google_sheets", "toughtongue", "sarvam", "composio", "cartesia", *AI_PROVIDER_CONFIG.keys()}
+# "whatsapp" holds the Meta Cloud API access token used to send pitch
+# documents. It has no probe below: Meta's token check needs the phone
+# number id too, which lives in the pitch settings, not the vault.
+ALLOWED_PROVIDERS = {"apify", "google_sheets", "toughtongue", "sarvam", "composio", "cartesia", "elevenlabs", "whatsapp", *AI_PROVIDER_CONFIG.keys()}
 LIVE_MODELS = {"gemini-3.8-live", "gemini-2.5-flash-native-audio-preview-12-2025", "gemini-3.1-flash-live-preview"}
 
 
@@ -112,6 +119,15 @@ PROVIDER_CHECKS: dict = {
         "label": "Cartesia", "method": "GET", "url": "https://api.cartesia.ai/voices",
         "headers": lambda s: {"X-API-Key": s, "Cartesia-Version": "2024-06-10"},
         "console": "https://play.cartesia.ai/keys",
+    },
+    "elevenlabs": {
+        "label": "ElevenLabs", "method": "GET",
+        "url": "https://api.elevenlabs.io/v1/user/subscription",
+        "headers": lambda s: {"xi-api-key": s},
+        # Restricted keys can lack subscription-read permission. Reject only
+        # ElevenLabs' explicit invalid-key code, never a plan/scope failure.
+        "marker": "invalid_api_key", "code": "ELEVENLABS_KEY_INVALID",
+        "console": "https://elevenlabs.io/app/settings/api-keys",
     },
     "gemini": {
         "label": "Google AI Studio", "method": "GET",
@@ -190,9 +206,13 @@ def encrypt_secret(secret: str) -> tuple[str, str]:
 
 
 def decrypt_secret(record: ProviderCredential) -> str:
-    ciphertext = base64.urlsafe_b64decode(record.ciphertext.encode())
-    nonce = base64.urlsafe_b64decode(record.nonce.encode())
-    return AESGCM(_master_key()).decrypt(nonce, ciphertext, None).decode("utf-8")
+    try:
+        ciphertext = base64.urlsafe_b64decode(record.ciphertext.encode())
+        nonce = base64.urlsafe_b64decode(record.nonce.encode())
+        return AESGCM(_master_key()).decrypt(nonce, ciphertext, None).decode("utf-8")
+    except (InvalidTag, ValueError, TypeError, AttributeError):
+        raise HTTPException(503, detail={"code": "CREDENTIAL_UNREADABLE",
+            "message": "Saved provider access could not be opened. Ask the workspace owner to restore the vault configuration or reconnect this provider."}) from None
 
 
 class CredentialRequest(BaseModel):
@@ -205,6 +225,10 @@ def upsert_credential(req: CredentialRequest, db: Session = Depends(get_db), use
     provider = normalize_provider(req.provider)
     if provider not in ALLOWED_PROVIDERS:
         raise HTTPException(status_code=400, detail="Unsupported provider")
+    from services.developer_control import ProviderAssignment
+    assignment = db.query(ProviderAssignment).filter_by(user_id=user.id, provider=provider).first()
+    if assignment and assignment.mode != 'individual':
+        raise HTTPException(403, 'Provider setup is managed by your administrator')
     _master_key()
     # Strip once, here, for every provider. Pasting a key from a web page
     # carries a trailing newline often enough that it used to be stored broken
@@ -221,6 +245,8 @@ def upsert_credential(req: CredentialRequest, db: Session = Depends(get_db), use
             "console": check.get("console", ""),
         })
     ciphertext, nonce = encrypt_secret(secret)
+    if not assignment:
+        db.add(ProviderAssignment(user_id=user.id, provider=provider, mode='individual'))
     record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider=provider).first()
     if record:
         record.ciphertext, record.nonce, record.updated_at = ciphertext, nonce, time.time()
@@ -235,8 +261,12 @@ def upsert_credential(req: CredentialRequest, db: Session = Depends(get_db), use
 
 @router.get("")
 def list_credentials(db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    from services.developer_control import managed_access
+    if managed_access():
+        from api.control import provider_status
+        return {'success': True, 'credentials': [{**item, 'source':item['mode']} for item in provider_status(db,user.id)]}
     records = db.query(ProviderCredential).filter_by(owner_user_id=user.id).all()
-    configured = [{"provider": r.provider, "updated_at": r.updated_at, "configured": True} for r in records]
+    configured = [{"provider": r.provider, "updated_at": r.updated_at, "configured": bool(r.ciphertext)} for r in records]
     owned = {r.provider for r in records}
     for provider in ALLOWED_PROVIDERS - owned:
         if get_provider_secret(provider, user, db):
@@ -253,10 +283,11 @@ def verify_credential(provider: str, db: Session = Depends(get_db), user: UserAc
         raise HTTPException(status_code=400, detail={"code": "CREDENTIAL_VERIFY_UNSUPPORTED",
                                                      "message": "Unsupported provider."})
     record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider=provider).first()
-    if not record:
+    secret = get_provider_secret(provider, user, db)
+    if not secret:
         raise HTTPException(status_code=404, detail={"code": "AI_CREDENTIAL_MISSING",
                                                      "message": f"{provider_label(provider)} is not connected yet."})
-    state, note = probe_key(provider, decrypt_secret(record))
+    state, note = probe_key(provider, secret)
     if state == "rejected":
         check = PROVIDER_CHECKS.get(provider) or {}
         raise HTTPException(status_code=422, detail={
@@ -270,18 +301,39 @@ def verify_credential(provider: str, db: Session = Depends(get_db), user: UserAc
 @router.delete("/{provider}")
 def delete_credential(provider: str, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
     provider = normalize_provider(provider)
+    if provider not in ALLOWED_PROVIDERS:
+        raise HTTPException(status_code=400, detail='Unsupported provider')
     record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider=provider).first()
-    if record:
-        db.delete(record)
-        db.commit()
+    if not record and not get_provider_secret(provider, user, db):
+        return {"success": True, "provider": provider}
+    if not record:
+        record = ProviderCredential(owner_user_id=user.id, provider=provider, ciphertext='', nonce='', updated_at=time.time())
+        db.add(record)
+    else:
+        record.ciphertext, record.nonce, record.updated_at = '', '', time.time()
+    db.commit()
     return {"success": True, "provider": provider}
 
 
 def get_provider_secret(provider: str, user: UserAccount, db: Session) -> Optional[str]:
     provider = normalize_provider(provider)
+    from services.developer_control import assigned_secret, managed_access
+    assigned, secret = assigned_secret(db, user, provider)
+    if assigned:
+        return secret
     record = db.query(ProviderCredential).filter_by(owner_user_id=user.id, provider=provider).first()
     if record:
-        return decrypt_secret(record)
+        return decrypt_secret(record) if record.ciphertext else None
+    if managed_access():
+        return None
+    from services.family_provider_access import get_family_secret
+    family = get_family_secret(provider, getattr(user, 'email', ''))
+    if family:
+        return family
+    if provider == "elevenlabs":
+        # A paid voice/calling account must belong to this tenant. Never use
+        # an operator's environment key for another tenant's audio or calls.
+        return None
     # Platform fallback. A tenant with no key of its own uses the operator's,
     # read from this server's environment — which is how a customer can run the
     # product without ever being handed a key. The key is used here and never
@@ -305,8 +357,8 @@ class LiveTokenRequest(BaseModel):
 async def gemini_live_token(req: LiveTokenRequest, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
     if req.model not in LIVE_MODELS:
         raise HTTPException(status_code=422, detail="Unsupported Live voice model")
-    from api.limits import consume
-    consume(db, user, "ai")
+    from api.limits import consume, finish_usage, fail_usage
+    from services.developer_control import reserve_provider
     key = get_provider_secret("gemini", user, db)
     if not key:
         raise HTTPException(status_code=503, detail="Connect Gemini in Setup first")
@@ -320,18 +372,32 @@ async def gemini_live_token(req: LiveTokenRequest, db: Session = Depends(get_db)
         "fieldMask": "model",
         "bidiGenerateContentSetup": {"model": "models/" + req.model},
     }
+    reservations = [('voice_sessions', consume(db, user, 'voice_sessions', provider='gemini', basis='token_requested'))]
+    submitted = False
     try:
+        reservations.append(('ai', consume(db, user, 'ai', provider='gemini', basis='token_requested')))
+        reserve_provider(db, user, 'gemini')
+        submitted = True
         async with httpx.AsyncClient(timeout=10.0) as client:
             response = await client.post("https://generativelanguage.googleapis.com/v1beta/auth_tokens",
                                          headers={"x-goog-api-key": key}, json=payload)
-        if response.status_code == 400:
-            raise ValueError("Google rejected the Live token request (400)")
+        if 400 <= response.status_code < 500:
+            raise HTTPException(429 if response.status_code == 429 else 422, 'Google rejected the Live token request')
         response.raise_for_status()
         data = response.json()
+        if not isinstance(data, dict):
+            raise ValueError('Invalid Live token response')
         # Google returns either {"name": "auth_tokens/..."} or newer format with token directly
         name = data.get("name") or data.get("token") or ""
-        if not isinstance(name, str) or not (name.startswith("auth_tokens/") or len(name) > 20):
+        if not isinstance(name, str) or name == key or not (name.startswith("auth_tokens/") or len(name) > 20):
             raise ValueError("Google returned an invalid Live token response")
-    except (httpx.HTTPError, ValueError) as e:
-        raise HTTPException(status_code=502, detail=f"Google could not issue a secure Live token: {str(e)[:100]}") from None
-    return {"token": name, "model": req.model, "expires_at": payload["expireTime"]}
+    except BaseException as exc:
+        for meter, reservation in reservations:
+            fail_usage(db, user, meter, reservation, exc, submitted=submitted)
+        if isinstance(exc, (httpx.HTTPError, ValueError)):
+            raise HTTPException(502, 'Google could not issue a secure Live token. Try again.') from None
+        raise
+    for _, reservation in reservations:
+        finish_usage(db, user, reservation, 'issued', 'token_issued')
+    return {"token": name, "model": req.model, "expires_at": payload["expireTime"],
+            "allowance_basis": "Issued sessions; vendor connection duration is not hard-capped by the app"}

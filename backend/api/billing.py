@@ -25,15 +25,20 @@ import hashlib
 import hmac
 import json
 import os
+import re
 import time
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
-from sqlalchemy import Column, Float, Integer, String
+from sqlalchemy import Column, Float, Integer, String, or_, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from api.auth_sync import AUTO_CREATE_SCHEMA, Base, UserAccount, engine, get_current_user, get_db
+
+from services.developer_control import AccountControl, UsageEvent
 
 router = APIRouter(prefix="/api/v1/billing", tags=["billing"])
 
@@ -61,6 +66,22 @@ class Subscription(Base):
     order_id = Column(String(64), default="")
     payment_id = Column(String(64), default="")
     updated_at = Column(Float, default=time.time)
+
+
+class PaymentReceipt(Base):
+    """Server-only purchase ledger; each payment and order can grant once."""
+    __tablename__ = "payment_receipts"
+    payment_id = Column(String(64), primary_key=True)
+    order_id = Column(String(64), unique=True, nullable=False)
+    owner_user_id = Column(String(64), nullable=False, index=True)
+    plan = Column(String(32), nullable=False)
+    amount_paise = Column(Integer, nullable=False)
+    currency = Column(String(3), nullable=False)
+    status = Column(String(24), nullable=False)
+    period_start = Column(Float, default=0.0, nullable=False)
+    period_end = Column(Float, default=0.0, nullable=False)
+    created_at = Column(Float, default=time.time, nullable=False)
+    updated_at = Column(Float, default=time.time, nullable=False)
 
 
 if AUTO_CREATE_SCHEMA:
@@ -95,41 +116,200 @@ def _row(db: Session, user_id: str) -> Subscription:
 
 
 def _activate(db: Session, user_id: str, plan: str, order_id: str, payment_id: str) -> Subscription:
-    row = _row(db, user_id)
-    now = time.time()
-    # Paying again while still inside a period extends it rather than
-    # throwing away what was already bought.
-    base = row.period_end if row.status == "active" and row.period_end > now else now
-    row.plan = plan
-    row.status = "active"
-    row.period_start = now
-    row.period_end = base + MONTH_SECONDS
-    row.calls_used = 0
-    row.order_id = order_id
-    row.payment_id = payment_id
-    row.updated_at = now
-    db.commit()
-    return row
+    order, payment = _fetch_purchase(order_id, payment_id)
+    if _binding(order, payment, user_id)[1] != plan:
+        raise HTTPException(400, "Payment plan does not match")
+    return apply_verified_payment(db, user_id, order, payment)
+
+
+def _binding(order: dict, payment: dict, owner: str | None = None) -> tuple[str, str]:
+    notes = order.get("notes")
+    if not isinstance(notes, dict):
+        raise HTTPException(400, "Order has no buyer binding")
+    buyer, plan = notes.get("owner_user_id"), notes.get("plan")
+    if not isinstance(buyer, str) or not buyer or len(buyer) > 64 or not isinstance(plan, str) or plan not in PLANS:
+        raise HTTPException(400, "Order buyer or plan is invalid")
+    if owner is not None and buyer != owner:
+        raise HTTPException(403, "That payment belongs to another buyer")
+    amount = PLANS[plan]["amount_paise"]
+    if (order.get("amount") != amount or payment.get("amount") != amount
+            or order.get("currency") != "INR" or payment.get("currency") != "INR"
+            or not order.get("id") or payment.get("order_id") != order["id"]
+            or not payment.get("id")):
+        raise HTTPException(400, "Payment amount, currency or order does not match")
+    return buyer, plan
+
+
+def _lock_purchase(db: Session, owner: str, order_id: str, payment_id: str) -> None:
+    # Billing owns this transaction. Drop the authentication read transaction
+    # before taking a writer lock; no endpoint calls this with pending writes.
+    db.rollback()
+    dialect = db.get_bind().dialect.name
+    if dialect == "sqlite":
+        db.execute(text("BEGIN IMMEDIATE"))
+    elif dialect == "postgresql":
+        # Locks also cover an absent subscription/receipt. Row locks cannot.
+        for identity in sorted(("buyer:" + owner, "order:" + order_id, "payment:" + payment_id)):
+            key = int.from_bytes(hashlib.sha256(identity.encode()).digest()[:8], "big", signed=True)
+            db.execute(text("SELECT pg_advisory_xact_lock(:key)"), {"key": key})
+    else:
+        raise HTTPException(503, "Billing requires SQLite or PostgreSQL")
+
+
+def _receipt(db: Session, owner: str, plan: str, order: dict, payment: dict) -> PaymentReceipt | None:
+    receipt = db.query(PaymentReceipt).filter(or_(
+        PaymentReceipt.payment_id == payment["id"], PaymentReceipt.order_id == order["id"]
+    )).first()
+    if receipt and (receipt.owner_user_id != owner or receipt.plan != plan
+                    or receipt.payment_id != payment["id"] or receipt.order_id != order["id"]
+                    or receipt.amount_paise != PLANS[plan]["amount_paise"] or receipt.currency != "INR"):
+        raise HTTPException(409, "Payment or order is already bound to another purchase")
+    return receipt
+
+
+def apply_verified_payment(db: Session, user_id: str, order: dict, payment: dict) -> Subscription:
+    """Apply entities fetched from Razorpay, atomically with their receipt."""
+    owner, plan = _binding(order, payment, user_id)
+    if (payment.get("status") != "captured" or payment.get("captured") is not True
+            or payment.get("amount_refunded", 0) != 0 or order.get("status") != "paid"):
+        raise HTTPException(400, "Payment is not captured and paid")
+    try:
+        _lock_purchase(db, owner, order["id"], payment["id"])
+        receipt = _receipt(db, owner, plan, order, payment)
+        row = db.query(Subscription).filter_by(owner_user_id=owner).first()
+        if receipt:
+            if receipt.status != "captured" or row is None:
+                raise HTTPException(409, "That purchase no longer grants access")
+            db.commit()
+            return row
+        now = time.time()
+        if row is None:
+            row = Subscription(owner_user_id=owner, calls_used=0)
+            db.add(row)
+        # Legacy subscriptions have no ledger yet. Import their last purchase
+        # without extending it when an old signed callback is replayed.
+        legacy = row.payment_id == payment["id"] and row.order_id == order["id"]
+        if legacy and row.status != "active":
+            raise HTTPException(409, "That purchase no longer grants access")
+        base = max(now, row.period_end or 0) if row.status == "active" else now
+        if not legacy:
+            row.plan, row.status = plan, "active"
+            row.period_start, row.period_end = now, base + MONTH_SECONDS
+            row.calls_used = 0
+            row.order_id, row.payment_id = order["id"], payment["id"]
+            row.updated_at = now
+        db.add(PaymentReceipt(payment_id=payment["id"], order_id=order["id"],
+                              owner_user_id=owner, plan=plan, amount_paise=PLANS[plan]["amount_paise"],
+                              currency="INR", status="captured", period_start=(max(row.period_start or 0, (row.period_end or 0) - MONTH_SECONDS) if legacy else base),
+                              period_end=row.period_end, created_at=now, updated_at=now))
+        db.commit()
+        return row
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(409, "Payment or order is already recorded") from None
+    except Exception:
+        db.rollback()
+        raise
+
+
+def _reverse_payment(db: Session, order: dict, payment: dict) -> bool:
+    owner, plan = _binding(order, payment)
+    refunded = payment.get("status") == "refunded" or payment.get("amount_refunded", 0) > 0
+    if not refunded and payment.get("status") != "failed":
+        return False
+    try:
+        _lock_purchase(db, owner, order["id"], payment["id"])
+        receipt = db.query(PaymentReceipt).filter_by(payment_id=payment['id']).first()
+        if receipt and (receipt.owner_user_id != owner or receipt.order_id != order['id']):
+            raise HTTPException(409, 'Payment binding mismatch')
+        row = db.query(Subscription).filter_by(owner_user_id=owner).first()
+        now = time.time()
+        if receipt is None and row and row.payment_id == payment["id"] and row.order_id == order["id"]:
+            receipt = PaymentReceipt(payment_id=payment["id"], order_id=order["id"],
+                                     owner_user_id=owner, plan=plan, amount_paise=PLANS[plan]["amount_paise"],
+                                     currency="INR", status="captured", period_start=max(row.period_start or 0, (row.period_end or 0) - MONTH_SECONDS),
+                                     period_end=row.period_end or 0, created_at=now, updated_at=now)
+            db.add(receipt)
+        if receipt is None:
+            # A processed refund can beat an in-flight captured callback.
+            # Persist its tombstone so that stale callback cannot grant later.
+            if refunded:
+                db.add(PaymentReceipt(payment_id=payment["id"], order_id=order["id"],
+                                      owner_user_id=owner, plan=plan, amount_paise=PLANS[plan]["amount_paise"],
+                                      currency="INR", status="refunded", created_at=now, updated_at=now))
+            db.commit()
+            return refunded
+        if receipt.status == "captured":
+            # Any processed refund cancels this grant. Keep independently paid
+            # periods, and move their future intervals forward consistently.
+            remaining = max(0, receipt.period_end - max(now, receipt.period_start))
+            if row and remaining:
+                row.period_end = max(now, (row.period_end or 0) - remaining)
+                later = db.query(PaymentReceipt).filter(
+                    PaymentReceipt.owner_user_id == owner, PaymentReceipt.status == "captured",
+                    PaymentReceipt.period_start >= receipt.period_end,
+                    PaymentReceipt.payment_id != receipt.payment_id).all()
+                for grant in later:
+                    grant.period_start -= remaining
+                    grant.period_end -= remaining
+                if row.period_end <= now:
+                    row.status = "refunded" if refunded else "failed"
+                elif row.payment_id == payment["id"]:
+                    previous = db.query(PaymentReceipt).filter(
+                        PaymentReceipt.owner_user_id == owner, PaymentReceipt.status == "captured",
+                        PaymentReceipt.payment_id != receipt.payment_id).order_by(PaymentReceipt.period_end.desc()).first()
+                    if previous:
+                        row.plan, row.order_id, row.payment_id = previous.plan, previous.order_id, previous.payment_id
+                row.updated_at = now
+            receipt.status = "refunded" if refunded else "failed"
+            receipt.updated_at = now
+        db.commit()
+        return True
+    except Exception:
+        db.rollback()
+        raise
 
 
 def entitlement(user: UserAccount, db: Session) -> dict:
     """The one answer every gated feature asks for."""
+    from services.developer_control import AccountControl
     row = _row(db, user.id)
     now = time.time()
-    active = row.status == "active" and row.period_end > now
-    if row.status == "active" and not active:
+    paid = row.status == "active" and row.period_end > now
+    if row.status == "active" and not paid:
         row.status = "expired"
         row.updated_at = now
         db.commit()
-    quota = PLANS.get(row.plan, {}).get("call_quota", 0) if active else FREE_QUOTA
+    control = db.query(AccountControl).filter_by(user_id=user.id).first()
+    manual = bool(control and control.status in ("active", "trial")
+                  and (not control.expires_at or control.expires_at > now))
+    blocked = bool(control and (control.status == "blocked"
+                               or json.loads(control.features or "{}").get("calls") is False))
+    active = (paid or manual) and not blocked
+    quota = PLANS.get(row.plan, {}).get("call_quota", 0) if paid else FREE_QUOTA
+    calls_used = int(row.calls_used or 0)
+    if manual:
+        quota = json.loads(control.monthly_limits or "{}").get("calls", quota)
+        # Owner grants use the same calendar-month ledger as admission.
+        from services.developer_control import UsageEvent
+        from api.limits import IST
+        from datetime import datetime
+        from sqlalchemy import func
+        start = datetime.now(IST).replace(day=1, hour=0, minute=0, second=0, microsecond=0).timestamp()
+        calls_used = int(db.query(func.coalesce(func.sum(UsageEvent.amount), 0)).filter(
+            UsageEvent.user_id == user.id, UsageEvent.meter == 'calls',
+            UsageEvent.created_at >= start, UsageEvent.state != 'refunded').scalar())
+    if blocked or control and not active:
+        quota = 0
     return {
-        "plan": row.plan if active else "",
-        "plan_label": PLANS.get(row.plan, {}).get("label", "") if active else "Free trial",
+        "plan": row.plan if paid and active else "",
+        "plan_label": (PLANS.get(row.plan, {}).get("label", "") if paid else "Owner access") if active else "Free trial",
         "active": active,
-        "period_end": row.period_end if active else 0,
-        "calls_used": int(row.calls_used or 0),
+        "access_source": ("payment" if paid else "owner") if active else "none",
+        "period_end": (row.period_end if paid else control.expires_at) if active else 0,
+        "calls_used": calls_used,
         "call_quota": quota,
-        "calls_left": max(0, quota - int(row.calls_used or 0)),
+        "calls_left": max(0, quota - calls_used),
     }
 
 
@@ -193,10 +373,6 @@ async def create_order(req: OrderRequest, db: Session = Depends(get_db), user: U
     if response.status_code >= 400:
         raise HTTPException(502, f"Razorpay rejected the order ({response.status_code})")
     order = response.json()
-    row = _row(db, user.id)
-    row.order_id = str(order.get("id", ""))
-    row.updated_at = time.time()
-    db.commit()
     return {
         "success": True,
         "key_id": key_id,
@@ -216,27 +392,30 @@ def verify(req: VerifyRequest, db: Session = Depends(get_db), user: UserAccount 
                         hashlib.sha256).hexdigest()
     if not hmac.compare_digest(expected, req.razorpay_signature):
         raise HTTPException(400, "Payment signature did not verify")
-    row = _row(db, user.id)
-    if row.order_id and row.order_id != req.razorpay_order_id:
-        raise HTTPException(400, "That payment belongs to a different order")
-    # Which plan was bought is read back from Razorpay's own notes, never from
-    # the browser — otherwise anyone could pay for Starter and claim Growth.
-    plan = _plan_from_order(req.razorpay_order_id)
-    if plan not in PLANS:
-        raise HTTPException(400, "Could not confirm which plan was paid for")
-    _activate(db, user.id, plan, req.razorpay_order_id, req.razorpay_payment_id)
+    order, payment = _fetch_purchase(req.razorpay_order_id, req.razorpay_payment_id)
+    apply_verified_payment(db, user.id, order, payment)
     return {"success": True, **entitlement(user, db)}
 
 
-def _plan_from_order(order_id: str) -> str:
+def _fetch_entity(kind: str, identifier: str) -> dict:
+    prefix = "order_" if kind == "orders" else "pay_"
+    if not isinstance(identifier, str) or not identifier.startswith(prefix) or not re.fullmatch(r"[A-Za-z0-9_]{4,64}", identifier):
+        raise HTTPException(400, "Invalid Razorpay identifier")
     key_id, secret = _keys()
     try:
-        response = httpx.get(f"{RAZORPAY_API}/orders/{order_id}", auth=(key_id, secret), timeout=15.0)
+        response = httpx.get(f"{RAZORPAY_API}/{kind}/{identifier}", auth=(key_id, secret), timeout=15.0)
         if response.status_code >= 400:
-            return ""
-        return str((response.json().get("notes") or {}).get("plan") or "")
+            raise HTTPException(502, "Could not confirm payment with Razorpay")
+        entity = response.json()
     except (httpx.HTTPError, ValueError):
-        return ""
+        raise HTTPException(502, "Could not confirm payment with Razorpay") from None
+    if not isinstance(entity, dict) or entity.get("id") != identifier:
+        raise HTTPException(502, "Razorpay returned a different payment or order")
+    return entity
+
+
+def _fetch_purchase(order_id: str, payment_id: str) -> tuple[dict, dict]:
+    return _fetch_entity("orders", order_id), _fetch_entity("payments", payment_id)
 
 
 @router.post("/webhook")
@@ -256,16 +435,44 @@ async def webhook(request: Request, db: Session = Depends(get_db)):
     except (ValueError, UnicodeDecodeError):
         raise HTTPException(400, "Bad webhook body") from None
 
-    if event.get("event") not in ("payment.captured", "order.paid"):
+    if not isinstance(event, dict):
+        raise HTTPException(400, "Bad webhook body")
+    return await run_in_threadpool(_process_webhook, event, db)
+
+
+def _process_webhook(event: dict, db: Session) -> dict:
+    name = event.get("event")
+    if name not in ("payment.captured", "order.paid", "payment.failed", "payment.refunded", "refund.processed"):
         return {"success": True, "ignored": event.get("event")}
 
-    entity = (((event.get("payload") or {}).get("payment") or {}).get("entity")) or {}
-    notes = entity.get("notes") or {}
-    owner = str(notes.get("owner_user_id") or "")
-    plan = str(notes.get("plan") or "")
-    if not owner or plan not in PLANS:
-        # Nothing to attribute it to. Answer 200 so Razorpay stops retrying a
-        # payment we genuinely cannot place, and leave it for the dashboard.
-        return {"success": True, "ignored": "unattributed"}
-    _activate(db, owner, plan, str(entity.get("order_id") or ""), str(entity.get("id") or ""))
+    payload = event.get("payload")
+    if not isinstance(payload, dict):
+        raise HTTPException(400, "Bad webhook payload")
+    payment_payload = payload.get("payment") or {}
+    refund_payload = payload.get("refund") or {}
+    order_payload = payload.get("order") or {}
+    if not all(isinstance(item, dict) for item in (payment_payload, refund_payload, order_payload)):
+        raise HTTPException(400, "Bad webhook entity")
+    entity = payment_payload.get("entity") or {}
+    refund = refund_payload.get("entity") or {}
+    sent_order = order_payload.get("entity") or {}
+    if not all(isinstance(item, dict) for item in (entity, refund, sent_order)):
+        raise HTTPException(400, "Bad webhook entity")
+    payment_id = entity.get("id") or refund.get("payment_id")
+    payment = _fetch_entity("payments", payment_id)
+    order = _fetch_entity("orders", payment.get("order_id"))
+    if (entity.get("order_id") and entity["order_id"] != order["id"]
+            or sent_order.get("id") and sent_order["id"] != order["id"]
+            or refund.get("payment_id") and refund["payment_id"] != payment["id"]):
+        raise HTTPException(400, "Webhook entities do not match this purchase")
+    owner, plan = _binding(order, payment)
+    if name in ("payment.failed", "payment.refunded", "refund.processed"):
+        reversed_payment = _reverse_payment(db, order, payment)
+        if name != "payment.failed" and not reversed_payment:
+            raise HTTPException(503, "Refund is not reflected by Razorpay yet; retry this event")
+        return {"success": True, "reversed": reversed_payment}
+    # A delayed captured event must honour an actual later refund/failure.
+    if payment.get("status") in ("failed", "refunded") or payment.get("amount_refunded", 0) > 0:
+        return {"success": True, "reversed": _reverse_payment(db, order, payment)}
+    apply_verified_payment(db, owner, order, payment)
     return {"success": True, "activated": plan}

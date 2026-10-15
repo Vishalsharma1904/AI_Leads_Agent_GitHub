@@ -11,7 +11,7 @@ if (-not (Test-Path -LiteralPath $python)) {
 $env:PYTHONPATH = $backend
 Push-Location $root
 try {
-  & $python -m unittest discover -s backend/tests -p 'test_*.py' -v
+  & $python backend/scripts/check_backend.py
   if ($LASTEXITCODE) { exit $LASTEXITCODE }
 } finally {
   Pop-Location

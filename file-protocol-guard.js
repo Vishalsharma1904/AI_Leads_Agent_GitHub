@@ -399,6 +399,9 @@
 
       if (st.ui) {
         var w = now - st.uiAt;
+        // UI chal raha hai par engine band (crash / PC sleep ke baad): pehle
+        // yahan launcher kabhi fire hi nahi hota tha, sirf intezaar hota tha.
+        if (!st.launched) launch(false);
         mark('engine', 'active', '');
         if (w > ENGINE_GIVEUP_AFTER) {
           say('AI engine start nahi hua — logs\\backend.log dekhiye');

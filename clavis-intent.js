@@ -556,6 +556,13 @@
     if (!t) return { handled: false };
     const words = t.split(' ');
 
+    // Viewing saved leads is navigation, never authorization for scraping.
+    if (/^(?:(?:please|mujhe|meri|mere|saved|existing|all|sab|purani)\s+)*(?:(?:show|list|open)\s+(?:me\s+|my\s+|the\s+|saved\s+|existing\s+|all\s+)*leads?(?:\s+list)?|leads?(?:\s+(?:ki\s+)?list)?\s+(?:dikhao|dikha\s*do|dikhaiye|kholo)|(?:मेरी\s+|सभी\s+|पुरानी\s+)?लीड्स?\s*(?:दिखाओ|दिखाइए|खोलो))$/.test(t)) {
+      if (typeof window.showView !== 'function') return { handled: true, spoken: 'Leads page abhi ready nahi hai. Dobara try kijiye.' };
+      window.showView('leads');
+      return { handled: true, spoken: 'Saved leads khol raha hoon.' };
+    }
+
     const det = await deterministicIntent(t, raw);
     if (det) return det;
 
@@ -695,8 +702,9 @@
 
   /* ── habits: personal over time ────────────────────────────── */
   const HABITS = 'clavis_habits_v1';
+  const habitsKey = () => HABITS + ':' + (window.SupabaseAuth?.getUser?.()?.id || 'anonymous');
   const STOPWORDS = new Set(('the a an and or of to in on for with is are was be me my mujhe mera meri mere hai hain ho karo kar do de ki ka ke ko se par pe me mein aur bhi toh ye yeh wo woh ek kya kaise please sir clavis ji abhi jara zara dikhao batao chahiye kholo band').split(' '));
-  function readHabits() { try { return JSON.parse(localStorage.getItem(HABITS) || '{}') || {}; } catch (_) { return {}; } }
+  function readHabits() { try { return JSON.parse(localStorage.getItem(habitsKey()) || '{}') || {}; } catch (_) { return {}; } }
   function learn(text) {
     const t = norm(text);
     if (!t || t.length < 3) return;
@@ -714,7 +722,7 @@
     const entries = Object.entries(h.topics).sort((a, b) => b[1] - a[1]);
     if (entries.length > 120) h.topics = Object.fromEntries(entries.slice(0, 80).map(([k, v]) => [k, Math.max(1, Math.round(v * 0.8))]));
     h.n = (h.n || 0) + 1;
-    try { localStorage.setItem(HABITS, JSON.stringify(h)); } catch (_) {}
+    try { localStorage.setItem(habitsKey(), JSON.stringify(h)); } catch (_) {}
   }
   function habitsLine() {
     const h = readHabits();
@@ -793,7 +801,7 @@
       r6.handled === true,
       r7.handled && petOn === false,
       r8.handled && !!r8.spoken && !!woke,
-      !r9.handled,
+      r9.handled,
       bareOk,
       rDist.handled && /12 km/.test(rDist.spoken),
       rFare.handled && /₹32/.test(rFare.spoken),

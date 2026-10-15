@@ -4,17 +4,17 @@ const vm = require('node:vm');
 const source = fs.readFileSync(require('node:path').join(__dirname, '..', 'jarvis_ui.js'), 'utf8');
 const speak = source.slice(source.indexOf('async function speakJarvisText('), source.indexOf('\nfunction testJarvisVoice(', source.indexOf('async function speakJarvisText(')));
 
-async function check(provider, googleResult, fishFails, expected) {
+async function check(result, expected) {
   const calls = [];
   let requestId = 0;
-  const storage = { clavis_tts_provider: provider, clavis_fish_voice_id: 'voice' };
   const context = {
     window: {
-      ClavisDirect: { keyFor: key => key === 'fish_audio' ? 'key' : '', ttsWithFish: async text => { calls.push(['fish', text]); if (fishFails) throw Error('quota'); return 'blob:fish'; } },
-      ClavisVoice: { speak: async (text, opts) => { calls.push(['google', text]); return opts.cloudOnly ? googleResult : true; } },
+      ClavisDirect: { keyFor: () => 'unused', ttsWithFish: async () => { throw Error('retired Fish path must never run'); } },
+      ClavisVoice: { speak: async (text, opts) => { calls.push([text, opts.engine]); return result; } },
+      LocalSpeechEngine: { speak: async () => { throw Error('partial output must never replay'); } },
       ClavisMind: {}, ClavisEar: {}, ClavisBargeIn: {},
     },
-    localStorage: { getItem: key => storage[key] || null },
+    localStorage: { getItem: () => null },
     document: { getElementById: () => null },
     Audio: class { play() { queueMicrotask(() => this.onended()); return Promise.resolve(); } pause() {} },
     URL: { revokeObjectURL() {} }, AbortController, DOMException, console,
@@ -25,12 +25,13 @@ async function check(provider, googleResult, fishFails, expected) {
   };
   vm.createContext(context);
   vm.runInContext(`${speak}\nthis.run = speakJarvisText;`, context);
-  assert.equal(await context.run('First sentence. Second sentence.'), true);
+  assert.equal(await context.run('First sentence. Second sentence.', {engine:'elevenlabs'}), result === true);
   assert.deepEqual(calls, expected);
 }
 
 (async () => {
-  await check('gemini', { remaining: 'Second sentence.' }, false, [['google', 'First sentence. Second sentence.'], ['fish', 'Second sentence.']]);
-  await check('fish', false, true, [['fish', 'First sentence. Second sentence.'], ['google', 'First sentence. Second sentence.']]);
+  await check(true, [['First sentence. Second sentence.', 'elevenlabs']]);
+  await check(false, [['First sentence. Second sentence.', 'elevenlabs']]);
+  await check({remaining:'Second sentence.'}, [['First sentence. Second sentence.', 'elevenlabs']]);
   console.log('Single voice handoff: PASS');
 })().catch(error => { console.error(error); process.exitCode = 1; });

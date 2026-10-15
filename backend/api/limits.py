@@ -43,8 +43,10 @@ router = APIRouter(prefix="/api/v1/limits", tags=["limits"])
 IST = timezone(timedelta(hours=5, minutes=30))
 
 # What a tenant gets unless the operator changes it for them.
-DEFAULT_LIMITS = {"leads": 50, "calls": 25, "ai": 300}
+DEFAULT_LIMITS = {"leads": 50, "calls": 25, "ai": 300, "whatsapp": 20,
+                  "tts_characters": 50000, "voice_seconds": 3600, "voice_sessions": 100}
 METERS = tuple(DEFAULT_LIMITS)          # the only names a caller may spend
+VOICE_METERS = ('tts_characters', 'voice_seconds', 'voice_sessions')
 
 
 def today_key() -> str:
@@ -58,7 +60,19 @@ class TenantLimits(Base):
     email = Column(String(255), default="")           # so the admin list is readable
     leads_per_day = Column(Integer, default=DEFAULT_LIMITS["leads"])
     calls_per_day = Column(Integer, default=DEFAULT_LIMITS["calls"])
+    whatsapp_per_day = Column(Integer, default=20)
+    whatsapp_used = Column(Integer, default=0)
+    whatsapp_total = Column(Integer, default=0)
     ai_per_day = Column(Integer, default=DEFAULT_LIMITS["ai"])
+    tts_characters_per_day = Column(Integer, default=DEFAULT_LIMITS['tts_characters'])
+    voice_seconds_per_day = Column(Integer, default=DEFAULT_LIMITS['voice_seconds'])
+    voice_sessions_per_day = Column(Integer, default=DEFAULT_LIMITS['voice_sessions'])
+    tts_characters_used = Column(Integer, default=0)
+    voice_seconds_used = Column(Integer, default=0)
+    voice_sessions_used = Column(Integer, default=0)
+    tts_characters_total = Column(Integer, default=0)
+    voice_seconds_total = Column(Integer, default=0)
+    voice_sessions_total = Column(Integer, default=0)
     day = Column(String(10), default="")              # YYYY-MM-DD in IST
     leads_used = Column(Integer, default=0)
     calls_used = Column(Integer, default=0)
@@ -91,23 +105,23 @@ if AUTO_CREATE_SCHEMA:
 # ── core ────────────────────────────────────────────────────────────
 
 def _row(db: Session, user: UserAccount) -> TenantLimits:
+    from sqlalchemy.exc import IntegrityError
     row = db.query(TenantLimits).filter_by(owner_user_id=user.id).first()
     if not row:
-        row = TenantLimits(owner_user_id=user.id, day=today_key(), updated_at=time.time())
-        db.add(row)
-    email = getattr(user, "email", "") or ""
-    if email and row.email != email:
-        row.email = email[:255]
-    # The reset is a date comparison, not a timer: a client that moves its own
-    # clock cannot talk this server into a fresh day.
+        try:
+            db.add(TenantLimits(owner_user_id=user.id, email=getattr(user, "email", "") or "", day=today_key()))
+            db.commit()
+        except IntegrityError:
+            db.rollback()
     key = today_key()
-    if row.day != key:
-        row.day = key
-        for meter in METERS:
-            setattr(row, f"{meter}_used", 0)
-    row.last_seen = time.time()
+    # Conditional SQL reset: midnight requests cannot erase each other's spend.
+    db.query(TenantLimits).filter(TenantLimits.owner_user_id == user.id, TenantLimits.day != key).update(
+        {TenantLimits.day: key, **{getattr(TenantLimits, f"{m}_used"): 0 for m in METERS}}, synchronize_session=False)
+    db.query(TenantLimits).filter_by(owner_user_id=user.id).update(
+        {TenantLimits.last_seen: time.time()}, synchronize_session=False)
     db.commit()
-    return row
+    db.expire_all()
+    return db.query(TenantLimits).filter_by(owner_user_id=user.id).one()
 
 
 def _cap(row: TenantLimits, meter: str) -> int:
@@ -128,14 +142,34 @@ def snapshot(db: Session, user: UserAccount) -> dict:
     }
 
 
-def consume(db: Session, user: UserAccount, meter: str, amount: int = 1) -> dict:
+def consume(db: Session, user: UserAccount, meter: str, amount: int = 1, request_id: str | None = None,
+            *, provider: str = '', basis: str = 'app_count') -> dict:
     """Atomically reserve quota BEFORE doing the expensive thing."""
+    if not isinstance(amount, int) or amount <= 0:
+        raise HTTPException(422, 'Reservation amount must be positive')
     if meter not in METERS:
         raise HTTPException(500, f"Unknown meter {meter!r}")
     row = _row(db, user)
+    from services.developer_control import check_access
+    check_access(db, user, 'voice' if meter in VOICE_METERS else meter)
     if row.blocked:
         raise HTTPException(403, "This account is paused. Contact support.")
+    # Serialize admission even on SQLite and reuse a durable retry reservation.
+    db.query(TenantLimits).filter_by(owner_user_id=user.id).update({TenantLimits.updated_at: TenantLimits.updated_at}, synchronize_session=False)
+    if request_id:
+        from services.developer_control import UsageEvent
+        existing = db.query(UsageEvent).filter_by(user_id=user.id, request_id=request_id, meter=meter).first()
+        if existing:
+            if existing.amount != amount: raise HTTPException(409, 'Request ID belongs to another reservation')
+            db.commit()
+            return {**snapshot(db, user), 'usage_id': existing.id, 'idempotent': True}
     cap, used = _cap(row, meter), _used(row, meter)
+    from services.developer_control import managed_access
+    # Testing phase (CLAVIS_MANAGED_ACCESS off): usage is still counted for the
+    # owner's dashboard, but daily caps never stop a test run.
+    testing = not managed_access()
+    if testing:
+        cap = max(cap, used + amount)
     if cap <= 0:
         raise HTTPException(403, f"Your plan has no {meter} allowance.")
     if used + amount > cap:
@@ -145,26 +179,57 @@ def consume(db: Session, user: UserAccount, meter: str, amount: int = 1) -> dict
         ))
     used_col = getattr(TenantLimits, f"{meter}_used")
     total_col = getattr(TenantLimits, f"{meter}_total")
+    from services.developer_control import reserve_monthly, record_usage
+    reserve_monthly(db, user, meter, amount)
+    usage_event = record_usage(db, user, meter, amount, request_id=request_id, provider=provider, basis=basis)
+    if meter == 'calls':
+        from api.billing import Subscription, PLANS, FREE_QUOTA
+        sub = db.query(Subscription).filter_by(owner_user_id=user.id).first()
+        if sub and sub.status == 'active' and sub.period_end > time.time():
+            quota = PLANS.get(sub.plan, {}).get('call_quota', FREE_QUOTA)
+            changed_sub = db.query(Subscription).filter(Subscription.owner_user_id == user.id,
+                Subscription.calls_used + amount <= quota).update({Subscription.calls_used: Subscription.calls_used + amount}, synchronize_session=False)
+            if not changed_sub:
+                db.rollback()
+                raise HTTPException(429, 'Subscription call allowance reached')
+    cap_filter = [] if testing else [used_col + amount <= getattr(TenantLimits, f"{meter}_per_day")]
     changed = db.query(TenantLimits).filter(
         TenantLimits.owner_user_id == user.id, TenantLimits.day == row.day,
-        TenantLimits.blocked == 0, used_col + amount <= getattr(TenantLimits, f"{meter}_per_day")
+        TenantLimits.blocked == 0, *cap_filter
     ).update({used_col: used_col + amount, total_col: total_col + amount,
               TenantLimits.updated_at: time.time()}, synchronize_session=False)
+    if not changed:
+        db.rollback()
+        raise HTTPException(429, f"Daily {meter} allowance reached. Check Usage & Limits.")
     db.commit()
     db.expire_all()
-    if not changed:
-        raise HTTPException(429, f"Daily {meter} allowance reached. Check Usage & Limits.")
-    return snapshot(db, user)
+    return {**snapshot(db, user), "usage_id": usage_event.id}
 
 
-def refund(db: Session, user: UserAccount, meter: str, day: str) -> None:
+def refund(db: Session, user: UserAccount, meter: str, day: str, usage_id: str | None = None) -> None:
     """Return a failed request's reservation, without subtracting from a new day."""
+    amount = 1
+    if usage_id:
+        from services.developer_control import UsageEvent
+        changed = db.query(UsageEvent).filter(UsageEvent.id == usage_id, UsageEvent.user_id == user.id,
+            UsageEvent.state != 'refunded').update({UsageEvent.state: 'refunded'}, synchronize_session=False)
+        if not changed:
+            db.rollback()
+            return
+        event = db.query(UsageEvent).filter_by(id=usage_id, user_id=user.id).first()
+        amount = int(event.amount) if event else 1
+        if meter == 'calls' and event:
+            from api.billing import Subscription
+            db.query(Subscription).filter(Subscription.owner_user_id == user.id, Subscription.period_start <= event.created_at, Subscription.calls_used >= amount).update({Subscription.calls_used: Subscription.calls_used - amount}, synchronize_session=False)
     used = getattr(TenantLimits, f"{meter}_used")
     total = getattr(TenantLimits, f"{meter}_total")
     db.query(TenantLimits).filter(TenantLimits.owner_user_id == user.id).update({
-        used: case((TenantLimits.day == day, case((used > 0, used - 1), else_=0)), else_=used),
-        total: case((total > 0, total - 1), else_=0),
+        used: case((TenantLimits.day == day, case((used >= amount, used - amount), else_=0)), else_=used),
+        total: case((total >= amount, total - amount), else_=0),
     }, synchronize_session=False)
+    if usage_id:
+        from services.developer_control import UsageEvent
+        db.query(UsageEvent).filter_by(id=usage_id, user_id=user.id).update({UsageEvent.state: 'refunded'}, synchronize_session=False)
     db.commit()
     db.expire_all()
 
@@ -176,6 +241,31 @@ def remaining(db: Session, user: UserAccount, meter: str) -> int:
     return max(0, _cap(row, meter) - _used(row, meter))
 
 
+def finish_usage(db: Session, user: UserAccount, reservation: dict, state: str, basis: str | None = None):
+    from services.developer_control import UsageEvent
+    changes = {UsageEvent.state: state}
+    if basis is not None: changes[UsageEvent.basis] = basis
+    db.query(UsageEvent).filter(UsageEvent.id == reservation['usage_id'], UsageEvent.user_id == user.id,
+                              UsageEvent.state != 'refunded').update(changes, synchronize_session=False)
+    db.commit()
+
+
+def fail_usage(db: Session, user: UserAccount, meter: str, reservation: dict, error: BaseException, *, submitted: bool):
+    """Refund definite rejection; retain the reservation when upstream outcome is unknown."""
+    from services.developer_control import UsageEvent, record_usage
+    known = not submitted or (isinstance(error, HTTPException) and 400 <= error.status_code < 500)
+    if not known:
+        finish_usage(db, user, reservation, 'unknown')
+        return
+    event = db.query(UsageEvent).filter_by(id=reservation['usage_id'], user_id=user.id).one()
+    provider, request_id, basis = event.provider, event.request_id, event.basis
+    refund(db, user, meter, reservation['day'], reservation['usage_id'])
+    # A failed attempt stays visible without consuming the refunded allowance.
+    if not db.query(UsageEvent).filter_by(user_id=user.id, request_id=request_id + ':failed', meter=meter).first():
+        record_usage(db, user, meter, 0, request_id=request_id + ':failed', provider=provider, state='failed', basis=basis)
+        db.commit()
+
+
 # ── who may administer ──────────────────────────────────────────────
 
 def is_admin(user: UserAccount) -> bool:
@@ -185,14 +275,15 @@ def is_admin(user: UserAccount) -> bool:
     letting a customer promote themselves. An env var on the server they do
     not control cannot be edited from the product at all.
     """
-    allow = {e.strip().lower() for e in os.getenv("CLAVIS_ADMIN_EMAILS", "").split(",") if e.strip()}
-    email = (getattr(user, "email", "") or "").strip().lower()
-    return bool(email and email in allow)
+    from services.developer_control import is_owner
+    return is_owner(user)
 
 
-def require_admin(user: UserAccount = Depends(get_current_user)) -> UserAccount:
-    if not is_admin(user):
-        raise HTTPException(404, "Not found")      # 404, not 403: don't advertise the console
+def require_admin(user: UserAccount = Depends(get_current_user), credentials=Depends(__import__('api.auth_sync', fromlist=['bearer_scheme']).bearer_scheme)) -> UserAccount:
+    from services.developer_control import owner_claims
+    from api.auth_sync import _verify_supabase_token
+    if not credentials or not owner_claims(user, _verify_supabase_token(credentials.credentials)):
+        raise HTTPException(403, "Developer access required")
     return user
 
 
@@ -207,8 +298,13 @@ def my_limits(db: Session = Depends(get_db), user: UserAccount = Depends(get_cur
 # ── operator console ────────────────────────────────────────────────
 
 class LimitPatch(BaseModel):
+    ai_per_day: int | None = Field(default=None, ge=0, le=100_000)
+    whatsapp_per_day: int | None = Field(default=None, ge=0, le=100_000)
     leads_per_day: int | None = Field(default=None, ge=0, le=100_000)
     calls_per_day: int | None = Field(default=None, ge=0, le=100_000)
+    tts_characters_per_day: int | None = Field(default=None, ge=0, le=10_000_000)
+    voice_seconds_per_day: int | None = Field(default=None, ge=0, le=10_000_000)
+    voice_sessions_per_day: int | None = Field(default=None, ge=0, le=10_000_000)
     blocked: bool | None = None
     note: str | None = Field(default=None, max_length=500)
 
@@ -226,6 +322,8 @@ def list_tenants(db: Session = Depends(get_db), _: UserAccount = Depends(require
                   "limit": int(r.leads_per_day or 0), "total": int(r.leads_total or 0)},
         "calls": {"used": int(r.calls_used or 0) if r.day == key else 0,
                   "limit": int(r.calls_per_day or 0), "total": int(r.calls_total or 0)},
+        "whatsapp": {"used": int(r.whatsapp_used or 0) if r.day == key else 0,
+                     "limit": int(r.whatsapp_per_day or 0), "total": int(r.whatsapp_total or 0)},
         "last_seen": r.last_seen or 0,
     } for r in rows]}
 
@@ -236,14 +334,16 @@ def patch_tenant(owner_user_id: str, patch: LimitPatch,
     row = db.query(TenantLimits).filter_by(owner_user_id=owner_user_id).first()
     if not row:
         raise HTTPException(404, "Tenant not found")
-    if patch.leads_per_day is not None:
-        row.leads_per_day = patch.leads_per_day
-    if patch.calls_per_day is not None:
-        row.calls_per_day = patch.calls_per_day
+    for meter in METERS:
+        value = getattr(patch, meter + '_per_day')
+        if value is not None: setattr(row, meter + '_per_day', value)
     if patch.blocked is not None:
         row.blocked = 1 if patch.blocked else 0
     if patch.note is not None:
         row.note = patch.note
     row.updated_at = time.time()
+    from services.developer_control import bump, audit
+    bump(db, owner_user_id)
+    audit(db, _, owner_user_id, 'limits.update', patch.model_dump(exclude_none=True))
     db.commit()
     return {"success": True, "owner_user_id": owner_user_id}

@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import Column, Integer, String, Text, Float, UniqueConstraint
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import IntegrityError
 
 from api.auth_sync import AUTO_CREATE_SCHEMA, Base, UserAccount, get_current_user, get_db
 from api.credentials import get_provider_secret
@@ -88,6 +89,13 @@ def _city_matches(city: str, place: str) -> bool:
     needle = re.sub(r"[^a-z0-9]+", " ", city.casefold()).strip()
     for alias, canonical in CITY_ALIASES.items():
         needle = re.sub(rf"\b{alias}\b", canonical, needle)
+    sector_pattern = r'\bsector\s*([0-9]{1,3}[a-z]?)\b'
+    sector = re.search(sector_pattern,needle)
+    if sector:
+        normalized = re.sub(sector_pattern,lambda match:'sector '+match[1],normalized)
+        area = 'sector '+sector[1]
+        city_part = re.sub(sector_pattern,'',needle).strip()
+        return f' {area} ' in f' {normalized} ' and (not city_part or f' {city_part} ' in f' {normalized} ')
     return bool(needle) and f" {needle} " in f" {normalized} "
 
 
@@ -186,7 +194,7 @@ def _job_payload(job: LeadJob) -> dict[str, Any]:
     stage = detail.get('label') or (job.error if job.status == "running" else "")
     if re.search(r"Apify|Scrapling|Google Maps|public Maps|Sulekha|Justdial", stage or "", re.I):
         stage = "Discovering companies and checking business contacts"
-    return {"id": job.id, "status": job.status, "result_count": job.result_count or 0,
+    return {"id": job.id, "request_id": job.idempotency_key, "status": job.status, "result_count": job.result_count or 0,
             "stage": stage,
             "progress": {**detail, "label": stage} if detail else {},
             "error": ("A business contact source is unavailable; saved contacts are retained" if re.search(r"Apify|Scrapling|Google Maps|Sulekha|Justdial", job.error or "", re.I) else job.error) if job.status == 'failed' else None,
@@ -240,7 +248,7 @@ async def _bounded_enrichment(records, on_progress=None, *, timeout=75):
                 _enrichment_cleanup.discard(t)
                 if not t.cancelled(): t.exception()
             task.add_done_callback(finish)
-            await asyncio.wait({task}, timeout=1)
+            await asyncio.wait({task}, timeout=min(1, max(0, timeout)))
     return json.loads(json.dumps(records))
 
 
@@ -285,6 +293,9 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
     user = db.query(UserAccount).filter_by(id=user_id).first()
     job.status, job.updated_at = "running", time.time(); db.commit()
     try:
+        from services.developer_control import check_access
+        if not user: raise HTTPException(403, 'Account unavailable')
+        check_access(db, user, 'leads')
         query = json.loads(job.request_payload)
         search_queries = _search_plan(query["cities"], query["industries"], min(12, max(3, query["count"])))
         max_queries = min(len(search_queries), query["count"])
@@ -300,8 +311,11 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
         # exhausted credits, and empty datasets with the same contact filters.
         token = get_provider_secret("apify", user, db) if user and "apify" in query.get("sources", ["apify"]) else None
         if token:
+            from services.developer_control import check_access, reserve_provider
+            check_access(db, user, 'leads')
+            reserve_provider(db, user, 'apify')
             try:
-                per_query = max(1, min(40, query["count"] // len(search_queries)))
+                per_query = max(1, min(100, math.ceil(query["count"] / len(search_queries))))
                 actor_input = {"searchStringsArray": search_queries, "maxCrawledPlacesPerSearch": per_query}
                 url = "https://api.apify.com/v2/acts/compass~crawler-google-places/runs"
                 async with httpx.AsyncClient(timeout=httpx.Timeout(35.0, connect=10.0)) as client:
@@ -324,6 +338,13 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
                         if time.monotonic() > deadline:
                             await client.post(f"https://api.apify.com/v2/actor-runs/{run_id}/abort", headers=headers)
                             raise RuntimeError("Apify exceeded five minutes. Reduce the search size and retry.")
+                        try:
+                            check_access(db, user, 'leads')
+                        except HTTPException:
+                            await client.post(f"https://api.apify.com/v2/actor-runs/{run_id}/abort", headers=headers)
+                            job.status, job.error = 'paused', 'Account access paused'
+                            db.commit()
+                            return
                         response = await client.get(f"https://api.apify.com/v2/actor-runs/{run_id}", headers=headers, params={"waitForFinish": 10})
                         response.raise_for_status()
                         run = response.json()["data"]
@@ -361,6 +382,8 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
                 else:
                     provider_errors.append("Apify returned no usable leads")
             except Exception as exc:
+                if isinstance(exc, HTTPException) and exc.status_code in (401,402,403,429):
+                    raise
                 if isinstance(exc, httpx.HTTPStatusError):
                     code = exc.response.status_code
                     reason = "key rejected" if code in (401, 403) else "credits or billing required" if code == 402 else "rate limited" if code == 429 else f"HTTP {code}"
@@ -377,6 +400,7 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
             job.updated_at = time.time(); db.commit()
 
         db.refresh(job)
+        check_access(db, user, 'leads')
         if job.status == "cancelled" and not valid_items: return
         if "maps" in query.get("sources", ["maps"]) and len(_contactable_items(valid_items, search_queries, query['count'])) < query['count']:
             semaphore = asyncio.Semaphore(3)
@@ -387,6 +411,7 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
                 async with semaphore:
                     db.refresh(job)
                     if job.status == 'cancelled': return []
+                    check_access(db, user, 'leads')
                     job.error = 'Searching public Maps · ' + query_text[:150]
                     job.updated_at = time.time(); db.commit()
                     try:
@@ -415,6 +440,7 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
             valid_items = _spread_results(valid_items, search_queries, min(200, query["count"] * 2))
             provider = 'Apify + public Maps' if provider == 'Apify' else 'Scrapling'
 
+        check_access(db, user, 'leads')
         for item in valid_items:
             item.setdefault("source", provider)
         # Publish genuine Maps contacts before optional website enrichment.
@@ -437,6 +463,7 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
         if directories:
             async def directory_progress(event):
                 db.refresh(job)
+                check_access(db, user, 'leads')
                 if job.status == "cancelled": raise asyncio.CancelledError()
                 job.error = event["label"]
                 job.updated_at = time.time(); db.commit()
@@ -480,6 +507,7 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
                 logger.warning("Website enrichment skipped after source success: %s", exc)
         db.refresh(job)
         if job.status == "cancelled": return
+        check_access(db, user, 'leads')
         # Already accepted contacts keep their slots; enrichment only fills the remainder.
         additional = [item for item in _contactable_items(valid_items, search_queries, query["count"])
                       if id(item) not in published]
@@ -512,18 +540,55 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
         job.updated_at = time.time(); db.commit(); db.close()
 
 
+def recover_stale_jobs(session_factory):
+    """Source budgets are bounded; old reservations never auto-start paid work."""
+    recovered=0
+    with session_factory() as db:
+        rows=db.query(LeadJob).filter(LeadJob.status.in_(['queued','running']),LeadJob.updated_at<time.time()-3600).all()
+        for job in rows:
+            count=db.query(LeadRecord).filter_by(job_id=job.id,owner_user_id=job.owner_user_id).count()
+            changed=db.query(LeadJob).filter_by(id=job.id,status=job.status,updated_at=job.updated_at).update({
+                'status':'partial' if count else 'failed','result_count':count,
+                'error':'Previous search was interrupted. Saved contacts are retained; review before starting another search.',
+                'updated_at':time.time()},synchronize_session=False)
+            recovered+=changed
+        db.commit()
+    return recovered
+
+
 @router.post("/lead-jobs", status_code=202)
 def create_lead_job(req: LeadJobRequest, background: BackgroundTasks, db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user), idempotency_key: Optional[str] = Header(default=None, alias="Idempotency-Key")):
     key = (idempotency_key or "").strip()[:128] or None
     if key:
         existing = db.query(LeadJob).filter_by(owner_user_id=user.id, idempotency_key=key).first()
         if existing:
+            if json.loads(existing.request_payload) != req.model_dump():
+                raise HTTPException(409,'This search key belongs to a different query')
             return {"success": True, "job": _job_payload(existing), "idempotent": True}
     job = LeadJob(id=f"job_{uuid.uuid4().hex}", owner_user_id=user.id, status="queued",
                   request_payload=req.model_dump_json(), idempotency_key=key, created_at=time.time(), updated_at=time.time())
-    db.add(job); db.commit(); db.refresh(job)
+    db.add(job)
+    try: db.commit()
+    except IntegrityError:
+        db.rollback()
+        existing=db.query(LeadJob).filter_by(owner_user_id=user.id,idempotency_key=key).first() if key else None
+        if not existing or json.loads(existing.request_payload) != req.model_dump():
+            raise HTTPException(409,'Search submission conflict; refresh job history') from None
+        return {'success':True,'job':_job_payload(existing),'idempotent':True}
+    try:
+        consume(db,user,'leads',req.count)
+    except HTTPException as error:
+        job.status,job.error,job.updated_at='failed',str(error.detail),time.time();db.commit()
+        raise
+    db.refresh(job)
     background.add_task(_run_apify, job.id, user.id, __import__("api.auth_sync", fromlist=["SessionLocal"]).SessionLocal)
     return {"success": True, "job": _job_payload(job)}
+
+
+@router.get("/lead-jobs")
+def list_lead_jobs(db: Session = Depends(get_db), user: UserAccount = Depends(get_current_user)):
+    jobs = db.query(LeadJob).filter_by(owner_user_id=user.id).order_by(LeadJob.created_at.desc()).limit(50).all()
+    return {"jobs": [_job_payload(job) for job in jobs]}
 
 
 @router.get("/lead-jobs/{job_id}")

@@ -913,6 +913,7 @@
     if (global.ClavisTask && typeof global.ClavisTask.begin === 'function') {
       taskId = global.ClavisTask.begin(fullText, {
         source: 'composer',
+        display: 'window',
         images: images,
         attachments: attachments
       });
@@ -926,6 +927,7 @@
     // Route to ChatEngine
     if (global.ChatEngine && typeof global.ChatEngine.sendMessage === 'function') {
       global.ChatEngine.sendMessage(fullText, null, {
+        taskId: taskId,
         images: images,
         attachments: attachments
       }).then(function (res) {
@@ -956,7 +958,7 @@
       if (typeof global.handleChatSend === 'function') {
         global.handleChatSend(fullText, { images: images, attachments: attachments });
       } else if (typeof global.handleJarvisSend === 'function') {
-        global.handleJarvisSend();
+        global.handleJarvisSend({ text: fullText, taskId: taskId, display: 'window', images: images, attachments: attachments });
       } else {
         var sendBtn = document.getElementById('chat-send-btn') || document.getElementById('jarvis-send-btn');
         if (sendBtn) sendBtn.click();
@@ -1877,12 +1879,11 @@
 
     // The presenter (jarvis_ui.js) decided this turn has something to show.
     if (task.display === 'window') return true;
-    if (task.mode === 'leads' || task.intent === 'lead_gen') return true;
-
     // Voice turns stay in the orb/audio channel — kabhi auto-show nahi
-    // (failure bhi bol kar batayi jaati hai). Pehle overheard speech se
-    // "Rudra24 AI · Thinking… · Stop" panel pop ho jaata tha.
+    // (failure bhi bol kar batayi jaati hai). A spoken lead QUESTION is
+    // classified lead_gen too; only a real scrape (display='window') opens.
     if (task.display === 'voice' || task.source === 'voice') return false;
+    if (task.mode === 'leads' || task.intent === 'lead_gen') return true;
 
     // On completion: open floating surface with the answer + composer
     if (task.phase === 'completed') return true;
@@ -1912,7 +1913,9 @@
     // paint of a spoken run falling through here and the window shut.
     var isLeadRun = task.mode === 'leads' || task.mode === 'contacts' ||
                     task.mode === 'dataset' || task.intent === 'lead_gen';
-    if (task.display === 'voice' && !isLeadRun && !task.requiresApproval && !userPinned) return;
+    // Even with the window pinned open, a spoken answer is not painted over
+    // what he is reading — it was said out loud.
+    if (task.display === 'voice' && !task.requiresApproval && !(isLeadRun && task.source !== 'voice')) return;
     build();
     // The user closed this one; keep it closed until a new task starts.
     if (manuallyHidden && task.id === hiddenTaskId) return;

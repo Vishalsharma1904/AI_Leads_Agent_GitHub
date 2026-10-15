@@ -17,6 +17,15 @@ from api import auth_sync, credentials, ai_chat
 
 
 class LoginSecurityCheck(unittest.TestCase):
+    def test_portable_legacy_auth_uses_verified_server_identity(self):
+        token=jwt.encode({'sub':'verified-dad','email':'spoof@example.test','session_id':'fixture-session','exp':time.time()+600},'fixture-key-at-least-thirty-two-bytes',algorithm='HS256')
+        response=httpx.Response(200,json={'id':'verified-dad','email':'dad@example.test','user_metadata':{},'app_metadata':{'provider':'google'}},request=httpx.Request('GET','https://project.supabase.co/auth/v1/user'))
+        with patch.object(auth_sync,'SUPABASE_JWT_SECRET',''),patch.dict(os.environ,{'SUPABASE_PUBLISHABLE_KEY':'sb_publishable_fixture'}),patch.object(auth_sync.httpx,'get',return_value=response) as request:
+            result=auth_sync._verify_supabase_token(token)
+            self.assertEqual(result['sub'],'verified-dad');self.assertEqual(result['email'],'dad@example.test');self.assertEqual(result['session_id'],'fixture-session');self.assertEqual(result['app_metadata']['provider'],'google');request.assert_called_once()
+            request.return_value=httpx.Response(401,request=response.request)
+            with self.assertRaises(HTTPException):auth_sync._verify_supabase_token(token)
+
     def test_jwt_and_subject_boundary(self):
         engine = create_engine("sqlite:///:memory:")
         auth_sync.Base.metadata.create_all(engine)
@@ -71,7 +80,7 @@ class LoginSecurityCheck(unittest.TestCase):
             calls.append((url, kwargs))
             return httpx.Response(200, json={"name": "auth_tokens/test-ephemeral"}, request=httpx.Request("POST", url))
         with patch.object(credentials, "get_provider_secret", return_value="private-provider-key"), \
-                patch("api.limits.consume"), patch.object(httpx.AsyncClient, "post", issue):
+                patch("api.limits.consume"), patch("api.limits.finish_usage"), patch("services.developer_control.check_access"), patch("services.developer_control.reserve_provider"), patch.object(httpx.AsyncClient, "post", issue):
             result = asyncio.run(credentials.gemini_live_token(credentials.LiveTokenRequest(model="gemini-3.8-live"), None, a))
             self.assertNotIn("private-provider-key", str(result))
             payload = calls[0][1]["json"]
@@ -102,7 +111,18 @@ class LoginSecurityCheck(unittest.TestCase):
                 ws.send_json(frame)
                 with self.assertRaises(WebSocketDisconnect):
                     ws.receive_json()
-        with patch.object(auth_sync, "_verify_supabase_token", return_value={"sub": "a", "exp": time.time() + 60}):
+        import tempfile
+        from pathlib import Path
+        from sqlalchemy.orm import sessionmaker
+        temporary = tempfile.TemporaryDirectory()
+        engine = create_engine('sqlite:///' + str(Path(temporary.name) / 'socket.db'), connect_args={'check_same_thread': False})
+        auth_sync.Base.metadata.create_all(engine)
+        factory = sessionmaker(bind=engine)
+        with factory() as db:
+            db.add(auth_sync.UserAccount(id='a', email='a@example.com', name='A'))
+            db.commit()
+        self.addCleanup(temporary.cleanup); self.addCleanup(engine.dispose)
+        with patch.object(auth_sync, 'SessionLocal', factory), patch.dict(os.environ, {'CLAVIS_MANAGED_ACCESS':'false'}), patch.object(auth_sync, "_verify_supabase_token", return_value={"sub": "a", "exp": time.time() + 60}):
             with client.websocket_connect("/voice", headers={"origin": "http://localhost:3000"}) as ws:
                 ws.send_json({"type": "auth", "token": "test"})
                 self.assertEqual(ws.receive_json()["type"], "authenticated")

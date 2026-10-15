@@ -5,19 +5,36 @@ const crypto = require('node:crypto');
 const { spawn } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
-const { backendOrigin } = require('./runtime-config');
+const { backendOrigin, discoverWorkspace } = require('./runtime-config');
+const { UIUpdates } = require('./ui-updates');
+const updateTrust = require('./update-trust.json');
 
 const APP_ORIGIN = 'http://localhost:3210';
 const configPath = path.join(__dirname, 'desktop-config.json');
-const config = fs.existsSync(configPath) ? JSON.parse(fs.readFileSync(configPath, 'utf8')) : {};
-let backendUrl = process.env.CLAVIS_BACKEND_URL || config.backendUrl || (!app.isPackaged ? 'http://localhost:8000' : '');
-let supabaseHost = config.supabaseUrl ? new URL(config.supabaseUrl).hostname : '';
+let config = {};
+try { if (fs.existsSync(configPath)) config = JSON.parse(fs.readFileSync(configPath, 'utf8')); }
+catch (_) { console.warn('Desktop configuration is unreadable; connection recovery is available.'); }
+const serviceUrl = process.env.CLAVIS_SERVICE_CONFIG_URL || config.serviceConfigUrl || '';
+let backendUrl = process.env.CLAVIS_BACKEND_URL || config.backendUrl || (!app.isPackaged ? 'http://127.0.0.1:8000' : '');
+let supabaseHost = '';
+try { if (config.supabaseUrl) supabaseHost = new URL(config.supabaseUrl).hostname; } catch (_) {}
 let uiServer;
 let bridgeServer;
 let backendProcess;
 let mainWindow;
 let backendStarting = false;
 let connecting = false;
+let uiUpdates;
+let staticServer;
+let bootTimer;
+let googleLoginUntil = 0;
+
+function recoverUI() {
+  if (!uiUpdates?.state.attempting) return;
+  clearTimeout(bootTimer);
+  staticServer.setUIRoot(uiUpdates.fallback());
+  mainWindow?.loadURL(`${APP_ORIGIN}/index.html#jarvis`);
+}
 
 /* Start the API ourselves when this build points at localhost.
  *
@@ -108,9 +125,14 @@ function createWindow() {
     title: 'Rudra24 AI',
     icon: path.join(__dirname, '..', 'assets', 'rudra24-icon.png'),
     webPreferences: { nodeIntegration: false, contextIsolation: true, sandbox: true,
+      autoplayPolicy: 'no-user-gesture-required', // login film may start with its soft narration
       preload: path.join(__dirname, 'preload.js'), devTools: !app.isPackaged }
   });
   mainWindow.once('ready-to-show', () => mainWindow.show());
+  mainWindow.webContents.on('render-process-gone', recoverUI);
+  mainWindow.webContents.on('did-fail-load', (_event, code, _description, _url, isMainFrame) => {
+    if (isMainFrame && code !== -3) recoverUI();
+  });
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     if (url.startsWith('https://')) shell.openExternal(url);
     return { action: 'deny' };
@@ -123,6 +145,11 @@ function createWindow() {
   // Render immediately. A sleeping/offline API must never hold the window
   // behind a 45–180 second health check. Existing auth handles availability.
   mainWindow.loadURL(`${APP_ORIGIN}/${backendUrl ? 'index.html#jarvis' : 'desktop-setup.html'}`);
+  // A renderer that never acknowledges boot is reverted on next launch. A timer
+  // must not reload a window that may already contain a draft or active call.
+  if (uiUpdates?.state.attempting && backendUrl) bootTimer = setTimeout(() => {
+    console.warn('UI update did not confirm startup; previous UI will be used on next launch.');
+  }, 90000);
 }
 
 app.on('second-instance', () => {
@@ -132,6 +159,7 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(async () => {
+  if (app.isPackaged) process.env.CLAVIS_MANAGED_ACCESS = 'true';
   const savedPath = path.join(app.getPath('userData'), 'connection.json');
   if (fs.existsSync(savedPath)) {
     try {
@@ -160,7 +188,22 @@ app.whenReady().then(async () => {
       (!details.embeddingOrigin || isAppNavigation(details.embeddingOrigin));
   });
 
-  uiServer = require('../serve-clavis.js').server;
+  staticServer = require('../serve-clavis.js');
+  staticServer.setAuthCallback(url => {
+    if (!googleLoginUntil || Date.now() > googleLoginUntil || url.origin !== APP_ORIGIN || url.pathname !== '/') return false;
+    const code = url.searchParams.get('code');
+    const denied = url.searchParams.has('error');
+    if ((!code || code.length > 4096 || /[\r\n]/.test(code)) && !denied) return false;
+    googleLoginUntil = 0;
+    const query = denied ? 'error=access_denied&error_description=Google%20sign-in%20was%20cancelled'
+      : 'code=' + encodeURIComponent(code);
+    mainWindow.loadURL(`${APP_ORIGIN}/index.html?${query}#jarvis`);
+    mainWindow.show(); mainWindow.focus();
+    return true;
+  });
+  uiUpdates = new UIUpdates(path.join(app.getPath('userData'), 'ui-releases'), path.join(__dirname, '..'), app.getVersion(), updateTrust);
+  staticServer.setUIRoot(uiUpdates.start());
+  uiServer = staticServer.server;
   try {
     await new Promise((resolve, reject) => {
       uiServer.once('error', reject);
@@ -185,9 +228,55 @@ app.whenReady().then(async () => {
       throw new Error('Connection setup is available only in the desktop setup page.');
     }
   }
+  function workspaceCaller(event) {
+    if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame ||
+        new URL(event.senderFrame.url).origin !== APP_ORIGIN || new URL(event.senderFrame.url).pathname !== '/index.html') {
+      throw new Error('Desktop updates are available only in the workspace.');
+    }
+  }
+  ipcMain.handle('desktop:google-sign-in', async (event, rawUrl) => {
+    workspaceCaller(event);
+    const url = new URL(rawUrl);
+    const expectedHost = supabaseHost || new URL(require('../public-auth-config.json').supabase_url).hostname;
+    if (url.protocol !== 'https:' || url.hostname !== expectedHost || url.port || url.username || url.password || url.hash ||
+        url.pathname !== '/auth/v1/authorize' || url.searchParams.get('provider') !== 'google' ||
+        url.searchParams.get('prompt') !== 'select_account' || url.searchParams.get('redirect_to') !== APP_ORIGIN + '/' ||
+        url.searchParams.get('code_challenge_method') !== 's256' || !/^[A-Za-z0-9_-]{43,128}$/.test(url.searchParams.get('code_challenge') || '')) {
+      throw new Error('Google sign-in must use this workspace and its PKCE callback.');
+    }
+    googleLoginUntil = Date.now() + 10 * 60 * 1000;
+    try { await shell.openExternal(url.href); }
+    catch (error) { googleLoginUntil = 0; throw error; }
+    return true;
+  });
+  ipcMain.handle('desktop:hardware', event => {
+    workspaceCaller(event);
+    const os = require('node:os');
+    return { memoryGB: os.totalmem() / 1024 ** 3, cores: os.cpus().length };
+  });
+  ipcMain.handle('desktop:update-status', event => { workspaceCaller(event); return uiUpdates.status(); });
+  ipcMain.handle('desktop:update-stage', async (event, token) => {
+    workspaceCaller(event);
+    if (typeof token !== 'string' || token.length < 8 || token.length > 8192 || /[\r\n]/.test(token)) return { error: 'Invalid authenticated session' };
+    try {
+      const origin = backendOrigin(backendUrl, !app.isPackaged);
+      const response = await fetch(origin + '/api/control/release?platform=desktop-ui', {
+        headers: {Authorization: 'Bearer ' + token}, redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(15000)
+      });
+      if (!response.ok) throw new Error('Release discovery unavailable');
+      const raw = await response.text();
+      if (raw.length > 16000) throw new Error('Release metadata too large');
+      const data = JSON.parse(raw);
+      if (!data.release && data.rollback_from) return uiUpdates.rollbackToPrevious(data.rollback_from);
+      return await uiUpdates.stage(data.release || null);
+    } catch (error) { return { ...uiUpdates.status(), error: error.message }; }
+  });
+  ipcMain.handle('desktop:update-ready', event => {
+    workspaceCaller(event); clearTimeout(bootTimer); uiUpdates.healthy(); return true;
+  });
   ipcMain.handle('desktop:configuration', (event) => {
     setupCaller(event);
-    return { backendUrl, localAllowed: !app.isPackaged };
+    return { backendUrl, localAllowed: !app.isPackaged, automaticAvailable: !!serviceUrl };
   });
   ipcMain.handle('desktop:workspace', (event) => {
     setupCaller(event);
@@ -195,8 +284,7 @@ app.whenReady().then(async () => {
     mainWindow.loadURL(`${APP_ORIGIN}/index.html#jarvis`);
     return true;
   });
-  ipcMain.handle('desktop:connect', async (event, rawUrl) => {
-    setupCaller(event);
+  async function connectWorkspace(rawUrl) {
     if (connecting) return { ok: false, error: 'A connection check is already running.' };
     connecting = true;
     try {
@@ -233,8 +321,24 @@ app.whenReady().then(async () => {
       supabaseHost = new URL(supabaseUrl).hostname;
       process.env.CLAVIS_DESKTOP_BACKEND_URL = backendUrl;
       return { ok: true };
-    } catch (error) { return { ok: false, error: error.message }; }
+    } catch (error) {
+      const offline = ['TypeError', 'AbortError', 'TimeoutError'].includes(error.name);
+      return { ok: false, error: offline
+        ? 'The service is temporarily unavailable. Check your internet connection and try again.'
+        : error.message };
+    }
     finally { connecting = false; }
+  }
+  ipcMain.handle('desktop:connect', (event, rawUrl) => {
+    setupCaller(event);
+    return connectWorkspace(rawUrl);
+  });
+  ipcMain.handle('desktop:auto-connect', async event => {
+    setupCaller(event);
+    if (backendUrl) return {ok:await backendIsUp(backendUrl, 10000),error:'Your service is temporarily unavailable. Your saved connection is unchanged.'};
+    if (!serviceUrl) return {ok:false,error:'Your workspace owner has not connected the service yet. Your app is installed; no local setup is needed.'};
+    try { return await connectWorkspace(await discoverWorkspace(serviceUrl, fetch)); }
+    catch (_) { return {ok:false,error:'Rudra24 could not reach its service. Check your connection and try again shortly.'}; }
   });
   Menu.setApplicationMenu(Menu.buildFromTemplate([
     { label: 'Rudra24 AI', submenu: [
@@ -244,6 +348,15 @@ app.whenReady().then(async () => {
     { role: 'editMenu' },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'resetZoom' }, { role: 'zoomIn' }, { role: 'zoomOut' }, { role: 'togglefullscreen' }] }
   ]));
+  // Optional signed NSIS shell updates are staged now and applied on a later launch.
+  let nativeStartup = true;
+  const nativeCheck = require('./native-updates').startNativeUpdates(app, updateTrust, () => nativeStartup && !mainWindow)
+    .catch(error => console.warn('Native updates unavailable:', error.message));
+  if (updateTrust.native?.enabled && fs.existsSync(path.join(app.getPath('userData'), 'native-update.json'))) {
+    // ponytail: two-second startup budget; slow/offline feeds defer to another launch.
+    await Promise.race([nativeCheck, new Promise(resolve => setTimeout(resolve, 2000))]);
+  }
+  nativeStartup = false;
   createWindow();
   // Source checkout only. Customer builds never spawn Python/PowerShell.
   void startLocalBackend();

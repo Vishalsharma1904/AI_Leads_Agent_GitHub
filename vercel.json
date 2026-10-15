@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path((?!public-config$)(?!omnidimension$)(?!grok-voice$).*)",
-      "destination": "https://REPLACE-WITH-BACKEND-HOST/api/:path*"
+      "destination": "/api/backend?path=:path*"
     }
   ],
   "headers": [
@@ -62,6 +62,9 @@
     "api/omnidimension.js": {
       "includeFiles": "{public-auth-config.json,omnidimension-contract.json}",
       "maxDuration": 40
+    },
+    "api/backend.js": {
+      "maxDuration": 60
     }
   }
 }

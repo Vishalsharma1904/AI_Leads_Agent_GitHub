@@ -5,7 +5,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const vm = require('node:vm');
-const { backendOrigin } = require('../electron/runtime-config');
+const { backendOrigin, discoverWorkspace } = require('../electron/runtime-config');
 const source = fs.readFileSync(path.join(__dirname, '../electron/main.js'), 'utf8');
 
 for (const value of ['http://api.example.org', 'https://localhost', 'https://127.1',
@@ -16,14 +16,15 @@ for (const value of ['http://api.example.org', 'https://localhost', 'https://127
 }
 assert.equal(backendOrigin('https://api.example.org/'), 'https://api.example.org');
 assert.equal(backendOrigin('http://127.0.0.1:8000', true), 'http://127.0.0.1:8000');
+assert.equal(backendOrigin('http://localhost:8000', true), 'http://127.0.0.1:8000');
 
-async function desktop(dataPath) {
+async function desktop(dataPath, serviceUrl = '') {
   const handlers = {}, menus = [], metrics = { spawned: 0, fetches: 0, storageClears: 0 };
-  let window, ready;
+  let window, ready, authCallback;
   const fakeServer = { once() {}, listen(_port, _host, done) { done?.(); }, on() {}, close() {} };
   const session = { setPermissionRequestHandler() {}, setPermissionCheckHandler() {},
     async clearStorageData() { metrics.storageClears++; }, async clearCache() {} };
-  const app = { isPackaged: true, requestSingleInstanceLock: () => true,
+  const app = { isPackaged: true, requestSingleInstanceLock: () => true, getVersion: () => '1.0.6',
     getPath: () => dataPath, on() {}, quit() {},
     whenReady: () => ({ then(fn) { ready = Promise.resolve().then(fn); return ready; } }) };
   class BrowserWindow {
@@ -35,31 +36,38 @@ async function desktop(dataPath) {
     loadURL(url) { this.url = url; this.webContents.mainFrame.url = url; return Promise.resolve(); }
   }
   let healthy = true;
+  let configOffline = false;
   let approveSwitch = false;
   const fakeFetch = async (url) => {
     metrics.fetches++;
+    if (configOffline && url.endsWith('/api/public-config')) throw new TypeError('fetch failed');
+    if (url.endsWith('/rudra24-service.json')) return new Response(JSON.stringify({schema:1,backendUrl:'https://auto.example.org'}));
     return { ok: true, json: async () => url.endsWith('/health')
       ? { status: 'healthy', services: { db: healthy ? 'ok' : 'error' } }
       : { supabase_url: 'https://project.supabase.co', supabase_publishable_key: 'sb_publishable_demo' } };
   };
   vm.runInNewContext(source, {
     __dirname: path.join(__dirname, '../electron'), URL, AbortSignal, console, setTimeout,
-    process: { env: {}, platform: 'win32', resourcesPath: dataPath }, fetch: fakeFetch,
+    process: { env: {CLAVIS_SERVICE_CONFIG_URL:serviceUrl}, platform: 'win32', resourcesPath: dataPath }, fetch: fakeFetch,
     require(name) {
       if (name === 'electron') return { app, BrowserWindow, session: { defaultSession: session },
-        shell: { openExternal() {} }, dialog: {
+        shell: { openExternal: async url => { metrics.externalURL = url; } }, dialog: {
           showErrorBox() { assert.fail('Unexpected startup error'); },
           showMessageBox: async () => ({ response: approveSwitch ? 1 : 0 }) },
         Menu: { buildFromTemplate: (menu) => menu, setApplicationMenu: (menu) => menus.push(menu) },
         ipcMain: { handle: (name, fn) => { handlers[name] = fn; } } };
       if (name === 'node:child_process') return { spawn() { metrics.spawned++; assert.fail('Packaged app started a child runtime'); } };
-      if (name === '../serve-clavis.js' || name.endsWith('clavis-bridge/bridge.js') || name.endsWith('clavis-bridge\\bridge.js')) return { server: fakeServer };
-      if (name === './runtime-config') return { backendOrigin };
+      if (name === '../serve-clavis.js' || name.endsWith('clavis-bridge/bridge.js') || name.endsWith('clavis-bridge\\bridge.js')) return { server: fakeServer, setUIRoot() {}, setAuthCallback(fn) { authCallback = fn; } };
+      if (name === './ui-updates') return { UIUpdates: class { constructor() { this.state = {}; } start() { return path.join(__dirname, '..'); } } };
+      if (name === './update-trust.json') return { publicKey: '', hosts: [] };
+      if (name === './native-updates') return { startNativeUpdates: async () => {} };
+      if (name === './runtime-config') return { backendOrigin, discoverWorkspace };
       return require(name);
     }
   }, { filename: 'electron/main.js' });
   await ready;
-  return { handlers, metrics, window, menus, setHealthy: (value) => { healthy = value; },
+  return { handlers, metrics, window, menus, callback: url => authCallback(new URL(url)), setHealthy: (value) => { healthy = value; },
+    setConfigOffline: value => { configOffline = value; },
     approveSwitch: () => { approveSwitch = true; },
     event: () => ({ sender: window.webContents, senderFrame: window.webContents.mainFrame }) };
 }
@@ -79,13 +87,34 @@ async function desktop(dataPath) {
     assert.equal(result.ok, false);
     assert.equal(first.metrics.fetches, 0);
     result = await first.handlers['desktop:connect'](first.event(), 'https://api.example.org');
-    assert.equal(result.ok, true);
+    assert.equal(result.ok, true, result.error);
     const saved = JSON.parse(fs.readFileSync(path.join(dataPath, 'connection.json'), 'utf8'));
     assert.deepEqual(Object.keys(saved).sort(), ['backendUrl', 'supabaseUrl']);
     assert.equal(saved.backendUrl, 'https://api.example.org');
     assert.equal(first.metrics.spawned, 0);
+    const automaticPath = path.join(dataPath, 'automatic'); fs.mkdirSync(automaticPath);
+    const automatic = await desktop(automaticPath, 'https://app.example.org/rudra24-service.json');
+    assert.equal(automatic.metrics.fetches, 0, 'Render immediately before automatic connection');
+    await assert.rejects(automatic.handlers['desktop:auto-connect']({sender:{},senderFrame:{}}));
+    automatic.setConfigOffline(true);
+    const interrupted = await automatic.handlers['desktop:auto-connect'](automatic.event());
+    assert.equal(interrupted.ok, false);
+    assert.match(interrupted.error, /temporarily unavailable/);
+    assert.equal(fs.existsSync(path.join(automaticPath, 'connection.json')), false, 'Interrupted setup cannot save an incomplete connection');
+    automatic.setConfigOffline(false);
+    assert.equal((await automatic.handlers['desktop:auto-connect'](automatic.event())).ok, true);
+    assert.equal(JSON.parse(fs.readFileSync(path.join(automaticPath,'connection.json'))).backendUrl, 'https://auto.example.org');
+    assert.equal(automatic.metrics.spawned, 0, 'Automatic cloud setup starts no local runtime');
     await first.handlers['desktop:workspace'](first.event());
     assert.equal(first.window.url, 'http://localhost:3210/index.html#jarvis');
+    const oauthURL = 'https://project.supabase.co/auth/v1/authorize?provider=google&prompt=select_account&code_challenge_method=s256&code_challenge=' + 'a'.repeat(43) + '&redirect_to=' + encodeURIComponent('http://localhost:3210/');
+    assert.equal(first.callback('http://localhost:3210/?code=unsolicited'), false);
+    await assert.rejects(first.handlers['desktop:google-sign-in'](first.event(), oauthURL.replace('project.supabase.co', 'attacker.example')));
+    assert.equal(await first.handlers['desktop:google-sign-in'](first.event(), oauthURL), true);
+    assert.equal(first.metrics.externalURL, oauthURL);
+    assert.equal(first.callback('http://localhost:3210/?code=fixture-authorization-code'), true);
+    assert.equal(first.window.url, 'http://localhost:3210/index.html?code=fixture-authorization-code#jarvis');
+    assert.equal(first.callback('http://localhost:3210/?code=replay'), false);
     assert.throws(() => first.handlers['desktop:configuration'](first.event()), 'Workspace cannot invoke privileged connection IPC');
 
     const reopened = await desktop(dataPath);
@@ -108,7 +137,13 @@ async function desktop(dataPath) {
     assert.equal(reopened.metrics.storageClears, 1, 'Changing server must clear the previous tenant cache');
     console.log('PASS desktop URL/IPC isolation, setup persistence, offline reopen, failed database check and no local child runtimes');
   } finally {
-    for (const name of fs.readdirSync(dataPath)) fs.unlinkSync(path.join(dataPath, name));
+    for (const name of fs.readdirSync(dataPath)) {
+      const owned = path.join(dataPath, name);
+      if (fs.statSync(owned).isDirectory()) {
+        for (const file of fs.readdirSync(owned)) fs.unlinkSync(path.join(owned, file));
+        fs.rmdirSync(owned);
+      } else fs.unlinkSync(owned);
+    }
     fs.rmdirSync(dataPath);
   }
 })().catch((error) => { console.error(error); process.exitCode = 1; });

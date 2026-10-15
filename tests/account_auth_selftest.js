@@ -18,6 +18,10 @@ async function main() {
   const client = {
     auth: {
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
+      signInWithOAuth: async options => {
+        calls.push(['google', options]);
+        return { data: { url: 'https://example.supabase.co/auth/v1/authorize?provider=google' }, error: null };
+      },
       getSession: async () => ({ data: { session } }),
       signInWithPassword: async credentials => {
         calls.push(['signIn', credentials]);
@@ -43,7 +47,7 @@ async function main() {
     AntigravityAuth: { handleSupabaseSession: next => calls.push(['session', next?.user?.id || null]) }
   };
   const authContext = {
-    window, location, console,
+    window, location, console, AbortController, clearTimeout,
     CustomEvent: class { constructor(type, options) { this.type = type; this.detail = options?.detail; } },
     setTimeout: resolve => resolve(),
     fetch: async () => {
@@ -61,6 +65,23 @@ async function main() {
   assert.equal(simultaneous.success, true);
   assert.equal(configAttempts, 3, 'auth should wait for a starting backend without duplicate clients');
   assert.equal(calls.filter(([name]) => name === 'createClient').length, 1);
+  const opened = [];
+  window.RudraDesktop = { googleSignIn: async url => { opened.push(url); return true; } };
+  assert.equal((await window.SupabaseAuth.signInWithGoogle()).success, true);
+  const google = calls.find(([name]) => name === 'google')[1];
+  assert.equal(google.options.skipBrowserRedirect, true, 'Desktop Google sign-in uses the normal browser with its saved Gmail accounts');
+  assert.equal(google.options.queryParams.prompt, 'select_account');
+  assert.equal(google.options.queryParams.login_hint, undefined, 'Account chooser must not filter to the old email');
+  assert.equal(opened.length, 1);
+  delete window.RudraDesktop;
+  const staticWindow = { ...window, location: { protocol: 'https:', hostname: 'app.example.test', origin: 'https://app.example.test' } };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '..', 'supabase-auth.js'), 'utf8'), {
+    ...authContext, window: staticWindow,
+    fetch: async url => url === './public-auth-config.json'
+      ? { ok: true, json: async () => ({ supabase_url: 'https://example.supabase.co', supabase_publishable_key: 'sb_publishable_fixture' }) }
+      : { ok: false, status: 404 }
+  });
+  assert.equal((await staticWindow.SupabaseAuth.init()).success, true, 'Static hosting must allow sign-in without a running calling API');
   assert.equal((await window.SupabaseAuth.signInWithPassword('owner@example.com', 'password123')).success, true);
   assert.equal(calls.find(([name]) => name === 'signIn')[1].email, 'owner@example.com');
   assert.equal((await window.SupabaseAuth.signUp('new@example.com', 'password123')).needsVerification, true);

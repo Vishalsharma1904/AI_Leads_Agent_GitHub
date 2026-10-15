@@ -33,7 +33,7 @@
 window.ClavisBargeIn = (() => {
   let stream = null, ctx = null, analyser = null, buf = null;
   let timer = null, armed = false, onBarge = null, armedAt = 0;
-  let voiceFrames = 0, warmFrames = 0, baseline = 0, dt = null;
+  let voiceFrames = 0, warmFrames = 0, baseline = 0, dt = null, voiceSince = 0;
   let generation = 0, candidate = null, graphReady = null;
 
   const FRAME_MS       = 30;   // sampling period
@@ -54,10 +54,11 @@ window.ClavisBargeIn = (() => {
     if (analyser) return;
     if (graphReady) return graphReady;
     graphReady = (async () => {
-    // Processed voice stream (AEC + NS + AGC), not the raw clap/snap stream.
-    stream = await (window.LocalSpeechEngine?.acquireVoiceMicrophone?.() || navigator.mediaDevices.getUserMedia({
-      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true }
+    // Borrow the processed stream; cleanup owns only a clone.
+    const microphone = await (window.LocalSpeechEngine?.acquireVoiceMicrophone?.() || navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: false }
     }));
+    stream = window.LocalSpeechEngine?.acquireVoiceMicrophone ? microphone.clone() : microphone;
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     const src = ctx.createMediaStreamSource(stream);
     analyser = ctx.createAnalyser();
@@ -113,7 +114,7 @@ window.ClavisBargeIn = (() => {
     try {
       const mimeType = ['audio/webm;codecs=opus','audio/webm','audio/mp4'].find(type => MediaRecorder.isTypeSupported(type));
       const recorder = new MediaRecorder(ownedStream, mimeType ? {mimeType} : undefined);
-      const capture = {stream:ownedStream,recorder,chunks:[],since:Date.now(),owner:window.SupabaseAuth?.getUser?.()?.id};
+      const capture = {stream:ownedStream,recorder,chunks:[],since:voiceSince || Date.now(),owner:window.SupabaseAuth?.getUser?.()?.id};
       recorder.ondataavailable = event => { if (candidate === capture && event.data.size) capture.chunks.push(event.data); };
       candidate = capture;
       recorder.start(200);
@@ -123,11 +124,11 @@ window.ClavisBargeIn = (() => {
     }
   }
 
-  function fire() {
+  function fire(voiceEvidence) {
     const cb = onBarge;
     const capture = candidate; candidate = null;
     disarm();
-    if (typeof cb === 'function') cb(capture);
+    if (typeof cb === 'function') cb(capture, { voiceEvidence });
     else if (capture) { candidate = capture; discardCandidate(); }
   }
 
@@ -147,11 +148,23 @@ window.ClavisBargeIn = (() => {
       loud = isVoice(level, baseline, floor());
     }
     if (loud && voiced()) {
+      if (!voiceSince) voiceSince = Date.now();
       captureCandidate(); // Retain the first words while confirming sustained speech.
-      if (++voiceFrames >= VOICE_FRAMES) fire();
+      if (++voiceFrames >= VOICE_FRAMES) {
+        const voiceEvidence = window.ClavisEar?.voiceId?.capture?.(voiceSince, Date.now());
+        const owner = window.ClavisEar?.voiceId?.check?.({ voiceEvidence });
+        if (window.ClavisEar?.voiceId?.required?.() && owner?.verdict !== 'owner') {
+          // A short candidate needs more voiced frames, not a weaker owner gate.
+          if (owner?.reason === 'too-short') return;
+          discardCandidate(); voiceFrames = 0; voiceSince = 0;
+          return;
+        }
+        if (candidate) candidate.voiceEvidence = voiceEvidence;
+        fire(voiceEvidence);
+      }
     } else {
       voiceFrames = Math.max(0, voiceFrames - (loud ? 0 : 2));
-      if (!voiceFrames) discardCandidate();
+      if (!voiceFrames) { discardCandidate(); voiceSince = 0; }
     }
   }
 
@@ -170,6 +183,8 @@ window.ClavisBargeIn = (() => {
     if (window.ClavisVoiceState && !window.ClavisVoiceState.canProcessMic()) { cleanup(); return false; }
     if (ctx.state === 'suspended') { try { await ctx.resume(); } catch (_) {} }
     if (current !== generation) return false;
+    await window.ClavisEar?.tap?.start?.('barge', stream);
+    if (current !== generation) return false;
     armed = true;
     timer = setInterval(tick, FRAME_MS);
     return true;
@@ -181,6 +196,8 @@ window.ClavisBargeIn = (() => {
     armed = false;
     if (timer) { clearInterval(timer); timer = null; }
     onBarge = null; voiceFrames = 0; warmFrames = 0; baseline = 0; dt = null;
+    voiceSince = 0;
+    window.ClavisEar?.tap?.stop?.('barge');
     // Keep stream/ctx alive for instant re-arm; they're idle when not sampling.
   }
 

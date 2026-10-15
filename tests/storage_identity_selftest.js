@@ -1,0 +1,11 @@
+const fs=require('node:fs'),vm=require('node:vm'),assert=require('node:assert/strict');
+const source=fs.readFileSync('auth-antigravity.js','utf8');
+const start=source.indexOf('window.UserStorage = {'),end=source.indexOf('\n};',start)+3;
+let user={id:'account-a',email:'john.smith@example.test'};const data=new Map();
+const window={SupabaseAuth:{getUser:()=>user}};
+vm.runInNewContext(source.slice(start,end),{window,encodeURIComponent,localStorage:{getItem:k=>data.get(k)??null,setItem:(k,v)=>data.set(k,v),removeItem:k=>data.delete(k)}});
+window.UserStorage.setJSON('allLeads',[{id:'a-only'}]);
+assert.notEqual(window.UserStorage.emailToUserId('john.smith@example.test'),window.UserStorage.emailToUserId('john_smith@example.test'));
+user={id:'account-b',email:'john_smith@example.test'};assert.equal(window.UserStorage.getJSON('allLeads',null),null);
+user={id:'account-a',email:'renamed@example.test'};assert.equal(window.UserStorage.getJSON('allLeads')[0].id,'a-only','verified identity survives an email rename');
+console.log('PASS storage identity: verified ID, email collision isolation, stable renamed account');

@@ -7,6 +7,8 @@ param(
   [string]$BatchFile = ""
 )
 
+$ErrorActionPreference = 'Stop'
+
 # ── Setup ──────────────────────────────────────────────────────────────────
 $AppName    = "Rudra24 AI"
 $Desktop    = [System.Environment]::GetFolderPath("Desktop")
@@ -44,7 +46,7 @@ try {
   $Shortcut  = $WshShell.CreateShortcut($ShortcutPath)
   
   # Target the quiet VBS wrapper so the console never flashes on launch.
-  $Shortcut.TargetPath  = "wscript.exe"
+  $Shortcut.TargetPath  = Join-Path $env:WINDIR "System32\wscript.exe"
   $Shortcut.Arguments   = "`"$BatchFile`""
   $Shortcut.WorkingDirectory = $AppDir
   $Shortcut.WindowStyle  = 1
@@ -62,8 +64,8 @@ try {
   Write-Host ""
   
 } catch {
-  Write-Warning "  Could not create shortcut: $_"
-  Write-Host "  You can manually create a shortcut to: $BatchFile"
+  Write-Error "Could not create the desktop shortcut: $_"
+  exit 1
 }
 
 # ── Also create a Start Menu entry (optional, makes it even more app-like) ──
@@ -73,7 +75,7 @@ try {
   
   $WshShell2 = New-Object -ComObject WScript.Shell
   $SM = $WshShell2.CreateShortcut($StartMenuShortcut)
-  $SM.TargetPath = "wscript.exe"
+  $SM.TargetPath = Join-Path $env:WINDIR "System32\wscript.exe"
   $SM.Arguments  = "`"$BatchFile`""
   $SM.WorkingDirectory = $AppDir
   $SM.WindowStyle = 1

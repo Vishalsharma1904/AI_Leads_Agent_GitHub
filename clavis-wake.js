@@ -41,11 +41,9 @@
   const now = () => clock();
   const ls = (k, d) => { try { const v = localStorage.getItem(k); return v == null ? d : v; } catch (_) { return d; } };
 
-  // Continuous conversation (clavis_continuous, default ON — owner's ask,
-  // 2026-09-25): once woken Rudra24 AI stays in the conversation, no name needed,
-  // until "so jao / bas karo / stop listening…" or SESSION_MS without an
-  // accepted turn. Off → the old 10 s first window + ~9 s follow-up.
-  const continuous = () => ls('clavis_continuous', 'true') !== 'false';
+  // Deliberate voice sessions keep listening between turns until explicit
+  // sleep/mute or the bounded idle timeout. A saved opt-out keeps short mode.
+  const continuous = () => ls('clavis_continuous', 'true') === 'true';
   const sessionMs = () => Math.min(15 * 60000, Math.max(30000, Number(ls('clavis_session_idle_ms', 180000)) || 180000));
   const firstMs = () => (continuous() ? sessionMs() : 10000);   // wake ke baad bolna shuru karne ka time
   const shortFollowMs = () => Math.min(30000, Math.max(4000, Number(ls('clavis_followup_ms', 9000)) || 9000));
@@ -123,7 +121,10 @@
    * A snap cannot happen by accident. That is the whole point of it.
    * Re-enable the word with: clavis_wake_sources = 'snap,tap,typed,touch,word'
    */
-  const DEFAULT_SOURCES = 'snap,clap,tap,typed,touch,orb,mic';
+  // The name is back in, but it is the FREE browser recognizer that listens for
+  // it while asleep (jarvis_ui's wake listener) — ElevenLabs is only opened once
+  // he is actually awake, so an idle room costs nothing.
+  const DEFAULT_SOURCES = 'snap,clap,tap,typed,touch,orb,mic,word';
   function allowedSources() {
     let raw;
     try { raw = localStorage.getItem('clavis_wake_sources'); } catch (_) {}
@@ -157,26 +158,19 @@
    * Woken, then silence. Rather than sit there with an open session (and
    * the proactive layers free to talk), he asks once, quietly, and goes to
    * sleep. One line per wake — never a second, never a loop. */
-  const CHECK_IN_MS = 75000;    // a little over a minute of nothing
-  const CHECK_IN_LINES = [
-    'Sir? … main hoon abhi bhi.',
-    'Sir, aap gaye kya? Main so jaata hoon phir.',
-    'Koi kaam nahi hai toh main chup ho jaata hoon, sir.',
-  ];
+  // It no longer says anything. The sleepy "sir?" line was the one thing
+  // allowed to speak unprompted, and every false wake spent paid characters
+  // asking an empty room a question. Silence costs nothing, so it just sleeps.
+  const CHECK_IN_MS = 45000;
   function armCheckIn() {
     clearTimeout(S.checkTimer);
     S.checkedIn = false;
-    S.checkTimer = setTimeout(async () => {
-      if (!S.awake || S.busy || S.checkedIn) return;
+    // The session's own idle timer owns continuous conversations. This legacy
+    // 45-second timer used to silently close a configured three-minute session.
+    if (continuous() && S.source !== 'typed') return;
+    S.checkTimer = setTimeout(() => {
+      if (!S.awake || S.busy) return;
       S.checkedIn = true;
-      try {
-        const speechOn = localStorage.getItem('jarvis_speech_enabled') !== 'false'
-          && localStorage.getItem('clavis_voice_muted') !== '1';
-        if (speechOn) {
-          const line = CHECK_IN_LINES[Math.floor(Math.random() * CHECK_IN_LINES.length)];
-          await window.ClavisVoice?.speak?.(line, { unprompted: true });
-        }
-      } catch (_) {}
       sleep('no-reply');
     }, CHECK_IN_MS);
   }
@@ -202,6 +196,10 @@
   function busy(on, who = 'main') {
     const b = !!on;
     const key = String(who || 'main');
+    // A cancelled turn may finish after sleep() cleared its hold. Its finally
+    // block releases nothing and must not open a fresh paid microphone session.
+    if (!b && !holds.has(key)) return;
+    if (b && window.ClavisVoiceState && !window.ClavisVoiceState.isClavisWorkspace()) return;
     if (b) {
       clearTimeout(holds.get(key));
       holds.set(key, setTimeout(() => { if (holds.has(key)) busy(false, key); }, BUSY_MAX_MS));

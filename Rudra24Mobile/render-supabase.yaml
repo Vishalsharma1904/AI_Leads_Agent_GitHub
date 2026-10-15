@@ -1,0 +1,43 @@
+# Select this blueprint path in Render. This file does not provision a second DB.
+# Choose/approve the hosting plan in Render before deploying.
+services:
+  - type: web
+    name: rudra24-mobile-api
+    runtime: docker
+    plan: free
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    region: singapore
+    healthCheckPath: /health
+    autoDeployTrigger: off
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: CLAVIS_MANAGED_ACCESS
+        value: "true"
+      - key: DEVELOPER_EMAILS
+        value: vishalsharma190405@gmail.com
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTO_CREATE_SCHEMA
+        value: "false"
+      - key: PGOPTIONS
+        value: "-csearch_path=rudra_mobile_backend"
+      - key: PGSSLMODE
+        value: require
+      - key: CORS_ORIGINS
+        value: https://rudra24-ai.vercel.app
+      - key: SUPABASE_URL
+        value: https://lyqnxutvfoytbtnthcrw.supabase.co
+      - key: SUPABASE_PUBLISHABLE_KEY
+        value: sb_publishable_m5n1NZ2E6eikmgjWZ2eSAw_8c-_n2A8
+      - key: SUPABASE_REDIRECT_URL
+        value: ai.rudra24.mobile://auth/callback
+      - key: CREDENTIAL_MASTER_KEY
+        generateValue: true
+      - key: CLAVIS_ADMIN_EMAILS
+        value: vishalsharma190405@gmail.com
+      - key: CLAVIS_AUTO_INSTALL_BROWSER
+        value: "false"
+      - key: CLAVIS_WARM_KOKORO
+        value: "false"
