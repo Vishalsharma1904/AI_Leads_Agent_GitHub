@@ -31,7 +31,25 @@
     }).catch(() => {});
   }
 
+  // A source timeout with nothing saved retries ONCE on a smaller plan: at most
+  // three categories (the server spends ~60 s per category batch), same city.
+  const RETRYABLE = /timed out|time budget|source is unavailable|stopped updating|could not be completed/i;
+  const TOP_SECTORS = ['Corporate Offices', 'Hotels', 'Hospitals'];
   async function run(request, callbacks = {}) {
+    try { return await runOnce(request, callbacks); }
+    catch (error) {
+      const industries = (request.industries || []).filter(i => String(i).toUpperCase() !== 'ALL');
+      if (stopRequested || request._retried || !RETRYABLE.test(String(error?.message || error))) throw error;
+      const smaller = { ...request, _retried: true, industries: (industries.length ? industries : TOP_SECTORS).slice(0, 3),
+        sources: (request.sources || []).filter(s => s === 'maps' || s === 'apify') };
+      if (!smaller.sources.length) smaller.sources = ['maps', 'apify'];
+      callbacks.onLog?.('info', 'Source slow tha; chhote plan se dobara try kar raha hoon');
+      callbacks.onProgressDetails?.({ status: 'retrying', label: 'Source slow tha · chhote plan se dobara dhoondh raha hoon', leads: [], count: 0 });
+      return runOnce(smaller, callbacks);
+    }
+  }
+
+  async function runOnce(request, callbacks = {}) {
     activeJobId = null;
     stopRequested = false;
     activeOwner = window.SupabaseAuth?.getUser?.()?.id || null;
@@ -73,8 +91,7 @@
       const count = status.job?.result_count || 0;
       lastLeads = status.leads || lastLeads;
       const elapsedSeconds = Math.floor((Date.now()-startedAt)/1000);
-      const waiting = state === 'running' && elapsedSeconds >= 5 ? ` · ${elapsedSeconds}s elapsed` : '';
-      callbacks.onProgressDetails?.({ ...status.job?.progress, jobId, status: state, label: phaseLabel + waiting, count, leads:lastLeads, elapsedSeconds });
+      callbacks.onProgressDetails?.({ ...status.job?.progress, jobId, status: state, label: phaseLabel, count, leads:lastLeads, elapsedSeconds });
       if (stopRequested) {
         if (!status.leads?.length && ++stopPolls < 30) continue;
         activeJobId = null;

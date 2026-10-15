@@ -287,8 +287,7 @@ const RealScraper = (() => {
           const event = JSON.parse(line);
           accept(event.records);
           if (event.label) {
-            const elapsed = event.type === 'heartbeat' ? ` · ${event.elapsedSeconds}s elapsed` : '';
-            status(event.label + elapsed, 3, { phase: event.phase || 'websites',
+            status(event.label, 3, { phase: event.phase || 'websites',
               company: event.company, companyIndex: event.companyIndex, companyTotal: event.companyTotal });
           }
         };

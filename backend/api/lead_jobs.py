@@ -201,6 +201,25 @@ def _job_payload(job: LeadJob) -> dict[str, Any]:
             "created_at": job.created_at, "updated_at": job.updated_at}
 
 
+async def _gather_within(coros, timeout: float) -> list:
+    """Like gather(return_exceptions=True), but a time budget keeps what finished.
+
+    The old wait_for(gather(...)) threw away every finished search the moment the
+    slowest one overran, so a run with leads in hand still ended "failed".
+    Unfinished slots come back as asyncio.TimeoutError and are cancelled."""
+    tasks = [asyncio.ensure_future(c) for c in coros]
+    if not tasks: return []
+    _, pending = await asyncio.wait(tasks, timeout=timeout)
+    for task in pending: task.cancel()
+    if pending: await asyncio.wait(pending, timeout=2)
+    out = []
+    for task in tasks:
+        if task in pending or task.cancelled(): out.append(asyncio.TimeoutError())
+        elif task.exception() is not None: out.append(task.exception())
+        else: out.append(task.result())
+    return out
+
+
 async def _send_progress(callback, event):
     if callback:
         result = callback(event)
@@ -424,10 +443,13 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
                     return found
 
             job.error = "Searching public Maps listings"; job.updated_at = time.time(); db.commit()
-            source_timeout = max(90, min(240, 30 * math.ceil(len(search_queries) / 3)))
-            results = await asyncio.wait_for(asyncio.gather(
-                *(discover(search) for search in search_queries), return_exceptions=True), timeout=source_timeout)
+            # 3 at a time, 60 s each: budget = waves x 60 s (+ slack), capped at 4 min.
+            source_timeout = max(90, min(240, 65 * math.ceil(len(search_queries) / 3)))
+            results = await _gather_within([discover(search) for search in search_queries], source_timeout)
             for search, result in zip(search_queries, results):
+                if isinstance(result, asyncio.TimeoutError):
+                    provider_errors.append(f"Maps time budget reached ({search})")
+                    continue
                 if isinstance(result, Exception):
                     provider_errors.append(f"Scrapling ({search}): {str(result)[:180]}")
                     logger.warning("Scrapling lead source failed for %r: %s", search, result)
@@ -533,11 +555,19 @@ async def _run_apify(job_id: str, user_id: str, db_factory) -> None:
     except RuntimeError as exc:
         job.status, job.error = "failed", str(exc)[:300]
     except asyncio.TimeoutError:
-        job.status, job.error = "failed", "The browser lead source timed out. Narrow the category or area and retry."
+        job.status, job.error = "failed", "Lead sources timed out before returning contacts. Retrying with a smaller search usually works."
     except Exception as exc:
+        logger.exception("Lead job %s crashed", job_id)
         job.status, job.error = "failed", "Lead job could not be completed"
     finally:
-        job.updated_at = time.time(); db.commit(); db.close()
+        try:
+            # Contacts already saved are a result, not a failure.
+            if job.status == "failed":
+                saved = db.query(LeadRecord).filter_by(job_id=job_id, owner_user_id=user_id).count()
+                if saved: job.status, job.result_count, job.error = "partial", saved, None
+            job.updated_at = time.time(); db.commit()
+        finally:
+            db.close()
 
 
 def recover_stale_jobs(session_factory):
@@ -655,7 +685,7 @@ async def maps_search(req: MapsSearchRequest, db: Session = Depends(get_db),
     failures: list[str] = []
     for query, result in zip(req.queries, results):
         if isinstance(result, BaseException):
-            failures.append(str(result))
+            failures.append(str(result) or type(result).__name__)
             logger.warning("Maps search failed for %r: %s", query, result)
             continue
         for item in result:

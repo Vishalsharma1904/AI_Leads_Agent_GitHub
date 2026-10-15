@@ -38,6 +38,7 @@ const SUITES = [
   '../tests/assistant_context_selftest',
   '../tests/lead_spoken_request_selftest',
   '../tests/lead_client_scope_selftest',
+  '../tests/lead_job_retry_selftest',
   '../tests/app_guide_defaults_selftest',
   '../tests/intent_engine_selftest',
   '../tests/voice_entry_routing_test',

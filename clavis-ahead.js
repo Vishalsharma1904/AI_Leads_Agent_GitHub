@@ -42,7 +42,7 @@
   async function leadsDone(detail){
     record('leads',{taskId:detail.taskId,count:detail.leads?.length||detail.total||0,requested:detail.requested,stopped:!!detail.stopped,exported:!!detail.exported});
     const ticket=owner,leads=Array.isArray(detail.leads)?detail.leads:[],key='leads:'+String(detail.taskId||leads.map(l=>l.id||l.company).join('|'));
-    if(!detail.ok||!leads.length){offer({id:'search-needs-review',key,source:'Lead agent · Needs attention',label:detail.stopped?'Search stopped before any results arrived':'This search needs a review',description:detail.error?String(detail.error).slice(0,160):'No matching contactable records were returned. Review your current location, industry and provider status before retrying.',actions:[{label:'Review search',run:()=>route('agent')},{label:'Provider settings',run:()=>route('tokens')} ]},{force:true});return;}
+    if(!detail.ok||!leads.length){if(doc.querySelector?.('#clavis-task-surface.is-open'))return;offer({id:'search-needs-review',key,source:'Lead agent · Needs attention',label:detail.stopped?'Search stopped before any results arrived':'This search needs a review',description:detail.error?String(detail.error).slice(0,160):'No matching contactable records were returned. Review your current location, industry and provider status before retrying.',actions:[{label:'Review search',run:()=>route('agent')},{label:'Provider settings',run:()=>route('tokens')} ]},{force:true});return;}
     // Export only this task's rows, once. Never download the entire saved database.
     if(!detail.exported && !seen.has(key+':export')){seen.add(key+':export');try{detail.exported=!!global.RealScraper?.exportExcel?.(leads,`leads-${leads.length}`);}catch(_){detail.exported=false;}}
     if(ticket!==identity())return;

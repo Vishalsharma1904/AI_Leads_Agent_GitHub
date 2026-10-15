@@ -36,7 +36,7 @@
   var DRAG_KEY = 'clavis-task-pos';
   var MARGIN = 8;
 
-  var el = null, headerEl = null, bodyEl = null, footerEl = null, dotEl = null, labelEl = null, cancelEl = null;
+  var el = null, headerEl = null, bodyEl = null, footerEl = null, dotEl = null, labelEl = null, cancelEl = null, clockEl = null;
   var composerEl = null, composerInput = null, composerSendBtn = null, placeholderTimer = null;
   var attachmentsTray = null, fileInput = null, attachBtn = null;
   var currentAttachments = [];
@@ -199,6 +199,14 @@
     dotEl = el.querySelector('.cts-dot');
     labelEl = el.querySelector('.cts-head-label');
     cancelEl = el.querySelector('.cts-x');
+    clockEl = el.querySelector('.cts-clock');
+    if (!clockEl) {
+      clockEl = document.createElement('span');
+      clockEl.className = 'cts-clock';
+      clockEl.setAttribute('aria-hidden', 'true');
+      clockEl.hidden = true;
+      headerEl.insertBefore(clockEl, cancelEl);
+    }
 
     composerEl = el.querySelector('.cts-composer');
     composerInput = el.querySelector('.cts-composer-input');
@@ -316,16 +324,21 @@
   }
 
   /* Already-open window, content just changed: glide to the new box. */
-  function smoothResize(mutationFn) {
+  /* quiet = a live progress tick. Small changes (a longer status line, one
+     more stat) settle instantly at the old width — animating the clip on
+     every 1 s poll is what made the window blink. */
+  function smoothResize(mutationFn, quiet) {
     if (!el) { if (typeof mutationFn === 'function') mutationFn(); return; }
 
     var from = el.getBoundingClientRect();
     if (typeof mutationFn === 'function') mutationFn();
 
     var to = measure();
+    if (quiet && Math.abs(to.w - from.width) < 48) to.w = Math.round(from.width);
     cancelGeo();
     settle(to);
     if (reducedMotion() || !el.animate) return;
+    if (quiet && Math.abs(to.w - from.width) + Math.abs(to.h - from.height) < 40) return;
     var grows = to.w >= from.width - 1 && to.h >= from.height - 1;
     var travel = Math.abs(to.w - from.width) + Math.abs(to.h - from.height);
     if (travel < 2) return;
@@ -1846,15 +1859,29 @@
   var pendingTask = null;
 
   // Keep live text, buttons, scroll position and selection in the same DOM nodes.
+  function nodeKey(n) {
+    if (n.nodeType !== 1) return '#' + n.nodeType;
+    return n.tagName + '.' + ((n.classList && n.classList[0]) || '') + '@' + (n.getAttribute('data-action-id') || '');
+  }
   function reconcile(parent, next) {
     var desired = Array.from(next.childNodes);
     for (var i = 0; i < desired.length; i++) {
       var incoming = desired[i], current = parent.childNodes[i];
       if (!current) { parent.appendChild(incoming.cloneNode(true)); continue; }
-      var compatible = current.nodeType === incoming.nodeType &&
-        (current.nodeType !== 1 || (current.tagName === incoming.tagName &&
-          current.getAttribute('data-action-id') === incoming.getAttribute('data-action-id')));
-      if (!compatible) { parent.replaceChild(incoming.cloneNode(true), current); continue; }
+      var want = nodeKey(incoming);
+      if (nodeKey(current) !== want) {
+        // Same node further on? The ones in between were removed.
+        var j = i + 1;
+        while (j < parent.childNodes.length && nodeKey(parent.childNodes[j]) !== want) j++;
+        if (j < parent.childNodes.length) {
+          while (j-- > i) parent.removeChild(parent.childNodes[i]);
+          current = parent.childNodes[i];
+        } else {
+          // Genuinely new: insert it, keep the current node for the next slot.
+          parent.insertBefore(incoming.cloneNode(true), current);
+          continue;
+        }
+      }
       if (current.nodeType === 3) { if (current.nodeValue !== incoming.nodeValue) current.nodeValue = incoming.nodeValue; continue; }
       if (current.nodeType !== 1) continue;
       Array.from(current.attributes).forEach(function (a) { if (!incoming.hasAttribute(a.name)) current.removeAttribute(a.name); });
@@ -1903,6 +1930,7 @@
   }
 
   function paint(task) {
+    syncClock(task);
     if (!task) { hide(); return; }
     // A voice-only turn leaves the window exactly as it is — open with the
     // last result, or closed. No flash open, no flash closed.
@@ -1985,7 +2013,7 @@
     } else {
       // Already open: the content is being swapped underneath, so it
       // gets its own small entrance while the box glides to fit.
-      smoothResize(applyContent);
+      smoothResize(applyContent, task.phase === 'working' || task.phase === 'understanding' || task.phase === 'waiting');
       bodyEl.classList.remove('cts-enter');
     }
 
@@ -1994,14 +2022,39 @@
     // It closes on: the × , Esc, a click outside, or the next task.
   }
 
+  /* Elapsed time lives in its own header span on its own 1 s timer, so the
+     body never has to repaint just because a second passed. */
+  var clockTimer = 0, clockSince = 0;
+  function syncClock(task) {
+    if (!clockEl) return;
+    var live = task && task.startedAt && (task.phase === 'working' || task.phase === 'understanding');
+    if (!live) {
+      clearInterval(clockTimer); clockTimer = 0; clockSince = 0;
+      if (!clockEl.hidden) clockEl.hidden = true;
+      return;
+    }
+    if (clockSince === task.startedAt && clockTimer) return;
+    clockSince = task.startedAt;
+    clearInterval(clockTimer);
+    var tick = function () {
+      var s = Math.max(0, Math.floor((Date.now() - clockSince) / 1000));
+      var text = s < 3 ? '' : Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2);
+      if (clockEl.textContent !== text) clockEl.textContent = text;
+      var hide = !text;
+      if (clockEl.hidden !== hide) clockEl.hidden = hide;
+    };
+    tick();
+    clockTimer = setInterval(tick, 1000);
+  }
+
   function show() {
     if (!el) return;
     cancelGeo();
     cancelContentExit();
     var wasClosed = !el.classList.contains('is-open');
+    if (!wasClosed) return;   // same-value class/attr writes still fire observers + a style recalc
     el.classList.add('is-open');
     el.removeAttribute('aria-hidden');
-    if (!wasClosed) return;
     // Let the browser commit visibility before measuring, otherwise the
     // content reports zero and the window unfurls to nothing.
     requestAnimationFrame(function () { playOpen(); });
