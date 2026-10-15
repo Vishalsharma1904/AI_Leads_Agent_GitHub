@@ -8,7 +8,11 @@ const w={RealScraper:{isRunning:()=>false},ClavisTask:{current:()=>task,event(){
 const context=vm.createContext({window:w,document:new EventTarget(),setTimeout:fn=>fn(),addChatMessage(){},console,escHtml:s=>s,chatSuggestionHtml:()=>''});
 vm.runInContext(text.slice(start,end),context);
 context.runScrapeFromChat({cities:['Delhi'],industries:['ALL'],count:20});
-assert.ok(picker,'Client AI uses the same floating scope picker');assert.equal(launches.length,0,'first prompt does not dispatch');
+assert.equal(picker,undefined,'an explicit search uses saved/default buyer scope without interrupting voice');
+assert.equal(launches.length,1);assert.equal(launches[0].count,20);
+launches=[];
+context.runScrapeFromChat({cities:['Delhi'],industries:['ALL'],count:20,requireScope:true});
+assert.ok(picker,'explicit scope selection remains available');assert.equal(launches.length,0);
 picker.runner(picker.id,{...picker.action,industries:['Hotels','Hospitals']});
 assert.equal(launches.length,1);assert.deepEqual(Array.from(launches[0].industries),['Hotels','Hospitals']);
 launches=[];picker.runner(picker.id,{...picker.action,industries:['ALL']});

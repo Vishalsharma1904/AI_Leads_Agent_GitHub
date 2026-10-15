@@ -949,9 +949,7 @@
   var WANTS_MAP = /\b(map|maps|naksha|nakshe|naksa|location|locations|lokeshan)\b|मैप|नक्शा|नक्शे|लोकेशन/i;
 
   function needsLeadScope(action) {
-    return action && Array.isArray(action.industries) && action.industries.some(function (value) {
-      return String(value || '').trim().toUpperCase() === 'ALL';
-    });
+    return action?.requireScope === true;
   }
 
   function askLeadScope(id, action, rawQuery, runner) {

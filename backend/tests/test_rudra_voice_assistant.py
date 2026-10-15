@@ -111,6 +111,18 @@ class RudraVoiceAssistantChecks(unittest.TestCase):
         self.assertEqual(params["required"], ["n"])
         self.assertIsNone(el._assistant_params({"type": "object", "properties": {}}))
 
+    def test_agent_setup_network_failure_returns_recoverable_gateway_error(self):
+        import httpx
+        from fastapi import HTTPException
+        class Unreachable:
+            async def request(self, *args, **kwargs):
+                raise httpx.ReadTimeout('private-key-must-not-leak')
+        with self.assertRaises(HTTPException) as failure:
+            asyncio.run(el._xi(Unreachable(), 'private-key', 'POST', '/convai/tools', {}))
+        self.assertEqual(failure.exception.status_code, 502)
+        self.assertNotIn('private-key', str(failure.exception.detail))
+        self.assertIn('retry', str(failure.exception.detail).lower())
+
 
 if __name__ == "__main__":
     unittest.main()

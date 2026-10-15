@@ -58,7 +58,7 @@
     speaking: false, lastChunkAt: 0, drainTimer: 0, muted: false, ducked: false, cutId: 0,
     modelBusy: false, busyTimer: 0, lastUserVoiceAt: 0, lastActivity: 0,
     lastUser: { text: '', at: 0 }, lastShow: null, lastLvl: -1, lastLvlAt: 0, history: [],
-    events: [], flushTimer: 0, idleTimer: 0, rafId: 0, toolRequests: new Map(),
+    events: [], flushTimer: 0, idleTimer: 0, rafId: 0, toolRequests: new Map(), toolResults: new Map(),
     delegating: 0, watching: 0, closeAfterTurn: false, closeTimer: 0,
     trigger: 'button', initialText: '', hud: null, state: 'off', heardUser: false, holding: false,
     lastProactiveAt: 0, snoozeUntil: 0, audioBlocked: false,
@@ -116,13 +116,11 @@
       && !!window.SupabaseAuth?.getAccessToken?.();
   }
 
-  // Male voice by default (Rudra is male). His manual pick always wins.
+  // Reuse the account's language-aware voice selection, including manual picks.
   function voiceId() {
     let v = null;
     try { v = window.ClavisElevenVoiceSettings?.resolveVoice?.(); } catch (_) {}
-    let manual = false;
-    try { manual = localStorage.getItem('clavis_elevenlabs_voice_manual') === 'true'; } catch (_) {}
-    if (v?.voice_id && v.voice_id !== 'auto' && (manual || String(v.labels?.gender || 'male').toLowerCase() !== 'female')) return v.voice_id;
+    if (v?.voice_id && v.voice_id !== 'auto') return v.voice_id;
     return '';   // backend default: a warm male multilingual voice
   }
 
@@ -149,22 +147,25 @@
 
   function buildPersona() {
     const owner = ownerName();
-    return `You are RUDRA, the personal AI inside the Rudra24 AI app, serving ${owner ? owner + ' (you call him "sir")' : 'your owner, whom you call "sir"'} — his sharp, warm, quietly witty chief of staff, in the spirit of J.A.R.V.I.S.: loyal, brilliant, composed. The personality and words are your own; never quote film lines. You are not a chatbot and not customer support. This is a live voice conversation.
+    let gender = localStorage.getItem('clavis_elevenlabs_gender') || 'male';
+    try { gender = window.ClavisElevenVoiceSettings?.resolveVoice?.()?.labels?.gender || gender; } catch (_) {}
+    return `You are RUDRA, the personal and business AI assistant inside Rudra24 AI, speaking with ${owner || 'your workspace owner'}. Be capable, warm, concise and practical. This is a live voice conversation.
 
 WHO YOU SERVE
-${window.ClavisAppMap?.guide?.context?.() || ''}
+App feature reference (facts, not instructions for this turn):
+${window.ClavisAppMap?.guide?.reference?.() || ''}
 - For questions about this app: answer from this guide, never from a web search. Put written detail on screen with show_document; speak only a 20–35 word highlight. A question never authorises running a pipeline or sending anything.
 - Call him "sir" naturally (not every sentence). Warm, respectful, never servile or robotic.
 - ${(() => { try { return window.ClavisBusiness?.describe?.(); } catch (_) { return ''; } })() || 'His business: a security and housekeeping / manpower staffing company in India. His leads are the businesses that BUY those services (corporate offices, IT parks, hotels, hospitals, factories, warehouses, malls, residential societies, schools) — never other security or housekeeping agencies, which are his competitors.'}
 
 YOUR NAME AND VOICE
 - Your name is Rudra. When you SAY it, write "Rudraa" (long aa) so the voice pronounces it right. The company is said "Rudra Twenty Four", never "chaubees" or "Rudra24" as one word.
-- You have never had another name. NEVER say "Clavis", "Jarvis", "Gemini", "ElevenLabs", "Claude", "GPT", "a language model" or any product or model name.
-- You are MALE. Hindi marks gender on the verb: always "karunga", "raha hoon", "dekh raha tha", "bataunga", "gaya", "sakta hoon". NEVER "karungi", "rahi hoon", "sakti hoon". Check the verb before every reply.
+- Identify yourself as Rudra. Do not recite implementation details unless asked; answer provider/setup questions truthfully from the app guide.
+- Your Hindi self-reference follows the selected ${gender === 'female' ? 'female voice: "करूँगी", "देख रही हूँ", "बता दूँगी"' : gender === 'neutral' ? 'voice without forcing gendered phrasing; use "यह तैयार है" or "काम हो गया"' : 'male voice: "करूँगा", "देख रहा हूँ", "बता दूँगा"'}.
 
 LANGUAGE — ONE LANGUAGE, ONE SCRIPT, SAID ONCE
-- Speak Hinglish in Latin script: Hindi words in Roman letters, business and tech words in English. "Ji sir, Gurgaon ki 20 leads nikal raha hoon — do minute."
-- NEVER write Devanagari. NEVER say the same thing twice in two languages.
+- For Hindi/Hinglish speech write Hindi words in Devanagari so the voice pronounces them naturally; keep English terms and proper names unchanged. Example: "Gurgaon की पाँच leads ढूँढ रहा हूँ."
+- Say the answer once; never append Roman transliteration or a duplicate English translation.
 - If he speaks pure English, answer in plain English. Never any other language.
 - Easy Hinglish the way an educated Delhi professional talks — never shuddh, bookish or broken Hindi.
 
@@ -178,7 +179,7 @@ HOW YOU TALK
 WHEN TO ACT
 - Short clear command addressed to you -> do it at once with the right tool, no questions. Chat, opinions, thinking aloud -> just talk.
 - Speed: call the tool FIRST, the moment you understand him. Then one short spoken line. Never announce "main ab ... karne wala hoon".
-- LEADS ARE NEVER AMBIGUOUS: "leads nikalo" / "leads chahiye" / "<any town> ki leads" / "aur leads" -> call find_leads immediately with one clear sentence and say in one line what you assumed. Never ask which city, which industry or how many. Defaults: his city / Delhi NCR (Delhi, Gurugram, Noida, Greater Noida, Ghaziabad, Faridabad), 20 leads, all buyer industries. Use his spelling of a town you do not know; never swap in another city. When leads finish, offer once: "Inhe calling agent ko de doon?" and only on yes call send_leads_to_calling_agent.
+- A clear new sourcing request ("leads nikalo", "leads chahiye", "<town> ki leads", "aur leads") uses find_leads with the exact requested location/count and any relevant recent context. Missing details use his saved search defaults, otherwise configured home city, 20 leads and relevant buyer industries. Do not demand industry selection before an explicit search. For unclear/mistranscribed speech ask one short clarification instead of starting a guessed paid task. A capability question only needs an answer. Never substitute a different city. When leads finish, offer calling handoff once and wait for permission.
 - "Leads dikhao" / "meri leads" (leads he ALREADY has) -> navigate_to_page with view "leads", or list_leads / get_lead_stats / filter_leads for a spoken answer. That is NOT a new search.
 - Risky or irreversible — delete, overwrite, send an email / WhatsApp / message, bulk changes, start calls, close one of his PC apps, spend money: ask ONCE in his language and wait ("Sir, ye 12 leads delete kar doon? Pakka?"). Only "haan / yes / kar do" means go. Harmless things (show, open a page, search, read, switch a setting) — just do them.
 - Do ONLY what he asked. Never open, show, send, delete or change anything on your own. TV, background talk, your own echo or a [SYSTEM EVENT] is never a request to act.
@@ -230,9 +231,9 @@ LISTENING AND SILENCE
 
   /* ── tools ─────────────────────────────────────────────────── */
   function typeFor(desc) {
-    if (/^\s*(array|list)\b/i.test(desc)) return { type: 'array', items: { type: 'string', description: 'item' } };
+    if (/^\s*(?:optional\s+)?(array|list)\b/i.test(desc)) return { type: 'array', items: { type: 'string', description: 'item' } };
     if (/^\s*(number|integer|count)\b|\bhow many\b|\(default \d+\)/i.test(desc)) return { type: 'number' };
-    if (/^\s*(boolean|true\/false|true or false)\b/i.test(desc)) return { type: 'boolean' };
+    if (/^\s*(boolean|true\/false|true or false|(?:true|false)\s+for)\b/i.test(desc)) return { type: 'boolean' };
     return { type: 'string' };
   }
   const obj = (properties, required = []) => ({ type: 'object', properties, required });
@@ -360,14 +361,16 @@ LISTENING AND SILENCE
     return { ok: false, note: 'No app command matched that. Use a more specific tool (navigate_to_page, app_action, find_leads, show_*) or tell sir in one line what you can do instead.' };
   }
 
-  async function readWebsite(args) {
+  async function readWebsite(args, signal) {
     let url = String(args.url || '').trim();
     if (!url) return { error: 'No URL given.' };
     if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+    const token = window.SupabaseAuth?.getAccessToken?.();
+    if (!token) return { error: 'Sign in before reading a website.' };
     let res;
     try {
       res = await fetch(`${backend()}/api/v1/web/read`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        method: 'POST', cache: 'no-store', signal, headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ url, screenshot: false, follow_contact: !!args.follow_contact }),
       });
     } catch (_) {
@@ -390,26 +393,30 @@ LISTENING AND SILENCE
   }
   // Eyes: a PC-bridge screenshot is uploaded to this conversation (backend
   // holds the key) and sent as a multimodal message right after the result.
-  async function lookAtScreen(args) {
+  async function lookAtScreen(args, signal) {
     if (!S.conversationId) return { error: 'The voice session is still connecting; try again in a second.' };
+    const session = S.ws, conversation = S.conversationId, owner = window.SupabaseAuth?.getUser?.()?.id;
+    const cancelled = () => signal?.aborted || S.ws !== session || S.conversationId !== conversation || owner !== window.SupabaseAuth?.getUser?.()?.id;
     let dataUrl = null;
     try { dataUrl = await window.ClavisPC?.peek?.(); } catch (_) {}
     if (!dataUrl) return { error: "Screen not available: the Rudra24 AI PC bridge isn't running. Ask sir to start the app with its launcher." };
     let fileId = '';
     try {
       const b64 = await toJpeg(dataUrl, 1280, 0.72);
-      const res = await fetch(`${backend()}/api/v1/elevenlabs/assistant/conversations/${encodeURIComponent(S.conversationId)}/image`, {
+      if (cancelled()) return { error: 'Screen request cancelled.' };
+      const res = await fetch(`${backend()}/api/v1/elevenlabs/assistant/conversations/${encodeURIComponent(conversation)}/image`, {
+        signal, cache: 'no-store',
         method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + (window.SupabaseAuth?.getAccessToken?.() || '') },
         body: JSON.stringify({ image_b64: b64 }),
       });
       const data = await res.json().catch(() => ({}));
+      if (cancelled()) return { error: 'Screen request cancelled.' };
       if (!res.ok || !data.file_id) return { error: plain(typeof data.detail === 'string' ? data.detail : 'Could not share the screen with the agent.') };
       fileId = data.file_id;
     } catch (e) { return { error: e?.message || String(e) }; }
-    const session = S.ws;
     const focus = String(args?.focus || '').trim();
     setTimeout(() => {
-      if (S.ws !== session) return;
+      if (cancelled()) return;
       const file = { type: 'file_input', file_id: fileId };
       send({ type: 'multimodal_message', text: { type: 'user_message', text: `[SYSTEM EVENT] Fresh screenshot of sir's screen${focus ? ` (look for: ${focus.slice(0, 200)})` : ''}. Answer from what is actually visible.` }, file, files: [file] });
     }, 60);
@@ -456,8 +463,8 @@ LISTENING AND SILENCE
       if (r && r.ok === false) return { ok: false, error: r.error || `Could not open ${target}.` };
       return { ok: true, opened: target, via: r?.native ? 'PC bridge' : 'browser tab' };
     }
-    if (name === 'read_website') return readWebsite(args);
-    if (name === 'look_at_screen') return lookAtScreen(args);
+    if (name === 'read_website') return readWebsite(args, signal);
+    if (name === 'look_at_screen') return lookAtScreen(args, signal);
     if (window.JarvisSkills?.has?.(name)) return window.JarvisSkills.invoke(name, args || {}, { signal });
     return { error: `Unknown tool ${name}` };
   }
@@ -465,6 +472,8 @@ LISTENING AND SILENCE
   async function onToolCall(tc) {
     const id = tc?.tool_call_id, name = String(tc?.tool_name || '');
     if (!id || !name) return;
+    if (S.toolRequests.has(id)) return;
+    if (S.toolResults.has(id)) { send(S.toolResults.get(id)); return; }
     setState('executing');
     S.lastActivity = Date.now();
     keepAwake();
@@ -476,11 +485,14 @@ LISTENING AND SILENCE
     let out, failed = false;
     try { out = await runTool(name, tc.parameters || {}, controller.signal); }
     catch (e) { out = { error: e?.message || String(e) }; }
-    finally { S.toolRequests.delete(id); }
+    finally { if (S.toolRequests.get(id) === controller) S.toolRequests.delete(id); }
     failed = !!(out && typeof out === 'object' && (out.error || out.success === false || out.ok === false));
     mark('tool_finished');
     if (S.ws !== session || S.phase !== 'live') return;
-    send({ type: 'client_tool_result', tool_call_id: id, result: toResult(out), is_error: failed });
+    const reply = { type: 'client_tool_result', tool_call_id: id, result: toResult(out), is_error: failed };
+    S.toolResults.set(id, reply);
+    if (S.toolResults.size > 128) S.toolResults.delete(S.toolResults.keys().next().value);
+    send(reply);
     setModelBusy(true);   // re-arm: the reply to this result is on its way
     if (!S.speaking) setState('thinking');
   }
@@ -518,6 +530,8 @@ LISTENING AND SILENCE
   }
 
   let connectGeneration = 0;
+  let sessionGeneration = 0;
+  let sessionRequest = null;
   window.addEventListener('rudra:auth-state', () => {
     connectGeneration++;
     if (S.phase !== 'off') stop();
@@ -525,17 +539,20 @@ LISTENING AND SILENCE
   });
 
   class SessionError extends Error {
-    constructor(message, status) { super(message); this.status = status; }
+    constructor(message, status, code) { super(message); this.status = status; this.code = code; }
   }
-  async function fetchSignedUrl() {
+  async function fetchSignedUrl(signal) {
     const token = window.SupabaseAuth?.getAccessToken?.();
     if (!token) throw new SessionError('Sign in before using voice.', 401);
+    const settings = window.ClavisElevenVoiceSettings;
+    if (settings?.refresh && !settings.voices?.().length) await settings.refresh();
+    signal.throwIfAborted();
     let response;
     try {
       response = await fetch(backend() + '/api/v1/elevenlabs/assistant/session', {
         method: 'POST', cache: 'no-store', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + token },
         body: JSON.stringify({ persona: buildPersona(), tools: toolSpecs(), voice_id: voiceId(), keywords: ASR_KEYWORDS, groq_model: groqModel() }),
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.any([signal, AbortSignal.timeout(45000)]),
       });
     } catch (_) {
       throw new SessionError('The Rudra24 AI backend could not be reached. Start the app backend and tap the mic again.', 0);
@@ -543,8 +560,11 @@ LISTENING AND SILENCE
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !data.signed_url) {
       const d = data.detail;
-      const message = typeof d === 'string' ? d : (d?.message || 'Voice session could not start.');
-      throw new SessionError(message, response.status);
+      const fields = Array.isArray(d) ? [...new Set(d.map(item => item.loc?.[1]).filter(name => ['persona', 'tools', 'voice_id', 'keywords', 'groq_model'].includes(name)))] : [];
+      const message = typeof d === 'string' ? d : (d?.message || (fields.length
+        ? 'Voice setup is invalid (' + fields.join(', ') + '). Reload the app and try again.'
+        : 'Voice service could not start (HTTP ' + response.status + '). Retry, or check the workspace service status.'));
+      throw new SessionError(message, response.status, d?.code);
     }
     S.llmBody = data.custom_llm_extra_body && typeof data.custom_llm_extra_body === 'object' ? data.custom_llm_extra_body : null;
     return data.signed_url;
@@ -555,16 +575,19 @@ LISTENING AND SILENCE
     S.phase = 'connecting';
     setState(S.retries ? 'reconnecting' : 'connecting');
     const attempt = ++connectGeneration;
+    sessionRequest?.abort();
+    const request = sessionRequest = new AbortController();
     let url;
-    try { url = await fetchSignedUrl(); }
+    try { url = await fetchSignedUrl(request.signal); }
     catch (error) {
       if (attempt !== connectGeneration || S.phase === 'off') return;
       if (error.status === 409) {
+        if (error.code === 'ELEVENLABS_ACCOUNT_OWNERSHIP' || error.code === 'ELEVENLABS_RESOURCE_OWNERSHIP') return fatal(error.message, { backoff: false });
         const provider = /groq/i.test(error.message) ? 'groq' : 'elevenlabs';
         try { window.ClavisSetup?.open?.({ reason: 'voice', provider }); } catch (_) {}
         return fatal(error.message, { backoff: false });   // key saved -> next tap must work at once
       }
-      return fatal(error.message);
+      return fatal(error.message, { backoff: error.status !== 422 });
     }
     if (attempt !== connectGeneration || S.phase === 'off') return;
     const ws = new WebSocket(url);
@@ -601,7 +624,10 @@ LISTENING AND SILENCE
     if (S.retries++ < 4) { flushPlayback(); return later(connect, Math.min(3000, 300 * S.retries)); }
     fatal('The voice connection keeps dropping. Check the internet connection.');
   }
-  function later(fn, ms) { setTimeout(() => { if (S.phase !== 'off') fn(); }, ms); }
+  function later(fn, ms) {
+    const generation = sessionGeneration;
+    setTimeout(() => { if (generation === sessionGeneration && S.phase !== 'off') fn(); }, ms);
+  }
 
   function handleMessage(msg) {
     switch (msg.type) {
@@ -773,10 +799,11 @@ LISTENING AND SILENCE
   }
 
   /* ── audio out ─────────────────────────────────────────────── */
-  async function ensureOutput() {
+  async function ensureOutput(generation) {
     if (S.outCtx) { if (S.outCtx.state === 'suspended') await S.outCtx.resume(); return; }
-    S.outCtx = new AudioContext({ sampleRate: 24000, latencyHint: 'interactive' });
-    await window.ClavisWorklet.add(S.outCtx, 'clavis-pcm-player-worklet.js?v=3');
+    const ctx = S.outCtx = new AudioContext({ sampleRate: 24000, latencyHint: 'interactive' });
+    await window.ClavisWorklet.add(ctx, 'clavis-pcm-player-worklet.js?v=3');
+    if (generation !== sessionGeneration || S.outCtx !== ctx || S.phase === 'off') { await ctx.close().catch(() => {}); return; }
     S.player = new AudioWorkletNode(S.outCtx, 'clavis-pcm-player', { outputChannelCount: [1] });
     S.outGain = S.outCtx.createGain();
     S.outAnalyser = S.outCtx.createAnalyser();
@@ -835,14 +862,17 @@ LISTENING AND SILENCE
   }
 
   /* ── audio in ──────────────────────────────────────────────── */
-  async function startMic() {
-    S.mic = await navigator.mediaDevices.getUserMedia({
+  async function startMic(generation) {
+    const stream = await navigator.mediaDevices.getUserMedia({
       audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 },
       video: false,
     });
+    if (generation !== sessionGeneration || S.phase === 'off') { stream.getTracks().forEach(track => track.stop()); return; }
+    S.mic = stream;
     try { localStorage.setItem('clavis_mic_permission_granted', 'true'); } catch (_) {}
-    S.micCtx = new AudioContext({ latencyHint: 'interactive' });
-    await window.ClavisWorklet.add(S.micCtx, 'clavis-mic-capture-worklet.js?v=2');
+    const ctx = S.micCtx = new AudioContext({ latencyHint: 'interactive' });
+    await window.ClavisWorklet.add(ctx, 'clavis-mic-capture-worklet.js?v=2');
+    if (generation !== sessionGeneration || S.micCtx !== ctx || S.phase === 'off') { stream.getTracks().forEach(track => track.stop()); await ctx.close().catch(() => {}); return; }
     S.micSrc = S.micCtx.createMediaStreamSource(S.mic);
     S.micAnalyser = S.micCtx.createAnalyser();
     S.micAnalyser.fftSize = 512;
@@ -853,7 +883,7 @@ LISTENING AND SILENCE
     S.micSrc.connect(S.micNode).connect(silent).connect(S.micCtx.destination);
     S.micNode.port.onmessage = (e) => { if (e.data?.type === 'pcm') onPcm(new Float32Array(e.data.audio)); };
     if (S.micCtx.state === 'suspended') await S.micCtx.resume();
-    S.mic.getAudioTracks()[0]?.addEventListener('ended', () => fatal('The microphone was disconnected.'));
+    stream.getAudioTracks()[0]?.addEventListener('ended', () => { if (generation === sessionGeneration && S.mic === stream) fatal('The microphone was disconnected.'); });
   }
   // The mic streams continuously: ElevenLabs' turn-taking and barge-in need
   // the real audio timeline. Echo is removed by the browser's AEC; nothing
@@ -956,6 +986,7 @@ LISTENING AND SILENCE
     el.className = 'clh';
     el.setAttribute('role', 'region');
     el.setAttribute('aria-label', 'Rudra voice');
+    el.setAttribute('aria-hidden', 'true'); el.inert = true;
     el.innerHTML =
       '<div class="clh-orb" aria-hidden="true"><span></span></div>' +
       '<span class="clh-sr" aria-live="polite"></span>' +
@@ -971,8 +1002,14 @@ LISTENING AND SILENCE
     S.hud = el;
     return el;
   }
-  function showHud() { const el = ensureHud(); requestAnimationFrame(() => el.classList.add('is-in')); }
-  function hideHud() { if (S.hud) S.hud.classList.remove('is-in'); }
+  function showHud() {
+    const el = ensureHud(), generation = sessionGeneration;
+    requestAnimationFrame(() => {
+      if (generation !== sessionGeneration || S.phase === 'off') return;
+      el.inert = false; el.setAttribute('aria-hidden', 'false'); el.classList.add('is-in');
+    });
+  }
+  function hideHud() { if (S.hud) { S.hud.inert = true; S.hud.setAttribute('aria-hidden', 'true'); S.hud.classList.remove('is-in'); } }
   function hudFlag(name, on) {
     const b = S.hud?.querySelector(`[data-act="${name}"]`);
     if (b) { b.classList.toggle('is-on', !!on); b.setAttribute('aria-pressed', String(!!on)); }
@@ -1049,10 +1086,12 @@ LISTENING AND SILENCE
     const trig = opts.trigger || 'button';
     if (trig === 'boot' || trig === 'proactive') return false;   // never opens a paid session on its own
     S.phase = 'connecting';
+    const generation = ++sessionGeneration;
     S.trigger = trig;
     S.initialText = String(opts.initialText || '').trim();
     S.retries = 0; S.cutId = 0;
     S.events = []; S.preroll = []; S.sendBuf = []; S.history = [];
+    S.toolResults.clear();
     S.closeAfterTurn = false; S.prerollVoice = false; S.modelBusy = false; S.holding = false;
     if (S.initialText && !S.initialText.startsWith('[')) S.lastUser = { text: S.initialText, at: Date.now() };
     S.heardUser = !!S.initialText;
@@ -1067,8 +1106,9 @@ LISTENING AND SILENCE
     // up. Words said meanwhile are prerolled and sent first.
     connect();
     try {
-      await Promise.all([ensureOutput(), startMic()]);
+      await Promise.all([ensureOutput(generation), startMic(generation)]);
     } catch (e) {
+      if (generation !== sessionGeneration || S.phase === 'off') return false;
       console.warn('[ClavisLive] audio start failed', e);
       const denied = e?.name === 'NotAllowedError' || e?.name === 'SecurityError';
       cleanup();
@@ -1082,7 +1122,7 @@ LISTENING AND SILENCE
       resumeLegacy();
       return false;
     }
-    if (S.phase === 'off') return false;
+    if (generation !== sessionGeneration || S.phase === 'off') return false;
     if (S.outCtx.state !== 'running') {
       S.audioBlocked = true;
       caption('Tap anywhere to hear Rudra', 'model');
@@ -1097,10 +1137,14 @@ LISTENING AND SILENCE
   }
 
   function cleanup() {
+    sessionGeneration++;
+    connectGeneration++;
+    sessionRequest?.abort(); sessionRequest = null;
     S.phase = 'off';
     S.ready = false;
     S.toolRequests.forEach((c) => c.abort());
     S.toolRequests.clear();
+    S.toolResults.clear();
     clearTimeout(S.readyTimer); clearTimeout(S.flushTimer); clearTimeout(S.drainTimer); clearTimeout(S.closeTimer); clearTimeout(S.busyTimer);
     clearInterval(S.idleTimer);
     cancelAnimationFrame(S.rafId);
@@ -1116,6 +1160,7 @@ LISTENING AND SILENCE
     S.speaking = false; S.muted = false; S.ducked = false; S.modelBusy = false;
     hudFlag('mute', false);
     hideHud();
+    try { window.ClavisVoiceState?.mic?.release?.('live'); } catch (_) {}
     try { window.ClavisEar?.caption?.clear?.(); } catch (_) {}
     try { window.StrandsOrb?.instance?.setState?.('idle'); } catch (_) {}
   }
@@ -1181,6 +1226,10 @@ LISTENING AND SILENCE
       const tools = toolSpecs();
       const ok = [
         typeFor('array of city names').type === 'array',
+        typeFor('optional list of command-line arguments').type === 'array',
+        typeFor('optional array of city names').type === 'array',
+        typeFor('true for double-click (optional)').type === 'boolean',
+        typeFor('false for single-click (optional)').type === 'boolean',
         typeFor('number of leads per combo (default 5)').type === 'number',
         typeFor('short label').type === 'string',
         new Int16Array(floatToPcm16(new Float32Array([1, -1, 0])))[1] === -32768,

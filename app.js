@@ -3014,8 +3014,7 @@ async function handleChatSend(textOverride, options = {}) {
         status?.remove();
         if (response.text) addChatMessage('assistant', `<p>${escHtml(response.text).replace(/\\n/g, '<br>')}</p>`);
         const activeTask = window.ClavisTask?.current?.();
-        const broadBuyerAsk = response.action.industries?.some?.(value => String(value || '').toUpperCase() === 'ALL');
-        if (broadBuyerAsk && activeTask && window.ClavisTask?.requestLeadScope) {
+        if (response.action.requireScope === true && activeTask && window.ClavisTask?.requestLeadScope) {
           window.ClavisTask.requestLeadScope(activeTask.id, response.action, text, (_id, scopedAction) => runScrapeFromChat(scopedAction));
         } else {
           runScrapeFromChat(response.action);
@@ -3262,7 +3261,7 @@ function runScrapeFromChat(action, existingStatus) {
     ? action.cities
     : (window.LeadCandidateDomain?.expandLocations(window.AgentCtrl?.getDefaults?.().locations || ['Delhi NCR']) || ['Delhi']);
   let industries = (action.industries && action.industries.length) ? action.industries : null;
-  if (!action._leadScopeConfirmed && (!industries || industries.some(value => /^all$/i.test(String(value).trim()))) && window.ClavisTask?.requestLeadScope) {
+  if (action.requireScope === true && !action._leadScopeConfirmed && window.ClavisTask?.requestLeadScope) {
     const task = window.ClavisTask.current();
     if (task) {
       task.display = 'window';

@@ -16,10 +16,10 @@ async function test() {
   assert.equal(tools.length,0);
   assert.equal(response.toolsRun.length,0);
   assert.match(response.text,/Public business data/);
-  assert.equal(requests[0].max_tokens,260);
+  assert.ok(requests[0].max_tokens >= 512 && requests[0].max_tokens <= 1200, 'A bounded answer budget must leave room for visible output after model reasoning');
   const before=requests.length;
   await w.JarvisEngine.sendMessage('Explain in more detail: '+question,null,()=>{},null,{source:'composer',answerOnly:true,elaborate:true});
-  assert.equal(requests[before].max_tokens,900);
+  assert.ok(requests[before].max_tokens >= requests[0].max_tokens && requests[before].max_tokens <= 1600, 'Elaboration has at least the normal bounded budget');
   // Saved account counts may use the narrow read-only allowlist.
   answers=['|||TOOL:{"skill":"get_lead_stats","params":{}}|||','You have four saved leads.'];
   await w.JarvisEngine.sendMessage('How many saved leads do I have?',null,()=>{},null,{source:'composer'});

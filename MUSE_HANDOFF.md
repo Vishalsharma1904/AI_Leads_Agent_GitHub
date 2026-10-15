@@ -2,6 +2,8 @@
 
 Continue this existing application; do not replace the Vanilla JS interface or remove working voice, account isolation or provider setup.
 
+- Latest repair: `docs/voice-assistant-repair-2026-10-15.md`. Shared lead parsing now handles English “fetch me” and spoken counts; explicit searches use defaults without a mandatory industry picker. Native Jarvis tool calls execute with standard result envelopes and input validation. Selected conversation restoration, streamed voice statistics and live Hindi/provider selection are repaired. Voice startup/reconnect/Stop paths discard stale asynchronous work; web reads carry account authorization. Review the report's live activation blockers before describing the app as deployed or working on another laptop.
+
 - Root app: `index.html`, `app.js`, `auth-antigravity.js`, `supabase-auth.js`; Electron desktop in `electron/`; separate mobile product in `Rudra24Mobile/`.
 - Current voice stack prioritizes ElevenLabs STT/TTS/realtime and Groq intelligence. Trace `clavis-live.js`, `clavis-voice.js`, `clavis-elevenlabs-stt.js` and `backend/api/elevenlabs.py` before changing routing. The older overview in `AGENTS.md` predates these changes.
 - Authentication is Supabase, not the old local-password mechanism. Desktop Google sign-in opens the default browser's account chooser. The loopback server hands a one-use code back to the app; Supabase exchanges it using the app's PKCE verifier. No email hint filters the account chooser.

@@ -161,7 +161,8 @@ def _ownership_conflict(kind):
     if kind == "account":
         return HTTPException(409, {"code": "ELEVENLABS_ACCOUNT_OWNERSHIP", "message":
             "This ElevenLabs account is connected to another app account. Sign in to the original app account, "
-            "or connect a separate ElevenLabs account in Setup. Changing the API key of the same ElevenLabs account does not transfer ownership."})
+            "or ask the workspace owner to configure shared ElevenLabs access and assign your user in the Developer Panel. "
+            "A separate ElevenLabs account can also be connected in Setup. Replacing a key from the same provider account does not transfer ownership."})
     return HTTPException(409, {"code": "ELEVENLABS_RESOURCE_OWNERSHIP", "message":
         "This ElevenLabs resource is already connected to another app account. Choose a resource belonging to this account."})
 
@@ -1187,9 +1188,15 @@ def _digest(value):
 
 
 async def _xi(client, key, method, path, payload=None):
-    response = await client.request(method, BASE_URL + path, headers={"xi-api-key": key}, json=payload)
-    _check_response(response)
-    return response.json() if response.content else {}
+    try:
+        response = await client.request(method, BASE_URL + path, headers={"xi-api-key": key}, json=payload)
+        _check_response(response)
+        data = response.json() if response.content else {}
+        if not isinstance(data, dict):
+            raise ValueError("Invalid provider response")
+        return data
+    except (httpx.HTTPError, ValueError):
+        raise HTTPException(502, "ElevenLabs voice setup could not be completed. Check connectivity and retry.") from None
 
 
 async def _sync_assistant(req, user, db):

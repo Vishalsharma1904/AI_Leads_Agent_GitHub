@@ -141,7 +141,8 @@ check('Rudra24 AI distinguishes saved leads from sourcing and retains new-search
   jv.includes('DISTINGUISH VIEW FROM SEARCH') && jv.includes('requested count, else 20') && jv.includes('else Gurugram'));
 check('Rudra24 AI offers the calling agent once the leads are in',
   jv.includes('After a confirmed new batch offer its calling handoff once'));
-check('the realtime voice brain says the same', read('clavis-live.js').includes('LEADS ARE NEVER AMBIGUOUS'));
+check('the realtime voice brain uses exact requests, saved defaults and clarification for unclear speech',
+  read('clavis-live.js').includes('exact requested location/count') && read('clavis-live.js').includes('unclear/mistranscribed speech'));
 
 // ── listening speed ───────────────────────────────────────────────────────
 const vs = read('clavis-voice-state.js');

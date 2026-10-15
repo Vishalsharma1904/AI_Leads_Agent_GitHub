@@ -13,7 +13,7 @@ services:
     runtime: docker
     dockerfilePath: ./backend/Dockerfile
     dockerContext: ./backend
-    plan: starter           # free tier sleeps; a sleeping API looks like a broken app
+    plan: free              # $0 preview; sleeps when idle. Choose an always-on plan explicitly before customer rollout.
     region: singapore       # closest to India
     healthCheckPath: /health
     autoDeploy: false       # deploy when you say so, not on every push

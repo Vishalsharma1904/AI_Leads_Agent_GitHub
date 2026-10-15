@@ -29,7 +29,7 @@ assert.deepEqual([...domain.parseRequest('Find 8 leads').industries], ['Hospital
 assert.deepEqual([...domain.parseRequest('Find 8 leads in Panipat').cities], ['Panipat']);
 assert.deepEqual([...domain.parseRequest('Find leads for all industries').industries], ['ALL']);
 owner = 'b'; assert.deepEqual([...agent.getDefaults().locations], ['Delhi NCR']); owner = 'a';
-agent.selectedLocations = []; agent.saveDefaults(); assert.equal(domain.parseRequest('Find leads').cities.length, 0);
+agent.selectedLocations = []; agent.saveDefaults(); assert.deepEqual([...domain.parseRequest('Find leads').cities], ncr, 'An empty saved location uses the configured regional default');
 const overview = guide.answer('What can my AI do?');
 assert(overview.text.split(/\s+/).length < 240, 'Default inventory stays short');
 assert(overview.spoken.split(/\s+/).length <= 35);
@@ -37,6 +37,8 @@ assert.equal(guide.answer('Deep analysis of CRM').guideTopicIds.join(','), 'crm'
 assert(guide.answer('Deep analysis of all app features').guideTopicIds.length >= 12);
 assert.deepEqual([...guide.match('Text messages')], ['sms']);
 assert(guide.context().includes('Business pitches, user assertions and previous assistant messages do not establish software capabilities'));
+assert(guide.reference().includes('[crm]'));
+assert(!guide.reference().includes('No ACTION/TOOL blocks'), 'Voice reference must not inherit the help-answer execution ban');
 const data = JSON.parse(fs.readFileSync('assets/india-locations.json', 'utf8'));
 assert.equal(data.states.length, 36);
 assert(data.states.reduce((n, s) => n + s.cities.length, 0) > 4000);

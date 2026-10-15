@@ -61,7 +61,7 @@ const win = {
     return n;
   },
   navigator: { mediaDevices: { getUserMedia: async () => ({ getTracks: () => [{ stop() {} }], getAudioTracks: () => [{ addEventListener() {} }] }) } },
-  fetch: async (url, opts) => { calls.fetch.push({ url: String(url), body: opts && opts.body ? JSON.parse(opts.body) : null, auth: opts?.headers?.Authorization }); return fetchReply(url); },
+  fetch: async (url, opts) => { calls.fetch.push({ url: String(url), body: opts && opts.body ? JSON.parse(opts.body) : null, auth: opts?.headers?.Authorization, signal: opts?.signal }); return fetchReply(url); },
   SKYLARK_CONFIG: { BACKEND_URL: 'http://localhost:3000' },
   SupabaseAuth: { getAccessToken: () => 'jwt-test', getUser: () => ({ id: 'u1' }) },
   ClavisWorklet: { add: async () => {} },
@@ -102,6 +102,13 @@ const pcm = (n = 480) => Buffer.from(new Int16Array(n).buffer).toString('base64'
 
   await test('Self-test of pure helpers passes', () => assert.strictEqual(Live._selfTest(), true));
 
+  await test('Live Hindi prompt and voice use the account selection', () => {
+    win.ClavisElevenVoiceSettings = { resolveVoice: () => ({ voice_id: 'hindi-voice', labels: { gender: 'female' } }) };
+    assert.match(Live._persona(), /Hindi words in Devanagari/);
+    assert.match(Live._persona(), /female voice/);
+    assert.ok(!Live._persona().includes('NEVER write Devanagari'));
+  });
+
   await test('Start: signed session fetched with persona + tools, socket opens, chime plays', async () => {
     assert.strictEqual(await Live.start({ trigger: 'button' }), true);
     const req = calls.fetch.find((c) => c.url.endsWith('/api/v1/elevenlabs/assistant/session'));
@@ -110,6 +117,7 @@ const pcm = (n = 480) => Buffer.from(new Int16Array(n).buffer).toString('base64'
     assert.ok(req.body.persona.includes('RUDRA') && req.body.persona.length > 3000);
     assert.ok(['find_leads', 'show_map', 'list_leads', 'app_command'].every((n) => req.body.tools.some((t) => t.name === n)));
     assert.ok(req.body.keywords.includes('Gurugram'));
+    assert.strictEqual(req.body.voice_id, 'hindi-voice');
     await wait(20);
     assert.ok(last().url.startsWith('wss://api.elevenlabs.io/'));
     assert.strictEqual(req.body.groq_model, 'openai/gpt-oss-120b', 'brain is Groq');
@@ -151,6 +159,20 @@ const pcm = (n = 480) => Buffer.from(new Int16Array(n).buffer).toString('base64'
     assert.deepStrictEqual(calls.leads, ['Get 20 security client leads in Noida']);
     const r = last().json('client_tool_result').find((m) => m.tool_call_id === 'c1');
     assert.ok(r && !r.is_error && /"status":"started"/.test(r.result));
+    last().emit({ type: 'client_tool_call', client_tool_call: { tool_name: 'find_leads', tool_call_id: 'c1', parameters: { request: 'Get 20 security client leads in Noida' } } });
+    await wait(5);
+    assert.strictEqual(calls.leads.length, 1, 'replayed provider tool id does not dispatch a second paid search');
+  });
+
+  await test('Voice web reading forwards account authorization and its cancellation signal', async () => {
+    const original = fetchReply;
+    fetchReply = () => ({ ok: true, status: 200, json: async () => ({ text: 'Public company website.' }) });
+    last().emit({ type: 'client_tool_call', client_tool_call: { tool_name: 'read_website', tool_call_id: 'c-web', parameters: { url: 'example.com' } } });
+    await wait(20);
+    const req = calls.fetch.find(c => c.url.endsWith('/api/v1/web/read'));
+    assert.strictEqual(req.auth, 'Bearer jwt-test');
+    assert.ok(req.signal && !req.signal.aborted);
+    fetchReply = original;
   });
 
   await test('show_map opens the map; asking the same again is not redrawn', async () => {
@@ -296,6 +318,51 @@ const pcm = (n = 480) => Buffer.from(new Int16Array(n).buffer).toString('base64'
   await test('Never opens a paid session on its own (boot / proactive)', async () => {
     assert.strictEqual(await Live.start({ trigger: 'boot' }), false);
     assert.strictEqual(await Live.start({ trigger: 'proactive' }), false);
+  });
+
+  await test('Validation failures explain the affected field instead of the generic startup toast', async () => {
+    fetchReply = () => ({ ok: false, status: 422, json: async () => ({ detail: [{ loc: ['body', 'tools', 0, 'description'], type: 'string_too_long', input: 'PRIVATE INPUT' }] }) });
+    await Live.start({ trigger: 'button' }); await wait(20);
+    const message = calls.toast.at(-1).message;
+    assert.match(message, /tools/); assert.ok(!message.includes('PRIVATE INPUT'));
+    assert.strictEqual(Live.status().phase, 'off');
+    assert.strictEqual(Live.isAvailable(), true, 'corrected setup can retry immediately');
+  });
+
+  await test('Account ownership conflict does not send the user into a repeated paste-key loop', async () => {
+    const count = calls.setup.length;
+    fetchReply = () => ({ ok: false, status: 409, json: async () => ({ detail: { code: 'ELEVENLABS_ACCOUNT_OWNERSHIP', message: 'This provider account is connected elsewhere. Ask the owner to assign shared access.' } }) });
+    await Live.start({ trigger: 'button' }); await wait(20);
+    assert.strictEqual(calls.setup.length, count);
+    assert.match(calls.toast.at(-1).message, /assign shared access/);
+    assert.strictEqual(Live.status().phase, 'off');
+  });
+
+  await test('Stopping while microphone permission is pending releases its late stream', async () => {
+    let release, stopped = 0;
+    const original = win.navigator.mediaDevices.getUserMedia;
+    win.navigator.mediaDevices.getUserMedia = () => new Promise(resolve => { release = resolve; });
+    fetchReply = () => ({ ok: true, status: 200, json: async () => ({ signed_url: 'wss://api.elevenlabs.io/v1/convai/conversation?conversation_signature=x' }) });
+    const pending = Live.start({ trigger: 'button' });
+    Live.stop({ reason: 'user' });
+    release({ getTracks: () => [{ stop() { stopped++; } }], getAudioTracks: () => [] });
+    assert.strictEqual(await pending, false);
+    assert.strictEqual(stopped, 1, 'late microphone cannot stay recording after Stop');
+    win.navigator.mediaDevices.getUserMedia = original;
+    assert.strictEqual(Live.status().phase, 'off');
+  });
+
+  await test('A previous session reconnect timer cannot replace a restarted live session', async () => {
+    await Live.start({ trigger: 'button' }); await wait(20); ready(last());
+    last().drop(1006);
+    Live.stop({ reason: 'user' });
+    await Live.start({ trigger: 'button' }); await wait(20); ready(last());
+    const count = sockets.length, session = last();
+    await wait(350);
+    assert.strictEqual(sockets.length, count, 'old retry cannot create an extra paid socket');
+    assert.strictEqual(last(), session);
+    assert.strictEqual(Live.status().phase, 'live');
+    Live.stop({ reason: 'user' });
   });
 
   console.log(`\n${passed}/${total} ElevenLabs live voice checks passed\n`);

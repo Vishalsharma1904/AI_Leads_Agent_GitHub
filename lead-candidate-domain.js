@@ -75,6 +75,8 @@
   var LEAD_ACTION_CUES = /\b(find|get|search|generate|nikalo|nikaal|dhundho|chahiye|chahie|laao|source|extract|scrape|pull|do|dedo|de\s*do|bhejo|lao|nikal|nikalwao|banao|chahiye)\b/i;
   var CANDIDATE_CUES = /\b(candidate|candidates|resume|resumes|cv|talent|applicant|job seeker|hire|hiring|recruit)\b/i;
   var GENERIC_REQUIREMENT_CUES = /\b(requirement|requirements|staff|manpower|service|services|vendor|outsourc|hiring)\b/i;
+  var NUMBER_WORDS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,hundred:100};
+  var NUMBER_PATTERN = Object.keys(NUMBER_WORDS).join('|');
 
   function levenshtein(a, b) {
     if (!a || !b) return (a || b).length;
@@ -125,7 +127,16 @@
   ];
 
   function extractCities(text) {
-    var lower = normalise(text);
+    // English "fetch me" is a pronoun, not the Hindi location marker "me".
+    var lower = normalise(text).replace(/\b(?:fetch|give|find|get|send|show|bring)\s+me\b/g, '');
+    // "Leads for Garziba" names a place; "for solar services in Noida"
+    // names the buyer need before its explicit location. Keep those separate.
+    var forPlace = lower.match(/\bleads?\s+for\s+(.+?)(?=[.!?;]|$)/);
+    if (forPlace && !/\b(?:in|at|near|from)\s+/.test(lower)
+        && !/\b(?:all|every|any|industr(?:y|ies)|services?|staff|manpower|vendors?|buyers?)\b/.test(forPlace[1])
+        && !extractIndustries(forPlace[1], []).length && !ROLE_ALIASES.some(function (pair) {
+          return new RegExp('\\b(?:' + pair[0] + ')\\b', 'i').test(forPlace[1]);
+        })) lower = lower.replace(/\bleads?\s+for\b/, 'leads in');
     // Whole words only ("colonies" is not Loni), longest alias first, and a
     // matched span is blanked so "noida extension" does not also give Noida.
     var rest = ' ' + lower + ' ';
@@ -148,7 +159,7 @@
       if (paired || states.some(function (s) { return normalise(s.name) === phrase; })) { qualified.push(phrase); continue; }
       phrase.split(/\s+(?:aur|and)\s+|,/).forEach(function (part) {
         part = part.trim();
-        if (part && /[a-z]/.test(part) && part.split(/\s+/).length <= 6 && !/\b(leads?|companies|hotels?|hospitals?|chahiye|chahie|nikalo|please|number|email|ncr|mmr|tricity)\b/.test(part)) qualified.push(part);
+        if (part && /[a-z]/.test(part) && part.split(/\s+/).length <= 6 && !/\b(leads?|companies|hotels?|hospitals?|chahiye|chahie|nikalo|please|fetch|give|find|get|send|show|bring|number|email|ncr|mmr|tricity)\b/.test(part)) qualified.push(part);
       });
     }
     qualified.sort(function (a, b) { return b.length - a.length; }).forEach(function (phrase) {
@@ -198,8 +209,8 @@
     // place name and trust the user's own word for it, instead of quietly
     // substituting a default city that was never asked for.
     if (!found.length) {
-      var stopWord = /^(lead|leads|company|companies|client|clients|prospect|prospects|candidate|candidates|data|chahiye|chahie|nikalo|nikaal|dhundho|do|dedo|mujhe|hume|humko|please|plz|record|records|number|numbers|contact|contacts|se|ka|ki|ke|mein|me|mai|in|at|near|from|the|a|an)$/i;
-      var markerRe = /\b([a-z][a-z\s]{1,24}?)\s+(?:ka|ki|ke|mein|me|mai|se)\b|\b(?:in|at|near|from)\s+([a-z][a-z\s]{1,24}?)(?=[\s,.!?]|$)/gi;
+      var stopWord = /^(lead|leads|company|companies|client|clients|prospect|prospects|candidate|candidates|data|chahiye|chahie|nikalo|nikaal|dhundho|do|dedo|mujhe|hume|humko|please|plz|record|records|number|numbers|contact|contacts|fetch|give|find|get|send|show|bring|se|ka|ki|ke|mein|me|mai|in|at|near|from|for|the|a|an)$/i;
+      var markerRe = /\b([a-z][a-z\s-]{1,40}?)\s+(?:ka|ki|ke|mein|me|mai|se)\b|\b(?:in|at|near|from)\s+([a-z][a-z\s-]{1,60}?)(?=\s+(?:for|with|and|ka|ki|ke|mein|me|mai|se|leads?|companies|clients?|chahiye|nikalo)\b|[,.!?]|$)/gi;
       var mm;
       while ((mm = markerRe.exec(lower)) !== null) {
         var phrase = (mm[1] || mm[2] || '').trim();
@@ -225,12 +236,15 @@
        "security supervisors". The result is a search term, never a claim. */
     var free = lower.match(/(?:find|get|search|source|for|need|needs|requirement(?:s)?|staff|manpower|role)\s+(?:me\s+)?(?:of\s+)?([a-z][a-z0-9 &\/-]{2,42}?)(?=\s+(?:in|at|near|from|for)\b|$)/i);
     if (free && free[1]) {
-      var candidate = free[1].replace(/\b(leads?|companies|candidates?)\b/ig, '').trim();
+      var candidate = free[1].replace(/\b(leads?|companies|candidates?)\b/ig, '').trim()
+        .replace(new RegExp('^(?:(?:\\d+|' + NUMBER_PATTERN + ')(?:[ -]+|$))+'), '').trim();
+      if (/^for\s/i.test(free[0]) && extractCities(text).some(function (city) { return normalise(city) === normalise(candidate); })) return unique(roles);
       var parts = candidate.split(/\s+and\s+|,|\/|\+/);
       parts.forEach(function (part) {
         var p = part.trim();
         if (p && !/\b(area|city|location|this|these|those)\b/i.test(p)
-          && !/^(all|any|some|more|new|relevant|me)$/i.test(p)) {
+          && !/^(all|any|some|more|new|relevant|me)(?:\s+industr(?:y|ies))?$/i.test(p)
+          && !/^(?:hotels?|hospitals?|schools?|colleges?|restaurants?|factories|warehouses?|offices?)$/i.test(p)) {
           // If part matched an alias already, don't duplicate
           var matchedAlias = false;
           ROLE_ALIASES.forEach(function (pair) {
@@ -277,9 +291,17 @@
   }
 
   function extractCount(text, fallback) {
-    var match = normalise(text).match(/\b(\d{1,4})\s*(?:\+\s*)?(?:leads?|prospects?|companies|clients?|candidates?|records?|people|persons?)\b/)
-      || normalise(text).replace(/\b(?:sector|phase|block|pin|pincode)\s*[-:]?\s*\d+\b/g, '').match(/\b(\d{1,4})\b/);
-    var raw = match ? parseInt(match[1], 10) : parseInt(fallback, 10);
+    var units = '(?:leads?|prospects?|companies|clients?|candidates?|records?|people|persons?|hotels?|hospitals?|schools?|colleges?|restaurants?|factories|warehouses?|offices?)';
+    var match = normalise(text).match(new RegExp('\\b(\\d{1,4})\\s*(?:\\+\\s*)?' + units + '\\b'));
+    var raw = match ? parseInt(match[1], 10) : NaN;
+    if (!match) {
+      var spoken = normalise(text).match(new RegExp('\\b((?:' + NUMBER_PATTERN + ')(?:[ -]+(?:' + NUMBER_PATTERN + '))?)\\s+(?:(?!(?:' + NUMBER_PATTERN + '|in|at|near|from|for|with|and)\\b)[a-z-]+\\s+){0,3}' + units + '\\b'));
+      if (spoken) raw = spoken[1].split(/[ -]+/).reduce(function (total, word) { return word === 'hundred' ? Math.max(1, total) * 100 : total + NUMBER_WORDS[word]; }, 0);
+    }
+    if (!Number.isFinite(raw)) {
+      match = normalise(text).replace(/\b(?:sector|phase|block|pin|pincode)\s*[-:]?\s*\d+\b/g, '').match(/\b(\d{1,4})\b/);
+      raw = match ? parseInt(match[1], 10) : parseInt(fallback, 10);
+    }
     return Math.max(1, Math.min(100, Number.isFinite(raw) ? raw : 20));
   }
 
